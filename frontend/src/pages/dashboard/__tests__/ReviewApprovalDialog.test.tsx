@@ -184,6 +184,56 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
     expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
   });
 
+  it(
+    "does NOT call onOpenChange(false) while the standing-approval wizard is open",
+    async () => {
+      setupMocks();
+      const approval = makeApproval();
+      const onOpenChange = vi.fn();
+
+      mockPost.mockResolvedValueOnce({
+        data: {
+          approval_id: approval.approval_id,
+          status: "approved",
+          approved_at: new Date().toISOString(),
+          confirmation_code: "ABC-123",
+          execution_status: "success",
+          execution_result: null,
+        },
+      });
+
+      const user = userEvent.setup();
+
+      render(
+        <ReviewApprovalDialog
+          approval={approval}
+          agentDisplayName="Test Bot"
+          open={true}
+          onOpenChange={onOpenChange}
+        />,
+        { wrapper },
+      );
+
+      await waitFor(() => {
+        expect(screen.getByText("Always allow this action")).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByText("Always allow this action"));
+
+      await waitFor(() => {
+        expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
+      });
+
+      // Parent auto-close is SUCCESS_AUTO_CLOSE_MS (3000); if a regression schedules it
+      // while the wizard is open, this would fire too early. Real timers avoid RTL waitFor
+      // hanging under vi.useFakeTimers().
+      await new Promise((r) => setTimeout(r, 3_100));
+
+      expect(onOpenChange).not.toHaveBeenCalledWith(false);
+    },
+    10_000,
+  );
+
   it("does NOT open standing approval wizard when execution fails after 'Always Allow'", async () => {
     setupMocks();
     const approval = makeApproval();
