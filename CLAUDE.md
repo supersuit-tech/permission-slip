@@ -6,6 +6,7 @@
 - Always ask for permission before writing any code.
 - Do not git push without confirming first
 - After making the first commit on a branch, automatically create a pull request using `gh pr create`. Use a concise title and include a descriptive body with a summary and test plan. For subsequent commits, push to the existing PR branch.
+- **Never open draft PRs.** Always open PRs as ready for review.
 - When suggesting a PR body that includes a checklist, **split the checklist into two sections** based on who should handle each item:
   - `### Claude Code` — items that Claude Code can address autonomously (e.g., add tests, fix lint, update docs, add error handling, run checks). The `/watch` command will pick these up and check them off.
   - `### Manual Testing` — items that require manual verification, design review, or hands-on testing that Claude Code can't perform.
