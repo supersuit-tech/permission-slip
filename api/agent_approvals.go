@@ -294,7 +294,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 
 		// Update agent's last_active_at (best-effort).
 		if err := db.TouchAgentLastActive(r.Context(), deps.DB, agent.AgentID); err != nil {
-			log.Printf("agent_approvals: failed to update last_active_at for agent %d: %v", agent.AgentID, err)
+			log.Printf("[%s] AgentRequestApproval: failed to update last_active_at for agent %d: %v", TraceID(r.Context()), agent.AgentID, err)
 		}
 
 		// Fire notification to approver (best-effort, async).

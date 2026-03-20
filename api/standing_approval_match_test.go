@@ -113,7 +113,9 @@ func TestRequestApproval_NoStandingApproval_CreatesPending(t *testing.T) {
 	}
 
 	var resp agentRequestApprovalResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
 	if resp.Status != "pending" {
 		t.Errorf("expected status \"pending\", got %q", resp.Status)
 	}
@@ -141,7 +143,9 @@ func TestRequestApproval_AutoApprove_ConstraintViolation_FallsThroughToPending(t
 	}
 
 	var resp agentRequestApprovalResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
 	if resp.Status != "pending" {
 		t.Errorf("expected status \"pending\" (fallthrough), got %q", resp.Status)
 	}
@@ -164,7 +168,9 @@ func TestRequestApproval_AutoApprove_ConstraintSatisfied(t *testing.T) {
 	}
 
 	var resp agentRequestApprovalResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
 	if resp.Status != "approved" {
 		t.Errorf("expected status \"approved\", got %q", resp.Status)
 	}
@@ -221,7 +227,9 @@ func TestRequestApproval_AutoApprove_ExpiredApproval_FallsThroughToPending(t *te
 	}
 
 	var resp agentRequestApprovalResponse
-	json.Unmarshal(w.Body.Bytes(), &resp)
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
 	if resp.Status != "pending" {
 		t.Errorf("expected status \"pending\" (expired SA), got %q", resp.Status)
 	}

@@ -115,7 +115,7 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 
 	// Update agent's last_active_at (best-effort).
 	if err := db.TouchAgentLastActive(r.Context(), deps.DB, agent.AgentID); err != nil {
-		log.Printf("auto_approve: failed to update last_active_at for agent %d: %v", agent.AgentID, err)
+		log.Printf("[%s] AutoApprove: failed to update last_active_at for agent %d: %v", TraceID(r.Context()), agent.AgentID, err)
 	}
 
 	RespondJSON(w, http.StatusOK, agentRequestApprovalResponse{
