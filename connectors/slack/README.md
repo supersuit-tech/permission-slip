@@ -98,7 +98,7 @@ Lists Slack channels visible to the bot. When listing private channel types (`pr
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `types` | string | No | `public_channel,private_channel,mpim,im` | Comma-separated channel types: `public_channel`, `private_channel`, `mpim`, `im`. Defaults to all types. |
+| `types` | string | No | `public_channel,private_channel,mpim,im` | Comma-separated channel types: `public_channel`, `private_channel`, `mpim`, `im`. Defaults to all types when user email is available; falls back to `public_channel` only when no email is set. |
 | `limit` | integer | No | `100` | Max channels to return (1–1000) |
 | `cursor` | string | No | — | Pagination cursor from a previous response |
 | `exclude_archived` | boolean | No | `true` | Exclude archived channels from results |

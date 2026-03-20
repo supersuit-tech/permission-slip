@@ -77,7 +77,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"types": {
 							"type": "string",
 							"default": "public_channel,private_channel,mpim,im",
-							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types."
+							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set."
 						},
 						"limit": {
 							"type": "integer",

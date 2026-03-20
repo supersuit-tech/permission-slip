@@ -117,6 +117,14 @@ func TestListChannels_DefaultTypes(t *testing.T) {
 				"user": map[string]string{"id": "U_CALLER"},
 			})
 		case "/users.conversations":
+			var body usersConversationsRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode users.conversations body: %v", err)
+			}
+			// public_channel should be stripped — only private types are needed.
+			if body.Types != "private_channel,mpim,im" {
+				t.Errorf("expected types 'private_channel,mpim,im' for users.conversations, got %q", body.Types)
+			}
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
 				"channels": []map[string]any{
