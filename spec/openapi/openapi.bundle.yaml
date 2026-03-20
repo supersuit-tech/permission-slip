@@ -4922,8 +4922,8 @@ paths:
                 requests:
                   total: 1542
                   included: 1000
-                  overage: 1292
-                  cost_cents: 646
+                  overage: 542
+                  cost_cents: 271
                 sms:
                   total: 5
                   cost_cents: 5
