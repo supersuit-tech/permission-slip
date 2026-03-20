@@ -48,8 +48,10 @@ export function OAuthProviderSection() {
     }
   }
 
-  // BYOA is only available on self-hosted deployments
-  if (config?.byoa_enabled === false) {
+  // BYOA is only available on self-hosted deployments.
+  // Also suppress rendering while config is still loading to prevent a brief
+  // flash of the BYOA section on hosted deployments.
+  if (!config || config.byoa_enabled === false) {
     return null;
   }
 

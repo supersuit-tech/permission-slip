@@ -85,9 +85,12 @@ func RegisterOAuthBYOARoutes(mux *http.ServeMux, deps *Deps) {
 	if deps.BillingEnabled {
 		// Hosted deployment — BYOA is disabled. Register handlers that
 		// return 404 so the endpoints don't leak into the hosted API.
-		byoaDisabled := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Wrap in requireProfile so unauthenticated callers get 401 (same
+		// as self-hosted), preventing deployment-type fingerprinting.
+		requireProfile := RequireProfile(deps)
+		byoaDisabled := requireProfile(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			RespondError(w, r, http.StatusNotFound, NotFound(ErrConfigurationDisabled, "BYOA is not available on hosted deployments"))
-		})
+		}))
 		mux.Handle("POST /oauth/provider-configs", byoaDisabled)
 		mux.Handle("GET /oauth/provider-configs", byoaDisabled)
 		mux.Handle("PUT /oauth/provider-configs/{provider}", byoaDisabled)
