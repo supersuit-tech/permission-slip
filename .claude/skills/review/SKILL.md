@@ -86,11 +86,11 @@ Repeat for `ROUND` = 1 to `MAX_TURNS`:
 
 If `ROUND > 1`:
 
-1. **Wait 5 minutes** using the Bash tool with `run_in_background: true`:
+1. **Wait 5 minutes** using a **blocking** (foreground) Bash call:
    ```bash
    sleep 300 && echo "WAIT_COMPLETE"
    ```
-   Set `run_in_background: true` on this Bash call so the agent is not blocked. You will be notified when the sleep completes. While waiting, do NOT proceed to the next step — wait for the background task notification before continuing.
+   **CRITICAL: This MUST be a foreground call (do NOT set `run_in_background: true`).** The entire point of the wait is to block the review from proceeding so the PR author has time to push fixes. If you run the sleep in the background, you will immediately continue to the next round — defeating the purpose of the wait. Use a 5-minute timeout override (`timeout: 360000`) on the Bash call so it doesn't time out before the sleep completes. Do NOT proceed to step 2 until this command finishes.
 
 2. **Check PR state:**
    ```bash
