@@ -185,7 +185,8 @@ func TestGetBillingPlan_QuotaGraceEffectiveLimits(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	future := time.Now().Add(48 * time.Hour)
+	// Postgres timestamptz is microsecond-precision; truncate so round-trip matches JSON.
+	future := time.Now().Add(48 * time.Hour).UTC().Truncate(time.Microsecond)
 	paid := db.PlanPayAsYouGo
 	testhelper.MustExec(t, tx,
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
