@@ -631,6 +631,19 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if cur.PlanID != db.PlanPayAsYouGo {
+			// Stripe webhook may have already downgraded (subscription.deleted) before this
+			// transaction opened — return success instead of a spurious 409.
+			if cur.PlanID == db.PlanFree && cur.QuotaPlanID != nil && cur.QuotaEntitlementsUntil != nil {
+				RespondJSON(w, http.StatusOK, downgradeResponse{
+					Status:                 string(cur.Status),
+					PlanID:                 cur.PlanID,
+					DowngradedAt:           cur.DowngradedAt,
+					GracePeriodEndsAt:      gracePeriodEnd(cur.DowngradedAt),
+					QuotaEntitlementsUntil: cur.QuotaEntitlementsUntil,
+					Warnings:               warnings,
+				})
+				return
+			}
 			RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Subscription changed during downgrade"))
 			return
 		}
@@ -668,17 +681,12 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		var quotaUntil *time.Time
-		if updated.QuotaEntitlementsUntil != nil {
-			quotaUntil = updated.QuotaEntitlementsUntil
-		}
-
 		RespondJSON(w, http.StatusOK, downgradeResponse{
 			Status:                 string(updated.Status),
 			PlanID:                 updated.PlanID,
 			DowngradedAt:           updated.DowngradedAt,
 			GracePeriodEndsAt:      gracePeriodEnd(updated.DowngradedAt),
-			QuotaEntitlementsUntil: quotaUntil,
+			QuotaEntitlementsUntil: updated.QuotaEntitlementsUntil,
 			Warnings:               warnings,
 		})
 	}

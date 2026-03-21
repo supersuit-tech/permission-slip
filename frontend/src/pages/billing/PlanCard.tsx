@@ -90,7 +90,7 @@ export function PlanCard({ plan, effectiveLimits, subscription, pricing }: PlanC
             <p className="text-amber-700 dark:text-amber-300 text-xs">
               Extended audit log retention stays available until{" "}
               {formatDate(subscription.grace_period_ends_at)} so you can export older
-              activity. After that, retention matches the free plan ({effectiveLimits.audit_retention_days}{" "}
+              activity. After that, retention matches the free plan ({plan.audit_retention_days}{" "}
               days).
             </p>
           )}

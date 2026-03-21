@@ -131,8 +131,8 @@ func DowngradeSubscriptionToFreeWithQuotaGrace(ctx context.Context, db DBTX, use
 		`UPDATE subscriptions
 		 SET plan_id = 'free',
 		     downgraded_at = CASE WHEN plan_id != 'free' THEN now() ELSE downgraded_at END,
-		     quota_plan_id = $2,
-		     quota_entitlements_until = $3,
+		     quota_plan_id = COALESCE(quota_plan_id, $2),
+		     quota_entitlements_until = COALESCE(quota_entitlements_until, $3),
 		     updated_at = now()
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
