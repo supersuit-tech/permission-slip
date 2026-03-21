@@ -72,6 +72,23 @@ func TestGetPlan_NotFound(t *testing.T) {
 	}
 }
 
+func TestGetPlan_FreePro(t *testing.T) {
+	t.Parallel()
+	plan := db.GetPlan("free_pro")
+	if plan == nil {
+		t.Fatal("expected free_pro plan to exist")
+	}
+	if plan.MaxRequestsPerMonth != nil {
+		t.Errorf("expected unlimited requests, got %v", plan.MaxRequestsPerMonth)
+	}
+	if plan.PricePerRequestMillicents != 0 {
+		t.Errorf("expected price=0 millicents, got %d", plan.PricePerRequestMillicents)
+	}
+	if plan.AuditRetentionDays != 90 {
+		t.Errorf("expected audit_retention_days=90, got %d", plan.AuditRetentionDays)
+	}
+}
+
 func TestDefaultPlanID(t *testing.T) {
 	t.Parallel()
 	if got := db.DefaultPlanID(false); got != db.PlanPayAsYouGo {

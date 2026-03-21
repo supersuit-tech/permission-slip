@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import { PolicyLayout } from "./PolicyLayout";
 import { GITHUB_REPO_URL } from "@/lib/links";
-import { freePlan, paidPlan, formatLimit, PRICE_PER_REQUEST } from "@/config/plans";
+import { freePlan, freeProPlan, paidPlan, formatLimit, PRICE_PER_REQUEST } from "@/config/plans";
 
 export function TermsOfServicePage() {
   return (
-    <PolicyLayout title="Terms of Service" lastUpdated="February 28, 2026">
+    <PolicyLayout title="Terms of Service" lastUpdated="March 21, 2026">
       <p>
         These Terms of Service (&quot;Terms&quot;) govern your access to and use
         of Permission Slip (&quot;the Service&quot;), operated by Supersuit
@@ -122,7 +122,26 @@ export function TermsOfServicePage() {
         <li>Email support</li>
       </ul>
 
-      <h3>5.4 SMS Add-on (Paid Tier Only)</h3>
+      <h3>5.4 Complimentary &quot;Free Pro&quot; Access</h3>
+      <p>
+        We may grant selected accounts complimentary access with paid-tier-style
+        limits (for example, unlimited requests and extended audit retention)
+        without charging Stripe usage. This access is a courtesy, not a
+        guarantee of any fixed benefit level.
+      </p>
+      <ul>
+        <li>
+          {freeProPlan.audit_retention_days}-day audit log retention (when this
+          tier is active)
+        </li>
+        <li>
+          We may <strong>revoke, suspend, or limit</strong> complimentary Free Pro
+          access <strong>at any time</strong>, with or without notice, including
+          by changing plan limits, features, or eligibility.
+        </li>
+      </ul>
+
+      <h3>5.5 SMS Add-on (Paid Tier Only)</h3>
       <ul>
         <li>US/Canada: $0.01 per SMS</li>
         <li>UK/EU: $0.04 per SMS</li>
@@ -130,7 +149,7 @@ export function TermsOfServicePage() {
         <li>Pass-through carrier costs with no markup</li>
       </ul>
 
-      <h3>5.5 Payment Terms</h3>
+      <h3>5.6 Payment Terms</h3>
       <ul>
         <li>Payments are processed via Stripe</li>
         <li>Usage is invoiced monthly based on actual consumption</li>

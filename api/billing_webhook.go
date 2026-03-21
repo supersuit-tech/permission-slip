@@ -125,7 +125,7 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 	// Atomically upgrade to paid plan — only succeeds if user is currently on
 	// the free plan. This prevents double-upgrade race conditions when two
 	// checkout webhooks arrive concurrently for the same user.
-	upgraded, err := db.UpgradeSubscriptionPlan(r.Context(), deps.DB, sub.UserID, db.PlanFree, db.PlanPayAsYouGo)
+	upgraded, err := db.UpgradePayAsYouGoFromFreeOrFreePro(r.Context(), deps.DB, sub.UserID)
 	if err != nil {
 		return fmt.Errorf("upgrade plan for %s: %w", sub.UserID, err)
 	}
@@ -262,15 +262,27 @@ func handleSubscriptionDeleted(r *http.Request, deps *Deps, event *pstripe.Webho
 		return nil
 	}
 
-	// Downgrade to free plan and mark cancelled.
-	if _, err := db.UpdateSubscriptionPlan(r.Context(), deps.DB, sub.UserID, db.PlanFree); err != nil {
+	// Downgrade to free plan (or keep comped Pro if Stripe cancels an old subscription).
+	cur, err := db.GetSubscriptionByUserID(r.Context(), deps.DB, sub.UserID)
+	if err != nil {
+		return fmt.Errorf("reload subscription for %s: %w", sub.UserID, err)
+	}
+	targetPlan := db.PlanFree
+	if cur != nil && cur.PlanID == db.PlanFreePro {
+		targetPlan = db.PlanFreePro
+	}
+	if _, err := db.UpdateSubscriptionPlan(r.Context(), deps.DB, sub.UserID, targetPlan); err != nil {
 		return fmt.Errorf("downgrade plan for %s: %w", sub.UserID, err)
 	}
-	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, db.SubscriptionStatusCancelled); err != nil {
-		return fmt.Errorf("cancel status for %s: %w", sub.UserID, err)
+	nextStatus := db.SubscriptionStatusCancelled
+	if targetPlan == db.PlanFreePro {
+		nextStatus = db.SubscriptionStatusActive
+	}
+	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, nextStatus); err != nil {
+		return fmt.Errorf("update status for %s: %w", sub.UserID, err)
 	}
 
-	log.Printf("[%s] StripeWebhook: subscription deleted (event %s), user %s downgraded to free", TraceID(r.Context()), event.ID, sub.UserID)
+	log.Printf("[%s] StripeWebhook: subscription deleted (event %s), user %s plan=%s", TraceID(r.Context()), event.ID, sub.UserID, targetPlan)
 	return nil
 }
 

@@ -54,15 +54,15 @@ func TestGetPlan_NotFound(t *testing.T) {
 
 func TestAllPlans(t *testing.T) {
 	all := AllPlans()
-	if len(all) != 2 {
-		t.Fatalf("expected 2 plans, got %d", len(all))
+	if len(all) != 3 {
+		t.Fatalf("expected 3 plans, got %d", len(all))
 	}
 	ids := make(map[string]bool)
 	for _, p := range all {
 		ids[p.ID] = true
 	}
-	if !ids["free"] || !ids["pay_as_you_go"] {
-		t.Errorf("expected free and pay_as_you_go plans, got %v", ids)
+	if !ids["free"] || !ids["pay_as_you_go"] || !ids["free_pro"] {
+		t.Errorf("expected free, pay_as_you_go, and free_pro plans, got %v", ids)
 	}
 }
 

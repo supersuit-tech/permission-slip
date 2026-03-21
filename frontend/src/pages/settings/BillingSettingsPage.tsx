@@ -32,13 +32,20 @@ export function BillingSettingsPage() {
   );
   const activateRef = useRef(alreadyActivated);
 
-  const isPaidPlan = billingPlan != null && billingPlan.plan.id !== "free";
+  const isPaidPlan =
+    billingPlan != null &&
+    billingPlan.plan.id !== "free" &&
+    billingPlan.plan.id !== "free_pro";
 
   const retryUntilUpgraded = useCallback(async () => {
     for (const delay of RETRY_DELAYS) {
       await new Promise((r) => setTimeout(r, delay));
       const result = await refetch();
-      if (result.data?.plan.id !== "free") return;
+      if (
+        result.data?.plan.id !== "free" &&
+        result.data?.plan.id !== "free_pro"
+      )
+        return;
     }
   }, [refetch]);
 
@@ -54,7 +61,10 @@ export function BillingSettingsPage() {
     void activateUpgrade(sessionId, session.access_token)
       .then(() => refetch())
       .then((result) => {
-        if (result?.data?.plan.id === "free") {
+        if (
+          result?.data?.plan.id === "free" ||
+          result?.data?.plan.id === "free_pro"
+        ) {
           void retryUntilUpgraded();
         }
       })

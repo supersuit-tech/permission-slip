@@ -134,6 +134,20 @@ func UpgradeSubscriptionPlan(ctx context.Context, db DBTX, userID, expectedOldPl
 	return s, err
 }
 
+// UpgradePayAsYouGoFromFreeOrFreePro upgrades to pay_as_you_go when the user is
+// currently on free or free_pro. Used by Stripe checkout activation so comped
+// users can still subscribe for paid billing if they choose.
+func UpgradePayAsYouGoFromFreeOrFreePro(ctx context.Context, db DBTX, userID string) (*Subscription, error) {
+	s, err := UpgradeSubscriptionPlan(ctx, db, userID, PlanFree, PlanPayAsYouGo)
+	if err != nil {
+		return nil, err
+	}
+	if s != nil {
+		return s, nil
+	}
+	return UpgradeSubscriptionPlan(ctx, db, userID, PlanFreePro, PlanPayAsYouGo)
+}
+
 // UpdateSubscriptionStatus updates the status of a user's subscription.
 // Returns an error if the status is not one of the allowed values.
 func UpdateSubscriptionStatus(ctx context.Context, db DBTX, userID string, status SubscriptionStatus) (*Subscription, error) {

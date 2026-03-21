@@ -169,6 +169,24 @@ func TestCheckRequestQuota_PaidPlan_Bypass(t *testing.T) {
 	}
 }
 
+func TestCheckRequestQuota_FreeProPlan_Bypass(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFreePro)
+
+	testhelper.SetUsageCount(t, tx, uid, 50000)
+
+	w := httptest.NewRecorder()
+	r := httptest.NewRequest(http.MethodPost, "/test", nil)
+	_, blocked := checkRequestQuota(r.Context(), w, r, tx, uid)
+
+	if blocked {
+		t.Fatalf("expected free_pro plan to bypass quota, but got blocked: %s", w.Body.String())
+	}
+}
+
 func TestCheckRequestQuota_NoSubscription_Allows(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
@@ -383,4 +401,3 @@ func TestQuota_DashboardStandingExecution_FreePlan_UnderLimit_Succeeds(t *testin
 	// Usage should have incremented.
 	testhelper.RequireUsageCount(t, tx, uid, 1000)
 }
-

@@ -31,6 +31,7 @@ type Plan struct {
 const (
 	PlanFree       = "free"
 	PlanPayAsYouGo = "pay_as_you_go"
+	PlanFreePro    = "free_pro"
 )
 
 // DefaultPlanID returns the plan to assign new or unsubscribed users.

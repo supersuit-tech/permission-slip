@@ -278,6 +278,9 @@ paths:
   /v1/billing/activate:
     $ref: './components/paths/billing.yaml#/activate'
 
+  /v1/billing/redeem-coupon:
+    $ref: './components/paths/billing.yaml#/redeemCoupon'
+
   /v1/billing/portal:
     $ref: './components/paths/billing.yaml#/portal'
 
