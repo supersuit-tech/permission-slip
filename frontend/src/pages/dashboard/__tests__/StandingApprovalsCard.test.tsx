@@ -59,7 +59,12 @@ const freePlanResponse = {
     ...freePlanLimits,
   },
   effective_limits: freePlanLimits,
-  subscription: { status: "active", can_upgrade: true, can_downgrade: false },
+  subscription: {
+    status: "active",
+    can_upgrade: true,
+    can_downgrade: false,
+    can_end_quota_grace_now: false,
+  },
   usage: { requests: 10, agents: 2, standing_approvals: 1, credentials: 0 },
 };
 

@@ -46,7 +46,12 @@ const freePlanResponse = {
     ...freePlanLimits,
   },
   effective_limits: freePlanLimits,
-  subscription: { status: "active", can_upgrade: true, can_downgrade: false },
+  subscription: {
+    status: "active",
+    can_upgrade: true,
+    can_downgrade: false,
+    can_end_quota_grace_now: false,
+  },
   usage: { requests: 10, agents: 2, standing_approvals: 1, credentials: 0 },
 };
 
@@ -422,7 +427,12 @@ describe("RegisteredAgentsCard", () => {
     const paidPlan = {
       plan: { ...freePlanResponse.plan, id: "pay_as_you_go", max_agents: null },
       effective_limits: paidEffectiveLimits,
-      subscription: { status: "active", can_upgrade: false, can_downgrade: true },
+      subscription: {
+        status: "active",
+        can_upgrade: false,
+        can_downgrade: true,
+        can_end_quota_grace_now: false,
+      },
       usage: { requests: 10, agents: 5, standing_approvals: 1, credentials: 0 },
     };
     mockAgentsFetch(mockAgentsResponse, paidPlan);
