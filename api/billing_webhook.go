@@ -286,15 +286,25 @@ func handleSubscriptionDeleted(r *http.Request, deps *Deps, event *pstripe.Webho
 	if cur != nil && cur.PlanID == db.PlanFreePro {
 		targetPlan = db.PlanFreePro
 	}
-	if _, err := db.UpdateSubscriptionPlan(r.Context(), tx, sub2.UserID, targetPlan); err != nil {
-		return fmt.Errorf("downgrade plan for %s: %w", sub2.UserID, err)
-	}
 	nextStatus := db.SubscriptionStatusCancelled
 	if targetPlan == db.PlanFreePro {
 		nextStatus = db.SubscriptionStatusActive
 	}
-	if _, err := db.UpdateSubscriptionStatus(r.Context(), tx, sub2.UserID, nextStatus); err != nil {
-		return fmt.Errorf("update status for %s: %w", sub2.UserID, err)
+	var quotaPlanID *string
+	var quotaUntil *time.Time
+	if targetPlan == db.PlanFree && cur != nil && cur.PlanID == db.PlanPayAsYouGo {
+		qp := db.PlanPayAsYouGo
+		quotaPlanID = &qp
+		if u, ok := pstripe.SubscriptionCurrentPeriodEndUnix(event.Raw.Data.Raw); ok {
+			t := time.Unix(u, 0)
+			quotaUntil = &t
+		} else {
+			pe := cur.CurrentPeriodEnd
+			quotaUntil = &pe
+		}
+	}
+	if _, err := db.ApplyStripeSubscriptionDeletedToFree(r.Context(), tx, sub2.UserID, targetPlan, nextStatus, quotaPlanID, quotaUntil); err != nil {
+		return fmt.Errorf("downgrade plan for %s: %w", sub2.UserID, err)
 	}
 	if owned {
 		if err := db.CommitTx(r.Context(), tx); err != nil {

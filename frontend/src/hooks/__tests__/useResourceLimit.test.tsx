@@ -8,30 +8,40 @@ import { useResourceLimit } from "../useResourceLimit";
 vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
+const freePlanLimits = {
+  max_requests_per_month: 1000,
+  max_agents: 3,
+  max_standing_approvals: 5,
+  max_credentials: 5,
+  audit_retention_days: 7,
+};
+
 const freePlan = {
   plan: {
     id: "free",
     name: "Free",
-    max_requests_per_month: 1000,
-    max_agents: 3,
-    max_standing_approvals: 5,
-    max_credentials: 5,
-    audit_retention_days: 7,
+    ...freePlanLimits,
   },
+  effective_limits: freePlanLimits,
   subscription: { status: "active" },
   usage: { requests: 10, agents: 2, standing_approvals: 4, credentials: 5 },
+};
+
+const paidPlanLimits = {
+  max_requests_per_month: null,
+  max_agents: null,
+  max_standing_approvals: null,
+  max_credentials: null,
+  audit_retention_days: 90,
 };
 
 const paidPlan = {
   plan: {
     id: "pay_as_you_go",
     name: "Pay as you go",
-    max_requests_per_month: null,
-    max_agents: null,
-    max_standing_approvals: null,
-    max_credentials: null,
-    audit_retention_days: 90,
+    ...paidPlanLimits,
   },
+  effective_limits: paidPlanLimits,
   subscription: { status: "active" },
   usage: { requests: 100, agents: 10, standing_approvals: 20, credentials: 15 },
 };

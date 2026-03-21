@@ -6,6 +6,7 @@ import type { components } from "@/api/schema";
 
 export type BillingPlanResponse = components["schemas"]["BillingPlanResponse"];
 export type Plan = components["schemas"]["Plan"];
+export type PlanLimits = components["schemas"]["PlanLimits"];
 export type Subscription = components["schemas"]["Subscription"];
 export type UsageSummary = components["schemas"]["UsageSummary"];
 export type BillingPricing = components["schemas"]["BillingPricing"];

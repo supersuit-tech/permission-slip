@@ -294,7 +294,7 @@ describe("BillingPage", () => {
       });
       // Paid plan shows requests against the 1000 free allowance with billed count
       expect(screen.getByText(/billed/)).toBeInTheDocument();
-      expect(screen.getByText(/\$0.005\/request/)).toBeInTheDocument();
+      expect(screen.getAllByText(/\$0.005\/request/).length).toBeGreaterThanOrEqual(1);
     });
 
     it("does not show upgrade CTA for paid plan", async () => {
@@ -368,8 +368,8 @@ describe("BillingPage", () => {
       expect(screen.getByText(/You have 25 standing approvals/)).toBeInTheDocument();
       expect(screen.getByText(/You have 20 credentials/)).toBeInTheDocument();
 
-      // Confirm button should be disabled when over limits
-      expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeDisabled();
+      // Over-limit is a warning only — user can still confirm downgrade.
+      expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeEnabled();
 
       // Should show "Manage" links for each over-limit resource
       expect(screen.getByText("Manage agents")).toBeInTheDocument();
@@ -400,7 +400,7 @@ describe("BillingPage", () => {
       mockBillingApi(atLimitPaidPlanResponse);
       mockPost.mockResolvedValue({
         data: undefined,
-        error: { error: { code: "downgrade_limit_exceeded", message: "Too many active agents" } },
+        error: { error: { code: "upstream_error", message: "Failed to cancel subscription with payment provider" } },
       });
 
       const user = userEvent.setup();
@@ -418,7 +418,9 @@ describe("BillingPage", () => {
       await user.click(screen.getByRole("button", { name: "Confirm Downgrade" }));
 
       await waitFor(() => {
-        expect(screen.getByText("Too many active agents")).toBeInTheDocument();
+        expect(
+          screen.getByText(/Failed to cancel subscription with payment provider/),
+        ).toBeInTheDocument();
       });
     });
 

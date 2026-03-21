@@ -7,13 +7,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
-import type { BillingPricing, Plan, Subscription } from "@/hooks/useBillingPlan";
+import type { BillingPricing, Plan, PlanLimits, Subscription } from "@/hooks/useBillingPlan";
 import { formatCents, formatDate } from "./formatters";
 import { RequestUsageBar } from "./RequestUsageBar";
 import { AgentBreakdownTable } from "./AgentBreakdownTable";
 
 interface UsageDashboardProps {
   plan: Plan;
+  effectiveLimits: PlanLimits;
   subscription: Subscription;
   pricing?: BillingPricing;
 }
@@ -25,9 +26,10 @@ function daysRemaining(periodEnd: string): number {
   return Math.max(0, Math.ceil(diff / (1000 * 60 * 60 * 24)));
 }
 
-export function UsageDashboard({ plan, subscription, pricing }: UsageDashboardProps) {
+export function UsageDashboard({ plan, effectiveLimits, subscription, pricing }: UsageDashboardProps) {
   const { usage, isLoading, error } = useBillingUsage();
-  const isFree = plan.id === "free" || plan.id === "free_pro";
+  const showPaidUsageDetails =
+    effectiveLimits.max_requests_per_month == null && plan.id !== "free_pro";
   const days = daysRemaining(subscription.current_period_end);
   const periodLabel = `${formatDate(subscription.current_period_start)} — ${formatDate(subscription.current_period_end)}`;
 
@@ -86,7 +88,7 @@ export function UsageDashboard({ plan, subscription, pricing }: UsageDashboardPr
           <div className="space-y-4">
             <RequestUsageBar
               total={usage.requests.total}
-              limit={plan.max_requests_per_month ?? null}
+              limit={effectiveLimits.max_requests_per_month ?? null}
               included={usage.requests.included}
               priceDisplay={pricing?.price_per_request_display}
             />
@@ -100,16 +102,16 @@ export function UsageDashboard({ plan, subscription, pricing }: UsageDashboardPr
                 <p className="text-lg font-semibold tabular-nums">{days}</p>
               </div>
 
-              {isFree ? (
+              {!showPaidUsageDetails ? (
                 <div className="rounded-lg border p-3 space-y-1">
                   <p className="text-xs text-muted-foreground">
                     Requests remaining
                   </p>
                   <p className="text-lg font-semibold tabular-nums">
-                    {plan.max_requests_per_month != null
+                    {effectiveLimits.max_requests_per_month != null
                       ? Math.max(
                           0,
-                          plan.max_requests_per_month - usage.requests.total,
+                          effectiveLimits.max_requests_per_month - usage.requests.total,
                         ).toLocaleString()
                       : "—"}
                   </p>
@@ -132,7 +134,7 @@ export function UsageDashboard({ plan, subscription, pricing }: UsageDashboardPr
             </div>
 
             {/* Overage notice for free tier */}
-            {isFree && usage.requests.overage > 0 && (
+            {!showPaidUsageDetails && usage.requests.overage > 0 && plan.id !== "free_pro" && (
               <p className="text-sm text-destructive">
                 You have exceeded your monthly limit by{" "}
                 {usage.requests.overage.toLocaleString()} requests. Upgrade to
@@ -148,14 +150,14 @@ export function UsageDashboard({ plan, subscription, pricing }: UsageDashboardPr
               <AgentBreakdownTable
                 byAgent={byAgent}
                 totalRequests={usage.requests.total}
-                showCost={!isFree}
+                showCost={showPaidUsageDetails}
                 costCents={totalCostCents}
               />
             </div>
           )}
 
           {/* SMS usage (paid tier only) */}
-          {!isFree && usage.sms.total > 0 && (
+          {showPaidUsageDetails && usage.sms.total > 0 && (
             <div className="space-y-2">
               <h3 className="flex items-center gap-1.5 text-sm font-medium">
                 <MessageSquare className="size-4" />

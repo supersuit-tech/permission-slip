@@ -125,9 +125,10 @@ function InvoicesList() {
 
 interface DowngradeSectionProps {
   usage: UsageSummary;
+  subscription: Subscription;
 }
 
-function DowngradeSection({ usage }: DowngradeSectionProps) {
+function DowngradeSection({ usage, subscription }: DowngradeSectionProps) {
   const { downgrade, isDowngrading } = useDowngradePlan();
   const [showConfirm, setShowConfirm] = useState(false);
   const [downgradeError, setDowngradeError] = useState<string | null>(null);
@@ -137,10 +138,13 @@ function DowngradeSection({ usage }: DowngradeSectionProps) {
     try {
       const result = await downgrade();
       setShowConfirm(false);
-      const graceMsg = result?.grace_period_ends_at
-        ? ` Your paid features remain active until ${formatDate(result.grace_period_ends_at)}.`
+      const quotaMsg = result?.quota_entitlements_until
+        ? ` Paid-plan limits apply until ${formatDate(result.quota_entitlements_until)}.`
         : "";
-      toast.success(`Your plan has been downgraded to Free.${graceMsg}`);
+      const retentionMsg = result?.grace_period_ends_at
+        ? ` Extended audit retention until ${formatDate(result.grace_period_ends_at)}.`
+        : "";
+      toast.success(`Your plan has been downgraded to Free.${quotaMsg}${retentionMsg}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to downgrade. Please try again.";
       setDowngradeError(message);
@@ -166,6 +170,7 @@ function DowngradeSection({ usage }: DowngradeSectionProps) {
         isPending={isDowngrading}
         error={downgradeError}
         usage={usage}
+        freeLimitsApplyDate={formatDate(subscription.current_period_end)}
       />
     </>
   );
@@ -199,7 +204,7 @@ export function PlanDetailsCard({ subscription, usage }: PlanDetailsCardProps) {
 
           {subscription.can_downgrade && (
             <div className="border-t pt-4">
-              <DowngradeSection usage={usage} />
+              <DowngradeSection usage={usage} subscription={subscription} />
             </div>
           )}
         </div>

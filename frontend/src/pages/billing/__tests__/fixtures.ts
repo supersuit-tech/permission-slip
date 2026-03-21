@@ -5,16 +5,21 @@
  * test files don't duplicate boilerplate.
  */
 
+const freePlanLimits = {
+  max_requests_per_month: 1000,
+  max_agents: 3,
+  max_standing_approvals: 5,
+  max_credentials: 5,
+  audit_retention_days: 7,
+};
+
 export const freePlanResponse = {
   plan: {
     id: "free",
     name: "Free",
-    max_requests_per_month: 1000,
-    max_agents: 3,
-    max_standing_approvals: 5,
-    max_credentials: 5,
-    audit_retention_days: 7,
+    ...freePlanLimits,
   },
+  effective_limits: freePlanLimits,
   subscription: {
     status: "active" as const,
     current_period_start: "2026-03-01T00:00:00Z",
@@ -23,6 +28,7 @@ export const freePlanResponse = {
     can_upgrade: true,
     can_downgrade: false,
     grace_period_ends_at: null,
+    quota_entitlements_until: null,
   },
   usage: {
     requests: 150,
@@ -30,18 +36,28 @@ export const freePlanResponse = {
     standing_approvals: 3,
     credentials: 1,
   },
+  pricing: {
+    free_request_allowance: 1000,
+    price_per_request_display: "$0.005",
+  },
+  coupon_redemption_enabled: false,
+};
+
+const paidPlanLimits = {
+  max_requests_per_month: null as number | null,
+  max_agents: null as number | null,
+  max_standing_approvals: null as number | null,
+  max_credentials: null as number | null,
+  audit_retention_days: 90,
 };
 
 export const paidPlanResponse = {
   plan: {
     id: "pay_as_you_go",
     name: "Pay As You Go",
-    max_requests_per_month: null,
-    max_agents: null,
-    max_standing_approvals: null,
-    max_credentials: null,
-    audit_retention_days: 90,
+    ...paidPlanLimits,
   },
+  effective_limits: paidPlanLimits,
   subscription: {
     status: "active" as const,
     current_period_start: "2026-03-01T00:00:00Z",
@@ -50,6 +66,7 @@ export const paidPlanResponse = {
     can_upgrade: false,
     can_downgrade: true,
     grace_period_ends_at: null,
+    quota_entitlements_until: null,
   },
   usage: {
     requests: 1542,
@@ -57,6 +74,11 @@ export const paidPlanResponse = {
     standing_approvals: 10,
     credentials: 8,
   },
+  pricing: {
+    free_request_allowance: 1000,
+    price_per_request_display: "$0.005",
+  },
+  coupon_redemption_enabled: false,
 };
 
 /** Paid plan where usage exceeds all free plan limits. */

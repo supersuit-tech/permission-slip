@@ -7,12 +7,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { BillingPricing, Plan, Subscription } from "@/hooks/useBillingPlan";
+import type { BillingPricing, Plan, PlanLimits, Subscription } from "@/hooks/useBillingPlan";
 import { DetailRow } from "./DetailRow";
 import { formatDate } from "./formatters";
 
 interface PlanCardProps {
   plan: Plan;
+  effectiveLimits: PlanLimits;
   subscription: Subscription;
   pricing?: BillingPricing;
 }
@@ -27,7 +28,7 @@ function StatusBadge({ status }: { status: Subscription["status"] }) {
   return <Badge variant="secondary">Cancelled</Badge>;
 }
 
-export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
+export function PlanCard({ plan, effectiveLimits, subscription, pricing }: PlanCardProps) {
   const isFree = plan.id === "free";
   const isFreePro = plan.id === "free_pro";
 
@@ -78,11 +79,19 @@ export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
               Your payment method failed. Please update it to avoid service interruption.
             </p>
           )}
+          {subscription.quota_entitlements_until && (
+            <p className="text-amber-700 dark:text-amber-300 text-xs">
+              Paid-plan usage limits (requests, agents, approvals, credentials) stay in
+              effect until {formatDate(subscription.quota_entitlements_until)}. After that,
+              free plan limits apply to new usage; existing resources are not removed.
+            </p>
+          )}
           {subscription.grace_period_ends_at && (
             <p className="text-amber-700 dark:text-amber-300 text-xs">
-              Your paid plan features are preserved until{" "}
-              {formatDate(subscription.grace_period_ends_at)}. After that,
-              your account will revert to free plan limits.
+              Extended audit log retention stays available until{" "}
+              {formatDate(subscription.grace_period_ends_at)} so you can export older
+              activity. After that, retention matches the free plan ({effectiveLimits.audit_retention_days}{" "}
+              days).
             </p>
           )}
         </div>

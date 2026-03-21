@@ -13,16 +13,21 @@ import { CredentialSection } from "../CredentialSection";
 vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
+const freePlanLimits = {
+  max_requests_per_month: 1000,
+  max_agents: 3,
+  max_standing_approvals: 5,
+  max_credentials: 5,
+  audit_retention_days: 7,
+};
+
 const freePlanResponse = {
   plan: {
     id: "free",
     name: "Free",
-    max_requests_per_month: 1000,
-    max_agents: 3,
-    max_standing_approvals: 5,
-    max_credentials: 5,
-    audit_retention_days: 7,
+    ...freePlanLimits,
   },
+  effective_limits: freePlanLimits,
   subscription: { status: "active", can_upgrade: true, can_downgrade: false },
   usage: { requests: 10, agents: 2, standing_approvals: 1, credentials: 0 },
 };

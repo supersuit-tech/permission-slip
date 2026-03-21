@@ -33,10 +33,11 @@ export function useResourceLimit(
   const { billingPlan } = useBillingPlan();
 
   const usageKey = LIMIT_TO_USAGE[limitKey];
-  const max = billingPlan?.plan?.[limitKey] ?? null;
+  const max =
+    billingPlan?.effective_limits?.[limitKey] ?? billingPlan?.plan?.[limitKey] ?? null;
   const current = billingPlan?.usage?.[usageKey] ?? fallbackCount;
   const atLimit = max != null && current >= max;
-  const hasData = billingPlan?.plan != null;
+  const hasData = billingPlan?.plan != null && billingPlan?.effective_limits != null;
 
   return { max, current, atLimit, hasData };
 }

@@ -90,6 +90,9 @@ func TestGetBillingPlan_ReturnsPlanSubscriptionUsage(t *testing.T) {
 	if resp.CouponRedemptionEnabled {
 		t.Error("expected coupon_redemption_enabled=false when COUPON_SECRET unset")
 	}
+	if resp.EffectiveLimits.MaxAgents == nil || *resp.EffectiveLimits.MaxAgents != *resp.Plan.MaxAgents {
+		t.Errorf("effective_limits should match plan for non-grace user: plan max_agents=%v effective=%v", resp.Plan.MaxAgents, resp.EffectiveLimits.MaxAgents)
+	}
 }
 
 func TestGetBillingPlan_CouponRedemptionEnabled(t *testing.T) {
@@ -172,6 +175,51 @@ func TestGetBillingPlan_ZeroUsage(t *testing.T) {
 	if resp.Usage.Credentials != 0 {
 		t.Errorf("expected usage.credentials=0, got %d", resp.Usage.Credentials)
 	}
+}
+
+func TestGetBillingPlan_QuotaGraceEffectiveLimits(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	future := time.Now().Add(48 * time.Hour)
+	paid := db.PlanPayAsYouGo
+	testhelper.MustExec(t, tx,
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
+		uid, paid, future)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if resp.Plan.ID != db.PlanFree {
+		t.Errorf("expected plan.id=free, got %s", resp.Plan.ID)
+	}
+	if resp.EffectiveLimits.MaxRequestsPerMonth != nil {
+		t.Error("expected effective unlimited requests during quota grace")
+	}
+	if resp.Subscription.QuotaEntitlementsUntil == nil {
+		t.Fatal("expected subscription.quota_entitlements_until during grace")
+	}
+	if !resp.Subscription.QuotaEntitlementsUntil.Equal(future) {
+		t.Errorf("quota_entitlements_until mismatch: want %v got %v", future, resp.Subscription.QuotaEntitlementsUntil)
+	}
+	_ = ctx
 }
 
 func TestGetBillingPlan_PaidPlan(t *testing.T) {
@@ -848,9 +896,18 @@ func TestDowngrade_Success_NoStripe(t *testing.T) {
 	if sub.DowngradedAt == nil {
 		t.Error("expected downgraded_at to be set after downgrade")
 	}
+	if sub.StripeSubscriptionID != nil {
+		t.Error("expected stripe_subscription_id cleared after downgrade")
+	}
+	if sub.QuotaPlanID == nil || *sub.QuotaPlanID != db.PlanPayAsYouGo {
+		t.Errorf("expected quota_plan_id=pay_as_you_go, got %v", sub.QuotaPlanID)
+	}
+	if sub.QuotaEntitlementsUntil == nil {
+		t.Fatal("expected quota_entitlements_until set after downgrade")
+	}
 }
 
-func TestDowngrade_TooManyAgents(t *testing.T) {
+func TestDowngrade_WarnsWhenOverFreeAgentLimit(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -858,9 +915,7 @@ func TestDowngrade_TooManyAgents(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	// Create more registered agents than the free plan allows.
-	// Free plan limit is 5 agents (from seed data).
-	for i := 0; i < 6; i++ {
+	for i := 0; i < 4; i++ {
 		testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 	}
 
@@ -871,23 +926,20 @@ func TestDowngrade_TooManyAgents(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var errResp ErrorResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
-		t.Fatalf("failed to parse error response: %v", err)
+	var resp downgradeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse: %v", err)
 	}
-	if errResp.Error.Code != ErrDowngradeLimitExceeded {
-		t.Errorf("expected error code %s, got %s", ErrDowngradeLimitExceeded, errResp.Error.Code)
-	}
-	if errResp.Error.Details["resource"] != "agents" {
-		t.Errorf("expected resource=agents, got %v", errResp.Error.Details["resource"])
+	if len(resp.Warnings) != 1 || resp.Warnings[0].Resource != "agents" {
+		t.Fatalf("expected one agents warning, got %+v", resp.Warnings)
 	}
 }
 
-func TestDowngrade_TooManyStandingApprovals(t *testing.T) {
+func TestDowngrade_WarnsWhenOverFreeStandingApprovalLimit(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -897,8 +949,7 @@ func TestDowngrade_TooManyStandingApprovals(t *testing.T) {
 
 	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 
-	// Free plan limit is 10 active standing approvals (from seed data).
-	for i := 0; i < 11; i++ {
+	for i := 0; i < 6; i++ {
 		saID := testhelper.GenerateID(t, "sa_")
 		testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)
 	}
@@ -910,23 +961,27 @@ func TestDowngrade_TooManyStandingApprovals(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var errResp ErrorResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
-		t.Fatalf("failed to parse error response: %v", err)
+	var resp downgradeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse: %v", err)
 	}
-	if errResp.Error.Code != ErrDowngradeLimitExceeded {
-		t.Errorf("expected error code %s, got %s", ErrDowngradeLimitExceeded, errResp.Error.Code)
+	var found bool
+	for _, wn := range resp.Warnings {
+		if wn.Resource == "standing_approvals" {
+			found = true
+			break
+		}
 	}
-	if errResp.Error.Details["resource"] != "standing_approvals" {
-		t.Errorf("expected resource=standing_approvals, got %v", errResp.Error.Details["resource"])
+	if !found {
+		t.Fatalf("expected standing_approvals warning, got %+v", resp.Warnings)
 	}
 }
 
-func TestDowngrade_TooManyCredentials(t *testing.T) {
+func TestDowngrade_WarnsWhenOverFreeCredentialLimit(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -934,7 +989,6 @@ func TestDowngrade_TooManyCredentials(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	// Free plan limit is 5 credentials (from seed data).
 	for i := 0; i < 6; i++ {
 		credID := testhelper.GenerateID(t, "cred_")
 		service := testhelper.GenerateID(t, "svc_")
@@ -948,19 +1002,23 @@ func TestDowngrade_TooManyCredentials(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var errResp ErrorResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
-		t.Fatalf("failed to parse error response: %v", err)
+	var resp downgradeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse: %v", err)
 	}
-	if errResp.Error.Code != ErrDowngradeLimitExceeded {
-		t.Errorf("expected error code %s, got %s", ErrDowngradeLimitExceeded, errResp.Error.Code)
+	var found bool
+	for _, wn := range resp.Warnings {
+		if wn.Resource == "credentials" {
+			found = true
+			break
+		}
 	}
-	if errResp.Error.Details["resource"] != "credentials" {
-		t.Errorf("expected resource=credentials, got %v", errResp.Error.Details["resource"])
+	if !found {
+		t.Fatalf("expected credentials warning, got %+v", resp.Warnings)
 	}
 }
 

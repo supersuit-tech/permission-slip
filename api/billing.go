@@ -13,11 +13,12 @@ import (
 // ── Response types ──────────────────────────────────────────────────────────
 
 type subscriptionResponse struct {
-	PlanID   string `json:"plan_id"`
-	PlanName string `json:"plan_name"`
+	PlanID          string     `json:"plan_id"`
+	PlanName        string     `json:"plan_name"`
 	billingSubscription
-	PlanLimits planLimits `json:"plan_limits"`
-	Usage      *usageInfo `json:"usage,omitempty"`
+	PlanLimits      planLimits `json:"plan_limits"`
+	EffectiveLimits planLimits `json:"effective_limits"`
+	Usage           *usageInfo `json:"usage,omitempty"`
 }
 
 type planLimits struct {
@@ -117,6 +118,7 @@ func toAPIInvoice(s pstripe.InvoiceSummary) apiInvoice {
 
 type billingPlanResponse struct {
 	Plan                    billingPlan         `json:"plan"`
+	EffectiveLimits         planLimits          `json:"effective_limits"`
 	Subscription            billingSubscription `json:"subscription"`
 	Usage                   billingUsageSummary `json:"usage"`
 	Pricing                 *billingPricing     `json:"pricing,omitempty"`
@@ -136,13 +138,14 @@ type billingPlan struct {
 }
 
 type billingSubscription struct {
-	Status             string     `json:"status"`
-	CurrentPeriodStart time.Time  `json:"current_period_start"`
-	CurrentPeriodEnd   time.Time  `json:"current_period_end"`
-	HasPaymentMethod   bool       `json:"has_payment_method"`
-	CanUpgrade         bool       `json:"can_upgrade"`
-	CanDowngrade       bool       `json:"can_downgrade"`
-	GracePeriodEndsAt  *time.Time `json:"grace_period_ends_at"`
+	Status                   string     `json:"status"`
+	CurrentPeriodStart       time.Time  `json:"current_period_start"`
+	CurrentPeriodEnd         time.Time  `json:"current_period_end"`
+	HasPaymentMethod         bool       `json:"has_payment_method"`
+	CanUpgrade               bool       `json:"can_upgrade"`
+	CanDowngrade             bool       `json:"can_downgrade"`
+	GracePeriodEndsAt        *time.Time `json:"grace_period_ends_at"`
+	QuotaEntitlementsUntil   *time.Time `json:"quota_entitlements_until"`
 }
 
 type billingUsageSummary struct {
@@ -154,14 +157,19 @@ type billingUsageSummary struct {
 
 // newBillingSubscription builds subscription status fields from a DB subscription.
 func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
+	var quotaUntil *time.Time
+	if sub.QuotaPlanID != nil && sub.QuotaEntitlementsUntil != nil && time.Now().Before(*sub.QuotaEntitlementsUntil) {
+		quotaUntil = sub.QuotaEntitlementsUntil
+	}
 	return billingSubscription{
-		Status:             string(sub.Status),
-		CurrentPeriodStart: sub.CurrentPeriodStart,
-		CurrentPeriodEnd:   sub.CurrentPeriodEnd,
-		HasPaymentMethod:   false,
-		CanUpgrade:         sub.PlanID == db.PlanFree || sub.PlanID == db.PlanFreePro,
-		CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
-		GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
+		Status:                 string(sub.Status),
+		CurrentPeriodStart:     sub.CurrentPeriodStart,
+		CurrentPeriodEnd:       sub.CurrentPeriodEnd,
+		HasPaymentMethod:       false,
+		CanUpgrade:             sub.PlanID == db.PlanFree || sub.PlanID == db.PlanFreePro,
+		CanDowngrade:           sub.PlanID == db.PlanPayAsYouGo,
+		GracePeriodEndsAt:      sub.GracePeriodEndsAt(),
+		QuotaEntitlementsUntil: quotaUntil,
 	}
 }
 
@@ -176,11 +184,19 @@ func newPlanLimits(p *db.Plan) planLimits {
 	}
 }
 
+type downgradeLimitWarning struct {
+	Resource   string `json:"resource"`
+	Current    int    `json:"current"`
+	MaxAllowed int    `json:"max_allowed"`
+}
+
 type downgradeResponse struct {
-	Status            string     `json:"status"`
-	PlanID            string     `json:"plan_id"`
-	DowngradedAt      *time.Time `json:"downgraded_at"`
-	GracePeriodEndsAt *time.Time `json:"grace_period_ends_at"`
+	Status                   string                    `json:"status"`
+	PlanID                   string                    `json:"plan_id"`
+	DowngradedAt             *time.Time                `json:"downgraded_at"`
+	GracePeriodEndsAt        *time.Time                `json:"grace_period_ends_at"`
+	QuotaEntitlementsUntil   *time.Time                `json:"quota_entitlements_until"`
+	Warnings                 []downgradeLimitWarning   `json:"warnings,omitempty"`
 }
 
 // gracePeriodEnd returns the time when the 7-day grace period expires for a
@@ -237,13 +253,15 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		eff := sub.EffectiveQuotaPlan()
 		resp := billingPlanResponse{
 			Plan: billingPlan{
 				ID:         sub.PlanID,
 				Name:       sub.Plan.Name,
 				planLimits: newPlanLimits(&sub.Plan),
 			},
-			Subscription: newBillingSubscription(sub),
+			EffectiveLimits: newPlanLimits(eff),
+			Subscription:  newBillingSubscription(sub),
 		}
 
 		// Include pricing info for all plans so the upgrade flow can show
@@ -321,11 +339,13 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		eff := sub.EffectiveQuotaPlan()
 		resp := subscriptionResponse{
 			PlanID:              sub.PlanID,
 			PlanName:            sub.Plan.Name,
 			billingSubscription: newBillingSubscription(sub),
 			PlanLimits:          newPlanLimits(&sub.Plan),
+			EffectiveLimits:     newPlanLimits(eff),
 		}
 
 		// A user "has a payment method" if they have local payment methods
@@ -352,9 +372,9 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			ui := &usageInfo{
 				RequestCount: usage.RequestCount,
 				SMSCount:     usage.SMSCount,
-				RequestLimit: sub.Plan.MaxRequestsPerMonth,
+				RequestLimit: eff.MaxRequestsPerMonth,
 			}
-			if sub.Plan.MaxRequestsPerMonth != nil && usage.RequestCount > *sub.Plan.MaxRequestsPerMonth {
+			if eff.MaxRequestsPerMonth != nil && usage.RequestCount > *eff.MaxRequestsPerMonth {
 				ui.OverLimit = true
 			}
 			resp.Usage = ui
@@ -474,13 +494,14 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 			PeriodEnd:   sub.CurrentPeriodEnd,
 		}
 
+		eff := sub.EffectiveQuotaPlan()
 		// Determine included request allowance.
 		// Paid plans get the same free allowance as the free tier (1000 requests).
 		included := int(pstripe.FreeRequestAllowance())
-		if sub.Plan.MaxRequestsPerMonth != nil {
-			included = *sub.Plan.MaxRequestsPerMonth
+		if eff.MaxRequestsPerMonth != nil {
+			included = *eff.MaxRequestsPerMonth
 		}
-		unlimitedRequests := sub.Plan.MaxRequestsPerMonth == nil
+		unlimitedRequests := eff.MaxRequestsPerMonth == nil
 		if sub.PlanID == db.PlanFreePro {
 			included = 0
 		}
@@ -569,12 +590,11 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if limitErr := validateDowngradeLimits(r.Context(), deps, profile.ID, freePlan); limitErr != nil {
-			status := http.StatusConflict
-			if limitErr.Error.Code == ErrInternalError {
-				status = http.StatusInternalServerError
-			}
-			RespondError(w, r, status, *limitErr)
+		warnings, warnErr := buildDowngradeLimitWarnings(r.Context(), deps, profile.ID, freePlan)
+		if warnErr != nil {
+			log.Printf("[%s] Downgrade: limit warnings: %v", TraceID(r.Context()), warnErr)
+			CaptureError(r.Context(), warnErr)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify plan limits"))
 			return
 		}
 
@@ -588,8 +608,46 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Downgrade plan locally.
-		updated, err := db.UpdateSubscriptionPlan(r.Context(), deps.DB, profile.ID, db.PlanFree)
+		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] Downgrade: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to downgrade plan"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(r.Context(), tx)
+		}
+
+		cur, err := db.GetSubscriptionByUserID(r.Context(), tx, profile.ID)
+		if err != nil {
+			log.Printf("[%s] Downgrade: reload subscription: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to downgrade plan"))
+			return
+		}
+		if cur == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrSubscriptionNotFound, "No subscription found"))
+			return
+		}
+		if cur.PlanID != db.PlanPayAsYouGo {
+			RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Subscription changed during downgrade"))
+			return
+		}
+
+		periodEnd := cur.CurrentPeriodEnd
+		var custPtr *string
+		if cur.StripeCustomerID != nil {
+			custPtr = cur.StripeCustomerID
+		}
+		if _, err := db.UpdateSubscriptionStripe(r.Context(), tx, profile.ID, custPtr, nil); err != nil {
+			log.Printf("[%s] Downgrade: clear stripe subscription id: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to downgrade plan"))
+			return
+		}
+
+		updated, err := db.DowngradeSubscriptionToFreeWithQuotaGrace(r.Context(), tx, profile.ID, db.PlanPayAsYouGo, periodEnd)
 		if err != nil {
 			log.Printf("[%s] Downgrade: update plan: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -601,77 +659,63 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] Downgrade: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to downgrade plan"))
+				return
+			}
+		}
+
+		var quotaUntil *time.Time
+		if updated.QuotaEntitlementsUntil != nil {
+			quotaUntil = updated.QuotaEntitlementsUntil
+		}
+
 		RespondJSON(w, http.StatusOK, downgradeResponse{
-			Status:            string(updated.Status),
-			PlanID:            updated.PlanID,
-			DowngradedAt:      updated.DowngradedAt,
-			GracePeriodEndsAt: gracePeriodEnd(updated.DowngradedAt),
+			Status:                 string(updated.Status),
+			PlanID:                 updated.PlanID,
+			DowngradedAt:           updated.DowngradedAt,
+			GracePeriodEndsAt:      gracePeriodEnd(updated.DowngradedAt),
+			QuotaEntitlementsUntil: quotaUntil,
+			Warnings:               warnings,
 		})
 	}
 }
 
-// validateDowngradeLimits checks that the user's current resource counts are
-// within the free plan's limits. Returns an ErrorResponse if any limit is
-// exceeded or if a count cannot be verified (fail-closed), nil otherwise.
-func validateDowngradeLimits(ctx context.Context, deps *Deps, userID string, freePlan *db.Plan) *ErrorResponse {
+// buildDowngradeLimitWarnings returns non-blocking warnings when the user
+// exceeds free-tier caps (they apply after quota_entitlements_until).
+func buildDowngradeLimitWarnings(ctx context.Context, deps *Deps, userID string, freePlan *db.Plan) ([]downgradeLimitWarning, error) {
+	var out []downgradeLimitWarning
 	if freePlan.MaxAgents != nil {
 		count, err := db.CountRegisteredAgentsByUser(ctx, deps.DB, userID)
 		if err != nil {
-			log.Printf("[%s] Downgrade: count agents: %v", TraceID(ctx), err)
-			CaptureError(ctx, err)
-			resp := InternalError("Unable to verify agent count")
-			return &resp
+			return nil, err
 		}
 		if count > *freePlan.MaxAgents {
-			resp := Conflict(ErrDowngradeLimitExceeded, "Too many active agents for the free plan")
-			resp.Error.Details = map[string]any{
-				"resource":    "agents",
-				"current":     count,
-				"max_allowed": *freePlan.MaxAgents,
-			}
-			return &resp
+			out = append(out, downgradeLimitWarning{Resource: "agents", Current: count, MaxAllowed: *freePlan.MaxAgents})
 		}
 	}
-
 	if freePlan.MaxStandingApprovals != nil {
 		count, err := db.CountActiveStandingApprovalsByUser(ctx, deps.DB, userID)
 		if err != nil {
-			log.Printf("[%s] Downgrade: count standing approvals: %v", TraceID(ctx), err)
-			CaptureError(ctx, err)
-			resp := InternalError("Unable to verify standing approval count")
-			return &resp
+			return nil, err
 		}
 		if count > *freePlan.MaxStandingApprovals {
-			resp := Conflict(ErrDowngradeLimitExceeded, "Too many active standing approvals for the free plan")
-			resp.Error.Details = map[string]any{
-				"resource":    "standing_approvals",
-				"current":     count,
-				"max_allowed": *freePlan.MaxStandingApprovals,
-			}
-			return &resp
+			out = append(out, downgradeLimitWarning{Resource: "standing_approvals", Current: count, MaxAllowed: *freePlan.MaxStandingApprovals})
 		}
 	}
-
 	if freePlan.MaxCredentials != nil {
 		count, err := db.CountCredentialsByUser(ctx, deps.DB, userID)
 		if err != nil {
-			log.Printf("[%s] Downgrade: count credentials: %v", TraceID(ctx), err)
-			CaptureError(ctx, err)
-			resp := InternalError("Unable to verify credential count")
-			return &resp
+			return nil, err
 		}
 		if count > *freePlan.MaxCredentials {
-			resp := Conflict(ErrDowngradeLimitExceeded, "Too many stored credentials for the free plan")
-			resp.Error.Details = map[string]any{
-				"resource":    "credentials",
-				"current":     count,
-				"max_allowed": *freePlan.MaxCredentials,
-			}
-			return &resp
+			out = append(out, downgradeLimitWarning{Resource: "credentials", Current: count, MaxAllowed: *freePlan.MaxCredentials})
 		}
 	}
-
-	return nil
+	return out, nil
 }
 
 // ── GET /billing/invoices ─────────────────────────────────────────────────

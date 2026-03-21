@@ -3,6 +3,7 @@ package db_test
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
@@ -15,7 +16,8 @@ func TestSubscriptionsSchema(t *testing.T) {
 		"id", "user_id", "plan_id", "status",
 		"stripe_customer_id", "stripe_subscription_id",
 		"current_period_start", "current_period_end",
-		"downgraded_at", "created_at", "updated_at",
+		"downgraded_at", "quota_plan_id", "quota_entitlements_until",
+		"created_at", "updated_at",
 	})
 }
 
@@ -247,6 +249,48 @@ func TestUpdateSubscriptionPeriod(t *testing.T) {
 	}
 	if !updated.CurrentPeriodEnd.Equal(newEnd) {
 		t.Errorf("expected period_end=%v, got %v", newEnd, updated.CurrentPeriodEnd)
+	}
+}
+
+func TestEffectiveQuotaPlan(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	_, err := db.CreateSubscription(ctx, tx, uid, db.PlanFree)
+	if err != nil {
+		t.Fatalf("CreateSubscription: %v", err)
+	}
+	future := time.Now().Add(24 * time.Hour)
+	paid := db.PlanPayAsYouGo
+	testhelper.MustExec(t, tx,
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
+		uid, paid, future)
+
+	sp, err := db.GetSubscriptionWithPlan(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("GetSubscriptionWithPlan: %v", err)
+	}
+	if sp.EffectiveQuotaPlan().ID != db.PlanPayAsYouGo {
+		t.Errorf("expected effective quota plan pay_as_you_go, got %s", sp.EffectiveQuotaPlan().ID)
+	}
+
+	past := time.Now().Add(-time.Hour)
+	testhelper.MustExec(t, tx,
+		`UPDATE subscriptions SET quota_entitlements_until = $2 WHERE user_id = $1`,
+		uid, past)
+
+	sp2, err := db.GetSubscriptionWithPlan(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("GetSubscriptionWithPlan: %v", err)
+	}
+	if sp2.QuotaPlanID != nil || sp2.QuotaEntitlementsUntil != nil {
+		t.Fatal("expected quota columns cleared after expiry")
+	}
+	if sp2.EffectiveQuotaPlan().ID != db.PlanFree {
+		t.Errorf("expected effective quota plan free after expiry, got %s", sp2.EffectiveQuotaPlan().ID)
 	}
 }
 
