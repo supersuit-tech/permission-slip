@@ -147,27 +147,13 @@ func DowngradeSubscriptionToFreeWithQuotaGrace(ctx context.Context, db DBTX, use
 // syncs status, and ensures quota grace columns are set from Stripe's period
 // end when missing (idempotent with user-initiated downgrade).
 func ApplyStripeSubscriptionDeletedToFree(ctx context.Context, db DBTX, userID string, targetPlan string, nextStatus SubscriptionStatus, quotaPlanID *string, periodEnd *time.Time) (*Subscription, error) {
-	if quotaPlanID != nil && periodEnd != nil {
-		s, err := scanSubscription(db.QueryRow(ctx,
-			`UPDATE subscriptions
-			 SET plan_id = $2,
-			     status = $3,
-			     stripe_subscription_id = CASE WHEN $2 = 'free' THEN NULL ELSE stripe_subscription_id END,
-			     downgraded_at = CASE
-			             WHEN $2 = 'free' AND plan_id != 'free' THEN now()
-			             WHEN $2 = 'free' THEN downgraded_at
-			             ELSE NULL
-			         END,
-			     quota_plan_id = COALESCE(quota_plan_id, $4),
-			     quota_entitlements_until = COALESCE(quota_entitlements_until, $5),
-			     updated_at = now()
-			 WHERE user_id = $1
-			 RETURNING `+subscriptionColumns,
-			userID, targetPlan, nextStatus, *quotaPlanID, *periodEnd))
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return s, err
+	var qPlan any
+	if quotaPlanID != nil {
+		qPlan = *quotaPlanID
+	}
+	var qEnd any
+	if periodEnd != nil {
+		qEnd = *periodEnd
 	}
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
@@ -179,10 +165,18 @@ func ApplyStripeSubscriptionDeletedToFree(ctx context.Context, db DBTX, userID s
 		             WHEN $2 = 'free' THEN downgraded_at
 		             ELSE NULL
 		         END,
+		     quota_plan_id = CASE
+		             WHEN $4::text IS NOT NULL THEN COALESCE(quota_plan_id, $4::text)
+		             ELSE quota_plan_id
+		         END,
+		     quota_entitlements_until = CASE
+		             WHEN $5::timestamptz IS NOT NULL THEN COALESCE(quota_entitlements_until, $5::timestamptz)
+		             ELSE quota_entitlements_until
+		         END,
 		     updated_at = now()
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
-		userID, targetPlan, nextStatus))
+		userID, targetPlan, nextStatus, qPlan, qEnd))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}

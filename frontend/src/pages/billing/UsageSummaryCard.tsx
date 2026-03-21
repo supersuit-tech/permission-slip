@@ -140,7 +140,7 @@ export function UsageSummaryCard({ usage, plan, effectiveLimits, pricing }: Usag
             limit={effectiveLimits.max_credentials ?? null}
           />
           <DetailRow label="Audit Retention">
-            <span className="text-muted-foreground">{effectiveLimits.audit_retention_days} days</span>
+            <span className="text-muted-foreground">{plan.audit_retention_days} days</span>
           </DetailRow>
         </div>
       </CardContent>

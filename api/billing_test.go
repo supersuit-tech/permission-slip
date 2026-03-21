@@ -219,7 +219,6 @@ func TestGetBillingPlan_QuotaGraceEffectiveLimits(t *testing.T) {
 	if !resp.Subscription.QuotaEntitlementsUntil.Equal(future) {
 		t.Errorf("quota_entitlements_until mismatch: want %v got %v", future, resp.Subscription.QuotaEntitlementsUntil)
 	}
-	_ = ctx
 }
 
 func TestGetBillingPlan_PaidPlan(t *testing.T) {
