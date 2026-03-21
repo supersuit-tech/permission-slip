@@ -120,7 +120,7 @@ export function BillingSettingsPage() {
             pricing={billingPlan.pricing}
           />
           {billingPlan.coupon_redemption_enabled &&
-            billingPlan.plan.id === "free" && <CouponRedemptionCard />}
+            billingPlan.plan.id !== "free_pro" && <CouponRedemptionCard />}
           {billingPlan.subscription.can_upgrade && (
             <UpgradeCTA plan={billingPlan.plan} pricing={billingPlan.pricing} />
           )}

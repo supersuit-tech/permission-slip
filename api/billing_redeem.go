@@ -62,12 +62,8 @@ func handleRedeemFreeProCoupon(deps *Deps) http.HandlerFunc {
 			RespondJSON(w, http.StatusOK, redeemCouponResponse{PlanID: db.PlanFreePro, Status: "already_redeemed"})
 			return
 		}
-		if sub.PlanID == db.PlanPayAsYouGo {
-			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadySubscribed, "Paid subscription already active"))
-			return
-		}
-		if sub.PlanID != db.PlanFree {
-			RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Coupon can only be applied on the free plan"))
+		if sub.PlanID != db.PlanFree && sub.PlanID != db.PlanPayAsYouGo {
+			RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Coupon can only be applied on the free or pay-as-you-go plan"))
 			return
 		}
 
@@ -76,7 +72,68 @@ func handleRedeemFreeProCoupon(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		updated, err := db.UpgradeSubscriptionPlan(r.Context(), deps.DB, profile.ID, db.PlanFree, db.PlanFreePro)
+		// Paid plan: cancel Stripe first so we do not leave an active paid subscription
+		// while the app treats the user as complimentary Pro.
+		if sub.PlanID == db.PlanPayAsYouGo && sub.StripeSubscriptionID != nil {
+			if deps.Stripe == nil {
+				RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Billing provider not configured"))
+				return
+			}
+			if _, err := deps.Stripe.CancelSubscription(r.Context(), *sub.StripeSubscriptionID); err != nil {
+				log.Printf("[%s] RedeemCoupon: cancel Stripe subscription: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusBadGateway, upstreamError("Failed to cancel subscription with payment provider"))
+				return
+			}
+		}
+
+		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] RedeemCoupon: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply coupon"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(r.Context(), tx)
+		}
+
+		cur, err := db.GetSubscriptionByUserID(r.Context(), tx, profile.ID)
+		if err != nil {
+			log.Printf("[%s] RedeemCoupon: reload subscription: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply coupon"))
+			return
+		}
+		if cur == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrSubscriptionNotFound, "No subscription found"))
+			return
+		}
+		if cur.PlanID == db.PlanFreePro {
+			RespondJSON(w, http.StatusOK, redeemCouponResponse{PlanID: db.PlanFreePro, Status: "already_redeemed"})
+			return
+		}
+
+		var updated *db.Subscription
+		switch cur.PlanID {
+		case db.PlanPayAsYouGo:
+			var custPtr *string
+			if cur.StripeCustomerID != nil {
+				custPtr = cur.StripeCustomerID
+			}
+			if _, err := db.UpdateSubscriptionStripe(r.Context(), tx, profile.ID, custPtr, nil); err != nil {
+				log.Printf("[%s] RedeemCoupon: clear stripe subscription id: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply coupon"))
+				return
+			}
+			updated, err = db.UpgradeSubscriptionPlan(r.Context(), tx, profile.ID, db.PlanPayAsYouGo, db.PlanFreePro)
+		case db.PlanFree:
+			updated, err = db.UpgradeSubscriptionPlan(r.Context(), tx, profile.ID, db.PlanFree, db.PlanFreePro)
+		default:
+			RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Subscription changed while redeeming coupon"))
+			return
+		}
 		if err != nil {
 			log.Printf("[%s] RedeemCoupon: upgrade plan: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -84,8 +141,36 @@ func handleRedeemFreeProCoupon(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if updated == nil {
-			RespondJSON(w, http.StatusOK, redeemCouponResponse{PlanID: db.PlanFreePro, Status: "already_redeemed"})
+			again, err := db.GetSubscriptionByUserID(r.Context(), tx, profile.ID)
+			if err != nil {
+				log.Printf("[%s] RedeemCoupon: reload after no-op upgrade: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply coupon"))
+				return
+			}
+			if again != nil && again.PlanID == db.PlanFreePro {
+				if owned {
+					if err := db.CommitTx(r.Context(), tx); err != nil {
+						log.Printf("[%s] RedeemCoupon: commit: %v", TraceID(r.Context()), err)
+						CaptureError(r.Context(), err)
+						RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply coupon"))
+						return
+					}
+				}
+				RespondJSON(w, http.StatusOK, redeemCouponResponse{PlanID: db.PlanFreePro, Status: "already_redeemed"})
+				return
+			}
+			RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Subscription changed while redeeming coupon"))
 			return
+		}
+
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] RedeemCoupon: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply coupon"))
+				return
+			}
 		}
 
 		log.Printf("[%s] RedeemCoupon: user %s upgraded to free_pro", TraceID(r.Context()), profile.ID)
