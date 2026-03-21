@@ -223,13 +223,14 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	}
 	total += tag.RowsAffected()
 
-	// Step 2: When billing is disabled, upgrade "free" subscriptions to the
+	// Step 2: When billing is disabled, upgrade free-tier subscriptions to the
 	// unlimited plan. This handles users backfilled by the initial migration
-	// (which always assigns "free") before BILLING_ENABLED existed.
+	// (which always assigns "free") before BILLING_ENABLED existed, and
+	// normalizes comped free_pro rows to pay_as_you_go for a single unlimited plan id.
 	if !billingEnabled {
 		tag, err = db.Exec(ctx,
 			`UPDATE subscriptions SET plan_id = $1, updated_at = now()
-			 WHERE plan_id = 'free'`,
+			 WHERE plan_id IN ('free', 'free_pro')`,
 			PlanPayAsYouGo)
 		if err != nil {
 			return total, err

@@ -396,8 +396,7 @@ redeemCoupon:
     description: |
       Applies a one-time coupon that upgrades the authenticated user from the
       free plan to complimentary Pro (`free_pro`) when the coupon matches
-      `MD5(username + "-" + COUPON_SECRET)` (hex, lowercase), using the user's
-      profile username (trimmed).
+      `HMAC-SHA256(COUPON_SECRET, trimmed username)` as lowercase hex (64 chars).
 
       **Requirements:** `billing_enabled` is `true` and the server has a
       non-empty `COUPON_SECRET` environment variable. If the secret is unset,

@@ -1,25 +1,41 @@
 package coupon
 
-import "testing"
+import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
+	"strings"
+	"testing"
+)
+
+func expectedHMAC(username, secret string) string {
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(strings.TrimSpace(username)))
+	return hex.EncodeToString(mac.Sum(nil))
+}
 
 func TestExpectedFreeProCouponHex(t *testing.T) {
-	// md5("alice-mysecret") = 84835a9a9c497ac4856515e2bc46f714
 	const secret = "mysecret"
 	got := ExpectedFreeProCouponHex("alice", secret)
-	want := "84835a9a9c497ac4856515e2bc46f714"
+	want := expectedHMAC("alice", secret)
 	if got != want {
 		t.Errorf("ExpectedFreeProCouponHex = %q, want %q", got, want)
+	}
+	if len(got) != 64 {
+		t.Errorf("expected 64 hex chars, got %d", len(got))
 	}
 }
 
 func TestFreeProCouponMatches(t *testing.T) {
-	if !FreeProCouponMatches("alice", "mysecret", "84835A9A9C497AC4856515E2BC46F714") {
+	const secret = "mysecret"
+	good := expectedHMAC("alice", secret)
+	if !FreeProCouponMatches("alice", secret, strings.ToUpper(good)) {
 		t.Error("expected match (case-insensitive hex)")
 	}
-	if FreeProCouponMatches("alice", "mysecret", "84835a9a9c497ac4856515e2bc46f713") {
+	if FreeProCouponMatches("alice", secret, good[:63]+"0") {
 		t.Error("expected mismatch for wrong digest")
 	}
-	if FreeProCouponMatches("alice", "mysecret", "not-hex") {
+	if FreeProCouponMatches("alice", secret, "not-hex") {
 		t.Error("expected mismatch for wrong length")
 	}
 }

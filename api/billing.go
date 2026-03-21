@@ -116,10 +116,11 @@ func toAPIInvoice(s pstripe.InvoiceSummary) apiInvoice {
 }
 
 type billingPlanResponse struct {
-	Plan         billingPlan         `json:"plan"`
-	Subscription billingSubscription `json:"subscription"`
-	Usage        billingUsageSummary `json:"usage"`
-	Pricing      *billingPricing     `json:"pricing,omitempty"`
+	Plan                    billingPlan         `json:"plan"`
+	Subscription            billingSubscription `json:"subscription"`
+	Usage                   billingUsageSummary `json:"usage"`
+	Pricing                 *billingPricing     `json:"pricing,omitempty"`
+	CouponRedemptionEnabled bool                `json:"coupon_redemption_enabled"`
 }
 
 // billingPricing provides pricing information sourced from Stripe.
@@ -295,6 +296,8 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 		} else {
 			resp.Usage.Credentials = count
 		}
+
+		resp.CouponRedemptionEnabled = deps.CouponSecret != ""
 
 		RespondJSON(w, http.StatusOK, resp)
 	}
@@ -477,12 +480,11 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 		if sub.Plan.MaxRequestsPerMonth != nil {
 			included = *sub.Plan.MaxRequestsPerMonth
 		}
-		resp.Requests.Included = included
-
 		unlimitedRequests := sub.Plan.MaxRequestsPerMonth == nil
 		if sub.PlanID == db.PlanFreePro {
 			included = 0
 		}
+		resp.Requests.Included = included
 
 		var usage *db.UsagePeriod
 		if periodStart.IsZero() {

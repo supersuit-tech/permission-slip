@@ -31,7 +31,7 @@ type Deps struct {
 	OAuthRedirectBaseURL   string                  // Public base URL for OAuth callbacks (e.g. "https://app.permissionslip.dev"); falls back to BaseURL
 	OAuthStateSecret       string                  // HMAC-SHA256 secret for signing OAuth CSRF state tokens; if empty, falls back to SupabaseJWTSecret
 	Stripe                 *pstripe.Client         // Stripe API client; nil when billing is disabled or Stripe keys not set
-	CouponSecret           string                  // secret for MD5(username-secret) free-pro coupons; empty disables POST /billing/redeem-coupon
+	CouponSecret           string                  // HMAC key for free-pro coupons; empty disables POST /billing/redeem-coupon
 	BillingEnabled         bool                    // true when BILLING_ENABLED=true; gates Stripe, metering, and billing endpoints
 	SMSEnabled             bool                    // true when SMS sender is configured AND SMS_NOTIFICATIONS_HIDDEN != "true"; gates SMS preference visibility
 	DevMode                bool                    // true when MODE=development; disables rate limiting

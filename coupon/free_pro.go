@@ -1,19 +1,19 @@
 package coupon
 
 import (
-	"crypto/md5" //nolint:gosec // MD5 is required for deterministic per-username coupon codes (not a security primitive).
+	"crypto/hmac"
+	"crypto/sha256"
 	"encoding/hex"
 	"strings"
 )
 
-// ExpectedFreeProCouponHex returns the lowercase hex MD5 digest for
-// md5(username + "-" + secret), matching the redeem API. Username is trimmed;
-// secret is used as-is (including empty, which yields a predictable digest — do
-// not deploy with an empty COUPON_SECRET).
+// ExpectedFreeProCouponHex returns the lowercase hex HMAC-SHA256(secret, username)
+// for the trimmed profile username. The coupon acts as a capability token — keep
+// COUPON_SECRET long and random.
 func ExpectedFreeProCouponHex(username, secret string) string {
-	s := strings.TrimSpace(username) + "-" + secret
-	sum := md5.Sum([]byte(s)) //nolint:gosec
-	return hex.EncodeToString(sum[:])
+	mac := hmac.New(sha256.New, []byte(secret))
+	mac.Write([]byte(strings.TrimSpace(username)))
+	return hex.EncodeToString(mac.Sum(nil))
 }
 
 // FreeProCouponMatches reports whether couponHex equals the expected digest

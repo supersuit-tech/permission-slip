@@ -12,6 +12,7 @@ import { PlanDetailsCard } from "../billing/PlanDetailsCard";
 import { BillingPageSkeleton } from "../billing/BillingPageSkeleton";
 import { UpgradeSuccessBanner } from "../billing/UpgradeSuccessBanner";
 import { activateUpgrade } from "../billing/activateUpgrade";
+import { CouponRedemptionCard } from "../billing/CouponRedemptionCard";
 import { DataRetentionSection } from "./DataRetentionSection";
 
 const RETRY_DELAYS = [1000, 2000, 3000];
@@ -115,6 +116,8 @@ export function BillingSettingsPage() {
             subscription={billingPlan.subscription}
             pricing={billingPlan.pricing}
           />
+          {billingPlan.coupon_redemption_enabled &&
+            billingPlan.plan.id === "free" && <CouponRedemptionCard />}
           {billingPlan.subscription.can_upgrade && (
             <UpgradeCTA plan={billingPlan.plan} pricing={billingPlan.pricing} />
           )}
