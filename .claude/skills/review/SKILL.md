@@ -29,8 +29,9 @@ Parse the PR number from the URL (e.g., `https://github.com/supersuit-tech/permi
 Set these variables for the session:
 - `PR_URL` — the PR URL (from arguments or auto-detected)
 - `PR_NUMBER` — the extracted PR number
-- `MAX_TURNS` — the value of `--max-turns` if passed, `6` otherwise
+- `MAX_TURNS` — the value of `--max-turns` if passed, `6` otherwise. Must be a positive integer; abort with an error for `0`, negative, or non-numeric values.
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
+- `GH_REPO_PATH` — `supersuit-tech/permission-slip` (used in `gh api` endpoint paths to avoid hardcoding)
 - `LAST_HEAD_SHA` — empty string initially, updated after each round
 - `ROUND` — current round number, starting at 1
 
@@ -106,6 +107,11 @@ If `ROUND > 1`:
      ```bash
      $GH_CMD pr view $PR_NUMBER --json commits --jq '.commits[] | select(.oid != "") | "\(.oid[:7]) \(.messageHeadline)"'
      ```
+   - **Fetch your prior review comments** to avoid posting duplicates:
+     ```bash
+     $GH_CMD api repos/${GH_REPO_PATH}/pulls/${PR_NUMBER}/comments --jq '[.[] | select(.user.login == "YOUR_BOT_LOGIN") | {path: .path, line: .line, body: .body}]'
+     ```
+     Track these in a `PRIOR_COMMENTS` list and skip any finding that matches an already-posted comment (same file, same line, same issue).
    - Note which prior review comments may have been addressed by the new commits.
    - Update `LAST_HEAD_SHA`.
 
@@ -179,7 +185,7 @@ If there are findings, submit a PR review with inline comments:
 
 ```bash
 echo "$REVIEW_JSON" | $GH_CMD api \
-  repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}/reviews \
+  repos/${GH_REPO_PATH}/pulls/${PR_NUMBER}/reviews \
   --input - || {
     echo "ERROR: Failed to submit Round ${ROUND} review."
     # Log the failure and abort — do not silently continue to the next round.
@@ -261,7 +267,7 @@ No new issues found.
 
 After submitting the review, check whether to continue:
 
-- If this round had **no findings** AND we're past Round 2 → exit early, go to Step 3.
+- If this round had **no findings** → exit early, go to Step 3. There is no reason to wait and re-review a clean PR.
 - If `ROUND >= MAX_TURNS` → exit, go to Step 3.
 - Otherwise → increment `ROUND`, loop back to 2a.
 
@@ -271,7 +277,7 @@ After all rounds complete (or early exit), post a final issue comment summarizin
 
 ```bash
 $GH_CMD api \
-  repos/supersuit-tech/permission-slip/issues/${PR_NUMBER}/comments \
+  repos/${GH_REPO_PATH}/issues/${PR_NUMBER}/comments \
   -f body="$SUMMARY"
 ```
 
@@ -313,4 +319,4 @@ Summary format:
 - **Check diff lines** — inline comments can only be placed on lines that appear in the PR diff. If you need to comment on an unchanged line, include it in the review body instead.
 - **Acknowledge good work** — every round summary should include a "What Looks Good" section. Reviews that only criticize are demoralizing.
 - **Re-fetch between rounds** — always check for new commits before reviewing again to avoid flagging already-fixed issues.
-- **Exit early when clean** — if a round has no findings after Round 2, stop. Don't keep reviewing just to fill rounds.
+- **Exit early when clean** — if any round has no findings, stop immediately. Don't wait 5 minutes just to re-review a clean PR.
