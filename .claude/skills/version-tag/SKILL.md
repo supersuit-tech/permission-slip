@@ -66,7 +66,7 @@ If the command fails or `SHA` is empty, print an error and stop.
 
 ### 4. Sync package.json Version
 
-Check whether `<package>/package.json` exists in the repo and whether its `version` field matches the target version. If it doesn't match, create a branch, commit the bump there, open a PR, and auto-merge it. The tag still points at the original `main` SHA (before the bump) — the PR will merge shortly after.
+Check whether `<package>/package.json` exists in the repo and whether its `version` field matches the target version. If it doesn't match, create a branch, commit the bump there, open a PR, merge it, and **wait for the merge to complete before proceeding to step 5**. This ensures the tag always points at a commit where `package.json` has the correct version.
 
 ```bash
 # Fetch the file metadata and content
@@ -119,6 +119,28 @@ if [ "$PKG_VERSION" != "<version>" ]; then
   GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
     gh pr merge "$PR_URL" --auto --squash \
     --repo supersuit-tech/permission-slip 2>/dev/null || echo "(auto-merge not available — merge manually)"
+
+  # Wait for the PR to merge before tagging (poll every 5s, up to 2 minutes)
+  echo "Waiting for bump PR to merge before creating tag..."
+  PR_NUMBER=$(echo "$PR_URL" | grep -o '[0-9]*$')
+  for i in $(seq 1 24); do
+    PR_STATE=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+      gh pr view "$PR_NUMBER" --repo supersuit-tech/permission-slip --json state --jq '.state')
+    if [ "$PR_STATE" = "MERGED" ]; then
+      echo "Bump PR merged."
+      break
+    fi
+    if [ "$i" = "24" ]; then
+      echo "::error::Bump PR did not merge within 2 minutes. Merge it manually, then re-run /version-tag."
+      exit 1
+    fi
+    sleep 5
+  done
+
+  # Re-resolve main SHA so the tag points at the commit that includes the version bump
+  SHA=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+    gh api repos/supersuit-tech/permission-slip/git/ref/heads/main \
+    --jq '.object.sha')
 fi
 ```
 
@@ -126,7 +148,7 @@ If the file doesn't exist (404), skip this step silently and proceed with the or
 
 ### 5. Create and Push the Tag
 
-Create the tag reference on GitHub directly via the API — no local branch switching or `git push` needed:
+Create the tag reference on GitHub directly via the API — no local branch switching or `git push` needed. The `SHA` used here is either the original `main` SHA (if no bump was needed) or the updated `main` SHA (after the bump PR merged).
 
 ```bash
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
