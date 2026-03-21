@@ -26,7 +26,9 @@ watch-post.sh          — Post-session tasks (no AI needed)
   ├── Triggers CI and audit workflows
   ├── Waits for completion
   ├── Auto-merges if enabled and checks pass
-  └── Triggers webhook notification
+  └── Triggers webhook notification (unless --skip-webhook)
+
+watch-append-wrapup-ci.sh — Appends CI/audit remediation bullets to the wrap-up PR comment
 
 Agent (this skill)     — Only invoked when reasoning is needed
   ├── Implements review comment requests
@@ -59,6 +61,8 @@ Set these variables for the session:
 - `NO_NOTIFY` — `true` if `--no-notify` was passed, `false` otherwise
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
 - `SKILL_DIR` — the directory containing this skill file (`.claude/skills/watch`)
+
+Preserve `WORK_DIR` from `watch-poll.sh` session JSON for the whole session — it holds `action-log.json`, the wrap-up comment id file, and other state. The poll script writes `pr-number.txt` and `wrapup-comment-id` when it posts the wrap-up.
 
 ## Orchestration Loop
 
@@ -117,7 +121,7 @@ The script communicates via stdout signals and exit codes:
 }
 ```
 
-**Exit code 0 + `IDLE_TIMEOUT`**: The session ended due to inactivity or the `--max-turns` limit being reached. The script already posted the wrap-up comment. Proceed to Step 4 (post-session).
+**Exit code 0 + `IDLE_TIMEOUT`**: The session ended due to inactivity or the `--max-turns` limit being reached. The script already posted the wrap-up comment (and recorded its id under `WORK_DIR` for later edits). Proceed to Step 5 (post-session / CI loop).
 
 **Exit code 100**: Pre-poll merge conflict. The script detected conflicts before the polling loop started. Read `WORK_ITEMS_FILE` for conflict details and resolve them (see Step 3), then re-run the polling script.
 
@@ -325,9 +329,30 @@ The action log is a JSON array. Each entry has a `type` field and type-specific 
   {
     "type": "open_question",
     "description": "Should we also add rate limiting to this endpoint?"
+  },
+  {
+    "type": "ci_remediation",
+    "workflow": "ci.yml",
+    "conclusion": "failure",
+    "detail": "go test ./db/... failed: missing migration grant — added GRANT in migration 20260320…",
+    "commit": "abc1234"
+  },
+  {
+    "type": "audit_remediation",
+    "workflow": "audit.yml",
+    "conclusion": "failure",
+    "detail": "gosec flagged unsafe usage — refactored to use sanitized input",
+    "commit": "def5678"
+  },
+  {
+    "type": "ci_fix_exhausted",
+    "workflow": "ci.yml",
+    "detail": "Stopped after 15 remediation attempts; integration test still flakes on job X — needs human triage"
   }
 ]
 ```
+
+Use **`ci_remediation`** / **`audit_remediation`** after each failed post-session run you fix (one object per fix round is enough; add both if you fixed issues revealed by both workflows in one push). **`ci_fix_exhausted`** is only for hitting the 15-attempt limit. These types appear in the **next** full wrap-up if you re-run poll with a fresh session; within the same session, **`watch-append-wrapup-ci.sh`** appends under a single **## 🔧 CI / audit remediation** heading: the first batch adds that heading plus **### Remediation round 1**, and later batches add **### Remediation round N** only (no duplicate H2).
 
 ### Step 4: Loop back to polling
 
@@ -335,42 +360,47 @@ After the agent finishes processing work items, go back to **Step 1** and run th
 
 **Important**: Pass the same work directory to the script on subsequent runs so it preserves last-seen IDs and the action log. The script's `WORK_DIR` is printed in its session context output — capture it on the first run and reuse it.
 
-### Step 5: Post-session tasks
+### Step 5: Post-session tasks — CI / audit loop until green
 
-When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has already been posted by the script. Run the post-session script:
+When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has already been posted. You must then **drive CI to success** (and audit to success) in a loop: fix, push, re-run workflows, repeat. **Do not stop after a single failed post-session run** unless you hit the exhaustion limit below.
 
-```bash
-bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") 2>&1
-```
+**Loop (run until both CI and audit report `success`, or you exhaust retries):**
 
-This handles:
-- Triggering CI and audit workflows
-- Waiting for them to complete
-- Auto-merging if enabled and checks pass
-- Triggering the webhook notification
+1. Run post-session. Always pass **`--work-dir "$WORK_DIR"`** (same session directory as `watch-poll.sh`) so CI/audit logs are written under that directory (avoids `/tmp` clashes between concurrent watch sessions) and so the webhook sentinel file is session-scoped. On the **first** iteration of this loop after wrap-up, pass **`--skip-webhook`** so the webhook does not fire until CI is actually green (this creates **`${WORK_DIR}/post-webhook-pending`** on success):
+   ```bash
+   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --skip-webhook 2>&1
+   ```
+   On **subsequent** iterations (after you pushed fixes), omit `--skip-webhook` so each successful pass can notify as usual, **or** keep using `--skip-webhook` until the final successful iteration and then run once with **`--webhook-only`** (see step 2b below).
+
+2. **Exit code 0** — Both workflows concluded `success`. If the webhook was sent this run (no `--skip-webhook`), **`post-webhook-pending`** is removed automatically. If you used **`--skip-webhook`** and `NO_NOTIFY` is false, run once with **`--webhook-only`** — this **requires** `--work-dir` and an existing **`post-webhook-pending`** file (otherwise exit **2**); on success the webhook runs and the sentinel is removed:
+   ```bash
+   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --webhook-only 2>&1
+   ```
+   Read merge result from stdout (`PR merged successfully`, etc.).
+
+3. **Exit code 101 (CI)** or **102 (audit)** — This is expected while fixing. **Automatically:**
+   - Read logs from `CI_LOGS_FILE` or `AUDIT_LOGS_FILE` in the script output.
+   - Diagnose and **implement fixes** (same rigor as review comments): run relevant tests (`make test`, `make build` before push when the failure could be compile-related).
+   - **Append to `action-log.json`** at least one object describing what you did (see **CI remediation** types below). Use a real summary in `detail` (root cause + fix), not placeholders.
+   - **Push** commits to the PR branch.
+   - **Patch the wrap-up comment** with the new remediation entry:
+     ```bash
+     bash "${SKILL_DIR}/watch-append-wrapup-ci.sh" --work-dir "$WORK_DIR"
+     ```
+   - **Go back to step 1** and re-run `watch-post.sh` with the same **`--work-dir "$WORK_DIR"`** so log paths stay session-isolated.
+
+4. **Retry limit** — Repeat step 3 **until CI and audit both succeed**, or until **15** failed post-session attempts (101/102) **in this loop** for the same PR session. If you hit the limit, append an `ci_fix_exhausted` entry to `action-log.json`, run `watch-append-wrapup-ci.sh` again, post a short PR comment that automated remediation stopped after 15 attempts and summarize what is still failing, then stop.
+
+`watch-post.sh` treats any workflow **conclusion other than `success`** (including `failure`, `cancelled`, `skipped`, `timed_out`, or **`timeout`** when the wait window expires) as needing remediation — exit **101** for CI, **102** for audit.
 
 **After the script completes successfully (exit code 0) with `AUTO_MERGE=true`:**
 
-Check the script output for the merge result. The script prints clear signals:
-- `"[post] PR merged successfully."` → The merge completed. Report it as **merged**, not "attempted". Do NOT say "may need human approval" — if the script printed this, the PR is merged.
-- `"[post] Auto-merge failed."` → The merge failed. The script already posted a comment on the PR. Report the failure and suggest the user merge manually.
-- `"[post] Auto-merge enabled but checks did not pass."` → CI or audit failed, merge was skipped. Report which checks failed.
+Check the script output for the merge result:
+- `"[post] PR merged successfully."` → The merge completed. Report it as **merged**, not "attempted".
+- `"[post] Auto-merge failed."` → The merge failed. The script already posted a comment on the PR.
+- `"[post] Auto-merge enabled but checks did not pass."` → Should not occur on exit 0; if it does, treat as inconsistent and re-run post-session.
 
-**Do NOT hedge or use vague language like "attempted" or "may need human approval" when the script output clearly indicates success or failure.** Read the output and report what actually happened.
-
-**If the post-session script exits with code 101 (CI failure) or 102 (audit failure):**
-
-1. Read the failure logs from the file path in the script output.
-2. Reproduce locally by running the relevant commands.
-3. Fix the issue, commit, and push.
-4. Post an addendum comment:
-   ```markdown
-   ## 🔧 Post-Session Check Fixes
-
-   Fixed failing checks after watch session ended:
-   - **`<description>`** (`<commit hash>`) — <what was failing and how it was fixed>
-   ```
-5. Re-run the post-session script. Repeat up to 3 times before posting a comment that CI cannot be fixed automatically.
+**Do NOT hedge** when the script output clearly indicates success or failure.
 
 ## Important Rules
 
