@@ -221,51 +221,9 @@ The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API typ
 
 ## GitHub Issues
 
-- **Ask clarifying questions before creating the issue.** If a task has open design decisions, ambiguous requirements, or choices that need human judgment, ask the user directly in chat first. Do not create an issue with unresolved questions embedded in it — resolve them upfront so the issue is actionable from the start.
+- **Ask clarifying questions before creating the issue.** If a task has open design decisions, ambiguous requirements, or choices that need human judgment, ask the user directly in chat first. Resolve all decisions upfront — the issue should be actionable from the start with no "Option A vs Option B" or "TBD" items. Never put unresolved questions or option comparisons in an issue.
 - When creating issues, default to using checklists (`- [ ]`) instead of bullet points for work items that can be completed independently. This makes it easy to track progress directly in the issue.
 - When you encounter an issue with a checklist that is out of date (items completed but not checked off, missing items, irrelevant items), update the checklist to reflect the current state.
-
-### Issue Structure: Phases & Model Allocation
-
-When creating issues with multiple tasks, **organize them into phases** and annotate each task with the recommended Claude model. This enables parallel execution by multiple agents and ensures expensive models are only used where they add value.
-
-**Phase structure:**
-- Group tasks into sequential phases where each phase depends on the previous one completing.
-- Within each phase, mark which tasks can run **in parallel** vs. which must be **sequential**.
-- Use checklists within each phase for trackability.
-
-**Model allocation — annotate every task with one of:**
-- **`[sonnet]`** — The default for most tasks. Use for: config/token changes, class string replacements, simple mappings, type system updates, structural JSX changes, applying patterns across files, running tests. Sonnet is reliable and cost-effective for the vast majority of well-specified implementation work.
-- **`[opus]`** — Reserve for tasks requiring design judgment, ambiguity resolution, or cross-cutting reasoning: deciding *what* to build (not just *how*), component extraction decisions, adapting a pattern across components with different state management, holistic code review of a full diff, or anything where getting it wrong undermines the quality of the whole effort.
-- **`[haiku]`** — Only for truly trivial, zero-ambiguity changes where the exact before→after is a single line and there's no way to get it wrong (e.g., changing one class name in one file). When in doubt, use Sonnet instead.
-
-**Be conservative with model selection.** It's better to overshoot on capability than to have a task fail or produce subtly wrong results. A Sonnet task that could have been Haiku wastes a little money. A Haiku task that needed Sonnet wastes time and may introduce bugs.
-
-**Every task annotation must include a justification** — a short italicized note explaining why that model was chosen. This makes the reasoning reviewable and helps calibrate over time.
-
-**Example phase block in an issue:**
-
-```markdown
-## Phase 1: Foundation (sequential)
-> Each step depends on the previous.
-- [ ] **1A. Add color tokens** `[sonnet]` — *multiple token additions across light/dark themes need internal consistency*
-- [ ] **1B. Add badge variants** `[sonnet]` — *CVA config + TypeScript variant type union updates*
-
-## Phase 2: Component Updates (parallel, after Phase 1)
-- [ ] **2A. Update status mappings** `[sonnet]` — *type union update + mapping logic across outcome types*
-- [ ] **2B. Refactor filter controls** `[opus]` — *structural refactor across 3 components with different state management*
-- [ ] **2C. Extract metadata component** `[opus]` — *design discretion on what to extract and how to compose*
-
-## Verification
-- [ ] Run tests + build `[sonnet]`
-- [ ] Final diff review `[opus]` — *holistic quality check before merge*
-```
-
-**Key principles:**
-- Sonnet is the default. Most tasks in a well-specified issue are Sonnet.
-- Bump to Opus when the task spans multiple components with different patterns, involves design discretion, or requires holistic judgment.
-- Haiku is the exception, not the rule — only use it when a task is a single trivial substitution with zero ambiguity.
-- If you're unsure between two tiers, pick the higher one. The cost of a subtle bug or a bad extraction far exceeds the cost difference between models.
 
 ## Go Toolchain Setup
 
