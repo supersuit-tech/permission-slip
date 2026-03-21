@@ -513,6 +513,7 @@ When a standing approval matches, the response returns `status: "approved"` with
 - **`standing_approval_id`** — identifies which pre-approval authorized this execution (useful for audit tracking and logging).
 - **`executions_remaining`** — how many more times this standing approval can be used. `null` means unlimited. Track this value to avoid hitting the limit unexpectedly.
 - **Idempotency** — if you receive `status: "approved"`, the action has already executed. Do not retry with the same `request_id` — you'll get `409 Conflict`.
+- **CLI `executed` field** — when using the CLI (`permission-slip request`), auto-approved responses include `"executed": true` to signal that the action has already completed and no polling or further action is needed. A `409 duplicate_request_id` is also returned as `{ "status": "duplicate", "executed": true }` with exit code `0`.
 
 If no standing approval matches, the response returns `status: "pending"` and the standard one-off approval flow begins (user receives a notification for review).
 
@@ -565,7 +566,9 @@ During registration (`POST /invite/{code}`), you don't have an agent ID yet. Use
 
 All POST requests must include a non-empty `request_id` (for example, a UUID v4) in the JSON body.
 
-The current implementation validates only that `request_id` is present and non-empty; it does not yet enforce uniqueness, idempotency, or replay protection based on this field.
+The server enforces `request_id` uniqueness within the standing approval execution flow — resubmitting the same `request_id` returns `409 duplicate_request_id` instead of executing the action again. This makes `request_id` an **idempotency key**: callers can safely retry with the same ID and the action will only execute once.
+
+For one-off approvals (the pending → human-approve flow), `request_id` uniqueness is also enforced — duplicate submission returns `409 Conflict`.
 
 ---
 
@@ -622,7 +625,7 @@ All errors follow a consistent format:
 | `token_already_used` | 403 | Token consumed — request new approval |
 | `insufficient_scope` | 403 | Token scope doesn't match action — check `action_id` |
 | `credentials_not_found` | 404 | User hasn't set up credentials for this service |
-| `duplicate_request_id` | 409 | `request_id` already used — generate a new UUID (not yet enforced; reserved for future use) |
+| `duplicate_request_id` | 409 | `request_id` already used — the action was already executed. Treat as an idempotency success (do not retry). |
 | `no_matching_standing_approval` | 404 | No standing approval matches — use one-off flow |
 | `constraint_violation` | 403 | Parameters violate standing approval constraints |
 | `upstream_error` | 502 | External service returned an error |
