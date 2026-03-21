@@ -109,6 +109,16 @@ func validateConfig() (errs []configError, warnings []configError) {
 				})
 			}
 		}
+
+		couponSecret := strings.TrimSpace(os.Getenv("COUPON_SECRET"))
+		if couponSecret != "" && len(couponSecret) < 16 {
+			msg := "when set, must be at least 16 characters (HMAC key for complimentary-pro coupons)"
+			if devMode {
+				warnings = append(warnings, configError{envVar: "COUPON_SECRET", message: msg})
+			} else {
+				errs = append(errs, configError{envVar: "COUPON_SECRET", message: msg})
+			}
+		}
 	}
 
 	// OAuth — warn when built-in provider client credentials are not set.

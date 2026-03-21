@@ -3,6 +3,7 @@ package api
 import (
 	"log"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/coupon"
 	"github.com/supersuit-tech/permission-slip-web/db"
@@ -35,8 +36,13 @@ func handleRedeemFreeProCoupon(deps *Deps) http.HandlerFunc {
 		if !DecodeJSONOrReject(w, r, &req) {
 			return
 		}
-		if req.Coupon == "" {
+		couponHex := strings.TrimSpace(req.Coupon)
+		if couponHex == "" {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "coupon is required"))
+			return
+		}
+		if !coupon.ValidFreeProCouponHexFormat(strings.ToLower(couponHex)) {
+			RespondError(w, r, http.StatusForbidden, Forbidden(ErrInvalidCoupon, "Invalid coupon"))
 			return
 		}
 
@@ -65,7 +71,7 @@ func handleRedeemFreeProCoupon(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if !coupon.FreeProCouponMatches(profile.Username, deps.CouponSecret, req.Coupon) {
+		if !coupon.FreeProCouponMatches(profile.Username, deps.CouponSecret, couponHex) {
 			RespondError(w, r, http.StatusForbidden, Forbidden(ErrInvalidCoupon, "Invalid coupon"))
 			return
 		}
