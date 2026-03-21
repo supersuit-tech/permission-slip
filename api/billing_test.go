@@ -180,7 +180,6 @@ func TestGetBillingPlan_ZeroUsage(t *testing.T) {
 func TestGetBillingPlan_QuotaGraceEffectiveLimits(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
 	uid := testhelper.GenerateUID(t)
 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
