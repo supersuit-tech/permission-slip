@@ -41,7 +41,7 @@ Fetch all the information needed to review the PR.
 ### 1a. PR Metadata
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr view $PR_NUMBER --json title,body,author,labels,headRefOid,baseRefName,files,commits,state
+$GH_CMD pr view $PR_NUMBER --json title,body,author,labels,headRefOid,baseRefName,files,commits,state
 ```
 
 Capture:
@@ -57,7 +57,7 @@ If `PR_STATE` is not `OPEN`, abort — no point reviewing a merged/closed PR.
 ### 1b. Full Diff
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr diff $PR_NUMBER
+$GH_CMD pr diff $PR_NUMBER
 ```
 
 Read and understand the complete diff.
@@ -65,7 +65,7 @@ Read and understand the complete diff.
 ### 1c. Read Changed Files
 
 For each file in `CHANGED_FILES`:
-- If the file still exists (not deleted), read the **full source file** to understand the broader context — not just the diff hunks.
+- If the file still exists (not deleted), read it to understand the broader context — not just the diff hunks. **If a file exceeds 500 lines**, read only the diff hunks plus ±30 lines of surrounding context instead of the full file.
 - If the file was deleted, only review the deletion in the diff.
 - Skip auto-generated files (e.g., `frontend/src/api/schema.d.ts`, vendor directories, lock files).
 
@@ -85,14 +85,15 @@ Repeat for `ROUND` = 1 to `MAX_TURNS`:
 
 If `ROUND > 1`:
 
-1. **Wait 5 minutes:**
+1. **Wait 5 minutes** using the Bash tool with `run_in_background: true`:
    ```bash
-   sleep 300
+   sleep 300 && echo "WAIT_COMPLETE"
    ```
+   Set `run_in_background: true` on this Bash call so the agent is not blocked. You will be notified when the sleep completes. While waiting, do NOT proceed to the next step — wait for the background task notification before continuing.
 
 2. **Check PR state:**
    ```bash
-   GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr view $PR_NUMBER --json state,headRefOid --jq '{state: .state, head: .headRefOid}'
+   $GH_CMD pr view $PR_NUMBER --json state,headRefOid --jq '{state: .state, head: .headRefOid}'
    ```
    - If PR is merged or closed → go to Step 3 (Final Summary) with a note that the PR was merged/closed.
 
@@ -100,10 +101,10 @@ If `ROUND > 1`:
    - Compare the new `HEAD_SHA` against `LAST_HEAD_SHA`.
    - If they differ, new commits were pushed. Re-fetch the diff and re-read any files that changed:
      ```bash
-     GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr diff $PR_NUMBER
+     $GH_CMD pr diff $PR_NUMBER
      ```
      ```bash
-     GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr view $PR_NUMBER --json commits --jq '.commits[] | select(.oid != "") | "\(.oid[:7]) \(.messageHeadline)"'
+     $GH_CMD pr view $PR_NUMBER --json commits --jq '.commits[] | select(.oid != "") | "\(.oid[:7]) \(.messageHeadline)"'
      ```
    - Note which prior review comments may have been addressed by the new commits.
    - Update `LAST_HEAD_SHA`.
@@ -177,9 +178,13 @@ Only flag **real issues**. Do not invent problems or pad the review. If you can'
 If there are findings, submit a PR review with inline comments:
 
 ```bash
-echo "$REVIEW_JSON" | GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api \
+echo "$REVIEW_JSON" | $GH_CMD api \
   repos/supersuit-tech/permission-slip/pulls/${PR_NUMBER}/reviews \
-  --input -
+  --input - || {
+    echo "ERROR: Failed to submit Round ${ROUND} review."
+    # Log the failure and abort — do not silently continue to the next round.
+    exit 1
+  }
 ```
 
 Where `$REVIEW_JSON` is:
@@ -192,13 +197,14 @@ Where `$REVIEW_JSON` is:
     {
       "path": "path/to/file.go",
       "line": 42,
+      "side": "RIGHT",
       "body": "**[Security]** This query uses string interpolation which is vulnerable to SQL injection. Use parameterized queries instead:\n```go\ndb.Query(\"SELECT * FROM users WHERE id = $1\", userID)\n```"
     }
   ]
 }
 ```
 
-Build the JSON payload using `jq` to ensure valid JSON. The `line` field is the line number in the file at the PR's HEAD commit (absolute line number, not diff position).
+Build the JSON payload using `jq` to ensure valid JSON. The `line` field is the line number in the file at the PR's HEAD commit (absolute line number, not diff position). The `side` field is **required** — use `"RIGHT"` for additions/modifications (the common case) and `"LEFT"` for deletions on the base side.
 
 **Important:** If a comment targets a line that was not changed in the PR diff, it cannot be an inline comment — include it in the review body instead. The GitHub API only allows inline comments on lines that appear in the diff.
 
@@ -264,7 +270,7 @@ After submitting the review, check whether to continue:
 After all rounds complete (or early exit), post a final issue comment summarizing the entire review:
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh api \
+$GH_CMD api \
   repos/supersuit-tech/permission-slip/issues/${PR_NUMBER}/comments \
   -f body="$SUMMARY"
 ```
@@ -303,7 +309,7 @@ Summary format:
 - **Don't invent problems** — only flag real, substantive issues. If a round has no findings, say so and move on. Padding reviews with nitpicks erodes trust.
 - **Be specific** — every comment should explain what's wrong AND how to fix it. Suggest code when possible.
 - **Prefix inline comments** with category tags (`[Security]`, `[Architecture]`, etc.) for scannability.
-- **Read full source files** — not just diff hunks. Many issues (DRY violations, architectural problems) are invisible without file-level context.
+- **Read source files for context** — not just diff hunks. Many issues (DRY violations, architectural problems) are invisible without file-level context. For files over 500 lines, read diff hunks ±30 lines of context instead of the full file to avoid exhausting the context window.
 - **Check diff lines** — inline comments can only be placed on lines that appear in the PR diff. If you need to comment on an unchanged line, include it in the review body instead.
 - **Acknowledge good work** — every round summary should include a "What Looks Good" section. Reviews that only criticize are demoralizing.
 - **Re-fetch between rounds** — always check for new commits before reviewing again to avoid flagging already-fixed issues.
