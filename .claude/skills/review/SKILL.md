@@ -109,9 +109,9 @@ If `ROUND > 1`:
      ```
    - **Fetch your prior review comments** to avoid posting duplicates:
      ```bash
-     $GH_CMD api repos/${GH_REPO_PATH}/pulls/${PR_NUMBER}/comments --jq '[.[] | select(.user.login == "YOUR_BOT_LOGIN") | {path: .path, line: .line, body: .body}]'
+     $GH_CMD api --paginate repos/${GH_REPO_PATH}/pulls/${PR_NUMBER}/comments --jq '[.[] | {path: .path, line: .line, body: .body}]'
      ```
-     Track these in a `PRIOR_COMMENTS` list and skip any finding that matches an already-posted comment (same file, same line, same issue).
+     Filter these to only comments authored by yourself (match on the login used by this Claude Code session). Track these in a `PRIOR_COMMENTS` list and skip any finding that matches an already-posted comment (same file, same line, same issue).
    - Note which prior review comments may have been addressed by the new commits.
    - Update `LAST_HEAD_SHA`.
 
@@ -180,6 +180,8 @@ For each issue found, create an inline comment with:
 Only flag **real issues**. Do not invent problems or pad the review. If you can't find issues in a category, that's fine — skip it. Quality over quantity.
 
 ### 2d. Submit Review
+
+**Always** submit a PR review, even when there are no findings (use an empty `comments` array). This ensures every round leaves a visible review event on the PR timeline.
 
 If there are findings, submit a PR review with inline comments:
 
@@ -275,10 +277,14 @@ After submitting the review, check whether to continue:
 
 After all rounds complete (or early exit), post a final issue comment summarizing the entire review:
 
+Build the summary as a shell variable, then post it using a heredoc to avoid quoting issues with special characters in PR titles or author names:
+
 ```bash
 $GH_CMD api \
   repos/${GH_REPO_PATH}/issues/${PR_NUMBER}/comments \
-  -f body="$SUMMARY"
+  --input - <<EOF
+{"body": $(echo "$SUMMARY" | jq -Rs .)}
+EOF
 ```
 
 Summary format:
