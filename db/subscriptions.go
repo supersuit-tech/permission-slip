@@ -382,6 +382,27 @@ func (sp *SubscriptionWithPlan) GracePeriodEndsAt() *time.Time {
 	return nil
 }
 
+// ClearSubscriptionQuotaGrace clears active paid-plan quota snapshot columns
+// immediately (user already on free). Returns the updated row, or nil if the
+// user had no active quota grace window.
+func ClearSubscriptionQuotaGrace(ctx context.Context, db DBTX, userID string) (*Subscription, error) {
+	s, err := scanSubscription(db.QueryRow(ctx,
+		`UPDATE subscriptions
+		 SET quota_plan_id = NULL,
+		     quota_entitlements_until = NULL,
+		     updated_at = now()
+		 WHERE user_id = $1
+		   AND quota_plan_id IS NOT NULL
+		   AND quota_entitlements_until IS NOT NULL
+		   AND quota_entitlements_until > now()
+		 RETURNING `+subscriptionColumns,
+		userID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return s, err
+}
+
 // ClearExpiredSubscriptionQuotaGrace clears quota grace columns when the
 // entitlement window has ended (lazy expiration on read paths).
 func ClearExpiredSubscriptionQuotaGrace(ctx context.Context, db DBTX, userID string) error {

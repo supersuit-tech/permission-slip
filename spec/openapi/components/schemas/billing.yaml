@@ -316,6 +316,7 @@ Subscription:
     - has_payment_method
     - can_upgrade
     - can_downgrade
+    - can_end_quota_grace_now
   properties:
     status:
       type: string
@@ -347,6 +348,13 @@ Subscription:
     can_downgrade:
       type: boolean
       description: Whether the user can downgrade (true when on a paid plan). Use this to show/hide the downgrade button.
+      example: false
+    can_end_quota_grace_now:
+      type: boolean
+      description: |
+        True when the user is already on the free plan but still has paid-plan quotas
+        until `quota_entitlements_until` (post–pay-as-you-go cancellation). The client may
+        offer "Downgrade now" to apply free-tier limits immediately via `POST /billing/downgrade`.
       example: false
     grace_period_ends_at:
       type: string

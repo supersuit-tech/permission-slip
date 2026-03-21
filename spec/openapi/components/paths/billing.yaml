@@ -353,7 +353,12 @@ downgrade:
       Cancels the Stripe subscription and sets a 7-day grace period during
       which the user retains the longer audit retention window to export data.
 
-      If the user is already on the free plan, returns 409 Conflict.
+      If the user is already on the free plan with no active paid-quota grace window
+      (`quota_entitlements_until` in the past or unset), returns 409 Conflict.
+
+      If the user is already on the free plan but still has paid-plan quotas until
+      the end of the cancelled billing period, this call clears that grace immediately
+      so free-tier limits apply right away (same limit warnings as a normal downgrade).
 
       Only available when `billing_enabled` is `true`.
     operationId: downgradePlan
@@ -376,7 +381,9 @@ downgrade:
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
       '409':
-        description: Already on the free plan
+        description: |
+          Conflict — already fully on the free plan, or entitlements already ended when
+          attempting to end quota grace early.
         content:
           application/json:
             schema:
