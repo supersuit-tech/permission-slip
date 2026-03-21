@@ -580,7 +580,7 @@ if [[ "$MAX_TURNS" -gt 0 && "$CURRENT_TURNS" -ge "$MAX_TURNS" ]]; then
   echo "[wrap-up] Generating session summary..."
   wrapup=$(generate_wrapup "$CURRENT_TURNS")
   echo "[wrap-up] Posting to PR..."
-  post_wrapup_comment "$wrapup"
+  post_wrapup_comment "$wrapup" || true
 
   echo "IDLE_TIMEOUT"
   echo "REASON=turn limit reached (${CURRENT_TURNS}/${MAX_TURNS})"
@@ -691,7 +691,7 @@ while true; do
     echo "[wrap-up] Generating session summary..."
     wrapup=$(generate_wrapup "$CYCLE")
     echo "[wrap-up] Posting to PR..."
-    post_wrapup_comment "$wrapup"
+    post_wrapup_comment "$wrapup" || true
 
     # CI triggering is handled by watch-post.sh (Step 5 in SKILL.md)
     echo "IDLE_TIMEOUT"

@@ -26,6 +26,7 @@ ACTION_LOG_FILE="$WORK_DIR/action-log.json"
 WRAPUP_COMMENT_ID_FILE="$WORK_DIR/wrapup-comment-id"
 PR_NUMBER_FILE="$WORK_DIR/pr-number.txt"
 APPENDED_COUNT_FILE="$WORK_DIR/wrapup-ci-remediations-appended-count"
+ROUND_FILE="$WORK_DIR/wrapup-ci-remediation-last-round"
 
 OWNER="supersuit-tech"
 REPO="permission-slip"
@@ -75,9 +76,24 @@ append_md=$(echo "$new_slice" | jq -r '
   ) | join("\n")
 ')
 
-block="## 🔧 CI / audit remediation
+last_round=0
+if [[ -f "$ROUND_FILE" ]]; then
+  last_round=$(tr -d '[:space:]' < "$ROUND_FILE" || echo "0")
+fi
+[[ -z "$last_round" || ! "$last_round" =~ ^[0-9]+$ ]] && last_round=0
+next_round=$((last_round + 1))
+
+if [[ "$stored" -eq 0 ]]; then
+  block="## 🔧 CI / audit remediation
+
+### Remediation round ${next_round}
 
 ${append_md}"
+else
+  block="### Remediation round ${next_round}
+
+${append_md}"
+fi
 
 posted=false
 if [[ -z "$COMMENT_ID" ]]; then
@@ -113,4 +129,5 @@ if [[ "$posted" != "true" ]]; then
 fi
 
 echo "$total" > "$APPENDED_COUNT_FILE"
-echo "[append-wrapup-ci] Appended $((total - stored)) remediation block(s). Total logged: ${total}."
+echo "$next_round" > "$ROUND_FILE"
+echo "[append-wrapup-ci] Appended round ${next_round} ($((total - stored)) entr(y/ies)). Total logged: ${total}."

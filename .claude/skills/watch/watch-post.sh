@@ -4,7 +4,7 @@
 # Invoked after the polling loop ends (idle timeout) and the agent has
 # finished all its work.
 #
-# Usage: bash watch-post.sh [PR_URL] [--no-automerge]
+# Usage: bash watch-post.sh [PR_URL] [--work-dir DIR] [--no-automerge] [--skip-webhook] [--webhook-only]
 #
 # This script handles steps 11-13 from the original SKILL.md:
 #   11. Trigger CI and audit, wait, fix failures (signals agent for fixes)
@@ -21,6 +21,7 @@ AUTO_MERGE=true
 NO_NOTIFY=false
 SKIP_WEBHOOK=false
 WEBHOOK_ONLY=false
+WORK_DIR=""
 
 # Parse arguments — PR URL is optional (auto-detected from current branch if omitted)
 while [[ $# -gt 0 ]]; do
@@ -30,6 +31,7 @@ while [[ $# -gt 0 ]]; do
     --no-notify) NO_NOTIFY=true; shift ;;
     --skip-webhook) SKIP_WEBHOOK=true; shift ;;
     --webhook-only) WEBHOOK_ONLY=true; shift ;;
+    --work-dir) WORK_DIR="$2"; shift 2 ;;
     https://*) PR_URL="$1"; shift ;;
     *) shift ;;
   esac
@@ -70,11 +72,25 @@ if [[ "$WEBHOOK_ONLY" == "true" ]]; then
     echo "[post] --webhook-only with --no-notify: nothing to do."
     exit 0
   fi
+  pending_file="${WORK_DIR}/post-webhook-pending"
+  if [[ -z "$WORK_DIR" || ! -f "$pending_file" ]]; then
+    echo "[post] ERROR: --webhook-only requires --work-dir and a prior successful watch-post run with --skip-webhook (missing ${pending_file})." >&2
+    exit 2
+  fi
   echo "[post] Triggering webhook notification only..."
-  gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null || echo "[post] WARNING: Failed to trigger webhook"
+  if gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null; then
+    rm -f "$pending_file"
+  else
+    echo "[post] WARNING: Failed to trigger webhook (sentinel kept for retry)." >&2
+    exit 1
+  fi
   echo "POST_WEBHOOK_ONLY=true"
   exit 0
 fi
+
+LOG_ROOT="${WORK_DIR:-/tmp}"
+CI_LOGS_FILE="${LOG_ROOT}/ci-failed-logs.txt"
+AUDIT_LOGS_FILE="${LOG_ROOT}/audit-failed-logs.txt"
 
 # ---------------------------------------------------------------------------
 # Snapshot latest run IDs before triggering (to detect new runs)
@@ -152,12 +168,12 @@ if [[ "$ci_conclusion" != "success" ]]; then
   echo "CI_CONCLUSION=${ci_conclusion}"
   echo "[post] Fetching CI logs (failed jobs if any)..."
   if [[ "$ci_run_id" != "unknown" ]]; then
-    gh_cmd run view "$ci_run_id" --log-failed 2>/dev/null > "/tmp/ci-failed-logs.txt" || true
-    gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "/tmp/ci-failed-logs.txt" || true
+    gh_cmd run view "$ci_run_id" --log-failed 2>/dev/null > "$CI_LOGS_FILE" || true
+    gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "$CI_LOGS_FILE" || true
   else
-    : > "/tmp/ci-failed-logs.txt"
+    : > "$CI_LOGS_FILE"
   fi
-  echo "CI_LOGS_FILE=/tmp/ci-failed-logs.txt"
+  echo "CI_LOGS_FILE=${CI_LOGS_FILE}"
   echo "AGENT_NEEDED"
   if [[ "$ci_conclusion" == "timeout" ]]; then
     echo "REASON=CI workflow did not complete within wait window — re-trigger or investigate GitHub Actions"
@@ -174,12 +190,12 @@ if [[ "$audit_conclusion" != "success" ]]; then
   echo "AUDIT_CONCLUSION=${audit_conclusion}"
   echo "[post] Fetching audit logs (failed jobs if any)..."
   if [[ "$audit_run_id" != "unknown" ]]; then
-    gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "/tmp/audit-failed-logs.txt" || true
-    gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "/tmp/audit-failed-logs.txt" || true
+    gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "$AUDIT_LOGS_FILE" || true
+    gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "$AUDIT_LOGS_FILE" || true
   else
-    : > "/tmp/audit-failed-logs.txt"
+    : > "$AUDIT_LOGS_FILE"
   fi
-  echo "AUDIT_LOGS_FILE=/tmp/audit-failed-logs.txt"
+  echo "AUDIT_LOGS_FILE=${AUDIT_LOGS_FILE}"
   echo "AGENT_NEEDED"
   if [[ "$audit_conclusion" == "timeout" ]]; then
     echo "REASON=Audit workflow did not complete within wait window — re-trigger or investigate GitHub Actions"
@@ -214,6 +230,14 @@ if [[ "$NO_NOTIFY" == "true" || "$SKIP_WEBHOOK" == "true" ]]; then
 else
   echo "[post] Triggering webhook notification..."
   gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null || echo "[post] WARNING: Failed to trigger webhook"
+  if [[ -n "$WORK_DIR" && -f "${WORK_DIR}/post-webhook-pending" ]]; then
+    rm -f "${WORK_DIR}/post-webhook-pending"
+  fi
+fi
+
+if [[ -n "$WORK_DIR" && "$SKIP_WEBHOOK" == "true" && "$NO_NOTIFY" == "false" ]]; then
+  touch "${WORK_DIR}/post-webhook-pending"
+  echo "[post] Wrote ${WORK_DIR}/post-webhook-pending (use --webhook-only after final green run to notify)."
 fi
 
 echo ""

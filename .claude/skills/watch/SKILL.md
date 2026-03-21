@@ -352,7 +352,7 @@ The action log is a JSON array. Each entry has a `type` field and type-specific 
 ]
 ```
 
-Use **`ci_remediation`** / **`audit_remediation`** after each failed post-session run you fix (one object per fix round is enough; add both if you fixed issues revealed by both workflows in one push). **`ci_fix_exhausted`** is only for hitting the 15-attempt limit. These types appear in the **next** full wrap-up if you re-run poll with a fresh session; within the same session, **`watch-append-wrapup-ci.sh`** appends a **## 🔧 CI / audit remediation** section to the **existing** wrap-up comment so the PR thread shows what changed after each fix.
+Use **`ci_remediation`** / **`audit_remediation`** after each failed post-session run you fix (one object per fix round is enough; add both if you fixed issues revealed by both workflows in one push). **`ci_fix_exhausted`** is only for hitting the 15-attempt limit. These types appear in the **next** full wrap-up if you re-run poll with a fresh session; within the same session, **`watch-append-wrapup-ci.sh`** appends under a single **## 🔧 CI / audit remediation** heading: the first batch adds that heading plus **### Remediation round 1**, and later batches add **### Remediation round N** only (no duplicate H2).
 
 ### Step 4: Loop back to polling
 
@@ -366,15 +366,15 @@ When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has alrea
 
 **Loop (run until both CI and audit report `success`, or you exhaust retries):**
 
-1. Run post-session. On the **first** iteration of this loop after wrap-up, pass **`--skip-webhook`** so the webhook does not fire until CI is actually green:
+1. Run post-session. Always pass **`--work-dir "$WORK_DIR"`** (same session directory as `watch-poll.sh`) so CI/audit logs are written under that directory (avoids `/tmp` clashes between concurrent watch sessions) and so the webhook sentinel file is session-scoped. On the **first** iteration of this loop after wrap-up, pass **`--skip-webhook`** so the webhook does not fire until CI is actually green (this creates **`${WORK_DIR}/post-webhook-pending`** on success):
    ```bash
-   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --skip-webhook 2>&1
+   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --skip-webhook 2>&1
    ```
-   On **subsequent** iterations (after you pushed fixes), omit `--skip-webhook` so each successful pass can notify as usual, **or** keep using `--skip-webhook` until the final successful iteration and then run once with `--webhook-only` (see step 4 below).
+   On **subsequent** iterations (after you pushed fixes), omit `--skip-webhook` so each successful pass can notify as usual, **or** keep using `--skip-webhook` until the final successful iteration and then run once with **`--webhook-only`** (see step 2b below).
 
-2. **Exit code 0** — Both workflows concluded `success`. If you used `--skip-webhook` on prior successful attempts, run once with **`--webhook-only`** (and without `--skip-webhook`) to trigger the webhook if `NO_NOTIFY` is false:
+2. **Exit code 0** — Both workflows concluded `success`. If the webhook was sent this run (no `--skip-webhook`), **`post-webhook-pending`** is removed automatically. If you used **`--skip-webhook`** and `NO_NOTIFY` is false, run once with **`--webhook-only`** — this **requires** `--work-dir` and an existing **`post-webhook-pending`** file (otherwise exit **2**); on success the webhook runs and the sentinel is removed:
    ```bash
-   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --webhook-only 2>&1
+   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --webhook-only 2>&1
    ```
    Read merge result from stdout (`PR merged successfully`, etc.).
 
@@ -387,7 +387,7 @@ When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has alrea
      ```bash
      bash "${SKILL_DIR}/watch-append-wrapup-ci.sh" --work-dir "$WORK_DIR"
      ```
-   - **Go back to step 1** and re-run `watch-post.sh` to trigger fresh workflow runs and wait again.
+   - **Go back to step 1** and re-run `watch-post.sh` with the same **`--work-dir "$WORK_DIR"`** so log paths stay session-isolated.
 
 4. **Retry limit** — Repeat step 3 **until CI and audit both succeed**, or until **15** failed post-session attempts (101/102) **in this loop** for the same PR session. If you hit the limit, append an `ci_fix_exhausted` entry to `action-log.json`, run `watch-append-wrapup-ci.sh` again, post a short PR comment that automated remediation stopped after 15 attempts and summarize what is still failing, then stop.
 
