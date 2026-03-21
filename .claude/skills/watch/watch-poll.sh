@@ -86,6 +86,8 @@ WORK_ITEMS_FILE="$WORK_DIR/work-items.json"
 ACTION_LOG_FILE="$WORK_DIR/action-log.json"
 CHECKLIST_CACHE_FILE="$WORK_DIR/checklist-cache.txt"
 TURNS_FILE="$WORK_DIR/turns-count"
+WRAPUP_COMMENT_ID_FILE="$WORK_DIR/wrapup-comment-id"
+PR_NUMBER_FILE="$WORK_DIR/pr-number.txt"
 
 # Only initialize state files if they don't already exist (fresh session)
 [[ -f "$LAST_REVIEW_ID_FILE" ]] || echo "0" > "$LAST_REVIEW_ID_FILE"
@@ -93,6 +95,7 @@ TURNS_FILE="$WORK_DIR/turns-count"
 [[ -f "$LAST_ISSUE_COMMENT_ID_FILE" ]] || echo "0" > "$LAST_ISSUE_COMMENT_ID_FILE"
 [[ -f "$ACTION_LOG_FILE" ]] || echo "[]" > "$ACTION_LOG_FILE"
 [[ -f "$TURNS_FILE" ]] || echo "0" > "$TURNS_FILE"
+echo "$PR_NUMBER" > "$PR_NUMBER_FILE"
 
 # Bot username(s) to filter out
 BOT_USERS=("claude-code[bot]" "github-actions[bot]" "claude[bot]")
@@ -424,6 +427,25 @@ generate_wrapup() {
     else map("- " + .description) | join("\n")
     end')
 
+  local ci_audit_fixes ci_fix_exhausted
+  ci_audit_fixes=$(echo "$action_log" | jq -r '
+    [.[] | select(.type == "ci_remediation" or .type == "audit_remediation")] |
+    if length == 0 then ""
+    else "### CI / audit fixes (logged)\n" + (map(
+        "- **" + .workflow + "** (" + .conclusion + ")"
+        + (if .commit != null and .commit != "" then " — `" + .commit + "`" else "" end)
+        + " — " + .detail
+      ) | join("\n"))
+    end')
+
+  ci_fix_exhausted=$(echo "$action_log" | jq -r '
+    [.[] | select(.type == "ci_fix_exhausted")] |
+    if length == 0 then ""
+    else "### CI / audit remediation stopped\n" + (map(
+        "- **" + .workflow + "** — " + .detail
+      ) | join("\n"))
+    end')
+
   local comment_count
   comment_count=$(echo "$action_log" | jq '[.[] | select(.type == "implemented" or .type == "declined")] | length')
 
@@ -480,6 +502,18 @@ ${open_questions}
 "
   fi
 
+  if [[ -n "$ci_audit_fixes" ]]; then
+    wrapup="${wrapup}
+${ci_audit_fixes}
+"
+  fi
+
+  if [[ -n "$ci_fix_exhausted" ]]; then
+    wrapup="${wrapup}
+${ci_fix_exhausted}
+"
+  fi
+
   wrapup="${wrapup}
 ---
 *Watch session ended after $((MAX_IDLE_CYCLES * POLL_INTERVAL / 60)) minutes of inactivity. Processed ${comment_count} comments across ${total_cycles} poll cycles.*"
@@ -493,7 +527,13 @@ ${open_questions}
 # ---------------------------------------------------------------------------
 post_wrapup_comment() {
   local body="$1"
-  gh_api "/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" -f body="$body" > /dev/null 2>&1
+  local resp
+  if ! resp=$(gh_api "/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" -f body="$body" 2>/dev/null); then
+    echo "[wrap-up] WARNING: Failed to post wrap-up comment" >&2
+    echo -n "" > "$WRAPUP_COMMENT_ID_FILE"
+    return 1
+  fi
+  echo "$resp" | jq -r '.id // empty' | tr -d '\n' > "$WRAPUP_COMMENT_ID_FILE"
 }
 
 # ---------------------------------------------------------------------------
@@ -508,7 +548,9 @@ print_session_context() {
   "auto_merge": ${AUTO_MERGE},
   "work_dir": "${WORK_DIR}",
   "work_items_file": "${WORK_ITEMS_FILE}",
-  "action_log_file": "${ACTION_LOG_FILE}"
+  "action_log_file": "${ACTION_LOG_FILE}",
+  "wrapup_comment_id_file": "${WRAPUP_COMMENT_ID_FILE}",
+  "pr_number_file": "${PR_NUMBER_FILE}"
 }
 EOF
 }

@@ -19,6 +19,8 @@ set -euo pipefail
 PR_URL=""
 AUTO_MERGE=true
 NO_NOTIFY=false
+SKIP_WEBHOOK=false
+WEBHOOK_ONLY=false
 
 # Parse arguments — PR URL is optional (auto-detected from current branch if omitted)
 while [[ $# -gt 0 ]]; do
@@ -26,6 +28,8 @@ while [[ $# -gt 0 ]]; do
     --automerge) AUTO_MERGE=true; shift ;;  # kept for backwards compat
     --no-automerge) AUTO_MERGE=false; shift ;;
     --no-notify) NO_NOTIFY=true; shift ;;
+    --skip-webhook) SKIP_WEBHOOK=true; shift ;;
+    --webhook-only) WEBHOOK_ONLY=true; shift ;;
     https://*) PR_URL="$1"; shift ;;
     *) shift ;;
   esac
@@ -57,6 +61,20 @@ gh_api() {
 gh_cmd() {
   GH_HOST="${GH_HOST}" GH_REPO="${GH_REPO}" gh "$@"
 }
+
+# ---------------------------------------------------------------------------
+# Webhook-only mode (after a successful --skip-webhook run)
+# ---------------------------------------------------------------------------
+if [[ "$WEBHOOK_ONLY" == "true" ]]; then
+  if [[ "$NO_NOTIFY" == "true" ]]; then
+    echo "[post] --webhook-only with --no-notify: nothing to do."
+    exit 0
+  fi
+  echo "[post] Triggering webhook notification only..."
+  gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null || echo "[post] WARNING: Failed to trigger webhook"
+  echo "POST_WEBHOOK_ONLY=true"
+  exit 0
+fi
 
 # ---------------------------------------------------------------------------
 # Snapshot latest run IDs before triggering (to detect new runs)
@@ -125,31 +143,49 @@ audit_run_id="${audit_result##*:}"
 echo "[post] Audit result: ${audit_conclusion} (run ${audit_run_id})"
 
 # ---------------------------------------------------------------------------
-# Report CI results
+# Report CI results (anything other than success needs remediation)
 # ---------------------------------------------------------------------------
-if [[ "$ci_conclusion" == "failure" ]]; then
+if [[ "$ci_conclusion" != "success" ]]; then
   echo ""
   echo "CI_FAILED"
   echo "CI_RUN_ID=${ci_run_id}"
-  # Fetch failed logs for the agent
-  echo "[post] Fetching failed CI logs..."
-  gh_cmd run view "$ci_run_id" --log-failed 2>/dev/null > "/tmp/ci-failed-logs.txt" || true
+  echo "CI_CONCLUSION=${ci_conclusion}"
+  echo "[post] Fetching CI logs (failed jobs if any)..."
+  if [[ "$ci_run_id" != "unknown" ]]; then
+    gh_cmd run view "$ci_run_id" --log-failed 2>/dev/null > "/tmp/ci-failed-logs.txt" || true
+    gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "/tmp/ci-failed-logs.txt" || true
+  else
+    : > "/tmp/ci-failed-logs.txt"
+  fi
   echo "CI_LOGS_FILE=/tmp/ci-failed-logs.txt"
   echo "AGENT_NEEDED"
-  echo "REASON=CI failure needs diagnosis and fix"
-  # Exit with special code — caller invokes agent to fix
+  if [[ "$ci_conclusion" == "timeout" ]]; then
+    echo "REASON=CI workflow did not complete within wait window — re-trigger or investigate GitHub Actions"
+  else
+    echo "REASON=CI did not succeed (conclusion=${ci_conclusion}) — fix and re-run"
+  fi
   exit 101
 fi
 
-if [[ "$audit_conclusion" == "failure" ]]; then
+if [[ "$audit_conclusion" != "success" ]]; then
   echo ""
   echo "AUDIT_FAILED"
   echo "AUDIT_RUN_ID=${audit_run_id}"
-  echo "[post] Fetching failed audit logs..."
-  gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "/tmp/audit-failed-logs.txt" || true
+  echo "AUDIT_CONCLUSION=${audit_conclusion}"
+  echo "[post] Fetching audit logs (failed jobs if any)..."
+  if [[ "$audit_run_id" != "unknown" ]]; then
+    gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "/tmp/audit-failed-logs.txt" || true
+    gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "/tmp/audit-failed-logs.txt" || true
+  else
+    : > "/tmp/audit-failed-logs.txt"
+  fi
   echo "AUDIT_LOGS_FILE=/tmp/audit-failed-logs.txt"
   echo "AGENT_NEEDED"
-  echo "REASON=Audit failure needs diagnosis and fix"
+  if [[ "$audit_conclusion" == "timeout" ]]; then
+    echo "REASON=Audit workflow did not complete within wait window — re-trigger or investigate GitHub Actions"
+  else
+    echo "REASON=Audit did not succeed (conclusion=${audit_conclusion}) — fix and re-run"
+  fi
   exit 102
 fi
 
@@ -171,10 +207,10 @@ elif [[ "$AUTO_MERGE" == "true" ]]; then
 fi
 
 # ---------------------------------------------------------------------------
-# Trigger webhook notification (skipped with --no-notify)
+# Trigger webhook notification (skipped with --no-notify or --skip-webhook)
 # ---------------------------------------------------------------------------
-if [[ "$NO_NOTIFY" == "true" ]]; then
-  echo "[post] Skipping webhook notification (--no-notify)."
+if [[ "$NO_NOTIFY" == "true" || "$SKIP_WEBHOOK" == "true" ]]; then
+  echo "[post] Skipping webhook notification (--no-notify or --skip-webhook)."
 else
   echo "[post] Triggering webhook notification..."
   gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null || echo "[post] WARNING: Failed to trigger webhook"
