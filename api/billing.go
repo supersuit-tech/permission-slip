@@ -142,6 +142,7 @@ type billingSubscription struct {
 	CanUpgrade         bool       `json:"can_upgrade"`
 	CanDowngrade       bool       `json:"can_downgrade"`
 	GracePeriodEndsAt  *time.Time `json:"grace_period_ends_at"`
+	IsFreePro          bool       `json:"is_free_pro"`
 }
 
 type billingUsageSummary struct {
@@ -158,9 +159,10 @@ func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
 		CurrentPeriodStart: sub.CurrentPeriodStart,
 		CurrentPeriodEnd:   sub.CurrentPeriodEnd,
 		HasPaymentMethod:   false,
-		CanUpgrade:         sub.PlanID == db.PlanFree,
-		CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
+		CanUpgrade:         sub.PlanID == db.PlanFree && !sub.IsFreePro,
+		CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo && !sub.IsFreePro,
 		GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
+		IsFreePro:          sub.IsFreePro,
 	}
 }
 
@@ -235,10 +237,15 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		planName := sub.Plan.Name
+		if sub.IsFreePro {
+			planName = "Free Pro"
+		}
+
 		resp := billingPlanResponse{
 			Plan: billingPlan{
 				ID:         sub.PlanID,
-				Name:       sub.Plan.Name,
+				Name:       planName,
 				planLimits: newPlanLimits(&sub.Plan),
 			},
 			Subscription: newBillingSubscription(sub),
@@ -377,9 +384,13 @@ func handleCreateCheckout(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// If already on paid plan, reject.
+		// If already on paid plan or free pro, reject.
 		if sub != nil && sub.PlanID == db.PlanPayAsYouGo {
 			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadySubscribed, "Already subscribed to a paid plan"))
+			return
+		}
+		if sub != nil && sub.IsFreePro {
+			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadySubscribed, "Already on a free pro plan"))
 			return
 		}
 
@@ -544,6 +555,12 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 		// Can only downgrade from a paid plan.
 		if sub.PlanID == db.PlanFree {
 			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadyDowngraded, "Already on the free plan"))
+			return
+		}
+
+		// Free pro users cannot downgrade — their plan is managed via coupon.
+		if sub.IsFreePro {
+			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadySubscribed, "Free pro accounts cannot be downgraded"))
 			return
 		}
 
@@ -760,6 +777,11 @@ func ReportPeriodUsage(ctx context.Context, deps *Deps, userID string, usage *db
 		return
 	}
 	if sub == nil || sub.StripeCustomerID == nil {
+		return
+	}
+
+	// Free pro users are not billed.
+	if sub.IsFreePro {
 		return
 	}
 

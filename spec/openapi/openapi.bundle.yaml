@@ -5381,6 +5381,47 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/redeem-coupon:
+    post:
+      summary: Redeem a free pro coupon
+      description: |
+        Validates a coupon code and grants the user a free pro account with
+        unlimited usage and no billing. The coupon code is an MD5 hash of
+        `{username}-{COUPON_SECRET}`. Once redeemed, the free pro status is
+        permanent (though it may be revoked per the Terms of Service).
+
+        Idempotent — if the user already has free pro, returns `already_redeemed`.
+      operationId: redeemCoupon
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemCouponRequest'
+      responses:
+        '200':
+          description: Coupon redeemed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedeemCouponResponse'
+              example:
+                status: redeemed
+                plan_id: pay_as_you_go
+        '400':
+          description: Invalid or missing coupon code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/admin/usage:
     get:
       summary: Get your usage for a billing period
@@ -10159,6 +10200,10 @@ components:
             During the grace period (7 days after downgrade), the user retains the longer
             audit retention window (90 days) to export their data. After this timestamp,
             retention drops to the free plan's window (7 days).
+        is_free_pro:
+          type: boolean
+          description: Whether the user has a free pro account (granted via coupon). Free pro users get unlimited usage with no billing.
+          example: false
     UsageSummary:
       type: object
       required:
@@ -11638,6 +11683,35 @@ components:
           pattern: ^https://
           description: Stripe Billing Portal URL — redirect the user here to manage their subscription. Always HTTPS.
           example: https://billing.stripe.com/p/session/test_...
+    RedeemCouponRequest:
+      type: object
+      required:
+        - coupon_code
+      properties:
+        coupon_code:
+          type: string
+          description: The coupon code to redeem for a free pro account
+          example: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+    RedeemCouponResponse:
+      type: object
+      required:
+        - status
+        - plan_id
+      properties:
+        status:
+          type: string
+          enum:
+            - redeemed
+            - already_redeemed
+          description: |
+            Redemption result:
+            - `redeemed`: Coupon was accepted and free pro was activated.
+            - `already_redeemed`: User already has a free pro account.
+          example: redeemed
+        plan_id:
+          type: string
+          description: The user's plan after redemption
+          example: pay_as_you_go
   parameters:
     ActionConfigId:
       name: config_id

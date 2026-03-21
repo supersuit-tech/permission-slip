@@ -13,6 +13,7 @@ import { BillingPageSkeleton } from "../billing/BillingPageSkeleton";
 import { UpgradeSuccessBanner } from "../billing/UpgradeSuccessBanner";
 import { activateUpgrade } from "../billing/activateUpgrade";
 import { DataRetentionSection } from "./DataRetentionSection";
+import { CouponRedemptionCard } from "../billing/CouponRedemptionCard";
 
 const RETRY_DELAYS = [1000, 2000, 3000];
 const ACTIVATION_KEY = "ps-billing-activation-done";
@@ -106,7 +107,10 @@ export function BillingSettingsPage() {
             pricing={billingPlan.pricing}
           />
           {billingPlan.subscription.can_upgrade && (
-            <UpgradeCTA plan={billingPlan.plan} pricing={billingPlan.pricing} />
+            <>
+              <UpgradeCTA plan={billingPlan.plan} pricing={billingPlan.pricing} />
+              <CouponRedemptionCard onRedeemed={() => refetch()} />
+            </>
           )}
           {billingPlan.subscription.can_downgrade && (
             <PlanDetailsCard

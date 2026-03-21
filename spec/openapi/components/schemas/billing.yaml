@@ -317,6 +317,39 @@ Subscription:
         During the grace period (7 days after downgrade), the user retains the longer
         audit retention window (90 days) to export their data. After this timestamp,
         retention drops to the free plan's window (7 days).
+    is_free_pro:
+      type: boolean
+      description: Whether the user has a free pro account (granted via coupon). Free pro users get unlimited usage with no billing.
+      example: false
+
+RedeemCouponRequest:
+  type: object
+  required:
+    - coupon_code
+  properties:
+    coupon_code:
+      type: string
+      description: The coupon code to redeem for a free pro account
+      example: a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6
+
+RedeemCouponResponse:
+  type: object
+  required:
+    - status
+    - plan_id
+  properties:
+    status:
+      type: string
+      enum: [redeemed, already_redeemed]
+      description: |
+        Redemption result:
+        - `redeemed`: Coupon was accepted and free pro was activated.
+        - `already_redeemed`: User already has a free pro account.
+      example: redeemed
+    plan_id:
+      type: string
+      description: The user's plan after redemption
+      example: pay_as_you_go
 
 UsageSummary:
   type: object

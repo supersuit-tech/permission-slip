@@ -130,7 +130,40 @@ export function TermsOfServicePage() {
         <li>Pass-through carrier costs with no markup</li>
       </ul>
 
-      <h3>5.5 Payment Terms</h3>
+      <h3>5.5 Free Pro Accounts</h3>
+      <p>
+        We may, at our sole discretion, grant certain users a &quot;Free
+        Pro&quot; account via a promotional coupon code. Free Pro accounts
+        receive the same resource limits and features as the Pay-as-You-Go tier
+        at no charge.
+      </p>
+      <ul>
+        <li>
+          Free Pro accounts are granted on a per-user basis and are
+          non-transferable
+        </li>
+        <li>
+          <strong>
+            We reserve the right to revoke, limit, or modify Free Pro accounts
+            at any time, for any reason, with or without notice
+          </strong>
+        </li>
+        <li>
+          Abuse of Free Pro access (e.g., excessive automated usage,
+          circumventing intended limits, or sharing coupon codes) may result in
+          immediate revocation
+        </li>
+        <li>
+          Free Pro accounts do not include any service level agreement (SLA),
+          priority support, or guaranteed availability
+        </li>
+        <li>
+          If a Free Pro account is revoked, the user will be downgraded to the
+          Free tier
+        </li>
+      </ul>
+
+      <h3>5.6 Payment Terms</h3>
       <ul>
         <li>Payments are processed via Stripe</li>
         <li>Usage is invoiced monthly based on actual consumption</li>

@@ -44,11 +44,12 @@ type Subscription struct {
 	CurrentPeriodStart   time.Time
 	CurrentPeriodEnd     time.Time
 	DowngradedAt         *time.Time // set when plan changes from paid to free; nil otherwise
+	IsFreePro            bool       // true when user redeemed a free pro coupon; grants pay_as_you_go limits with no billing
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }
 
-const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, created_at, updated_at`
+const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, is_free_pro, created_at, updated_at`
 
 func scanSubscription(row pgx.Row) (*Subscription, error) {
 	var s Subscription
@@ -62,6 +63,7 @@ func scanSubscription(row pgx.Row) (*Subscription, error) {
 		&s.CurrentPeriodStart,
 		&s.CurrentPeriodEnd,
 		&s.DowngradedAt,
+		&s.IsFreePro,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 	)
@@ -224,6 +226,21 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	}
 
 	return total, nil
+}
+
+// GrantFreePro upgrades a user to the pay_as_you_go plan with is_free_pro=true.
+// This gives them unlimited usage with no billing. Idempotent — returns the
+// existing subscription if already a free pro user.
+func GrantFreePro(ctx context.Context, db DBTX, userID string) (*Subscription, error) {
+	return scanSubscription(db.QueryRow(ctx,
+		`UPDATE subscriptions
+		 SET plan_id = $2,
+		     is_free_pro = true,
+		     downgraded_at = NULL,
+		     updated_at = now()
+		 WHERE user_id = $1
+		 RETURNING `+subscriptionColumns,
+		userID, PlanPayAsYouGo))
 }
 
 // GetSubscriptionByStripeCustomerID returns the subscription with the given
