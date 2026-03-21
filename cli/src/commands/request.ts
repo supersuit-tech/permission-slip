@@ -27,6 +27,7 @@ export function requestCommand(program: Command): void {
       "https://app.permissionslip.dev",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
+    .option("--request-id <id>", "Idempotency key — reuse across retries to prevent duplicate execution")
     .option("--payment-method-id <id>", "Payment method ID for payment-required actions")
     .option("--amount-cents <cents>", "Transaction amount in cents (required with --payment-method-id)", parseInt)
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
@@ -37,6 +38,7 @@ export function requestCommand(program: Command): void {
       riskLevel?: string;
       server: string;
       agentId?: string;
+      requestId?: string;
       paymentMethodId?: string;
       amountCents?: number;
       pretty?: boolean;
@@ -62,6 +64,7 @@ export function requestCommand(program: Command): void {
             : undefined;
 
         const result = await client.requestApproval(opts.action, params, context, {
+          requestId: opts.requestId,
           paymentMethodId: opts.paymentMethodId,
           amountCents: opts.amountCents,
         });

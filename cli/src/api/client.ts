@@ -249,9 +249,9 @@ export class ApiClient {
     actionId: string,
     params: unknown,
     context?: { description?: string; risk_level?: string },
-    payment?: { paymentMethodId?: string; amountCents?: number },
+    payment?: { requestId?: string; paymentMethodId?: string; amountCents?: number },
   ) {
-    const requestId = crypto.randomUUID();
+    const requestId = payment?.requestId ?? crypto.randomUUID();
     const body: Record<string, unknown> = {
       request_id: requestId,
       action: { type: actionId, parameters: params },
