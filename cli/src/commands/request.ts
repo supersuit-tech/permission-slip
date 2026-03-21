@@ -70,8 +70,9 @@ export function requestCommand(program: Command): void {
         });
 
         if (result.status === "approved") {
-          // Auto-approved via standing approval — result is inline.
-          output(result, outputOpts);
+          // Auto-approved via standing approval — action already executed, result is inline.
+          // Include executed flag so external tools know no further action is needed.
+          output({ ...result, executed: true }, outputOpts);
         } else {
           // Pending — tell the user how to check the result.
           output(
