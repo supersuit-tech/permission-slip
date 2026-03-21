@@ -107,13 +107,17 @@ If `ROUND > 1`:
      ```bash
      $GH_CMD pr view $PR_NUMBER --json commits --jq '.commits[] | select(.oid != "") | "\(.oid[:7]) \(.messageHeadline)"'
      ```
-   - **Fetch your prior review comments** to avoid posting duplicates:
+   - **Fetch your prior review comments** to avoid posting duplicates. First, resolve your own login:
      ```bash
-     $GH_CMD api --paginate repos/${GH_REPO_PATH}/pulls/${PR_NUMBER}/comments --jq '[.[] | {path: .path, line: .line, body: .body}]'
+     MY_LOGIN=$($GH_CMD api user --jq '.login')
      ```
-     Filter these to only comments authored by yourself (match on the login used by this Claude Code session). Track these in a `PRIOR_COMMENTS` list and skip any finding that matches an already-posted comment (same file, same line, same issue).
+     Then fetch and filter:
+     ```bash
+     $GH_CMD api --paginate repos/${GH_REPO_PATH}/pulls/${PR_NUMBER}/comments --jq "[.[] | select(.user.login == \"$MY_LOGIN\") | {path: .path, line: .line, body: .body}]"
+     ```
+     Track these in a `PRIOR_COMMENTS` list and skip any finding that matches an already-posted comment (same file, same line, same issue).
    - Note which prior review comments may have been addressed by the new commits.
-   - Update `LAST_HEAD_SHA`.
+   - **Update `LAST_HEAD_SHA`** to the new `HEAD_SHA` value from step 2a.2 (the `head` field from the state check). This must happen regardless of whether commits changed — the state check fetches the authoritative SHA.
 
 ### 2b. Perform Comprehensive Review
 
