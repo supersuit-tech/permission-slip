@@ -68,7 +68,11 @@ func handleActivateUpgrade(deps *Deps) http.HandlerFunc {
 
 		// Only activate if the session is complete and payment succeeded.
 		if sess.Status != "complete" || sess.PaymentStatus != "paid" {
-			RespondJSON(w, http.StatusOK, activateResponse{PlanID: db.PlanFree, Status: "pending"})
+			pendingPlan := db.PlanFree
+			if sub != nil && sub.PlanID == db.PlanFreePro {
+				pendingPlan = db.PlanFreePro
+			}
+			RespondJSON(w, http.StatusOK, activateResponse{PlanID: pendingPlan, Status: "pending"})
 			return
 		}
 
@@ -98,7 +102,7 @@ func handleActivateUpgrade(deps *Deps) http.HandlerFunc {
 		}
 
 		// Atomically upgrade — same logic as the webhook handler.
-		upgraded, err := db.UpgradeSubscriptionPlan(r.Context(), deps.DB, profile.ID, db.PlanFree, db.PlanPayAsYouGo)
+		upgraded, err := db.UpgradePayAsYouGoFromFreeOrFreePro(r.Context(), deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] ActivateUpgrade: upgrade plan: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)

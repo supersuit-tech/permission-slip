@@ -8,6 +8,7 @@ import (
 const (
 	PlanFree       = config.PlanFree
 	PlanPayAsYouGo = config.PlanPayAsYouGo
+	PlanFreePro    = config.PlanFreePro
 )
 
 // DefaultPlanID returns the plan to assign new or unsubscribed users.

@@ -59,6 +59,8 @@ Error:
         - approval_already_resolved
         - duplicate_credential
         - already_subscribed
+        - invalid_coupon
+        - plan_change_not_allowed
         # 410 Gone
         - registration_expired
         - verification_locked

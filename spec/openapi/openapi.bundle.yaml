@@ -5238,6 +5238,9 @@ paths:
         needed to render the billing section of the settings page in a single request.
 
         Only available when `billing_enabled` is `true` in the server config.
+
+        Plan IDs include `free_pro` for complimentary Pro (unlimited usage, no
+        Stripe per-request billing) granted via coupon.
       operationId: getBillingPlan
       tags:
         - Billing
@@ -5333,6 +5336,67 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '502':
           description: Stripe API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/redeem-coupon:
+    post:
+      summary: Redeem complimentary Pro coupon
+      description: |
+        Applies a one-time coupon that upgrades the authenticated user from the
+        free plan to complimentary Pro (`free_pro`) when the coupon matches
+        `HMAC-SHA256(COUPON_SECRET, trimmed username)` as lowercase hex (64 chars).
+
+        **Requirements:** `billing_enabled` is `true` and the server has a
+        non-empty `COUPON_SECRET` environment variable. If the secret is unset,
+        this route is not registered.
+
+        Returns `403` with `invalid_coupon` for a wrong code. Returns `409`
+        `already_subscribed` if the user is already on pay-as-you-go. Idempotent
+        for users already on `free_pro` (`already_redeemed`).
+      operationId: redeemComplimentaryProCoupon
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemCouponRequest'
+      responses:
+        '200':
+          description: Coupon applied or already active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedeemCouponResponse'
+        '400':
+          description: Missing coupon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Invalid coupon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No subscription found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Not on free plan or already on paid Stripe plan
           content:
             application/json:
               schema:
@@ -9902,7 +9966,7 @@ components:
       properties:
         plan_id:
           type: string
-          description: The plan ID (e.g., "free", "pay_as_you_go")
+          description: The plan ID (e.g., "free", "pay_as_you_go", "free_pro")
           example: free
         plan_name:
           type: string
@@ -10195,6 +10259,7 @@ components:
         - subscription
         - usage
         - pricing
+        - coupon_redemption_enabled
       properties:
         plan:
           $ref: '#/components/schemas/Plan'
@@ -10204,6 +10269,13 @@ components:
           $ref: '#/components/schemas/UsageSummary'
         pricing:
           $ref: '#/components/schemas/BillingPricing'
+        coupon_redemption_enabled:
+          type: boolean
+          description: |
+            True when the server has `COUPON_SECRET` set so `POST /v1/billing/redeem-coupon`
+            is available. The frontend may show a coupon entry form when true and the user
+            is on the free plan.
+          example: false
     UsageDetail:
       type: object
       description: |
@@ -11334,6 +11406,8 @@ components:
             - approval_already_resolved
             - duplicate_credential
             - already_subscribed
+            - invalid_coupon
+            - plan_change_not_allowed
             - registration_expired
             - verification_locked
             - approval_expired
@@ -11627,6 +11701,40 @@ components:
           type: string
           description: Human-readable per-request price string (e.g. "$0.005"), sourced from the Stripe price object.
           example: $0.005
+    RedeemCouponRequest:
+      type: object
+      required:
+        - coupon
+      properties:
+        coupon:
+          type: string
+          description: |
+            Lowercase hex HMAC-SHA256(`COUPON_SECRET`, trimmed username) for the
+            authenticated user's profile username. One-time grant from free to
+            complimentary Pro when valid.
+          minLength: 64
+          maxLength: 64
+          pattern: ^[0-9a-f]{64}$
+          example: a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+    RedeemCouponResponse:
+      type: object
+      required:
+        - plan_id
+        - status
+      properties:
+        plan_id:
+          type: string
+          description: Plan after redemption (typically "free_pro")
+          example: free_pro
+        status:
+          type: string
+          description: |
+            `redeemed` when the plan was upgraded, `already_redeemed` when the
+            account was already on complimentary Pro.
+          enum:
+            - redeemed
+            - already_redeemed
+          example: redeemed
     PortalResponse:
       type: object
       required:

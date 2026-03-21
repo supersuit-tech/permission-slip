@@ -103,6 +103,32 @@ func TestEnsureAllUsersSubscribed_UpgradesFreeWhenBillingDisabled(t *testing.T) 
 	}
 }
 
+func TestEnsureAllUsersSubscribed_UpgradesFreeProWhenBillingDisabled(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFreePro)
+
+	count, err := db.EnsureAllUsersSubscribed(ctx, tx, false)
+	if err != nil {
+		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
+	}
+	if count < 1 {
+		t.Errorf("expected at least 1 upgraded, got %d", count)
+	}
+
+	sub, err := db.GetSubscriptionByUserID(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("GetSubscriptionByUserID: %v", err)
+	}
+	if sub.PlanID != db.PlanPayAsYouGo {
+		t.Errorf("free_pro should normalize to %s when billing off, got %s", db.PlanPayAsYouGo, sub.PlanID)
+	}
+}
+
 func TestEnsureAllUsersSubscribed_PreservesPayAsYouGo(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
