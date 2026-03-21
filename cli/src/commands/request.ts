@@ -8,7 +8,7 @@
  */
 
 import type { Command } from "commander";
-import { ApiClient } from "../api/client.js";
+import { ApiClient, PermissionSlipApiError } from "../api/client.js";
 import { resolveAgentId } from "./status.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
@@ -27,6 +27,7 @@ export function requestCommand(program: Command): void {
       "https://app.permissionslip.dev",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
+    .option("--request-id <id>", "Idempotency key — reuse across retries to prevent duplicate execution")
     .option("--payment-method-id <id>", "Payment method ID for payment-required actions")
     .option("--amount-cents <cents>", "Transaction amount in cents (required with --payment-method-id)", parseInt)
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
@@ -37,6 +38,7 @@ export function requestCommand(program: Command): void {
       riskLevel?: string;
       server: string;
       agentId?: string;
+      requestId?: string;
       paymentMethodId?: string;
       amountCents?: number;
       pretty?: boolean;
@@ -61,14 +63,18 @@ export function requestCommand(program: Command): void {
               }
             : undefined;
 
-        const result = await client.requestApproval(opts.action, params, context, {
-          paymentMethodId: opts.paymentMethodId,
-          amountCents: opts.amountCents,
-        });
+        const result = await client.requestApproval(
+          opts.action,
+          params,
+          context,
+          { paymentMethodId: opts.paymentMethodId, amountCents: opts.amountCents },
+          opts.requestId,
+        );
 
         if (result.status === "approved") {
-          // Auto-approved via standing approval — result is inline.
-          output(result, outputOpts);
+          // Auto-approved via standing approval — action already executed, result is inline.
+          // Include executed flag so external tools know no further action is needed.
+          output({ ...result, executed: true }, outputOpts);
         } else {
           // Pending — tell the user how to check the result.
           output(
@@ -83,6 +89,17 @@ export function requestCommand(program: Command): void {
           );
         }
       } catch (err) {
+        // Treat 409 duplicate_request_id as an idempotency success — the action
+        // was already executed on a prior call with this request_id. Exit 0 so
+        // external tools (AI agents, MCP wrappers) don't retry.
+        if (
+          err instanceof PermissionSlipApiError &&
+          err.statusCode === 409 &&
+          err.apiError.code === "duplicate_request_id"
+        ) {
+          output({ status: "duplicate", executed: true, request_id: opts.requestId }, outputOpts);
+          return;
+        }
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
         process.exit(1);
       }

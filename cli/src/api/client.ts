@@ -250,10 +250,13 @@ export class ApiClient {
     params: unknown,
     context?: { description?: string; risk_level?: string },
     payment?: { paymentMethodId?: string; amountCents?: number },
+    requestId?: string,
   ) {
-    const requestId = crypto.randomUUID();
+    const resolvedRequestId = (requestId && requestId.trim().length > 0)
+      ? requestId
+      : crypto.randomUUID();
     const body: Record<string, unknown> = {
-      request_id: requestId,
+      request_id: resolvedRequestId,
       action: { type: actionId, parameters: params },
       context: context ?? {},
     };
