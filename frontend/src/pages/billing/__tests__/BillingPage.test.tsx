@@ -368,8 +368,8 @@ describe("BillingPage", () => {
       expect(screen.getByText(/You have 25 standing approvals/)).toBeInTheDocument();
       expect(screen.getByText(/You have 20 credentials/)).toBeInTheDocument();
 
-      // Confirm button should be disabled when over limits
-      expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeDisabled();
+      // Confirm button should be enabled — warnings are informational, not blockers
+      expect(screen.getByRole("button", { name: "Confirm Downgrade" })).toBeEnabled();
 
       // Should show "Manage" links for each over-limit resource
       expect(screen.getByText("Manage agents")).toBeInTheDocument();

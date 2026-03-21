@@ -88,7 +88,7 @@ export function DowngradeConfirmDialog({
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
                 <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                  You&apos;re over free plan limits
+                  You&apos;re over free plan limits (enforced after your billing period ends)
                 </p>
               </div>
               <ul className="ml-6 space-y-1.5">
@@ -110,18 +110,15 @@ export function DowngradeConfirmDialog({
           <div className="rounded-lg border p-4 space-y-1">
             <p className="text-sm font-medium">What changes</p>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>Audit retention drops from {paidPlan.audit_retention_days} days to {freePlan.audit_retention_days} days</li>
+              <li>Your paid plan resource limits are preserved until the end of your current billing period</li>
               <li>
-                Resource limits will be enforced ({FREE_PLAN_LIMITS.agents.limit} agents,{" "}
+                After that, free plan limits apply ({FREE_PLAN_LIMITS.agents.limit} agents,{" "}
                 {FREE_PLAN_LIMITS.standing_approvals.limit} approvals,{" "}
-                {FREE_PLAN_LIMITS.credentials.limit} credentials)
+                {FREE_PLAN_LIMITS.credentials.limit} credentials,{" "}
+                {formatLimit(freePlan.max_requests_per_month)} requests/month)
               </li>
-              <li>{formatLimit(freePlan.max_requests_per_month)} request/month limit</li>
+              <li>Audit retention drops from {paidPlan.audit_retention_days} to {freePlan.audit_retention_days} days after a 7-day grace period</li>
             </ul>
-            <p className="mt-2 text-xs text-muted-foreground">
-              A 7-day grace period preserves your {paidPlan.audit_retention_days}-day audit retention so you
-              can export data before it reverts.
-            </p>
           </div>
 
           {error && (
@@ -140,7 +137,7 @@ export function DowngradeConfirmDialog({
           <Button
             variant="destructive"
             onClick={onConfirm}
-            disabled={isPending || hasWarnings}
+            disabled={isPending}
           >
             {isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
             Confirm Downgrade

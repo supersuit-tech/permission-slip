@@ -850,7 +850,7 @@ func TestDowngrade_Success_NoStripe(t *testing.T) {
 	}
 }
 
-func TestDowngrade_TooManyAgents(t *testing.T) {
+func TestDowngrade_TooManyAgents_SucceedsWithWarning(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -859,7 +859,6 @@ func TestDowngrade_TooManyAgents(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
 	// Create more registered agents than the free plan allows.
-	// Free plan limit is 5 agents (from seed data).
 	for i := 0; i < 6; i++ {
 		testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 	}
@@ -871,23 +870,27 @@ func TestDowngrade_TooManyAgents(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	// Downgrade now succeeds with warnings instead of blocking.
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var errResp ErrorResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
-		t.Fatalf("failed to parse error response: %v", err)
+	var resp downgradeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
 	}
-	if errResp.Error.Code != ErrDowngradeLimitExceeded {
-		t.Errorf("expected error code %s, got %s", ErrDowngradeLimitExceeded, errResp.Error.Code)
+	if len(resp.Warnings) == 0 {
+		t.Error("expected warnings about agent limit, got none")
 	}
-	if errResp.Error.Details["resource"] != "agents" {
-		t.Errorf("expected resource=agents, got %v", errResp.Error.Details["resource"])
+	if resp.Warnings[0].Resource != "agents" {
+		t.Errorf("expected warning resource=agents, got %s", resp.Warnings[0].Resource)
+	}
+	if resp.QuotaEntitlementsUntil == nil {
+		t.Error("expected quota_entitlements_until to be set")
 	}
 }
 
-func TestDowngrade_TooManyStandingApprovals(t *testing.T) {
+func TestDowngrade_TooManyStandingApprovals_SucceedsWithWarning(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -897,7 +900,6 @@ func TestDowngrade_TooManyStandingApprovals(t *testing.T) {
 
 	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 
-	// Free plan limit is 10 active standing approvals (from seed data).
 	for i := 0; i < 11; i++ {
 		saID := testhelper.GenerateID(t, "sa_")
 		testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)
@@ -910,23 +912,23 @@ func TestDowngrade_TooManyStandingApprovals(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var errResp ErrorResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
-		t.Fatalf("failed to parse error response: %v", err)
+	var resp downgradeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
 	}
-	if errResp.Error.Code != ErrDowngradeLimitExceeded {
-		t.Errorf("expected error code %s, got %s", ErrDowngradeLimitExceeded, errResp.Error.Code)
+	if len(resp.Warnings) == 0 {
+		t.Error("expected warnings about standing approval limit, got none")
 	}
-	if errResp.Error.Details["resource"] != "standing_approvals" {
-		t.Errorf("expected resource=standing_approvals, got %v", errResp.Error.Details["resource"])
+	if resp.Warnings[0].Resource != "standing_approvals" {
+		t.Errorf("expected warning resource=standing_approvals, got %s", resp.Warnings[0].Resource)
 	}
 }
 
-func TestDowngrade_TooManyCredentials(t *testing.T) {
+func TestDowngrade_TooManyCredentials_SucceedsWithWarning(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -934,7 +936,6 @@ func TestDowngrade_TooManyCredentials(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	// Free plan limit is 5 credentials (from seed data).
 	for i := 0; i < 6; i++ {
 		credID := testhelper.GenerateID(t, "cred_")
 		service := testhelper.GenerateID(t, "svc_")
@@ -948,19 +949,19 @@ func TestDowngrade_TooManyCredentials(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var errResp ErrorResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
-		t.Fatalf("failed to parse error response: %v", err)
+	var resp downgradeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to parse response: %v", err)
 	}
-	if errResp.Error.Code != ErrDowngradeLimitExceeded {
-		t.Errorf("expected error code %s, got %s", ErrDowngradeLimitExceeded, errResp.Error.Code)
+	if len(resp.Warnings) == 0 {
+		t.Error("expected warnings about credential limit, got none")
 	}
-	if errResp.Error.Details["resource"] != "credentials" {
-		t.Errorf("expected resource=credentials, got %v", errResp.Error.Details["resource"])
+	if resp.Warnings[0].Resource != "credentials" {
+		t.Errorf("expected warning resource=credentials, got %s", resp.Warnings[0].Resource)
 	}
 }
 

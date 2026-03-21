@@ -6,15 +6,18 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { BillingPricing, Plan, UsageSummary } from "@/hooks/useBillingPlan";
+import type { BillingPlanResponse, BillingPricing, Plan, UsageSummary } from "@/hooks/useBillingPlan";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { FREE_REQUEST_ALLOWANCE, PRICE_PER_REQUEST } from "./constants";
 import { DetailRow } from "./DetailRow";
+
+type EffectiveLimits = BillingPlanResponse["effective_limits"];
 
 interface UsageSummaryCardProps {
   usage: UsageSummary;
   plan: Plan;
   pricing?: BillingPricing;
+  effectiveLimits?: EffectiveLimits;
 }
 
 interface UsageRowProps {
@@ -93,12 +96,20 @@ function PaidRequestRow({ current, included, priceDisplay }: { current: number; 
   );
 }
 
-export function UsageSummaryCard({ usage, plan, pricing }: UsageSummaryCardProps) {
+export function UsageSummaryCard({ usage, plan, pricing, effectiveLimits }: UsageSummaryCardProps) {
   const isPaid = plan.id !== "free" && plan.id !== "free_pro";
   const { usage: usageDetail } = useBillingUsage();
   // Use server-provided included value, fall back to config constant.
   const included = usageDetail?.requests.included ?? FREE_REQUEST_ALLOWANCE;
   const priceDisplay = pricing?.price_per_request_display ?? PRICE_PER_REQUEST;
+
+  // During quota grace period, use effective limits (paid plan limits) instead of
+  // the current plan's limits. This ensures the UI shows the limits actually enforced.
+  const limits = effectiveLimits ?? plan;
+  const hasGrace = !!effectiveLimits;
+  // Show paid-style request row when user is on paid plan OR in quota grace period
+  // (effective limits have no request cap).
+  const showPaidRequests = isPaid || (hasGrace && limits.max_requests_per_month == null);
 
   return (
     <Card>
@@ -108,34 +119,34 @@ export function UsageSummaryCard({ usage, plan, pricing }: UsageSummaryCardProps
           <CardTitle>Usage</CardTitle>
         </div>
         <CardDescription>
-          Current resource usage against your plan limits.
+          Current resource usage against your {hasGrace ? "effective" : "plan"} limits.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {isPaid ? (
+          {showPaidRequests ? (
             <PaidRequestRow current={usage.requests} included={included} priceDisplay={priceDisplay} />
           ) : (
             <UsageRow
               label="Requests"
               current={usage.requests}
-              limit={plan.max_requests_per_month ?? null}
+              limit={limits.max_requests_per_month ?? null}
             />
           )}
           <UsageRow
             label="Agents"
             current={usage.agents}
-            limit={plan.max_agents ?? null}
+            limit={limits.max_agents ?? null}
           />
           <UsageRow
             label="Standing Approvals"
             current={usage.standing_approvals}
-            limit={plan.max_standing_approvals ?? null}
+            limit={limits.max_standing_approvals ?? null}
           />
           <UsageRow
             label="Credentials"
             current={usage.credentials}
-            limit={plan.max_credentials ?? null}
+            limit={limits.max_credentials ?? null}
           />
           <DetailRow label="Audit Retention">
             <span className="text-muted-foreground">{plan.audit_retention_days} days</span>

@@ -78,11 +78,18 @@ export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
               Your payment method failed. Please update it to avoid service interruption.
             </p>
           )}
-          {subscription.grace_period_ends_at && (
+          {subscription.quota_entitlements_until && (
             <p className="text-amber-700 dark:text-amber-300 text-xs">
-              Your paid plan features are preserved until{" "}
+              Your paid plan resource limits are preserved until{" "}
+              {formatDate(subscription.quota_entitlements_until)}. After that,
+              free plan limits will apply.
+            </p>
+          )}
+          {subscription.grace_period_ends_at && !subscription.quota_entitlements_until && (
+            <p className="text-amber-700 dark:text-amber-300 text-xs">
+              Your {90}-day audit retention is preserved until{" "}
               {formatDate(subscription.grace_period_ends_at)}. After that,
-              your account will revert to free plan limits.
+              retention drops to 7 days.
             </p>
           )}
         </div>

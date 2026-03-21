@@ -34,9 +34,10 @@ func checkResourceLimit(ctx context.Context, w http.ResponseWriter, r *http.Requ
 		return false // no subscription — bypass limits
 	}
 
-	limit := cfg.getLimit(&sp.Plan)
+	effectivePlan := sp.EffectiveQuotaPlan()
+	limit := cfg.getLimit(effectivePlan)
 	if limit == nil {
-		return false // unlimited plan
+		return false // unlimited plan (or quota grace period active)
 	}
 
 	count, err := cfg.countFn(ctx, d, userID)
@@ -50,12 +51,12 @@ func checkResourceLimit(ctx context.Context, w http.ResponseWriter, r *http.Requ
 	if count >= *limit {
 		resp := Forbidden(cfg.errorCode, fmt.Sprintf(
 			"%s plan allows up to %d %s. Upgrade your plan to add more.",
-			sp.Plan.Name, *limit, cfg.resourceName,
+			effectivePlan.Name, *limit, cfg.resourceName,
 		))
 		resp.Error.Details = map[string]any{
 			"current_count": count,
 			"limit":         *limit,
-			"plan_id":       sp.Plan.ID,
+			"plan_id":       effectivePlan.ID,
 		}
 		RespondError(w, r, http.StatusForbidden, resp)
 		return true
@@ -97,9 +98,10 @@ func checkRequestQuota(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		return r, false // no subscription — bypass limits
 	}
 
-	limit := sp.Plan.MaxRequestsPerMonth
+	effectivePlan := sp.EffectiveQuotaPlan()
+	limit := effectivePlan.MaxRequestsPerMonth
 	if limit == nil {
-		return r, false // unlimited plan (paid tier)
+		return r, false // unlimited plan (paid tier or quota grace period)
 	}
 
 	now := time.Now()
@@ -138,7 +140,7 @@ func checkRequestQuota(ctx context.Context, w http.ResponseWriter, r *http.Reque
 		resp.Error.Details = map[string]any{
 			"current_usage": currentCount,
 			"limit":         *limit,
-			"plan_id":       sp.Plan.ID,
+			"plan_id":       effectivePlan.ID,
 			"reset_at":      resetAt,
 		}
 		w.Header().Set("Retry-After", strconv.Itoa(retryAfter))

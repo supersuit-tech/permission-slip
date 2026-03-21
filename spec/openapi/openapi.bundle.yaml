@@ -10223,6 +10223,15 @@ components:
             During the grace period (7 days after downgrade), the user retains the longer
             audit retention window (90 days) to export their data. After this timestamp,
             retention drops to the free plan's window (7 days).
+        quota_entitlements_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When paid quota entitlements expire after a downgrade, or null if no quota
+            grace period is active. During this period, the user retains their previous
+            paid plan's resource limits (unlimited agents, approvals, credentials, and
+            no request cap). After this timestamp, free plan limits are enforced.
     UsageSummary:
       type: object
       required:
@@ -10267,6 +10276,15 @@ components:
           $ref: '#/components/schemas/Subscription'
         usage:
           $ref: '#/components/schemas/UsageSummary'
+        effective_limits:
+          $ref: '#/components/schemas/PlanLimits'
+          nullable: true
+          description: |
+            The resource limits currently in effect, or null when they match the plan's
+            limits. Present only during a quota grace period (after downgrade, before
+            `quota_entitlements_until`), when the user retains their previous paid plan's
+            limits. The frontend should use these values for limit displays and progress
+            bars instead of `plan.max_*` when present.
         pricing:
           $ref: '#/components/schemas/BillingPricing'
         coupon_redemption_enabled:
@@ -11637,6 +11655,30 @@ components:
           type: integer
           description: Number of days audit logs are retained
           example: 7
+    DowngradeWarning:
+      type: object
+      required:
+        - resource
+        - current
+        - max_allowed
+        - message
+      properties:
+        resource:
+          type: string
+          description: The resource type that exceeds the free plan limit
+          example: agents
+        current:
+          type: integer
+          description: Current count of this resource
+          example: 6
+        max_allowed:
+          type: integer
+          description: Maximum allowed on the free plan
+          example: 3
+        message:
+          type: string
+          description: Human-readable warning message
+          example: 'You have 6 agents (free limit: 3). Free plan limits apply after Apr 1, 2026.'
     DowngradeResponse:
       type: object
       required:
@@ -11668,6 +11710,22 @@ components:
             When the 7-day grace period expires. Until this time, the user retains
             the 90-day audit retention window from their paid plan. Show this to the
             user so they know how long they have to export their data.
+        quota_entitlements_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When paid quota entitlements expire. Until this time, the user retains
+            their previous paid plan's resource limits (unlimited agents, approvals,
+            credentials, and no request cap). Null if no quota grace period applies.
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DowngradeWarning'
+          description: |
+            Warnings about resources that exceed free plan limits. Informational only —
+            the downgrade proceeds regardless. Free plan limits are enforced after
+            `quota_entitlements_until`.
     InvoiceListResponse:
       type: object
       required:

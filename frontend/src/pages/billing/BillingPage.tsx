@@ -114,6 +114,7 @@ export function BillingPage() {
             usage={billingPlan.usage}
             plan={billingPlan.plan}
             pricing={billingPlan.pricing}
+            effectiveLimits={billingPlan.effective_limits}
           />
           <UsageDashboard
             plan={billingPlan.plan}

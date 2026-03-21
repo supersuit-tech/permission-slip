@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -119,6 +120,7 @@ type billingPlanResponse struct {
 	Plan                    billingPlan         `json:"plan"`
 	Subscription            billingSubscription `json:"subscription"`
 	Usage                   billingUsageSummary `json:"usage"`
+	EffectiveLimits         *planLimits         `json:"effective_limits,omitempty"`
 	Pricing                 *billingPricing     `json:"pricing,omitempty"`
 	CouponRedemptionEnabled bool                `json:"coupon_redemption_enabled"`
 }
@@ -136,13 +138,14 @@ type billingPlan struct {
 }
 
 type billingSubscription struct {
-	Status             string     `json:"status"`
-	CurrentPeriodStart time.Time  `json:"current_period_start"`
-	CurrentPeriodEnd   time.Time  `json:"current_period_end"`
-	HasPaymentMethod   bool       `json:"has_payment_method"`
-	CanUpgrade         bool       `json:"can_upgrade"`
-	CanDowngrade       bool       `json:"can_downgrade"`
-	GracePeriodEndsAt  *time.Time `json:"grace_period_ends_at"`
+	Status                 string     `json:"status"`
+	CurrentPeriodStart     time.Time  `json:"current_period_start"`
+	CurrentPeriodEnd       time.Time  `json:"current_period_end"`
+	HasPaymentMethod       bool       `json:"has_payment_method"`
+	CanUpgrade             bool       `json:"can_upgrade"`
+	CanDowngrade           bool       `json:"can_downgrade"`
+	GracePeriodEndsAt      *time.Time `json:"grace_period_ends_at"`
+	QuotaEntitlementsUntil *time.Time `json:"quota_entitlements_until"`
 }
 
 type billingUsageSummary struct {
@@ -155,13 +158,14 @@ type billingUsageSummary struct {
 // newBillingSubscription builds subscription status fields from a DB subscription.
 func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
 	return billingSubscription{
-		Status:             string(sub.Status),
-		CurrentPeriodStart: sub.CurrentPeriodStart,
-		CurrentPeriodEnd:   sub.CurrentPeriodEnd,
-		HasPaymentMethod:   false,
-		CanUpgrade:         sub.PlanID == db.PlanFree || sub.PlanID == db.PlanFreePro,
-		CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
-		GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
+		Status:                 string(sub.Status),
+		CurrentPeriodStart:     sub.CurrentPeriodStart,
+		CurrentPeriodEnd:       sub.CurrentPeriodEnd,
+		HasPaymentMethod:       false,
+		CanUpgrade:             sub.PlanID == db.PlanFree || sub.PlanID == db.PlanFreePro,
+		CanDowngrade:           sub.PlanID == db.PlanPayAsYouGo,
+		GracePeriodEndsAt:      sub.GracePeriodEndsAt(),
+		QuotaEntitlementsUntil: sub.QuotaGracePeriodEndsAt(),
 	}
 }
 
@@ -177,10 +181,19 @@ func newPlanLimits(p *db.Plan) planLimits {
 }
 
 type downgradeResponse struct {
-	Status            string     `json:"status"`
-	PlanID            string     `json:"plan_id"`
-	DowngradedAt      *time.Time `json:"downgraded_at"`
-	GracePeriodEndsAt *time.Time `json:"grace_period_ends_at"`
+	Status                 string              `json:"status"`
+	PlanID                 string              `json:"plan_id"`
+	DowngradedAt           *time.Time          `json:"downgraded_at"`
+	GracePeriodEndsAt      *time.Time          `json:"grace_period_ends_at"`
+	QuotaEntitlementsUntil *time.Time          `json:"quota_entitlements_until"`
+	Warnings               []downgradeWarning  `json:"warnings,omitempty"`
+}
+
+type downgradeWarning struct {
+	Resource   string `json:"resource"`
+	Current    int    `json:"current"`
+	MaxAllowed int    `json:"max_allowed"`
+	Message    string `json:"message"`
 }
 
 // gracePeriodEnd returns the time when the 7-day grace period expires for a
@@ -244,6 +257,14 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 				planLimits: newPlanLimits(&sub.Plan),
 			},
 			Subscription: newBillingSubscription(sub),
+		}
+
+		// When in a quota grace period, include the effective (paid) limits
+		// so the frontend can show users the limits actually in effect.
+		effectivePlan := sub.EffectiveQuotaPlan()
+		if effectivePlan.ID != sub.Plan.ID {
+			el := newPlanLimits(effectivePlan)
+			resp.EffectiveLimits = &el
 		}
 
 		// Include pricing info for all plans so the upgrade flow can show
@@ -349,12 +370,13 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 			CaptureError(r.Context(), err)
 		}
 		if usage != nil {
+			effectiveQuotaPlan := sub.EffectiveQuotaPlan()
 			ui := &usageInfo{
 				RequestCount: usage.RequestCount,
 				SMSCount:     usage.SMSCount,
-				RequestLimit: sub.Plan.MaxRequestsPerMonth,
+				RequestLimit: effectiveQuotaPlan.MaxRequestsPerMonth,
 			}
-			if sub.Plan.MaxRequestsPerMonth != nil && usage.RequestCount > *sub.Plan.MaxRequestsPerMonth {
+			if effectiveQuotaPlan.MaxRequestsPerMonth != nil && usage.RequestCount > *effectiveQuotaPlan.MaxRequestsPerMonth {
 				ui.OverLimit = true
 			}
 			resp.Usage = ui
@@ -561,21 +583,12 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Check plan limits: count agents, standing approvals, credentials.
+		// Collect warnings about resources over free plan limits.
+		// These are informational — the user can always downgrade.
 		freePlan := db.GetPlan(db.PlanFree)
-		if freePlan == nil {
-			log.Printf("[%s] Downgrade: free plan not found in config", TraceID(r.Context()))
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Free plan not configured"))
-			return
-		}
-
-		if limitErr := validateDowngradeLimits(r.Context(), deps, profile.ID, freePlan); limitErr != nil {
-			status := http.StatusConflict
-			if limitErr.Error.Code == ErrInternalError {
-				status = http.StatusInternalServerError
-			}
-			RespondError(w, r, status, *limitErr)
-			return
+		var warnings []downgradeWarning
+		if freePlan != nil {
+			warnings = collectDowngradeWarnings(r.Context(), deps, profile.ID, freePlan, sub.CurrentPeriodEnd)
 		}
 
 		// Cancel Stripe subscription if one exists.
@@ -602,76 +615,55 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, downgradeResponse{
-			Status:            string(updated.Status),
-			PlanID:            updated.PlanID,
-			DowngradedAt:      updated.DowngradedAt,
-			GracePeriodEndsAt: gracePeriodEnd(updated.DowngradedAt),
+			Status:                 string(updated.Status),
+			PlanID:                 updated.PlanID,
+			DowngradedAt:           updated.DowngradedAt,
+			GracePeriodEndsAt:      gracePeriodEnd(updated.DowngradedAt),
+			QuotaEntitlementsUntil: updated.QuotaEntitlementsUntil,
+			Warnings:               warnings,
 		})
 	}
 }
 
-// validateDowngradeLimits checks that the user's current resource counts are
-// within the free plan's limits. Returns an ErrorResponse if any limit is
-// exceeded or if a count cannot be verified (fail-closed), nil otherwise.
-func validateDowngradeLimits(ctx context.Context, deps *Deps, userID string, freePlan *db.Plan) *ErrorResponse {
-	if freePlan.MaxAgents != nil {
-		count, err := db.CountRegisteredAgentsByUser(ctx, deps.DB, userID)
-		if err != nil {
-			log.Printf("[%s] Downgrade: count agents: %v", TraceID(ctx), err)
-			CaptureError(ctx, err)
-			resp := InternalError("Unable to verify agent count")
-			return &resp
-		}
-		if count > *freePlan.MaxAgents {
-			resp := Conflict(ErrDowngradeLimitExceeded, "Too many active agents for the free plan")
-			resp.Error.Details = map[string]any{
-				"resource":    "agents",
-				"current":     count,
-				"max_allowed": *freePlan.MaxAgents,
-			}
-			return &resp
-		}
+// collectDowngradeWarnings checks resource counts against free plan limits and
+// returns informational warnings for any that exceed the limit. These are
+// advisory — the user can always proceed with the downgrade. Free plan limits
+// will be enforced after quota_entitlements_until (the end of the paid billing period).
+func collectDowngradeWarnings(ctx context.Context, deps *Deps, userID string, freePlan *db.Plan, periodEnd time.Time) []downgradeWarning {
+	var warnings []downgradeWarning
+	periodEndStr := periodEnd.Format("Jan 2, 2006")
+
+	type check struct {
+		name    string
+		limit   *int
+		countFn func(context.Context, db.DBTX, string) (int, error)
+	}
+	checks := []check{
+		{"agents", freePlan.MaxAgents, db.CountRegisteredAgentsByUser},
+		{"standing_approvals", freePlan.MaxStandingApprovals, db.CountActiveStandingApprovalsByUser},
+		{"credentials", freePlan.MaxCredentials, db.CountCredentialsByUser},
 	}
 
-	if freePlan.MaxStandingApprovals != nil {
-		count, err := db.CountActiveStandingApprovalsByUser(ctx, deps.DB, userID)
-		if err != nil {
-			log.Printf("[%s] Downgrade: count standing approvals: %v", TraceID(ctx), err)
-			CaptureError(ctx, err)
-			resp := InternalError("Unable to verify standing approval count")
-			return &resp
+	for _, c := range checks {
+		if c.limit == nil {
+			continue
 		}
-		if count > *freePlan.MaxStandingApprovals {
-			resp := Conflict(ErrDowngradeLimitExceeded, "Too many active standing approvals for the free plan")
-			resp.Error.Details = map[string]any{
-				"resource":    "standing_approvals",
-				"current":     count,
-				"max_allowed": *freePlan.MaxStandingApprovals,
-			}
-			return &resp
+		count, err := c.countFn(ctx, deps.DB, userID)
+		if err != nil {
+			log.Printf("[%s] Downgrade warning: count %s: %v", TraceID(ctx), c.name, err)
+			CaptureError(ctx, err)
+			continue
+		}
+		if count > *c.limit {
+			warnings = append(warnings, downgradeWarning{
+				Resource:   c.name,
+				Current:    count,
+				MaxAllowed: *c.limit,
+				Message:    fmt.Sprintf("You have %d %s (free limit: %d). Free plan limits apply after %s.", count, c.name, *c.limit, periodEndStr),
+			})
 		}
 	}
-
-	if freePlan.MaxCredentials != nil {
-		count, err := db.CountCredentialsByUser(ctx, deps.DB, userID)
-		if err != nil {
-			log.Printf("[%s] Downgrade: count credentials: %v", TraceID(ctx), err)
-			CaptureError(ctx, err)
-			resp := InternalError("Unable to verify credential count")
-			return &resp
-		}
-		if count > *freePlan.MaxCredentials {
-			resp := Conflict(ErrDowngradeLimitExceeded, "Too many stored credentials for the free plan")
-			resp.Error.Details = map[string]any{
-				"resource":    "credentials",
-				"current":     count,
-				"max_allowed": *freePlan.MaxCredentials,
-			}
-			return &resp
-		}
-	}
-
-	return nil
+	return warnings
 }
 
 // ── GET /billing/invoices ─────────────────────────────────────────────────

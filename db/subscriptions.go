@@ -35,20 +35,22 @@ func IsValidSubscriptionStatus(s SubscriptionStatus) bool {
 // Each user has at most one subscription (enforced by UNIQUE on user_id).
 // Billing periods are aligned to calendar months (via date_trunc defaults).
 type Subscription struct {
-	ID                   string
-	UserID               string
-	PlanID               string
-	Status               SubscriptionStatus
-	StripeCustomerID     *string // nil for free-tier users (no Stripe setup)
-	StripeSubscriptionID *string // nil for free-tier users
-	CurrentPeriodStart   time.Time
-	CurrentPeriodEnd     time.Time
-	DowngradedAt         *time.Time // set when plan changes from paid to free; nil otherwise
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                    string
+	UserID                string
+	PlanID                string
+	Status                SubscriptionStatus
+	StripeCustomerID      *string // nil for free-tier users (no Stripe setup)
+	StripeSubscriptionID  *string // nil for free-tier users
+	CurrentPeriodStart    time.Time
+	CurrentPeriodEnd      time.Time
+	DowngradedAt          *time.Time // set when plan changes from paid to free; nil otherwise
+	QuotaPlanID           *string    // plan whose quotas apply during grace period; nil when not in grace
+	QuotaEntitlementsUntil *time.Time // when quota grace expires; nil when not in grace
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
-const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, created_at, updated_at`
+const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, quota_plan_id, quota_entitlements_until, created_at, updated_at`
 
 func scanSubscription(row pgx.Row) (*Subscription, error) {
 	var s Subscription
@@ -62,6 +64,8 @@ func scanSubscription(row pgx.Row) (*Subscription, error) {
 		&s.CurrentPeriodStart,
 		&s.CurrentPeriodEnd,
 		&s.DowngradedAt,
+		&s.QuotaPlanID,
+		&s.QuotaEntitlementsUntil,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 	)
@@ -94,7 +98,9 @@ func CreateSubscription(ctx context.Context, db DBTX, userID, planID string) (*S
 // UpdateSubscriptionPlan changes the plan for a user's subscription.
 // When downgrading (moving to a plan with shorter retention), sets downgraded_at
 // to trigger a grace period before the shorter retention window takes effect.
-// When upgrading, clears downgraded_at since the longer retention applies immediately.
+// Also sets quota_plan_id and quota_entitlements_until so paid quotas are
+// preserved until the end of the billing period the user already paid for.
+// When upgrading, clears downgraded_at and quota columns since paid features apply immediately.
 func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
@@ -102,6 +108,16 @@ func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string)
 		         WHEN $2 = 'free' AND plan_id != 'free' THEN now()
 		         WHEN $2 != 'free' THEN NULL
 		         ELSE downgraded_at
+		     END,
+		     quota_plan_id = CASE
+		         WHEN $2 = 'free' AND plan_id != 'free' THEN plan_id
+		         WHEN $2 != 'free' THEN NULL
+		         ELSE quota_plan_id
+		     END,
+		     quota_entitlements_until = CASE
+		         WHEN $2 = 'free' AND plan_id != 'free' THEN current_period_end
+		         WHEN $2 != 'free' THEN NULL
+		         ELSE quota_entitlements_until
 		     END,
 		     plan_id = $2,
 		     updated_at = now()
@@ -124,6 +140,8 @@ func UpgradeSubscriptionPlan(ctx context.Context, db DBTX, userID, expectedOldPl
 		`UPDATE subscriptions
 		 SET plan_id = $3,
 		     downgraded_at = NULL,
+		     quota_plan_id = NULL,
+		     quota_entitlements_until = NULL,
 		     updated_at = now()
 		 WHERE user_id = $1 AND plan_id = $2
 		 RETURNING `+subscriptionColumns,
@@ -307,6 +325,34 @@ func (sp *SubscriptionWithPlan) GracePeriodEndsAt() *time.Time {
 	if sp.DowngradedAt != nil && time.Since(*sp.DowngradedAt) < DowngradeGracePeriod {
 		t := sp.DowngradedAt.Add(DowngradeGracePeriod)
 		return &t
+	}
+	return nil
+}
+
+// EffectiveQuotaPlan returns the plan whose resource limits should be enforced.
+// During the quota grace period (after downgrade, before the paid billing period
+// ends), this returns the previous paid plan so users keep paid quotas until the
+// period they already paid for expires. Outside the grace period, returns the
+// current plan.
+func (sp *SubscriptionWithPlan) EffectiveQuotaPlan() *Plan {
+	if sp.QuotaPlanID != nil && sp.QuotaEntitlementsUntil != nil {
+		if time.Now().Before(*sp.QuotaEntitlementsUntil) {
+			if p := GetPlan(*sp.QuotaPlanID); p != nil {
+				return p
+			}
+		}
+	}
+	return &sp.Plan
+}
+
+// QuotaGracePeriodEndsAt returns the timestamp when the quota grace period
+// expires, or nil if no quota grace period is active. This is separate from
+// the audit retention grace period (GracePeriodEndsAt).
+func (sp *SubscriptionWithPlan) QuotaGracePeriodEndsAt() *time.Time {
+	if sp.QuotaPlanID != nil && sp.QuotaEntitlementsUntil != nil {
+		if time.Now().Before(*sp.QuotaEntitlementsUntil) {
+			return sp.QuotaEntitlementsUntil
+		}
 	}
 	return nil
 }
