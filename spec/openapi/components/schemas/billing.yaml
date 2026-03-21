@@ -12,7 +12,7 @@ SubscriptionResponse:
   properties:
     plan_id:
       type: string
-      description: The plan ID (e.g., "free", "pay_as_you_go")
+      description: The plan ID (e.g., "free", "pay_as_you_go", "free_pro")
       example: free
     plan_name:
       type: string
@@ -223,6 +223,40 @@ InvoiceSummary:
       format: uri
       description: URL to download the invoice PDF
 
+RedeemCouponRequest:
+  type: object
+  required:
+    - coupon
+  properties:
+    coupon:
+      type: string
+      description: |
+        Lowercase hex HMAC-SHA256(`COUPON_SECRET`, trimmed username) for the
+        authenticated user's profile username. One-time grant from free to
+        complimentary Pro when valid.
+      minLength: 64
+      maxLength: 64
+      pattern: '^[0-9a-f]{64}$'
+      example: a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+
+RedeemCouponResponse:
+  type: object
+  required:
+    - plan_id
+    - status
+  properties:
+    plan_id:
+      type: string
+      description: Plan after redemption (typically "free_pro")
+      example: free_pro
+    status:
+      type: string
+      description: |
+        `redeemed` when the plan was upgraded, `already_redeemed` when the
+        account was already on complimentary Pro.
+      enum: [redeemed, already_redeemed]
+      example: redeemed
+
 CheckoutResponse:
   type: object
   required:
@@ -355,6 +389,7 @@ BillingPlanResponse:
     - subscription
     - usage
     - pricing
+    - coupon_redemption_enabled
   properties:
     plan:
       $ref: '#/Plan'
@@ -364,6 +399,13 @@ BillingPlanResponse:
       $ref: '#/UsageSummary'
     pricing:
       $ref: '#/BillingPricing'
+    coupon_redemption_enabled:
+      type: boolean
+      description: |
+        True when the server has `COUPON_SECRET` set so `POST /v1/billing/redeem-coupon`
+        is available. The frontend may show a coupon entry form when true and the user
+        is on the free plan.
+      example: false
 
 BillingPricing:
   type: object

@@ -27,7 +27,7 @@ function daysRemaining(periodEnd: string): number {
 
 export function UsageDashboard({ plan, subscription, pricing }: UsageDashboardProps) {
   const { usage, isLoading, error } = useBillingUsage();
-  const isFree = plan.id === "free";
+  const isFree = plan.id === "free" || plan.id === "free_pro";
   const days = daysRemaining(subscription.current_period_end);
   const periodLabel = `${formatDate(subscription.current_period_start)} — ${formatDate(subscription.current_period_end)}`;
 

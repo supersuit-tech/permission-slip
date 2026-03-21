@@ -160,6 +160,10 @@ func main() {
 	} else {
 		log.Println("Billing: disabled (all users get unlimited plan, Stripe/metering skipped)")
 	}
+	deps.CouponSecret = strings.TrimSpace(os.Getenv("COUPON_SECRET"))
+	if deps.BillingEnabled && deps.CouponSecret != "" {
+		log.Println("Coupons: COUPON_SECRET set — POST /v1/billing/redeem-coupon enabled")
+	}
 	deps.DevMode = os.Getenv("MODE") == "development"
 	if !deps.DevMode {
 		deps.RateLimiter = api.NewRateLimiter(api.DefaultRateLimiterConfig())

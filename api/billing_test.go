@@ -87,6 +87,35 @@ func TestGetBillingPlan_ReturnsPlanSubscriptionUsage(t *testing.T) {
 	if resp.Usage.Credentials != 1 {
 		t.Errorf("expected usage.credentials=1, got %d", resp.Usage.Credentials)
 	}
+	if resp.CouponRedemptionEnabled {
+		t.Error("expected coupon_redemption_enabled=false when COUPON_SECRET unset")
+	}
+}
+
+func TestGetBillingPlan_CouponRedemptionEnabled(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, CouponSecret: "x"}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp billingPlanResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if !resp.CouponRedemptionEnabled {
+		t.Error("expected coupon_redemption_enabled=true when COUPON_SECRET set")
+	}
 }
 
 func TestGetBillingPlan_NoSubscription(t *testing.T) {
@@ -1135,4 +1164,3 @@ func TestBillingPortal_NoCustomerID_Returns404(t *testing.T) {
 		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
-

@@ -125,7 +125,7 @@ func handleCheckoutCompleted(r *http.Request, deps *Deps, event *pstripe.Webhook
 	// Atomically upgrade to paid plan — only succeeds if user is currently on
 	// the free plan. This prevents double-upgrade race conditions when two
 	// checkout webhooks arrive concurrently for the same user.
-	upgraded, err := db.UpgradeSubscriptionPlan(r.Context(), deps.DB, sub.UserID, db.PlanFree, db.PlanPayAsYouGo)
+	upgraded, err := db.UpgradePayAsYouGoFromFreeOrFreePro(r.Context(), deps.DB, sub.UserID)
 	if err != nil {
 		return fmt.Errorf("upgrade plan for %s: %w", sub.UserID, err)
 	}
@@ -254,23 +254,55 @@ func handleSubscriptionUpdated(r *http.Request, deps *Deps, event *pstripe.Webho
 // handleSubscriptionDeleted processes subscription cancellation.
 // Downgrades the user back to the free plan.
 func handleSubscriptionDeleted(r *http.Request, deps *Deps, event *pstripe.WebhookEvent) error {
-	sub, _, err := lookupByStripeSubscription(r, deps, event)
+	sub, stripeSub, err := lookupByStripeSubscription(r, deps, event)
 	if err != nil {
 		return err
 	}
-	if sub == nil {
+	if sub == nil || stripeSub == nil {
 		return nil
 	}
 
-	// Downgrade to free plan and mark cancelled.
-	if _, err := db.UpdateSubscriptionPlan(r.Context(), deps.DB, sub.UserID, db.PlanFree); err != nil {
-		return fmt.Errorf("downgrade plan for %s: %w", sub.UserID, err)
+	tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+	if err != nil {
+		return fmt.Errorf("begin tx for subscription deleted: %w", err)
 	}
-	if _, err := db.UpdateSubscriptionStatus(r.Context(), deps.DB, sub.UserID, db.SubscriptionStatusCancelled); err != nil {
-		return fmt.Errorf("cancel status for %s: %w", sub.UserID, err)
+	if owned {
+		defer db.RollbackTx(r.Context(), tx)
 	}
 
-	log.Printf("[%s] StripeWebhook: subscription deleted (event %s), user %s downgraded to free", TraceID(r.Context()), event.ID, sub.UserID)
+	// Re-read by Stripe subscription ID inside the transaction (same snapshot as cur).
+	sub2, err := db.GetSubscriptionByStripeSubscriptionID(r.Context(), tx, stripeSub.ID)
+	if err != nil {
+		return fmt.Errorf("reload subscription by stripe id: %w", err)
+	}
+	if sub2 == nil {
+		return nil
+	}
+	cur, err := db.GetSubscriptionByUserID(r.Context(), tx, sub2.UserID)
+	if err != nil {
+		return fmt.Errorf("reload subscription for %s: %w", sub2.UserID, err)
+	}
+	targetPlan := db.PlanFree
+	if cur != nil && cur.PlanID == db.PlanFreePro {
+		targetPlan = db.PlanFreePro
+	}
+	if _, err := db.UpdateSubscriptionPlan(r.Context(), tx, sub2.UserID, targetPlan); err != nil {
+		return fmt.Errorf("downgrade plan for %s: %w", sub2.UserID, err)
+	}
+	nextStatus := db.SubscriptionStatusCancelled
+	if targetPlan == db.PlanFreePro {
+		nextStatus = db.SubscriptionStatusActive
+	}
+	if _, err := db.UpdateSubscriptionStatus(r.Context(), tx, sub2.UserID, nextStatus); err != nil {
+		return fmt.Errorf("update status for %s: %w", sub2.UserID, err)
+	}
+	if owned {
+		if err := db.CommitTx(r.Context(), tx); err != nil {
+			return fmt.Errorf("commit subscription deleted: %w", err)
+		}
+	}
+
+	log.Printf("[%s] StripeWebhook: subscription deleted (event %s), user %s plan=%s", TraceID(r.Context()), event.ID, sub2.UserID, targetPlan)
 	return nil
 }
 

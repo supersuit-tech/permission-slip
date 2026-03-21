@@ -94,7 +94,7 @@ function PaidRequestRow({ current, included, priceDisplay }: { current: number; 
 }
 
 export function UsageSummaryCard({ usage, plan, pricing }: UsageSummaryCardProps) {
-  const isPaid = plan.id !== "free";
+  const isPaid = plan.id !== "free" && plan.id !== "free_pro";
   const { usage: usageDetail } = useBillingUsage();
   // Use server-provided included value, fall back to config constant.
   const included = usageDetail?.requests.included ?? FREE_REQUEST_ALLOWANCE;

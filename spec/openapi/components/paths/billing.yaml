@@ -186,6 +186,9 @@ plan:
       needed to render the billing section of the settings page in a single request.
 
       Only available when `billing_enabled` is `true` in the server config.
+
+      Plan IDs include `free_pro` for complimentary Pro (unlimited usage, no
+      Stripe per-request billing) granted via coupon.
     operationId: getBillingPlan
     tags:
       - Billing
@@ -380,6 +383,68 @@ downgrade:
               $ref: '../schemas/errors.yaml#/ErrorResponse'
       '502':
         description: Stripe API error (failed to cancel subscription)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+redeemCoupon:
+  post:
+    summary: Redeem complimentary Pro coupon
+    description: |
+      Applies a one-time coupon that upgrades the authenticated user from the
+      free plan to complimentary Pro (`free_pro`) when the coupon matches
+      `HMAC-SHA256(COUPON_SECRET, trimmed username)` as lowercase hex (64 chars).
+
+      **Requirements:** `billing_enabled` is `true` and the server has a
+      non-empty `COUPON_SECRET` environment variable. If the secret is unset,
+      this route is not registered.
+
+      Returns `403` with `invalid_coupon` for a wrong code. Returns `409`
+      `already_subscribed` if the user is already on pay-as-you-go. Idempotent
+      for users already on `free_pro` (`already_redeemed`).
+    operationId: redeemComplimentaryProCoupon
+    tags:
+      - Billing
+    security:
+      - SupabaseSession: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/billing.yaml#/RedeemCouponRequest'
+    responses:
+      '200':
+        description: Coupon applied or already active
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/billing.yaml#/RedeemCouponResponse'
+      '400':
+        description: Missing coupon
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '403':
+        description: Invalid coupon
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '404':
+        description: No subscription found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '409':
+        description: Not on free plan or already on paid Stripe plan
         content:
           application/json:
             schema:

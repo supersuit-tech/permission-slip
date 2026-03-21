@@ -29,6 +29,7 @@ function StatusBadge({ status }: { status: Subscription["status"] }) {
 
 export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
   const isFree = plan.id === "free";
+  const isFreePro = plan.id === "free_pro";
 
   return (
     <Card>
@@ -48,13 +49,18 @@ export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
               <div className="flex items-center gap-2">
                 <span>{plan.name}</span>
                 <Badge variant={isFree ? "outline" : "default"}>
-                  {isFree ? "Free" : "Pay-as-you-go"}
+                  {isFree ? "Free" : isFreePro ? "Complimentary Pro" : "Pay-as-you-go"}
                 </Badge>
               </div>
             </DetailRow>
-            {!isFree && pricing && (
+            {!isFree && !isFreePro && pricing && (
               <DetailRow label="Pricing">
                 <span className="text-muted-foreground">{pricing.free_request_allowance.toLocaleString()} requests/month included, then {pricing.price_per_request_display}/request</span>
+              </DetailRow>
+            )}
+            {isFreePro && (
+              <DetailRow label="Pricing">
+                <span className="text-muted-foreground">Unlimited usage at no charge</span>
               </DetailRow>
             )}
             <DetailRow label="Status">

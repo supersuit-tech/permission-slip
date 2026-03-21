@@ -13,6 +13,7 @@ import { PlanDetailsCard } from "./PlanDetailsCard";
 import { BillingPageSkeleton } from "./BillingPageSkeleton";
 import { UpgradeSuccessBanner } from "./UpgradeSuccessBanner";
 import { activateUpgrade } from "./activateUpgrade";
+import { CouponRedemptionCard } from "./CouponRedemptionCard";
 
 // Retry delays (ms) after activate call if plan hasn't changed yet.
 const RETRY_DELAYS = [1000, 2000, 3000];
@@ -26,14 +27,21 @@ export function BillingPage() {
   );
   const activateRef = useRef(false);
 
-  const isPaidPlan = billingPlan != null && billingPlan.plan.id !== "free";
+  const isPaidPlan =
+    billingPlan != null &&
+    billingPlan.plan.id !== "free" &&
+    billingPlan.plan.id !== "free_pro";
 
   // Retry refetch a few times if the plan hasn't changed after activate.
   const retryUntilUpgraded = useCallback(async () => {
     for (const delay of RETRY_DELAYS) {
       await new Promise((r) => setTimeout(r, delay));
       const result = await refetch();
-      if (result.data?.plan.id !== "free") return;
+      if (
+        result.data?.plan.id !== "free" &&
+        result.data?.plan.id !== "free_pro"
+      )
+        return;
     }
   }, [refetch]);
 
@@ -52,7 +60,10 @@ export function BillingPage() {
     void activateUpgrade(sessionId, session.access_token)
       .then(() => refetch())
       .then((result) => {
-        if (result?.data?.plan.id === "free") {
+        if (
+          result?.data?.plan.id === "free" ||
+          result?.data?.plan.id === "free_pro"
+        ) {
           void retryUntilUpgraded();
         }
       });
@@ -109,6 +120,8 @@ export function BillingPage() {
             subscription={billingPlan.subscription}
             pricing={billingPlan.pricing}
           />
+          {billingPlan.coupon_redemption_enabled &&
+            billingPlan.plan.id === "free" && <CouponRedemptionCard />}
           {billingPlan.subscription.can_upgrade && (
             <UpgradeCTA plan={billingPlan.plan} pricing={billingPlan.pricing} />
           )}

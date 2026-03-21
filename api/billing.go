@@ -116,10 +116,11 @@ func toAPIInvoice(s pstripe.InvoiceSummary) apiInvoice {
 }
 
 type billingPlanResponse struct {
-	Plan         billingPlan         `json:"plan"`
-	Subscription billingSubscription `json:"subscription"`
-	Usage        billingUsageSummary `json:"usage"`
-	Pricing      *billingPricing     `json:"pricing,omitempty"`
+	Plan                    billingPlan         `json:"plan"`
+	Subscription            billingSubscription `json:"subscription"`
+	Usage                   billingUsageSummary `json:"usage"`
+	Pricing                 *billingPricing     `json:"pricing,omitempty"`
+	CouponRedemptionEnabled bool                `json:"coupon_redemption_enabled"`
 }
 
 // billingPricing provides pricing information sourced from Stripe.
@@ -158,7 +159,7 @@ func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
 		CurrentPeriodStart: sub.CurrentPeriodStart,
 		CurrentPeriodEnd:   sub.CurrentPeriodEnd,
 		HasPaymentMethod:   false,
-		CanUpgrade:         sub.PlanID == db.PlanFree,
+		CanUpgrade:         sub.PlanID == db.PlanFree || sub.PlanID == db.PlanFreePro,
 		CanDowngrade:       sub.PlanID == db.PlanPayAsYouGo,
 		GracePeriodEndsAt:  sub.GracePeriodEndsAt(),
 	}
@@ -205,6 +206,7 @@ func init() {
 
 func RegisterBillingRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
+	RegisterBillingRedeemRoute(mux, deps)
 	mux.Handle("GET /billing/plan", requireProfile(handleGetBillingPlan(deps)))
 	mux.Handle("GET /billing/subscription", requireProfile(handleGetSubscription(deps)))
 	mux.Handle("GET /billing/usage", requireProfile(handleGetUsage(deps)))
@@ -255,7 +257,7 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 		// (for agent-initiated purchases) OR an active paid Stripe subscription.
 		// Gate on plan_id != free to avoid false positives for downgraded users
 		// whose stripe_subscription_id was never cleared.
-		hasStripeSubscription := sub.StripeSubscriptionID != nil && sub.PlanID != db.PlanFree
+		hasStripeSubscription := sub.StripeSubscriptionID != nil && sub.PlanID != db.PlanFree && sub.PlanID != db.PlanFreePro
 		if pmCount, err := db.CountPaymentMethodsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetBillingPlan: count payment methods: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -295,6 +297,8 @@ func handleGetBillingPlan(deps *Deps) http.HandlerFunc {
 			resp.Usage.Credentials = count
 		}
 
+		resp.CouponRedemptionEnabled = deps.CouponSecret != ""
+
 		RespondJSON(w, http.StatusOK, resp)
 	}
 }
@@ -328,7 +332,7 @@ func handleGetSubscription(deps *Deps) http.HandlerFunc {
 		// (for agent-initiated purchases) OR an active paid Stripe subscription.
 		// Gate on plan_id != free to avoid false positives for downgraded users
 		// whose stripe_subscription_id was never cleared.
-		hasStripeSubscription := sub.StripeSubscriptionID != nil && sub.PlanID != db.PlanFree
+		hasStripeSubscription := sub.StripeSubscriptionID != nil && sub.PlanID != db.PlanFree && sub.PlanID != db.PlanFreePro
 		if pmCount, err := db.CountPaymentMethodsByUser(r.Context(), deps.DB, profile.ID); err != nil {
 			log.Printf("[%s] GetSubscription: count payment methods: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -476,6 +480,10 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 		if sub.Plan.MaxRequestsPerMonth != nil {
 			included = *sub.Plan.MaxRequestsPerMonth
 		}
+		unlimitedRequests := sub.Plan.MaxRequestsPerMonth == nil
+		if sub.PlanID == db.PlanFreePro {
+			included = 0
+		}
 		resp.Requests.Included = included
 
 		var usage *db.UsagePeriod
@@ -500,13 +508,15 @@ func handleGetUsage(deps *Deps) http.HandlerFunc {
 			resp.SMS.Total = usage.SMSCount
 
 			// Calculate overage using the shared pricing function.
-			if included > 0 && usage.RequestCount > included {
+			if !unlimitedRequests && included > 0 && usage.RequestCount > included {
 				resp.Requests.Overage = usage.RequestCount - included
 				resp.Requests.CostCents = pstripe.OverageCostCents(resp.Requests.Overage)
 			}
 
-			// SMS cost: $0.01/message (us_ca rate).
-			resp.SMS.CostCents = usage.SMSCount
+			// SMS cost: $0.01/message (us_ca rate); comped Pro is not billed for SMS.
+			if sub.PlanID != db.PlanFreePro {
+				resp.SMS.CostCents = usage.SMSCount
+			}
 
 			// Include breakdown if available.
 			b := usage.ParseBreakdown()
@@ -541,9 +551,13 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Can only downgrade from a paid plan.
+		// Can only downgrade from Stripe-billed pay-as-you-go.
 		if sub.PlanID == db.PlanFree {
 			RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadyDowngraded, "Already on the free plan"))
+			return
+		}
+		if sub.PlanID == db.PlanFreePro {
+			RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Complimentary Pro cannot be changed through billing"))
 			return
 		}
 
@@ -760,6 +774,9 @@ func ReportPeriodUsage(ctx context.Context, deps *Deps, userID string, usage *db
 		return
 	}
 	if sub == nil || sub.StripeCustomerID == nil {
+		return
+	}
+	if sub.PlanID == db.PlanFreePro {
 		return
 	}
 
