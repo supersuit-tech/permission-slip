@@ -31,18 +31,31 @@ const mockAgentsResponse = {
 
 const emptyResponse = { data: [], has_more: false };
 
+const freePlanLimits = {
+  max_requests_per_month: 1000 as number | null,
+  max_agents: 3 as number | null,
+  max_standing_approvals: 5 as number | null,
+  max_credentials: 5 as number | null,
+  audit_retention_days: 7,
+};
+
 const freePlanResponse = {
   plan: {
     id: "free",
     name: "Free",
-    max_requests_per_month: 1000 as number | null,
-    max_agents: 3 as number | null,
-    max_standing_approvals: 5 as number | null,
-    max_credentials: 5 as number | null,
-    audit_retention_days: 7,
+    ...freePlanLimits,
   },
+  effective_limits: freePlanLimits,
   subscription: { status: "active", can_upgrade: true, can_downgrade: false },
   usage: { requests: 10, agents: 2, standing_approvals: 1, credentials: 0 },
+};
+
+const paidEffectiveLimits = {
+  max_requests_per_month: null as number | null,
+  max_agents: null as number | null,
+  max_standing_approvals: null as number | null,
+  max_credentials: null as number | null,
+  audit_retention_days: 90,
 };
 
 function mockAgentsFetch(response = mockAgentsResponse, billingPlan = freePlanResponse) {
@@ -408,6 +421,7 @@ describe("RegisteredAgentsCard", () => {
   it("shows no limit badge for paid plan", async () => {
     const paidPlan = {
       plan: { ...freePlanResponse.plan, id: "pay_as_you_go", max_agents: null },
+      effective_limits: paidEffectiveLimits,
       subscription: { status: "active", can_upgrade: false, can_downgrade: true },
       usage: { requests: 10, agents: 5, standing_approvals: 1, credentials: 0 },
     };

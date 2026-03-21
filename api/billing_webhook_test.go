@@ -319,9 +319,11 @@ func TestWebhook_SubscriptionDeleted_DowngradesToFree(t *testing.T) {
 	ctx := context.Background()
 
 	subID := "sub_" + uid[:8]
+	periodEnd := time.Date(2026, 5, 1, 0, 0, 0, 0, time.UTC).Unix()
 	payload := stripeEventPayload(t, "evt_sub_deleted_1", "customer.subscription.deleted", map[string]interface{}{
-		"id":     subID,
-		"status": "canceled",
+		"id":                  subID,
+		"status":              "canceled",
+		"current_period_end":  periodEnd,
 	})
 
 	r := signedWebhookRequest(t, payload)
@@ -341,6 +343,15 @@ func TestWebhook_SubscriptionDeleted_DowngradesToFree(t *testing.T) {
 	}
 	if sub.Status != db.SubscriptionStatusCancelled {
 		t.Errorf("expected status=cancelled, got %s", sub.Status)
+	}
+	if sub.StripeSubscriptionID != nil {
+		t.Errorf("expected stripe_subscription_id cleared, got %v", *sub.StripeSubscriptionID)
+	}
+	if sub.QuotaPlanID == nil || *sub.QuotaPlanID != db.PlanPayAsYouGo {
+		t.Errorf("expected quota_plan_id=%s, got %v", db.PlanPayAsYouGo, sub.QuotaPlanID)
+	}
+	if sub.QuotaEntitlementsUntil == nil || !sub.QuotaEntitlementsUntil.Equal(time.Unix(periodEnd, 0)) {
+		t.Errorf("expected quota_entitlements_until=%v, got %v", time.Unix(periodEnd, 0), sub.QuotaEntitlementsUntil)
 	}
 }
 

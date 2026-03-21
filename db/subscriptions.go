@@ -35,20 +35,22 @@ func IsValidSubscriptionStatus(s SubscriptionStatus) bool {
 // Each user has at most one subscription (enforced by UNIQUE on user_id).
 // Billing periods are aligned to calendar months (via date_trunc defaults).
 type Subscription struct {
-	ID                   string
-	UserID               string
-	PlanID               string
-	Status               SubscriptionStatus
-	StripeCustomerID     *string // nil for free-tier users (no Stripe setup)
-	StripeSubscriptionID *string // nil for free-tier users
-	CurrentPeriodStart   time.Time
-	CurrentPeriodEnd     time.Time
-	DowngradedAt         *time.Time // set when plan changes from paid to free; nil otherwise
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                     string
+	UserID                 string
+	PlanID                 string
+	Status                 SubscriptionStatus
+	StripeCustomerID       *string // nil for free-tier users (no Stripe setup)
+	StripeSubscriptionID   *string // nil for free-tier users
+	CurrentPeriodStart     time.Time
+	CurrentPeriodEnd       time.Time
+	DowngradedAt           *time.Time // set when plan changes from paid to free; nil otherwise
+	QuotaPlanID            *string    // plan whose quotas apply during post-downgrade grace; nil when not in quota grace
+	QuotaEntitlementsUntil *time.Time // paid quotas apply until this instant (exclusive convention matches billing period end)
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
-const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, created_at, updated_at`
+const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, quota_plan_id, quota_entitlements_until, created_at, updated_at`
 
 func scanSubscription(row pgx.Row) (*Subscription, error) {
 	var s Subscription
@@ -62,6 +64,8 @@ func scanSubscription(row pgx.Row) (*Subscription, error) {
 		&s.CurrentPeriodStart,
 		&s.CurrentPeriodEnd,
 		&s.DowngradedAt,
+		&s.QuotaPlanID,
+		&s.QuotaEntitlementsUntil,
 		&s.CreatedAt,
 		&s.UpdatedAt,
 	)
@@ -95,6 +99,9 @@ func CreateSubscription(ctx context.Context, db DBTX, userID, planID string) (*S
 // When downgrading (moving to a plan with shorter retention), sets downgraded_at
 // to trigger a grace period before the shorter retention window takes effect.
 // When upgrading, clears downgraded_at since the longer retention applies immediately.
+// When moving to a paid plan, clears quota grace columns.
+// For pay-as-you-go → free with paid quotas until period end, use
+// DowngradeSubscriptionToFreeWithQuotaGrace instead.
 func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
@@ -103,11 +110,73 @@ func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string)
 		         WHEN $2 != 'free' THEN NULL
 		         ELSE downgraded_at
 		     END,
+		     quota_plan_id = CASE WHEN $2 != 'free' THEN NULL ELSE quota_plan_id END,
+		     quota_entitlements_until = CASE WHEN $2 != 'free' THEN NULL ELSE quota_entitlements_until END,
 		     plan_id = $2,
 		     updated_at = now()
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
 		userID, planID))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return s, err
+}
+
+// DowngradeSubscriptionToFreeWithQuotaGrace sets plan to free, records
+// downgraded_at, and snapshots paid quota entitlements until periodEnd.
+// paidPlanID must be the plan the user is leaving (e.g. PlanPayAsYouGo).
+func DowngradeSubscriptionToFreeWithQuotaGrace(ctx context.Context, db DBTX, userID, paidPlanID string, periodEnd time.Time) (*Subscription, error) {
+	s, err := scanSubscription(db.QueryRow(ctx,
+		`UPDATE subscriptions
+		 SET plan_id = 'free',
+		     downgraded_at = CASE WHEN plan_id != 'free' THEN now() ELSE downgraded_at END,
+		     quota_plan_id = COALESCE(quota_plan_id, $2),
+		     quota_entitlements_until = COALESCE(quota_entitlements_until, $3),
+		     updated_at = now()
+		 WHERE user_id = $1
+		 RETURNING `+subscriptionColumns,
+		userID, paidPlanID, periodEnd))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	return s, err
+}
+
+// ApplyStripeSubscriptionDeletedToFree downgrades to free (or keeps free_pro),
+// syncs status, and ensures quota grace columns are set from Stripe's period
+// end when missing (idempotent with user-initiated downgrade).
+func ApplyStripeSubscriptionDeletedToFree(ctx context.Context, db DBTX, userID string, targetPlan string, nextStatus SubscriptionStatus, quotaPlanID *string, periodEnd *time.Time) (*Subscription, error) {
+	var qPlan any
+	if quotaPlanID != nil {
+		qPlan = *quotaPlanID
+	}
+	var qEnd any
+	if periodEnd != nil {
+		qEnd = *periodEnd
+	}
+	s, err := scanSubscription(db.QueryRow(ctx,
+		`UPDATE subscriptions
+		 SET plan_id = $2,
+		     status = $3,
+		     stripe_subscription_id = CASE WHEN $2 = 'free' THEN NULL ELSE stripe_subscription_id END,
+		     downgraded_at = CASE
+		             WHEN $2 = 'free' AND plan_id != 'free' THEN now()
+		             WHEN $2 = 'free' THEN downgraded_at
+		             ELSE NULL
+		         END,
+		     quota_plan_id = CASE
+		             WHEN $4::text IS NOT NULL THEN COALESCE(quota_plan_id, $4::text)
+		             ELSE quota_plan_id
+		         END,
+		     quota_entitlements_until = CASE
+		             WHEN $5::timestamptz IS NOT NULL THEN COALESCE(quota_entitlements_until, $5::timestamptz)
+		             ELSE quota_entitlements_until
+		         END,
+		     updated_at = now()
+		 WHERE user_id = $1
+		 RETURNING `+subscriptionColumns,
+		userID, targetPlan, nextStatus, qPlan, qEnd))
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -124,6 +193,8 @@ func UpgradeSubscriptionPlan(ctx context.Context, db DBTX, userID, expectedOldPl
 		`UPDATE subscriptions
 		 SET plan_id = $3,
 		     downgraded_at = NULL,
+		     quota_plan_id = NULL,
+		     quota_entitlements_until = NULL,
 		     updated_at = now()
 		 WHERE user_id = $1 AND plan_id = $2
 		 RETURNING `+subscriptionColumns,
@@ -311,6 +382,34 @@ func (sp *SubscriptionWithPlan) GracePeriodEndsAt() *time.Time {
 	return nil
 }
 
+// ClearExpiredSubscriptionQuotaGrace clears quota grace columns when the
+// entitlement window has ended (lazy expiration on read paths).
+func ClearExpiredSubscriptionQuotaGrace(ctx context.Context, db DBTX, userID string) error {
+	_, err := db.Exec(ctx,
+		`UPDATE subscriptions
+		 SET quota_plan_id = NULL,
+		     quota_entitlements_until = NULL,
+		     updated_at = now()
+		 WHERE user_id = $1
+		   AND quota_plan_id IS NOT NULL
+		   AND quota_entitlements_until IS NOT NULL
+		   AND quota_entitlements_until <= now()`,
+		userID)
+	return err
+}
+
+// EffectiveQuotaPlan returns the plan whose resource/request quotas should
+// apply. During an active quota grace period after downgrade, this is the
+// snapshotted paid plan; otherwise the current plan row.
+func (sp *SubscriptionWithPlan) EffectiveQuotaPlan() *Plan {
+	if sp.QuotaPlanID != nil && sp.QuotaEntitlementsUntil != nil && time.Now().Before(*sp.QuotaEntitlementsUntil) {
+		if p := GetPlan(*sp.QuotaPlanID); p != nil {
+			return p
+		}
+	}
+	return &sp.Plan
+}
+
 // GetSubscriptionWithPlan returns the user's subscription with plan details
 // attached from config (no DB join needed), or nil if the user has no subscription.
 func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*SubscriptionWithPlan, error) {
@@ -320,6 +419,18 @@ func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*Subs
 	}
 	if sub == nil {
 		return nil, nil
+	}
+	if sub.QuotaPlanID != nil && sub.QuotaEntitlementsUntil != nil && !time.Now().Before(*sub.QuotaEntitlementsUntil) {
+		if err := ClearExpiredSubscriptionQuotaGrace(ctx, db, userID); err != nil {
+			return nil, err
+		}
+		sub, err = GetSubscriptionByUserID(ctx, db, userID)
+		if err != nil {
+			return nil, err
+		}
+		if sub == nil {
+			return nil, nil
+		}
 	}
 	plan := GetPlan(sub.PlanID)
 	if plan == nil {

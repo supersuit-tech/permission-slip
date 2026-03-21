@@ -20,6 +20,8 @@ interface DowngradeConfirmDialogProps {
   isPending: boolean;
   error: string | null;
   usage: UsageSummary | null;
+  /** When free-tier resource caps start applying after downgrade (end of current billing period). */
+  freeLimitsApplyDate: string;
 }
 
 interface LimitWarning {
@@ -67,6 +69,7 @@ export function DowngradeConfirmDialog({
   isPending,
   error,
   usage,
+  freeLimitsApplyDate,
 }: DowngradeConfirmDialogProps) {
   const warnings = buildLimitWarnings(usage);
   const hasWarnings = warnings.length > 0;
@@ -94,7 +97,7 @@ export function DowngradeConfirmDialog({
               <ul className="ml-6 space-y-1.5">
                 {warnings.map((w) => (
                   <li key={w.resource} className="text-sm text-amber-800 dark:text-amber-200">
-                    You have {w.current} {w.resource}. Free tier allows {w.limit}.{" "}
+                    You have {w.current} {w.resource}. Free tier allows {w.limit} after {freeLimitsApplyDate}.{" "}
                     <Link
                       to={w.managePath}
                       className="underline font-medium hover:text-amber-900 dark:hover:text-amber-100"
@@ -110,18 +113,22 @@ export function DowngradeConfirmDialog({
           <div className="rounded-lg border p-4 space-y-1">
             <p className="text-sm font-medium">What changes</p>
             <ul className="space-y-1 text-sm text-muted-foreground">
-              <li>Audit retention drops from {paidPlan.audit_retention_days} days to {freePlan.audit_retention_days} days</li>
               <li>
-                Resource limits will be enforced ({FREE_PLAN_LIMITS.agents.limit} agents,{" "}
-                {FREE_PLAN_LIMITS.standing_approvals.limit} approvals,{" "}
-                {FREE_PLAN_LIMITS.credentials.limit} credentials)
+                Until {freeLimitsApplyDate}, paid-plan usage limits still apply (unlimited requests and resources on
+                your current plan).
               </li>
-              <li>{formatLimit(freePlan.max_requests_per_month)} request/month limit</li>
+              <li>
+                After {freeLimitsApplyDate}, free tier caps apply to new usage ({FREE_PLAN_LIMITS.agents.limit}{" "}
+                agents, {FREE_PLAN_LIMITS.standing_approvals.limit} approvals,{" "}
+                {FREE_PLAN_LIMITS.credentials.limit} credentials, {formatLimit(freePlan.max_requests_per_month)}{" "}
+                requests/month). Existing resources are kept; reduce them before adding new ones if you are over the cap.
+              </li>
+              <li>
+                A separate 7-day window after downgrade keeps extended audit log retention ({paidPlan.audit_retention_days}{" "}
+                days) so you can export older activity before it matches the free plan ({freePlan.audit_retention_days}{" "}
+                days).
+              </li>
             </ul>
-            <p className="mt-2 text-xs text-muted-foreground">
-              A 7-day grace period preserves your {paidPlan.audit_retention_days}-day audit retention so you
-              can export data before it reverts.
-            </p>
           </div>
 
           {error && (
@@ -140,7 +147,7 @@ export function DowngradeConfirmDialog({
           <Button
             variant="destructive"
             onClick={onConfirm}
-            disabled={isPending || hasWarnings}
+            disabled={isPending}
           >
             {isPending && <Loader2 className="animate-spin" aria-hidden="true" />}
             Confirm Downgrade

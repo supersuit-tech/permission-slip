@@ -9,6 +9,7 @@ SubscriptionResponse:
     - has_payment_method
     - can_upgrade
     - plan_limits
+    - effective_limits
   properties:
     plan_id:
       type: string
@@ -41,6 +42,11 @@ SubscriptionResponse:
       example: true
     plan_limits:
       $ref: '#/PlanLimits'
+    effective_limits:
+      $ref: '#/PlanLimits'
+      description: |
+        Resource and request limits currently enforced (may match a paid plan during
+        quota grace after downgrade while `plan_id` is already `free`).
     usage:
       $ref: '#/UsageInfo'
 
@@ -347,10 +353,18 @@ Subscription:
       format: date-time
       nullable: true
       description: |
-        When the downgrade grace period expires, or null if no grace period is active.
-        During the grace period (7 days after downgrade), the user retains the longer
-        audit retention window (90 days) to export their data. After this timestamp,
-        retention drops to the free plan's window (7 days).
+        When the 7-day audit retention grace period expires after downgrade, or null
+        if not active. During this window the user keeps the longer paid-plan audit
+        retention (e.g. 90 days) to export data; afterward retention matches the
+        free plan. This is separate from quota entitlements (`quota_entitlements_until`).
+    quota_entitlements_until:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        When paid-plan quotas stop applying after a downgrade to free, or null if not
+        in quota grace. Until this instant, API enforcement uses the snapshotted paid
+        plan limits even though `plan_id` is `free`.
 
 UsageSummary:
   type: object
@@ -386,6 +400,7 @@ BillingPlanResponse:
     prompts, and gate features like SMS notifications.
   required:
     - plan
+    - effective_limits
     - subscription
     - usage
     - pricing
@@ -393,6 +408,12 @@ BillingPlanResponse:
   properties:
     plan:
       $ref: '#/Plan'
+    effective_limits:
+      $ref: '#/PlanLimits'
+      description: |
+        Limits currently enforced for quotas and resource caps. During quota grace
+        after downgrade, this reflects the previous paid plan while `plan` reflects
+        the billing plan (`free`).
     subscription:
       $ref: '#/Subscription'
     usage:
@@ -596,6 +617,26 @@ ActivateResponse:
         - `pending`: Checkout session is not yet complete (payment still processing).
       example: activated
 
+DowngradeLimitWarning:
+  type: object
+  required:
+    - resource
+    - current
+    - max_allowed
+  properties:
+    resource:
+      type: string
+      description: Resource type over the free-tier cap (e.g. agents, credentials)
+      example: agents
+    current:
+      type: integer
+      description: Current count for that resource
+      example: 5
+    max_allowed:
+      type: integer
+      description: Maximum allowed on the free plan (applies after quota grace ends)
+      example: 3
+
 DowngradeResponse:
   type: object
   required:
@@ -621,9 +662,22 @@ DowngradeResponse:
       type: string
       format: date-time
       description: |
-        When the 7-day grace period expires. Until this time, the user retains
-        the 90-day audit retention window from their paid plan. Show this to the
-        user so they know how long they have to export their data.
+        When the 7-day audit retention grace period expires. Until this time, the user
+        retains the longer paid-plan audit retention window to export data.
+    quota_entitlements_until:
+      type: string
+      format: date-time
+      nullable: true
+      description: |
+        When paid-plan resource and request quotas stop applying. Until then, limits
+        match the previous paid plan even though the billing plan is now free.
+    warnings:
+      type: array
+      items:
+        $ref: '#/DowngradeLimitWarning'
+      description: |
+        Non-blocking notices when the user exceeds free-tier caps; those limits apply
+        after `quota_entitlements_until`.
 
 Invoice:
   type: object

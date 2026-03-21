@@ -76,6 +76,19 @@ func ParseSubscriptionEvent(event *WebhookEvent) (*StripeSubscription, error) {
 	return &sub, nil
 }
 
+// SubscriptionCurrentPeriodEndUnix returns current_period_end from raw subscription
+// webhook JSON when present. stripe-go v82's Subscription struct omits this field,
+// but Stripe still includes it in subscription event payloads.
+func SubscriptionCurrentPeriodEndUnix(raw json.RawMessage) (unix int64, ok bool) {
+	var v struct {
+		CurrentPeriodEnd int64 `json:"current_period_end"`
+	}
+	if err := json.Unmarshal(raw, &v); err != nil || v.CurrentPeriodEnd == 0 {
+		return 0, false
+	}
+	return v.CurrentPeriodEnd, true
+}
+
 // ParseInvoicePaid extracts invoice data from invoice.paid events.
 func ParseInvoicePaid(event *WebhookEvent) (*gostripe.Invoice, error) {
 	var inv gostripe.Invoice

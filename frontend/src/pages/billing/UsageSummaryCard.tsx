@@ -6,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { BillingPricing, Plan, UsageSummary } from "@/hooks/useBillingPlan";
+import type { BillingPricing, Plan, PlanLimits, UsageSummary } from "@/hooks/useBillingPlan";
 import { useBillingUsage } from "@/hooks/useBillingUsage";
 import { FREE_REQUEST_ALLOWANCE, PRICE_PER_REQUEST } from "./constants";
 import { DetailRow } from "./DetailRow";
@@ -14,6 +14,7 @@ import { DetailRow } from "./DetailRow";
 interface UsageSummaryCardProps {
   usage: UsageSummary;
   plan: Plan;
+  effectiveLimits: PlanLimits;
   pricing?: BillingPricing;
 }
 
@@ -93,8 +94,9 @@ function PaidRequestRow({ current, included, priceDisplay }: { current: number; 
   );
 }
 
-export function UsageSummaryCard({ usage, plan, pricing }: UsageSummaryCardProps) {
-  const isPaid = plan.id !== "free" && plan.id !== "free_pro";
+export function UsageSummaryCard({ usage, plan, effectiveLimits, pricing }: UsageSummaryCardProps) {
+  const showPaidRequestRow =
+    plan.id !== "free_pro" && effectiveLimits.max_requests_per_month == null;
   const { usage: usageDetail } = useBillingUsage();
   // Use server-provided included value, fall back to config constant.
   const included = usageDetail?.requests.included ?? FREE_REQUEST_ALLOWANCE;
@@ -113,29 +115,29 @@ export function UsageSummaryCard({ usage, plan, pricing }: UsageSummaryCardProps
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {isPaid ? (
+          {showPaidRequestRow ? (
             <PaidRequestRow current={usage.requests} included={included} priceDisplay={priceDisplay} />
           ) : (
             <UsageRow
               label="Requests"
               current={usage.requests}
-              limit={plan.max_requests_per_month ?? null}
+              limit={effectiveLimits.max_requests_per_month ?? null}
             />
           )}
           <UsageRow
             label="Agents"
             current={usage.agents}
-            limit={plan.max_agents ?? null}
+            limit={effectiveLimits.max_agents ?? null}
           />
           <UsageRow
             label="Standing Approvals"
             current={usage.standing_approvals}
-            limit={plan.max_standing_approvals ?? null}
+            limit={effectiveLimits.max_standing_approvals ?? null}
           />
           <UsageRow
             label="Credentials"
             current={usage.credentials}
-            limit={plan.max_credentials ?? null}
+            limit={effectiveLimits.max_credentials ?? null}
           />
           <DetailRow label="Audit Retention">
             <span className="text-muted-foreground">{plan.audit_retention_days} days</span>
