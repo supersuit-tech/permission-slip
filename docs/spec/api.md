@@ -777,7 +777,7 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", timestamp="1707
   - `id` (string): Connector identifier
   - `name` (string): Human-readable name
   - `description` (string or null): Connector description
-  - `credentials_ready` (boolean): Whether the user has stored the required credentials. `true` means actions can be executed; `false` means execution will fail with `credentials_not_found`. No credential values are ever exposed.
+  - `credentials_ready` (boolean): Whether a credential or OAuth connection is **bound** to this agent+connector (not merely stored on the user account). `true` means actions can be executed; `false` means execution will fail with `credentials_not_found`. No credential values are ever exposed.
   - `credentials_setup_url` (string or null): URL where the user can set up credentials. Only included when `credentials_ready` is `false`.
   - `actions` (array): Available actions with full schemas
     - `action_type` (string): Action type identifier (use as `action.type` in approval requests)
