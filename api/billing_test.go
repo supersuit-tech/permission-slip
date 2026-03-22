@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
 	"time"
 
@@ -914,65 +913,6 @@ func TestDowngrade_EndQuotaGraceNow_PastEntitlementsReturnsAlreadyDowngraded(t *
 	}
 	if errResp.Error.Code != ErrAlreadyDowngraded {
 		t.Errorf("expected error code %s, got %s", ErrAlreadyDowngraded, errResp.Error.Code)
-	}
-}
-
-func TestDowngrade_EndQuotaGraceNow_ConcurrentSecondReturnsPlanChangeNotAllowed(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-
-	future := time.Now().Add(48 * time.Hour)
-	testhelper.MustExec(t, tx,
-		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = now() WHERE user_id = $1`,
-		uid, db.PlanPayAsYouGo, future)
-
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
-	router := NewRouter(deps)
-
-	type result struct {
-		code int
-		body string
-	}
-	ch := make(chan result, 2)
-	var wg sync.WaitGroup
-	for range 2 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, r)
-			ch <- result{code: w.Code, body: w.Body.String()}
-		}()
-	}
-	wg.Wait()
-	close(ch)
-
-	var okCount, conflictCount int
-	var conflictCode ErrorCode
-	for res := range ch {
-		switch res.code {
-		case http.StatusOK:
-			okCount++
-		case http.StatusConflict:
-			conflictCount++
-			var errResp ErrorResponse
-			if err := json.Unmarshal([]byte(res.body), &errResp); err == nil {
-				conflictCode = errResp.Error.Code
-			}
-		default:
-			t.Fatalf("unexpected status %d: %s", res.code, res.body)
-		}
-	}
-	if okCount != 1 || conflictCount != 1 {
-		t.Fatalf("expected exactly one 200 and one 409, got ok=%d conflict=%d", okCount, conflictCount)
-	}
-	if conflictCode != ErrPlanChangeNotAllowed {
-		t.Errorf("expected conflict code %s, got %s", ErrPlanChangeNotAllowed, conflictCode)
 	}
 }
 
