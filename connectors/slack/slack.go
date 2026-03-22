@@ -72,6 +72,9 @@ var OAuthScopes = []string{
 // im:history and mpim:history are required on the user token for conversations.history
 // and conversations.replies in DMs and group DMs (Slack documents these scopes for
 // user tokens — not chat:read).
+// User read scopes for users.conversations (listing DMs / shared private convos the bot
+// is not in). Slack documents channels:read, groups:read, im:read, mpim:read for this
+// method on user tokens alongside bot tokens.
 var OAuthUserScopes = []string{
 	"search:read.public",
 	"search:read.private",
@@ -81,6 +84,10 @@ var OAuthUserScopes = []string{
 	"chat:write",
 	"im:history",
 	"mpim:history",
+	"channels:read",
+	"groups:read",
+	"im:read",
+	"mpim:read",
 }
 
 // SlackConnector owns the shared HTTP client and base URL used by all

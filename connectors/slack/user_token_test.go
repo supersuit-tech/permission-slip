@@ -117,7 +117,7 @@ func TestSearchMessages_FallsBackToBotToken(t *testing.T) {
 func TestOAuthUserScopes_IncludesSearchChatWriteAndDMHistory(t *testing.T) {
 	t.Parallel()
 
-	// Verify OAuthUserScopes: search, chat:write, and im/mpim history for user-token DM reads.
+	// Verify OAuthUserScopes: search, chat:write, DM history, and users.conversations read scopes.
 	expectedSearch := map[string]struct{}{
 		"search:read.public":  {},
 		"search:read.private": {},
@@ -125,34 +125,31 @@ func TestOAuthUserScopes_IncludesSearchChatWriteAndDMHistory(t *testing.T) {
 		"search:read.mpim":    {},
 		"search:read.files":   {},
 	}
-	var hasChatWrite, hasIMHistory, hasMPIMHistory bool
+	wantExact := map[string]struct{}{
+		"chat:write":    {},
+		"im:history":    {},
+		"mpim:history":  {},
+		"channels:read": {},
+		"groups:read":   {},
+		"im:read":       {},
+		"mpim:read":     {},
+	}
 	for _, s := range OAuthUserScopes {
 		if _, ok := expectedSearch[s]; ok {
 			delete(expectedSearch, s)
 			continue
 		}
-		switch s {
-		case "chat:write":
-			hasChatWrite = true
-		case "im:history":
-			hasIMHistory = true
-		case "mpim:history":
-			hasMPIMHistory = true
-		default:
-			t.Errorf("unexpected user scope: %q", s)
+		if _, ok := wantExact[s]; ok {
+			delete(wantExact, s)
+			continue
 		}
+		t.Errorf("unexpected user scope: %q", s)
 	}
 	for s := range expectedSearch {
 		t.Errorf("missing user scope: %q", s)
 	}
-	if !hasChatWrite {
-		t.Error(`missing user scope: "chat:write"`)
-	}
-	if !hasIMHistory {
-		t.Error(`missing user scope: "im:history"`)
-	}
-	if !hasMPIMHistory {
-		t.Error(`missing user scope: "mpim:history"`)
+	for s := range wantExact {
+		t.Errorf("missing user scope: %q", s)
 	}
 }
 
