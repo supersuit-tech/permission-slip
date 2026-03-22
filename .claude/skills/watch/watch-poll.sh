@@ -98,7 +98,12 @@ PR_NUMBER_FILE="$WORK_DIR/pr-number.txt"
 echo "$PR_NUMBER" > "$PR_NUMBER_FILE"
 
 # Bot username(s) to filter out
-BOT_USERS=("claude-code[bot]" "github-actions[bot]" "claude[bot]")
+BOT_USERS=(
+  "claude-code[bot]"
+  "github-actions[bot]"
+  "claude[bot]"
+  "greptile-apps[bot]"
+)
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -167,7 +172,7 @@ fetch_new_comments() {
 
   local new_rcs
   new_rcs=$(echo "$review_comments" | jq -r --argjson last "$last_rc_id" '
-    [.[] | select(.id > $last)] | sort_by(.id)')
+    [.[] | select(.id > $last and .in_reply_to_id == null)] | sort_by(.id)')
 
   new_rcs=$(echo "$new_rcs" | jq -r --argjson bots "$(printf '%s\n' "${BOT_USERS[@]}" | jq -R . | jq -s .)" '
     [.[] | select(.user.login as $u | $bots | index($u) | not)]')
