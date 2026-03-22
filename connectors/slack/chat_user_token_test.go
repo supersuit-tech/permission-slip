@@ -269,3 +269,159 @@ func TestSendMessage_NotAllowedTokenTypeReturnsAuthError(t *testing.T) {
 		t.Fatalf("expected AuthError, got %T", err)
 	}
 }
+
+func TestReadChannelMessages_DMUsesUserTokenForMembersAndHistory(t *testing.T) {
+	t.Parallel()
+
+	var membersAuth, historyAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]any{"id": "U_ALICE"},
+			})
+		case "/conversations.members":
+			membersAuth = r.Header.Get("Authorization")
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"members": []string{"U_ALICE", "U_BOB"},
+			})
+		case "/conversations.history":
+			historyAuth = r.Header.Get("Authorization")
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":       true,
+				"messages": []map[string]any{},
+				"has_more": false,
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &readChannelMessagesAction{conn: conn}
+	params, _ := json.Marshal(readChannelMessagesParams{Channel: "D01234567"})
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token":      "xoxb-bot",
+		"user_access_token": "xoxp-user",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.read_channel_messages",
+		Parameters:  params,
+		Credentials: creds,
+		UserEmail:   "alice@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if membersAuth != "Bearer xoxp-user" {
+		t.Errorf("conversations.members: expected user token, got %q", membersAuth)
+	}
+	if historyAuth != "Bearer xoxp-user" {
+		t.Errorf("conversations.history: expected user token, got %q", historyAuth)
+	}
+}
+
+func TestReadChannelMessages_PublicChannelKeepsBotTokenForHistory(t *testing.T) {
+	t.Parallel()
+
+	var historyAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/conversations.info":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"channel": map[string]any{"id": "C01234567", "is_private": false},
+			})
+		case "/conversations.history":
+			historyAuth = r.Header.Get("Authorization")
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":       true,
+				"messages": []map[string]any{},
+				"has_more": false,
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &readChannelMessagesAction{conn: conn}
+	params, _ := json.Marshal(readChannelMessagesParams{Channel: "C01234567"})
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token":      "xoxb-bot",
+		"user_access_token": "xoxp-user",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.read_channel_messages",
+		Parameters:  params,
+		Credentials: creds,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if historyAuth != "Bearer xoxb-bot" {
+		t.Errorf("conversations.history: expected bot token for public C-channel, got %q", historyAuth)
+	}
+}
+
+func TestReadThread_DMUsesUserTokenForReplies(t *testing.T) {
+	t.Parallel()
+
+	var repliesAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]any{"id": "U_ALICE"},
+			})
+		case "/conversations.members":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":      true,
+				"members": []string{"U_ALICE", "U_BOB"},
+			})
+		case "/conversations.replies":
+			repliesAuth = r.Header.Get("Authorization")
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{"type": "message", "user": "U002", "text": "root", "ts": "1.0", "thread_ts": "1.0"},
+				},
+				"has_more": false,
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &readThreadAction{conn: conn}
+	params, _ := json.Marshal(readThreadParams{Channel: "D01234567", ThreadTS: "1.0"})
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token":      "xoxb-bot",
+		"user_access_token": "xoxp-user",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.read_thread",
+		Parameters:  params,
+		Credentials: creds,
+		UserEmail:   "alice@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if repliesAuth != "Bearer xoxp-user" {
+		t.Errorf("conversations.replies: expected user token, got %q", repliesAuth)
+	}
+}

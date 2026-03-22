@@ -69,6 +69,7 @@ const maxMembershipPages = 50
 // isUserInChannel checks whether the given Slack user ID is a member of the
 // specified channel. Paginates through the member list up to maxMembershipPages.
 func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.Credentials, channelID, slackUserID string) (bool, error) {
+	membersCreds := credentialsForUserTokenIfDirectOrGroupDM(creds, channelID)
 	cursor := ""
 	for page := 0; page < maxMembershipPages; page++ {
 		body := conversationsMembersRequest{
@@ -78,7 +79,7 @@ func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.C
 		}
 
 		var resp conversationsMembersResponse
-		if err := c.doPost(ctx, "conversations.members", creds, body, &resp); err != nil {
+		if err := c.doPost(ctx, "conversations.members", membersCreds, body, &resp); err != nil {
 			return false, err
 		}
 		if !resp.OK {

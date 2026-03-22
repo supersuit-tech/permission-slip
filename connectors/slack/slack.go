@@ -69,6 +69,9 @@ var OAuthScopes = []string{
 // search.messages endpoint requires a user token — bot tokens are not supported.
 // chat:write is required for chat.postMessage, chat.update, chat.delete, and
 // chat.scheduleMessage when using the user token so messages can be sent as the user.
+// im:history and mpim:history are required on the user token for conversations.history
+// and conversations.replies in DMs and group DMs (Slack documents these scopes for
+// user tokens — not chat:read).
 var OAuthUserScopes = []string{
 	"search:read.public",
 	"search:read.private",
@@ -76,6 +79,8 @@ var OAuthUserScopes = []string{
 	"search:read.mpim",
 	"search:read.files",
 	"chat:write",
+	"im:history",
+	"mpim:history",
 }
 
 // SlackConnector owns the shared HTTP client and base URL used by all
@@ -274,6 +279,24 @@ func (c *SlackConnector) getToken(creds connectors.Credentials) (string, error) 
 func credentialsForChat(creds connectors.Credentials) connectors.Credentials {
 	if userToken, ok := creds.Get(credKeyUserAccessToken); ok && userToken != "" {
 		return connectors.NewCredentials(map[string]string{credKeyAccessToken: userToken})
+	}
+	return creds
+}
+
+// credentialsForUserTokenIfDirectOrGroupDM selects the user OAuth token for API
+// calls scoped to a DM (D…) or group DM (G…) when user_access_token is present.
+// The bot is often not a member of the user’s 1:1 and MPIM conversations, so
+// conversations.members and conversations.history fail with the bot token even
+// when the authorizing human is a participant.
+func credentialsForUserTokenIfDirectOrGroupDM(creds connectors.Credentials, channelID string) connectors.Credentials {
+	if channelID == "" {
+		return creds
+	}
+	switch channelID[0] {
+	case 'D', 'G':
+		if userToken, ok := creds.Get(credKeyUserAccessToken); ok && userToken != "" {
+			return connectors.NewCredentials(map[string]string{credKeyAccessToken: userToken})
+		}
 	}
 	return creds
 }
