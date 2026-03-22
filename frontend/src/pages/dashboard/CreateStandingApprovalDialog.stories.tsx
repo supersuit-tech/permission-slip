@@ -26,7 +26,6 @@ import {
   StepPickAgent,
   StepPickAction,
   StepLimits,
-  CUSTOM_ACTION_SENTINEL,
 } from "./StandingApprovalSteps";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ParametersSchema, SchemaProperty } from "@/lib/parameterSchema";
@@ -396,7 +395,6 @@ function CreateStandingApprovalWizard({
   const [selectedConfigId, setSelectedConfigId] = useState(
     initialStep > 1 ? "cfg-1" : "",
   );
-  const [customActionType, setCustomActionType] = useState("");
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
   const [manualConstraintsJson, setManualConstraintsJson] = useState("");
@@ -404,7 +402,6 @@ function CreateStandingApprovalWizard({
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
 
-  const isCustomAction = selectedConfigId === CUSTOM_ACTION_SENTINEL;
   const effectiveSchema = schema ?? (step >= 3 ? CALENDAR_SCHEMA : null);
 
   const effectiveActionType =
@@ -412,7 +409,7 @@ function CreateStandingApprovalWizard({
       ? "google_calendar.create_event"
       : selectedConfigId === "cfg-3"
         ? "github.create_issue"
-        : customActionType;
+        : "";
 
   return (
     <Dialog open>
@@ -475,11 +472,8 @@ function CreateStandingApprovalWizard({
             <StepPickAction
               selectedConfigId={selectedConfigId}
               onConfigChange={setSelectedConfigId}
-              customActionType={customActionType}
-              onCustomActionTypeChange={setCustomActionType}
               configsByConnector={MOCK_CONFIGS_BY_CONNECTOR}
               configsLoading={false}
-              isCustomAction={isCustomAction}
             />
           )}
 
