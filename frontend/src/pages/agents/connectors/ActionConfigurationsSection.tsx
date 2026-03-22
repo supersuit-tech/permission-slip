@@ -105,6 +105,7 @@ export function ActionConfigurationsSection({
               </Button>
             )}
             <Button
+              type="button"
               size="sm"
               className="shrink-0"
               onClick={() => setAddDialogOpen(true)}

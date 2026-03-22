@@ -368,6 +368,29 @@ describe("ActionConfigurationsSection", () => {
     expect(screen.getByText("Add Configuration")).toBeInTheDocument();
   });
 
+  it("hides header Enable All Actions when wildcard and non-wildcard configs coexist", () => {
+    const mixedConfigs: ActionConfiguration[] = [
+      ...mockConfigs,
+      {
+        id: "ac_wildcard",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "*",
+        parameters: {},
+        status: "active",
+        name: "All GitHub Actions",
+        description: null,
+        created_at: "2026-03-11T10:00:00Z",
+        updated_at: "2026-03-11T10:00:00Z",
+      },
+    ];
+    renderSection({ configs: mixedConfigs });
+    expect(
+      screen.queryByRole("button", { name: /Enable All Actions/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Add Configuration")).toBeInTheDocument();
+  });
+
   it("hides Enable All Actions header button when a wildcard config exists", () => {
     const wildcardConfig: ActionConfiguration[] = [
       {
@@ -421,6 +444,40 @@ describe("ActionConfigurationsSection", () => {
           parameters: {},
         },
       });
+    });
+  });
+
+  it("shows loading spinner and disables header Enable All Actions while create is pending", async () => {
+    const user = userEvent.setup();
+    let resolvePost: (value: unknown) => void;
+    const pending = new Promise((resolve) => {
+      resolvePost = resolve;
+    });
+    mockPost.mockReturnValue(pending);
+
+    renderSection({ configs: mockConfigs });
+    await user.click(screen.getByRole("button", { name: /Enable All Actions/ }));
+
+    const btn = screen.getByRole("button", { name: /Enable All Actions/ });
+    expect(btn).toBeDisabled();
+    expect(btn.querySelector(".animate-spin")).toBeTruthy();
+
+    resolvePost!({
+      data: {
+        id: "ac_wildcard",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "*",
+        parameters: {},
+        status: "active",
+        name: "All GitHub Actions",
+        created_at: "2026-03-11T10:00:00Z",
+        updated_at: "2026-03-11T10:00:00Z",
+      },
+    });
+
+    await waitFor(() => {
+      expect(btn).not.toBeDisabled();
     });
   });
 
