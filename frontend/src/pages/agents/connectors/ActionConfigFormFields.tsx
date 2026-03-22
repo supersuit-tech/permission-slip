@@ -1,5 +1,7 @@
+import { Ban, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import validation from "@/lib/validation";
 
 /** Reserved action_type value meaning "all actions on this connector". */
@@ -73,21 +75,56 @@ export function StatusSelect({
   onChange,
   disabled,
 }: StatusSelectProps) {
+  const segmentBase =
+    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
+  const labelId = `${id}-label`;
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>Status</Label>
-      <select
-        id={id}
-        className={selectClassName}
-        value={value}
-        // Cast is safe: the only <option> values are "active" and "disabled"
-        onChange={(e) => onChange(e.target.value as "active" | "disabled")}
-        disabled={disabled}
+    <fieldset className="space-y-2" disabled={disabled}>
+      <Label id={labelId} className="text-sm font-medium">
+        Status
+      </Label>
+      <div
+        role="radiogroup"
+        aria-labelledby={labelId}
+        className="bg-muted/60 flex gap-1 rounded-lg border p-1"
       >
-        <option value="active">Active</option>
-        <option value="disabled">Disabled</option>
-      </select>
-    </div>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value === "active"}
+          className={cn(
+            segmentBase,
+            value === "active"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+          onClick={() => onChange("active")}
+        >
+          <Check className="size-3.5 shrink-0" aria-hidden />
+          Active
+        </button>
+        <button
+          type="button"
+          role="radio"
+          aria-checked={value === "disabled"}
+          className={cn(
+            segmentBase,
+            value === "disabled"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+          onClick={() => onChange("disabled")}
+        >
+          <Ban className="size-3.5 shrink-0" aria-hidden />
+          Disabled
+        </button>
+      </div>
+      <p className="text-muted-foreground text-xs">
+        {value === "disabled"
+          ? "Disabled configurations stay in the list but do not allow new requests for this action."
+          : "Active configurations allow the agent to request this action (subject to approval)."}
+      </p>
+    </fieldset>
   );
 }
 
