@@ -67,12 +67,15 @@ var OAuthScopes = []string{
 // result in a user token (xoxp-) returned in the authed_user field of the
 // OAuth response. The search:read.* scopes are here because Slack's
 // search.messages endpoint requires a user token — bot tokens are not supported.
+// chat:write is required for chat.postMessage, chat.update, chat.delete, and
+// chat.scheduleMessage when using the user token so messages can be sent as the user.
 var OAuthUserScopes = []string{
 	"search:read.public",
 	"search:read.private",
 	"search:read.im",
 	"search:read.mpim",
 	"search:read.files",
+	"chat:write",
 }
 
 // SlackConnector owns the shared HTTP client and base URL used by all
@@ -264,6 +267,17 @@ func (c *SlackConnector) getToken(creds connectors.Credentials) (string, error) 
 	return "", &connectors.ValidationError{Message: "credential is missing: access_token or bot_token"}
 }
 
+// credentialsForChat returns credentials for Slack chat.* and conversations.open
+// calls: when user_access_token is set (OAuth user token / xoxp-), it is swapped
+// into access_token so doPost posts as the authorizing user; otherwise the
+// original credentials are used (bot token path).
+func credentialsForChat(creds connectors.Credentials) connectors.Credentials {
+	if userToken, ok := creds.Get(credKeyUserAccessToken); ok && userToken != "" {
+		return connectors.NewCredentials(map[string]string{credKeyAccessToken: userToken})
+	}
+	return creds
+}
+
 // doPost is the shared request lifecycle for all Slack actions. It marshals
 // body as JSON, sends a POST to the given Slack API method with auth headers,
 // handles rate limiting and timeouts, and unmarshals the response into dest.
@@ -369,7 +383,9 @@ func mapSlackError(slackErr string) error {
 	case "not_authed", "invalid_auth", "token_revoked", "token_expired", "account_inactive":
 		return &connectors.AuthError{Message: fmt.Sprintf("Slack auth error: %s", slackErr)}
 	case "missing_scope":
-		return &connectors.AuthError{Message: "Slack bot token is missing a required OAuth scope — check your app's permissions at https://api.slack.com/apps"}
+		return &connectors.AuthError{Message: "Slack token is missing a required OAuth scope — if posting as yourself, re-authorize the Slack connection so your user token includes chat:write; otherwise check bot scopes at https://api.slack.com/apps"}
+	case "not_allowed_token_type":
+		return &connectors.AuthError{Message: "Slack rejected this request for the token type in use — reconnect Slack or use an action that supports your current token (user vs bot)"}
 
 	// Rate limiting
 	case "ratelimited":

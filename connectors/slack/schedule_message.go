@@ -147,8 +147,9 @@ func (a *scheduleMessageAction) Execute(ctx context.Context, req connectors.Acti
 		PostAt:  postAtUnix,
 	}
 
+	creds := credentialsForChat(req.Credentials)
 	var resp scheduleMessageResponse
-	if err := a.conn.doPost(ctx, "chat.scheduleMessage", req.Credentials, body, &resp); err != nil {
+	if err := a.conn.doPost(ctx, "chat.scheduleMessage", creds, body, &resp); err != nil {
 		return nil, err
 	}
 
