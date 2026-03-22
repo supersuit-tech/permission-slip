@@ -150,6 +150,10 @@ Permission Slip needs agents that can **(1) make HTTP requests to arbitrary URLs
 | [v0](https://v0.dev) (Vercel) | Sandboxed, focused on UI generation |
 | [Bolt](https://bolt.new) | Sandboxed WebContainer with limited network |
 
+### Claude Code skills
+
+This repo includes [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) skills under [`.claude/skills/`](.claude/skills/). For example, **`/fix-ci`** (see [`fix-ci/SKILL.md`](.claude/skills/fix-ci/SKILL.md)) triggers **CI + audit** on the current branch, pulls failure logs, and loops on fix → push → re-run until green (with a round cap).
+
 ### ❓ Uncertain (needs testing)
 
 | Agent | Concern |
