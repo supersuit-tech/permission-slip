@@ -21,6 +21,11 @@ export interface ParameterFieldWidgetProps {
   className?: string;
   /** Override the placeholder from x-ui (e.g. for constraint mode hints). */
   placeholder?: string;
+  /**
+   * Sibling field value for paired datetime bounds (e.g. time_max when editing time_min).
+   * When both sides are concrete datetimes, sets HTML min/max on the datetime-local input.
+   */
+  siblingDatetimeValue?: string;
 }
 
 /**
@@ -35,6 +40,7 @@ export function ParameterFieldWidget({
   disabled,
   className,
   placeholder: placeholderOverride,
+  siblingDatetimeValue,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
   const widget: WidgetType = ui?.widget ?? inferWidgetFromProperty(property);
@@ -51,6 +57,8 @@ export function ParameterFieldWidget({
         placeholder,
         className,
         enumValues: property.enum,
+        siblingDatetimeValue,
+        datetimeRangeRole: ui?.datetime_range_role,
       })}
       <FieldHints ui={ui} />
     </div>
@@ -65,6 +73,8 @@ interface WidgetRenderProps {
   placeholder?: string;
   className?: string;
   enumValues?: string[];
+  siblingDatetimeValue?: string;
+  datetimeRangeRole?: "lower" | "upper";
 }
 
 function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
@@ -184,14 +194,33 @@ function DateWidget({ inputId, value, onChange, disabled, placeholder, className
   );
 }
 
-function DateTimeWidget({ inputId, value, onChange, disabled, placeholder, className }: WidgetRenderProps) {
+function DateTimeWidget({
+  inputId,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  className,
+  siblingDatetimeValue,
+  datetimeRangeRole,
+}: WidgetRenderProps) {
   const localValue = toDatetimeLocalValue(value);
+  const siblingLocal =
+    siblingDatetimeValue && isConcreteDatetimeString(siblingDatetimeValue)
+      ? toDatetimeLocalValue(siblingDatetimeValue)
+      : undefined;
+  const minAttr =
+    datetimeRangeRole === "upper" && siblingLocal ? siblingLocal : undefined;
+  const maxAttr =
+    datetimeRangeRole === "lower" && siblingLocal ? siblingLocal : undefined;
 
   return (
     <Input
       id={inputId}
       type="datetime-local"
       value={localValue}
+      min={minAttr}
+      max={maxAttr}
       onChange={(e) => {
         const dtLocal = e.target.value;
         if (!dtLocal) {
@@ -322,6 +351,14 @@ function toDatetimeLocalValue(value: string): string {
   const hrs = String(d.getHours()).padStart(2, "0");
   const mins = String(d.getMinutes()).padStart(2, "0");
   return `${year}-${month}-${day}T${hrs}:${mins}`;
+}
+
+/** True when the value is a single concrete instant (not a wildcard pattern). */
+function isConcreteDatetimeString(value: string): boolean {
+  if (!value || value.includes("*")) return false;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return true;
+  const t = new Date(value).getTime();
+  return !Number.isNaN(t);
 }
 
 /** Renders help_text and help_url hints below the input. */

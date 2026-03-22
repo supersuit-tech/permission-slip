@@ -80,11 +80,23 @@ func (c *CalendlyConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"min_start_time": {
 							"type": "string",
-							"description": "Only return events starting at or after this time (ISO 8601 format)"
+							"format": "date-time",
+							"description": "Only return events starting at or after this time (ISO 8601 format)",
+							"x-ui": {
+								"label": "Start of range (min start time)",
+								"datetime_range_pair": "max_start_time",
+								"datetime_range_role": "lower"
+							}
 						},
 						"max_start_time": {
 							"type": "string",
-							"description": "Only return events starting before this time (ISO 8601 format)"
+							"format": "date-time",
+							"description": "Only return events starting before this time (ISO 8601 format)",
+							"x-ui": {
+								"label": "End of range (max start time)",
+								"datetime_range_pair": "min_start_time",
+								"datetime_range_role": "upper"
+							}
 						},
 						"status": {
 							"type": "string",
@@ -152,11 +164,21 @@ func (c *CalendlyConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_time": {
 							"type": "string",
-							"description": "Start of the time range to check (ISO 8601 format)"
+							"format": "date-time",
+							"description": "Start of the time range to check (ISO 8601 format)",
+							"x-ui": {
+								"datetime_range_pair": "end_time",
+								"datetime_range_role": "lower"
+							}
 						},
 						"end_time": {
 							"type": "string",
-							"description": "End of the time range to check (ISO 8601 format)"
+							"format": "date-time",
+							"description": "End of the time range to check (ISO 8601 format)",
+							"x-ui": {
+								"datetime_range_pair": "start_time",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),

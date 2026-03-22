@@ -22,6 +22,13 @@ export interface SchemaPropertyUI {
   help_url?: string;
   help_text?: string;
   visible_when?: VisibleWhen;
+  /**
+   * Sibling parameter key for datetime range pairing (e.g. time_min ↔ time_max).
+   * Use with `datetime_range_role` so the sibling's fixed value sets HTML min/max on this input.
+   */
+  datetime_range_pair?: string;
+  /** Whether this field is the lower or upper bound of the pair. */
+  datetime_range_role?: "lower" | "upper";
 }
 
 /** A named group for organizing related fields in the form. */
@@ -275,6 +282,13 @@ function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
     ) {
       ui.visible_when = { field: vw.field, equals: vw.equals as string | boolean | number };
     }
+  }
+
+  if (typeof obj.datetime_range_pair === "string" && obj.datetime_range_pair.length > 0) {
+    ui.datetime_range_pair = obj.datetime_range_pair;
+  }
+  if (obj.datetime_range_role === "lower" || obj.datetime_range_role === "upper") {
+    ui.datetime_range_role = obj.datetime_range_role;
   }
 
   // Return undefined if no valid fields were parsed
