@@ -360,14 +360,38 @@ describe("ActionConfigurationsSection", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows Enable All Actions footer link when configs exist and none are wildcard", () => {
+  it("shows Enable All Actions in the header when configs exist and none are wildcard", () => {
     renderSection({ configs: mockConfigs });
-    // The table has configs, so a footer link should appear
-    const footerLink = screen.getByRole("button", { name: /Enable All Actions/ });
-    expect(footerLink).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Enable All Actions/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Add Configuration")).toBeInTheDocument();
   });
 
-  it("hides Enable All Actions footer link when a wildcard config exists", () => {
+  it("hides header Enable All Actions when wildcard and non-wildcard configs coexist", () => {
+    const mixedConfigs: ActionConfiguration[] = [
+      ...mockConfigs,
+      {
+        id: "ac_wildcard",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "*",
+        parameters: {},
+        status: "active",
+        name: "All GitHub Actions",
+        description: null,
+        created_at: "2026-03-11T10:00:00Z",
+        updated_at: "2026-03-11T10:00:00Z",
+      },
+    ];
+    renderSection({ configs: mixedConfigs });
+    expect(
+      screen.queryByRole("button", { name: /Enable All Actions/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Add Configuration")).toBeInTheDocument();
+  });
+
+  it("hides Enable All Actions header button when a wildcard config exists", () => {
     const wildcardConfig: ActionConfiguration[] = [
       {
         id: "ac_wildcard",
@@ -383,7 +407,6 @@ describe("ActionConfigurationsSection", () => {
       },
     ];
     renderSection({ configs: wildcardConfig });
-    // Footer button must not be rendered
     expect(
       screen.queryByRole("button", { name: /Enable All Actions/ }),
     ).not.toBeInTheDocument();
@@ -391,7 +414,7 @@ describe("ActionConfigurationsSection", () => {
     expect(screen.getByText("All Actions")).toBeInTheDocument();
   });
 
-  it("calls create with wildcard action_type when clicking footer Enable All Actions", async () => {
+  it("calls create with wildcard action_type when clicking header Enable All Actions with existing configs", async () => {
     const user = userEvent.setup();
     mockPost.mockResolvedValue({
       data: {
@@ -421,6 +444,40 @@ describe("ActionConfigurationsSection", () => {
           parameters: {},
         },
       });
+    });
+  });
+
+  it("shows loading spinner and disables header Enable All Actions while create is pending", async () => {
+    const user = userEvent.setup();
+    let resolvePost: (value: unknown) => void;
+    const pending = new Promise((resolve) => {
+      resolvePost = resolve;
+    });
+    mockPost.mockReturnValue(pending);
+
+    renderSection({ configs: mockConfigs });
+    await user.click(screen.getByRole("button", { name: /Enable All Actions/ }));
+
+    const btn = screen.getByRole("button", { name: /Enable All Actions/ });
+    expect(btn).toBeDisabled();
+    expect(btn.querySelector(".animate-spin")).toBeTruthy();
+
+    resolvePost!({
+      data: {
+        id: "ac_wildcard",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "*",
+        parameters: {},
+        status: "active",
+        name: "All GitHub Actions",
+        created_at: "2026-03-11T10:00:00Z",
+        updated_at: "2026-03-11T10:00:00Z",
+      },
+    });
+
+    await waitFor(() => {
+      expect(btn).not.toBeDisabled();
     });
   });
 
