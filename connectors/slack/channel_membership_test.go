@@ -439,6 +439,79 @@ func TestSearchMessages_FiltersPrivateResults(t *testing.T) {
 	}
 }
 
+func TestGetUserChannelIDs_UserTokenOmitsUserParameter(t *testing.T) {
+	t.Parallel()
+
+	var gotAuth string
+	var gotBody usersConversationsRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/users.conversations" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			http.Error(w, "not found", http.StatusNotFound)
+			return
+		}
+		gotAuth = r.Header.Get("Authorization")
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":       true,
+			"channels": []map[string]any{{"id": "G123"}},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	creds := connectors.NewCredentials(map[string]string{
+		"access_token":      "xoxb-bot-token",
+		"user_access_token": "xoxp-user-token",
+	})
+	ids, err := conn.getUserChannelIDs(t.Context(), creds, "U_SHOULD_NOT_BE_SENT", "private_channel")
+	if err != nil {
+		t.Fatalf("getUserChannelIDs: %v", err)
+	}
+	if gotAuth != "Bearer xoxp-user-token" {
+		t.Errorf("expected user token in Authorization, got %q", gotAuth)
+	}
+	if gotBody.User != "" {
+		t.Errorf("users.conversations with user token should omit user field, got User=%q", gotBody.User)
+	}
+	if gotBody.Types != "private_channel" {
+		t.Errorf("types: got %q", gotBody.Types)
+	}
+	if !ids["G123"] {
+		t.Errorf("expected G123 in result set, got %v", ids)
+	}
+}
+
+func TestGetUserChannelIDs_BotTokenSendsUserParameter(t *testing.T) {
+	t.Parallel()
+
+	var gotBody usersConversationsRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewDecoder(r.Body).Decode(&gotBody); err != nil {
+			t.Errorf("decode body: %v", err)
+		}
+		json.NewEncoder(w).Encode(map[string]any{"ok": true, "channels": []any{}})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	creds := validCreds()
+	_, err := conn.getUserChannelIDs(t.Context(), creds, "U_TARGET", "im")
+	if err != nil {
+		t.Fatalf("getUserChannelIDs: %v", err)
+	}
+	if gotBody.User != "U_TARGET" {
+		t.Errorf("expected User U_TARGET for bot token call, got %q", gotBody.User)
+	}
+	if gotBody.Types != "im" {
+		t.Errorf("types: got %q", gotBody.Types)
+	}
+}
+
 func TestFilterPrivateTypes(t *testing.T) {
 	t.Parallel()
 

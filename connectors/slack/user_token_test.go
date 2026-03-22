@@ -114,11 +114,16 @@ func TestSearchMessages_FallsBackToBotToken(t *testing.T) {
 	}
 }
 
-func TestOAuthUserScopes_AreSearchScopes(t *testing.T) {
+func TestOAuthUserScopes_ContainsRequiredUserScopes(t *testing.T) {
 	t.Parallel()
 
-	// Verify OAuthUserScopes contains all search:read.* scopes.
+	// User token must include search:read.* (search.messages) and
+	// channels/groups/im/mpim read (users.conversations when called with xoxp-).
 	expected := map[string]bool{
+		"channels:read":       true,
+		"groups:read":         true,
+		"im:read":             true,
+		"mpim:read":           true,
 		"search:read.public":  true,
 		"search:read.private": true,
 		"search:read.im":      true,

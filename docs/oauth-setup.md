@@ -545,8 +545,9 @@ Under **Scopes**, add **Bot Token Scopes** and **User Token Scopes** to match wh
 - `reactions:write`
 - `users:read`, `users:read.email`
 
-**User Token Scopes** (required for search actions that only work with user tokens)
+**User Token Scopes** (required for search and for listing the installing user’s private conversations via `users.conversations`)
 
+- `channels:read`, `groups:read`, `im:read`, `mpim:read`
 - `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`
 
 ### 4. Configure environment

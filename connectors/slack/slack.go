@@ -65,9 +65,18 @@ var OAuthScopes = []string{
 // OAuthUserScopes is the list of user-level OAuth scopes requested via the
 // "user_scope" parameter in the Slack OAuth v2 authorization URL. These
 // result in a user token (xoxp-) returned in the authed_user field of the
-// OAuth response. The search:read.* scopes are here because Slack's
-// search.messages endpoint requires a user token — bot tokens are not supported.
+// OAuth response.
+//
+// - search:read.* — search.messages accepts only user tokens, not bot tokens.
+// - channels:read, groups:read, im:read, mpim:read — users.conversations
+//   requires one of these on the token used for the call. We call that method
+//   with the user token (listing the installing user's memberships) so private
+//   channel / DM filtering in list_channels and search_messages works reliably.
 var OAuthUserScopes = []string{
+	"channels:read",
+	"groups:read",
+	"im:read",
+	"mpim:read",
 	"search:read.public",
 	"search:read.private",
 	"search:read.im",

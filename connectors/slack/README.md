@@ -708,10 +708,14 @@ When connecting via OAuth, scopes are requested automatically. If you're creatin
 | `users:read` | List workspace users |
 | `users:read.email` | Access user email addresses (needed for identity verification) |
 
-**User token scopes (`xoxp-`)** — only needed for `search_messages`:
+**User token scopes (`xoxp-`)** — needed for `search_messages` and for `users.conversations` when filtering private channels / DMs to the installing user’s memberships:
 
 | Scope | Purpose |
 |-------|---------|
+| `channels:read` | List public channels the user is in (`users.conversations`) |
+| `groups:read` | Include private channels in `users.conversations` |
+| `im:read` | Include DMs in `users.conversations` |
+| `mpim:read` | Include group DMs in `users.conversations` |
 | `search:read.public` | Search public channel messages |
 | `search:read.private` | Search private channel messages |
 | `search:read.im` | Search DM messages |

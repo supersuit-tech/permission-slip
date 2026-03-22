@@ -256,19 +256,34 @@ const maxUserConversationPages = 50
 // filtered to the given channel types (e.g., "private_channel,mpim,im"). This is
 // more efficient than per-channel isUserInChannel calls when filtering a list of
 // channels, as it makes one paginated API call instead of N.
+//
+// When a user OAuth token (xoxp-) is present, Slack documents users.conversations
+// as returning the calling user's channels; the optional "user" filter applies
+// to the bot case. We therefore call with the user token and omit "user".
+// Otherwise we use the bot token and pass slackUserID so the bot's shared
+// conversations with that user are listed (legacy / partial coverage).
 func (c *SlackConnector) getUserChannelIDs(ctx context.Context, creds connectors.Credentials, slackUserID, types string) (map[string]bool, error) {
+	apiCreds := creds
+	useUserToken := false
+	if ut, ok := creds.Get(credKeyUserAccessToken); ok && ut != "" {
+		apiCreds = connectors.NewCredentials(map[string]string{credKeyAccessToken: ut})
+		useUserToken = true
+	}
+
 	channelSet := make(map[string]bool)
 	cursor := ""
 	for page := 0; page < maxUserConversationPages; page++ {
 		body := usersConversationsRequest{
-			User:   slackUserID,
 			Types:  types,
 			Limit:  200,
 			Cursor: cursor,
 		}
+		if !useUserToken {
+			body.User = slackUserID
+		}
 
 		var resp usersConversationsResponse
-		if err := c.doPost(ctx, "users.conversations", creds, body, &resp); err != nil {
+		if err := c.doPost(ctx, "users.conversations", apiCreds, body, &resp); err != nil {
 			return nil, err
 		}
 		if !resp.OK {
