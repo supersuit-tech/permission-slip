@@ -212,6 +212,16 @@ func gracePeriodEnd(downgradedAt *time.Time) *time.Time {
 	return &t
 }
 
+// gracePeriodEndIfActive returns gracePeriodEnd only when that instant is still
+// in the future, so clients do not show a stale "extended retention until …" date.
+func gracePeriodEndIfActive(downgradedAt *time.Time) *time.Time {
+	gp := gracePeriodEnd(downgradedAt)
+	if gp == nil || !gp.After(time.Now()) {
+		return nil
+	}
+	return gp
+}
+
 // maxInvoiceResults is the maximum number of invoices returned by the list endpoint.
 const maxInvoiceResults = 24
 
@@ -630,7 +640,7 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 				Status:                 string(updated.Status),
 				PlanID:                 updated.PlanID,
 				DowngradedAt:           updated.DowngradedAt,
-				GracePeriodEndsAt:      gracePeriodEnd(updated.DowngradedAt),
+				GracePeriodEndsAt:      gracePeriodEndIfActive(updated.DowngradedAt),
 				QuotaEntitlementsUntil: nil,
 				Warnings:               warnings,
 			})
@@ -697,7 +707,7 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 					Status:                 string(cur.Status),
 					PlanID:                 cur.PlanID,
 					DowngradedAt:           cur.DowngradedAt,
-					GracePeriodEndsAt:      gracePeriodEnd(cur.DowngradedAt),
+					GracePeriodEndsAt:      gracePeriodEndIfActive(cur.DowngradedAt),
 					QuotaEntitlementsUntil: cur.QuotaEntitlementsUntil,
 					Warnings:               warnings,
 				})
@@ -744,7 +754,7 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			Status:                 string(updated.Status),
 			PlanID:                 updated.PlanID,
 			DowngradedAt:           updated.DowngradedAt,
-			GracePeriodEndsAt:      gracePeriodEnd(updated.DowngradedAt),
+			GracePeriodEndsAt:      gracePeriodEndIfActive(updated.DowngradedAt),
 			QuotaEntitlementsUntil: updated.QuotaEntitlementsUntil,
 			Warnings:               warnings,
 		})
