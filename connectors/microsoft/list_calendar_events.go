@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -17,7 +18,8 @@ type listCalendarEventsAction struct {
 
 // listCalendarEventsParams is the user-facing parameter schema.
 type listCalendarEventsParams struct {
-	Top int `json:"top"`
+	CalendarID string `json:"calendar_id"`
+	Top        int    `json:"top"`
 }
 
 func (p *listCalendarEventsParams) defaults() {
@@ -66,7 +68,12 @@ func (a *listCalendarEventsAction) Execute(ctx context.Context, req connectors.A
 	}
 	params.defaults()
 
-	path := fmt.Sprintf("/me/events?$top=%d&$orderby=start/dateTime&$select=id,subject,start,end,location,organizer,webLink,isAllDay", params.Top)
+	base := microsoftCalendarEventsBasePath(params.CalendarID)
+	q := url.Values{}
+	q.Set("$top", fmt.Sprintf("%d", params.Top))
+	q.Set("$orderby", "start/dateTime")
+	q.Set("$select", "id,subject,start,end,location,organizer,webLink,isAllDay")
+	path := base + "?" + q.Encode()
 
 	var resp graphEventsResponse
 	if err := a.conn.doRequest(ctx, http.MethodGet, path, req.Credentials, nil, &resp); err != nil {

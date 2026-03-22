@@ -164,6 +164,15 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						"location": {
 							"type": "string",
 							"description": "Event location"
+						},
+						"calendar_id": {
+							"type": "string",
+							"description": "Microsoft Graph calendar ID (omit for default calendar)",
+							"x-ui": {
+								"widget": "select",
+								"options_from": "connector_calendars",
+								"placeholder": "Default calendar"
+							}
 						}
 					}
 				}`)),
@@ -176,6 +185,15 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
+						"calendar_id": {
+							"type": "string",
+							"description": "Microsoft Graph calendar ID (omit for default calendar)",
+							"x-ui": {
+								"widget": "select",
+								"options_from": "connector_calendars",
+								"placeholder": "Default calendar"
+							}
+						},
 						"top": {
 							"type": "integer",
 							"default": 10,
@@ -661,14 +679,14 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "microsoft.create_calendar_event",
 				Name:        "Create calendar events",
 				Description: "Agent can create events on the calendar with any details.",
-				Parameters:  json.RawMessage(`{"subject":"*","start":"*","end":"*","time_zone":"*","body":"*","attendees":"*","location":"*"}`),
+				Parameters:  json.RawMessage(`{"subject":"*","start":"*","end":"*","time_zone":"*","body":"*","attendees":"*","location":"*","calendar_id":"*"}`),
 			},
 			{
 				ID:          "tpl_microsoft_list_events",
 				ActionType:  "microsoft.list_calendar_events",
 				Name:        "View calendar",
 				Description: "Agent can view upcoming calendar events.",
-				Parameters:  json.RawMessage(`{"top":"*"}`),
+				Parameters:  json.RawMessage(`{"top":"*","calendar_id":"*"}`),
 			},
 			{
 			ID:          "tpl_microsoft_list_drive_files",

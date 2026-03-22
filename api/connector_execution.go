@@ -245,9 +245,13 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 	if len(reqCreds) == 0 {
 		return connectors.NewCredentials(nil), nil
 	}
+	return resolveAgentConnectorBoundCredentials(ctx, deps, agentID, userID, connectorID)
+}
 
-	// Require an explicit credential binding. No auto-resolve — the user must
-	// assign a credential to the agent+connector before it can execute.
+// resolveAgentConnectorBoundCredentials loads the credential bound to the
+// agent+connector pair (OAuth or static). Used for action execution and for
+// UI helpers (e.g. listing calendars) that need the same binding as execution.
+func resolveAgentConnectorBoundCredentials(ctx context.Context, deps *Deps, agentID int64, userID, connectorID string) (connectors.Credentials, error) {
 	if agentID == 0 {
 		return connectors.Credentials{}, &connectors.ValidationError{
 			Message: "no credential assigned — assign a credential to this connector before running actions",
@@ -274,7 +278,6 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 				Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
 			}
 		}
-		// Verify the bound connection belongs to the executing user.
 		if conn.UserID != userID {
 			return connectors.Credentials{}, &connectors.ValidationError{
 				Message: "bound OAuth connection does not belong to this user",
