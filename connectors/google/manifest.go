@@ -141,12 +141,22 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"time_min": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Lower bound (inclusive) for event start time in RFC 3339 format. Defaults to now."
+							"description": "Lower bound (inclusive) for event start time in RFC 3339 format. Defaults to now.",
+							"x-ui": {
+								"label": "Start of range (time min)",
+								"datetime_range_pair": "time_max",
+								"datetime_range_role": "lower"
+							}
 						},
 						"time_max": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Upper bound (exclusive) for event start time in RFC 3339 format"
+							"description": "Upper bound (exclusive) for event start time in RFC 3339 format",
+							"x-ui": {
+								"label": "End of range (time max)",
+								"datetime_range_pair": "time_min",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),

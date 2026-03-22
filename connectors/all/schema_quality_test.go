@@ -28,10 +28,6 @@ var knownMissingAnnotations = map[string]bool{
 	// datetime — various connectors with ISO 8601 fields missing format
 	"asana.asana.create_task:due_at":                         true,
 	"asana.asana.update_task:due_at":                         true,
-	"calendly.calendly.list_scheduled_events:min_start_time": true,
-	"calendly.calendly.list_scheduled_events:max_start_time": true,
-	"calendly.calendly.list_available_times:start_time":      true,
-	"calendly.calendly.list_available_times:end_time":        true,
 	"dropbox.dropbox.share_file:expires":                     true,
 	"hubspot.hubspot.create_deal:closedate":                  true,
 	"hubspot.hubspot.update_deal_stage:close_date":           true,
