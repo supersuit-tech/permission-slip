@@ -1,12 +1,12 @@
 ---
 name: review
-description: Perform a comprehensive, multi-round code review on a GitHub PR. Leaves inline review comments and summaries across up to 6 rounds, with 5-minute waits between rounds to let the author push fixes.
+description: Perform a comprehensive, multi-round code review on a GitHub PR. Leaves inline review comments and summaries across up to 6 rounds, with 3-minute waits between rounds to let the author push fixes.
 argument-hint: "<PR_URL> [--max-turns <N>]"
 ---
 
 # Review PR — Multi-Round Comprehensive Code Review
 
-Performs up to 6 rounds of thorough code review on a GitHub Pull Request. Each round submits a PR review with inline comments covering security, architecture, maintainability, code quality, documentation, and performance. Between rounds, waits 5 minutes and re-fetches the diff to check for fixes before reviewing again.
+Performs up to 6 rounds of thorough code review on a GitHub Pull Request. Each round submits a PR review with inline comments covering security, architecture, maintainability, code quality, documentation, and performance. Between rounds, waits 3 minutes and re-fetches the diff to check for fixes before reviewing again.
 
 This skill is **strictly read-only** — it never modifies code, creates branches, or makes commits.
 
@@ -86,9 +86,9 @@ Repeat for `ROUND` = 1 to `MAX_TURNS`:
 
 If `ROUND > 1`:
 
-1. **Wait 5 minutes** using the Bash tool with `run_in_background: true`:
+1. **Wait 3 minutes** using the Bash tool with `run_in_background: true`:
    ```bash
-   sleep 300 && echo "WAIT_COMPLETE"
+   sleep 180 && echo "WAIT_COMPLETE"
    ```
    Set `run_in_background: true` on this Bash call so the agent is not blocked. You will be notified when the sleep completes. While waiting, do NOT proceed to the next step — wait for the background task notification before continuing.
 
@@ -329,4 +329,4 @@ Summary format:
 - **Check diff lines** — inline comments can only be placed on lines that appear in the PR diff. If you need to comment on an unchanged line, include it in the review body instead.
 - **Acknowledge good work** — every round summary should include a "What Looks Good" section. Reviews that only criticize are demoralizing.
 - **Re-fetch between rounds** — always check for new commits before reviewing again to avoid flagging already-fixed issues.
-- **Exit early when clean** — if any round has no findings, stop immediately. Don't wait 5 minutes just to re-review a clean PR.
+- **Exit early when clean** — if any round has no findings, stop immediately. Don't wait 3 minutes just to re-review a clean PR.
