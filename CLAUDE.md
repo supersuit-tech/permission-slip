@@ -7,9 +7,9 @@
 - Do not git push without confirming first
 - After making the first commit on a branch, automatically create a pull request using `gh pr create`. Use a concise title and include a descriptive body with a summary and test plan. For subsequent commits, push to the existing PR branch.
 - **Never open draft PRs.** Always open PRs as ready for review.
-- When suggesting a PR body that includes a checklist, **split the checklist into two sections** based on who should handle each item:
-  - `### Claude Code` — items that Claude Code can address autonomously (e.g., add tests, fix lint, update docs, add error handling, run checks). The `/watch` command will pick these up and check them off.
-  - `### Manual Testing` — items that require manual verification, design review, or hands-on testing that Claude Code can't perform.
+- When suggesting a PR body or GitHub issue that includes a checklist, **split the checklist into two sections** based on who should handle each item:
+  - `### Developer` — items that a developer can address (e.g., add tests, fix lint, update docs, add error handling, run checks). The `/watch` command will pick these up and check them off.
+  - `### Manual Testing` — items that require manual verification, design review, or hands-on testing that a developer can't perform.
 - Always include the pull request URL at the end of every message where a PR already exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
