@@ -68,6 +68,28 @@ export GH_REPO="${GH_REPO:-${OWNER}/${REPO}}"
 BRANCH=$(git branch --show-current)
 
 # ---------------------------------------------------------------------------
+# If the PR is a draft, mark it as ready for review
+# ---------------------------------------------------------------------------
+PR_META=$(GH_HOST="${GH_HOST}" GH_REPO="${GH_REPO}" gh api "/repos/${OWNER}/${REPO}/pulls/${PR_NUMBER}" --jq '{draft: .draft, node_id: .node_id}' 2>/dev/null || echo '{"draft":false}')
+IS_DRAFT=$(echo "$PR_META" | jq -r '.draft')
+if [[ "$IS_DRAFT" == "true" ]]; then
+  echo "[setup] PR is a draft — marking as ready for review..."
+  PR_NODE_ID=$(echo "$PR_META" | jq -r '.node_id')
+  if [[ -n "$PR_NODE_ID" && "$PR_NODE_ID" != "null" ]]; then
+    GH_HOST="${GH_HOST}" GH_REPO="${GH_REPO}" gh api graphql -f query="
+      mutation {
+        markPullRequestReadyForReview(input: {pullRequestId: \"${PR_NODE_ID}\"}) {
+          pullRequest {
+            isDraft
+          }
+        }
+      }" > /dev/null 2>&1 && echo "[setup] PR marked as ready for review." || echo "[setup] WARNING: Failed to mark PR as ready for review." >&2
+  else
+    echo "[setup] WARNING: Could not fetch PR node ID to mark as ready." >&2
+  fi
+fi
+
+# ---------------------------------------------------------------------------
 # Working directory for session state
 # ---------------------------------------------------------------------------
 if [[ -n "$EXISTING_WORK_DIR" && -d "$EXISTING_WORK_DIR" ]]; then
