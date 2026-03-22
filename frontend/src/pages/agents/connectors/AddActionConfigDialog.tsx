@@ -223,6 +223,8 @@ export function AddActionConfigDialog({
                   modes={paramModes}
                   onModeChange={(key, mode) => setParamModes((prev) => ({ ...prev, [key]: mode }))}
                   disabled={isPending}
+                  agentId={agentId}
+                  connectorId={connectorId}
                 />
               </div>
             )}

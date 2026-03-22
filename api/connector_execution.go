@@ -144,11 +144,11 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 // resolvedPaymentMethod holds the validated payment method state between
 // validation (pre-execution) and transaction recording (post-execution).
 type resolvedPaymentMethod struct {
-	paymentMethodID      string
+	paymentMethodID       string
 	stripePaymentMethodID string
-	brand                string
-	last4                string
-	amount               int
+	brand                 string
+	last4                 string
+	amount                int
 }
 
 // validatePaymentMethod validates the payment method, enforces ownership and
@@ -245,9 +245,13 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 	if len(reqCreds) == 0 {
 		return connectors.NewCredentials(nil), nil
 	}
+	return resolveAgentConnectorBoundCredentials(ctx, deps, agentID, userID, connectorID)
+}
 
-	// Require an explicit credential binding. No auto-resolve — the user must
-	// assign a credential to the agent+connector before it can execute.
+// resolveAgentConnectorBoundCredentials loads the credential bound to the
+// agent+connector pair (OAuth or static). Used for action execution and for
+// UI helpers (e.g. listing calendars) that need the same binding as execution.
+func resolveAgentConnectorBoundCredentials(ctx context.Context, deps *Deps, agentID int64, userID, connectorID string) (connectors.Credentials, error) {
 	if agentID == 0 {
 		return connectors.Credentials{}, &connectors.ValidationError{
 			Message: "no credential assigned — assign a credential to this connector before running actions",
@@ -274,7 +278,6 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 				Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
 			}
 		}
-		// Verify the bound connection belongs to the executing user.
 		if conn.UserID != userID {
 			return connectors.Credentials{}, &connectors.ValidationError{
 				Message: "bound OAuth connection does not belong to this user",
@@ -354,9 +357,6 @@ func resolveOAuthCredentialsFromConnection(ctx context.Context, deps *Deps, conn
 	if deps.Vault == nil {
 		return zero, fmt.Errorf("credential vault is not configured but connector requires OAuth credentials")
 	}
-	if deps.OAuthProviders == nil {
-		return zero, fmt.Errorf("OAuth provider registry is not configured")
-	}
 
 	return credentialsFromOAuthConnection(ctx, deps, conn)
 }
@@ -380,6 +380,9 @@ func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OA
 
 	// Refresh the token if expired or within pre-emptive buffer.
 	if conn.TokenExpiry != nil && time.Now().After(conn.TokenExpiry.Add(-oauth.TokenExpiryBuffer)) {
+		if deps.OAuthProviders == nil {
+			return zero, fmt.Errorf("OAuth provider registry is not configured")
+		}
 		if err := refreshOAuthConnection(ctx, deps, conn, conn.Provider); err != nil {
 			return zero, err
 		}
@@ -531,5 +534,3 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 
 	return nil
 }
-
-

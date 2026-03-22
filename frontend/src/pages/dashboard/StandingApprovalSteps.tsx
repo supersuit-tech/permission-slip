@@ -116,6 +116,8 @@ export function StepConstraints({
   manualConstraintsJson,
   onManualConstraintsJsonChange,
   isPending,
+  agentId,
+  connectorId,
 }: {
   configSchema: ParametersSchema | null;
   schemaLoading: boolean;
@@ -126,6 +128,8 @@ export function StepConstraints({
   manualConstraintsJson: string;
   onManualConstraintsJsonChange: (value: string) => void;
   isPending: boolean;
+  agentId?: number;
+  connectorId?: string;
 }) {
   if (schemaLoading) {
     return (
@@ -158,6 +162,8 @@ export function StepConstraints({
             modes={paramModes}
             onModeChange={onParamModeChange}
             disabled={isPending}
+            agentId={agentId}
+            connectorId={connectorId}
           />
         </div>
       ) : (
