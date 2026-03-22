@@ -39,7 +39,7 @@ jobs:
           elif [ -n "$PR_URL" ]; then
             MESSAGE="permission-slip: PR needs attention — ${PR_URL}"
           else
-            MESSAGE="permission-slip: Claude Code needs your attention"
+            MESSAGE="permission-slip: @${{ github.actor }} needs your attention"
           fi
 
           PAYLOAD=$(jq -n --arg msg "$MESSAGE" --arg secret "$NOTIFY_WEBHOOK_SECRET" \
