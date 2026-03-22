@@ -57,7 +57,7 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 
 		creds, err := resolveAgentConnectorBoundCredentials(r.Context(), deps, agentID, userID, connectorID)
 		if err != nil {
-			if handleConnectorError(w, r, err, ConnectorContext{ConnectorID: connectorID}) {
+			if handleConnectorError(w, r, err, ConnectorContext{AgentID: agentID}) {
 				return
 			}
 			log.Printf("[%s] ListAgentConnectorCalendars resolve creds: %v", TraceID(r.Context()), err)
@@ -82,7 +82,7 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 		cals, err = lister.ListUserCalendars(r.Context(), creds)
 
 		if err != nil {
-			if handleConnectorError(w, r, err, ConnectorContext{ConnectorID: connectorID}) {
+			if handleConnectorError(w, r, err, ConnectorContext{AgentID: agentID}) {
 				return
 			}
 			log.Printf("[%s] ListUserCalendars: %v", TraceID(r.Context()), err)
