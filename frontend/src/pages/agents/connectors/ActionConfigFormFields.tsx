@@ -1,5 +1,8 @@
+import { type KeyboardEvent, useRef } from "react";
+import { Ban, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 import validation from "@/lib/validation";
 
 /** Reserved action_type value meaning "all actions on this connector". */
@@ -73,21 +76,82 @@ export function StatusSelect({
   onChange,
   disabled,
 }: StatusSelectProps) {
+  const activeRef = useRef<HTMLButtonElement>(null);
+  const disabledRef = useRef<HTMLButtonElement>(null);
+
+  const segmentBase =
+    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
+  const labelId = `${id}-label`;
+
+  function handleActiveKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+      e.preventDefault();
+      onChange("disabled");
+      queueMicrotask(() => disabledRef.current?.focus());
+    }
+  }
+
+  function handleDisabledKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
+    if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+      e.preventDefault();
+      onChange("active");
+      queueMicrotask(() => activeRef.current?.focus());
+    }
+  }
+
   return (
-    <div className="space-y-2">
-      <Label htmlFor={id}>Status</Label>
-      <select
-        id={id}
-        className={selectClassName}
-        value={value}
-        // Cast is safe: the only <option> values are "active" and "disabled"
-        onChange={(e) => onChange(e.target.value as "active" | "disabled")}
-        disabled={disabled}
+    <fieldset className="space-y-2" disabled={disabled}>
+      <Label id={labelId} className="text-sm font-medium">
+        Status
+      </Label>
+      <div
+        role="radiogroup"
+        aria-labelledby={labelId}
+        className="bg-muted/60 flex gap-1 rounded-lg border p-1"
       >
-        <option value="active">Active</option>
-        <option value="disabled">Disabled</option>
-      </select>
-    </div>
+        <button
+          ref={activeRef}
+          type="button"
+          role="radio"
+          aria-checked={value === "active"}
+          tabIndex={value === "active" ? 0 : -1}
+          className={cn(
+            segmentBase,
+            value === "active"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+          onClick={() => onChange("active")}
+          onKeyDown={handleActiveKeyDown}
+        >
+          <Check className="size-3.5 shrink-0" aria-hidden />
+          Active
+        </button>
+        <button
+          ref={disabledRef}
+          type="button"
+          role="radio"
+          aria-checked={value === "disabled"}
+          tabIndex={value === "disabled" ? 0 : -1}
+          className={cn(
+            segmentBase,
+            value === "disabled"
+              ? "bg-background text-foreground shadow-sm"
+              : "text-muted-foreground hover:text-foreground",
+          )}
+          onClick={() => onChange("disabled")}
+          onKeyDown={handleDisabledKeyDown}
+        >
+          <Ban className="size-3.5 shrink-0" aria-hidden />
+          Disabled
+        </button>
+      </div>
+      <p className="text-muted-foreground text-xs">
+        {value === "disabled"
+          ? "Disabled configurations stay in the list but do not allow new requests for this action."
+          : "Active configurations allow the agent to request this action (subject to approval)."}
+      </p>
+    </fieldset>
   );
 }
 

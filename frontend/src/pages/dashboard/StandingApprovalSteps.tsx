@@ -9,8 +9,6 @@ import type { ParametersSchema } from "@/lib/parameterSchema";
 import { ActionConfigParameterFields } from "@/pages/agents/connectors/ActionConfigParameterFields";
 import type { ParamMode } from "@/pages/agents/connectors/ActionConfigFormFields";
 
-export const CUSTOM_ACTION_SENTINEL = "__custom__";
-
 const selectClassName =
   "border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
 
@@ -51,19 +49,13 @@ export function StepPickAgent({
 export function StepPickAction({
   selectedConfigId,
   onConfigChange,
-  customActionType,
-  onCustomActionTypeChange,
   configsByConnector,
   configsLoading,
-  isCustomAction,
 }: {
   selectedConfigId: string;
   onConfigChange: (id: string) => void;
-  customActionType: string;
-  onCustomActionTypeChange: (value: string) => void;
   configsByConnector: Record<string, ActionConfiguration[]>;
   configsLoading: boolean;
-  isCustomAction: boolean;
 }) {
   const connectorIds = Object.keys(configsByConnector);
 
@@ -76,6 +68,13 @@ export function StepPickAction({
           <span className="text-muted-foreground text-sm">
             Loading configurations...
           </span>
+        </div>
+      ) : connectorIds.length === 0 ? (
+        <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            No active action configurations found for this agent. Configure an
+            action in the agent settings before creating a standing approval.
+          </p>
         </div>
       ) : (
         <>
@@ -95,29 +94,13 @@ export function StepPickAction({
                 ))}
               </optgroup>
             ))}
-            <option value={CUSTOM_ACTION_SENTINEL}>
-              Custom action type...
-            </option>
           </select>
           <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Select an action configuration to pre-populate constraints, or
-              choose &quot;Custom action type&quot; for manual entry.
+              Select an action configuration to pre-populate constraints.
             </p>
           </div>
         </>
-      )}
-
-      {isCustomAction && (
-        <div className="space-y-2">
-          <Label htmlFor="sa-custom-action">Action Type</Label>
-          <Input
-            id="sa-custom-action"
-            placeholder="e.g. github.create_issue"
-            value={customActionType}
-            onChange={(e) => onCustomActionTypeChange(e.target.value)}
-          />
-        </div>
       )}
     </div>
   );
