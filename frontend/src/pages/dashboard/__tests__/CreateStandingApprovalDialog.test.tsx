@@ -184,35 +184,9 @@ describe("CreateStandingApprovalDialog", () => {
       ).toBeInTheDocument();
     });
 
-    // Custom option should be present
-    expect(screen.getByText("Custom action type...")).toBeInTheDocument();
-  });
-
-  it("shows custom action type input when custom is selected", async () => {
-    const user = userEvent.setup();
-    render(
-      <CreateStandingApprovalDialog
-        agents={mockAgents}
-        open={true}
-        onOpenChange={vi.fn()}
-      />,
-      { wrapper },
-    );
-
-    await user.selectOptions(screen.getByLabelText("Agent"), "1");
-    await user.click(screen.getByText("Next"));
-
-    await waitFor(() => {
-      expect(screen.getByText(/Step 2 of 4/)).toBeInTheDocument();
-    });
-
-    // Select custom action type
-    await user.selectOptions(
-      screen.getByLabelText("Action Configuration"),
-      "__custom__",
-    );
-
-    expect(screen.getByLabelText("Action Type")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Custom action type..."),
+    ).not.toBeInTheDocument();
   });
 
   it("navigates back from step 2 to step 1", async () => {

@@ -1,4 +1,4 @@
-import { type FormEvent, useState, useMemo } from "react";
+import { type FormEvent, useState, useMemo, useEffect } from "react";
 import { Loader2, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -24,7 +24,6 @@ import {
   type ParamMode,
 } from "@/pages/agents/connectors/ActionConfigFormFields";
 import {
-  CUSTOM_ACTION_SENTINEL,
   StepPickAgent,
   StepPickAction,
   StepConstraints,
@@ -108,12 +107,7 @@ export function CreateStandingApprovalDialog({
   const [step, setStep] = useState<Step>(hasInitialContext ? 3 : 1);
   const [agentId, setAgentId] = useState<number | "">(ctxAgentId ?? "");
   const [selectedConfigId, setSelectedConfigId] = useState<string>(
-    isEditMode
-      ? (editTarget.source_action_configuration_id ?? CUSTOM_ACTION_SENTINEL)
-      : (ctxActionType ? CUSTOM_ACTION_SENTINEL : ""),
-  );
-  const [customActionType, setCustomActionType] = useState(
-    ctxActionType ?? "",
+    isEditMode ? (editTarget.source_action_configuration_id ?? "") : "",
   );
   // Pre-populate constraint form values when initial constraints are provided
   const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
@@ -170,17 +164,40 @@ export function CreateStandingApprovalDialog({
 
   const selectedConfig = useMemo(
     () =>
-      selectedConfigId && selectedConfigId !== CUSTOM_ACTION_SENTINEL
+      selectedConfigId
         ? activeConfigs.find((c) => c.id === selectedConfigId) ?? null
         : null,
     [activeConfigs, selectedConfigId],
   );
 
-  const isCustomAction = selectedConfigId === CUSTOM_ACTION_SENTINEL;
+  const matchingConfigForContext = useMemo(() => {
+    if (!ctxActionType) return null;
+    return activeConfigs.find((c) => c.action_type === ctxActionType) ?? null;
+  }, [activeConfigs, ctxActionType]);
 
-  const effectiveActionType = selectedConfig
-    ? selectedConfig.action_type
-    : customActionType;
+  useEffect(() => {
+    if (!open) return;
+    if (isEditMode && editTarget) {
+      if (editTarget.source_action_configuration_id) {
+        setSelectedConfigId(editTarget.source_action_configuration_id);
+      } else {
+        setSelectedConfigId(matchingConfigForContext?.id ?? "");
+      }
+      return;
+    }
+    if (hasInitialContext) {
+      setSelectedConfigId(matchingConfigForContext?.id ?? "");
+    }
+  }, [
+    open,
+    isEditMode,
+    editTarget,
+    hasInitialContext,
+    matchingConfigForContext?.id,
+  ]);
+
+  const effectiveActionType =
+    selectedConfig?.action_type ?? ctxActionType ?? "";
 
   const {
     schema: fetchedSchema,
@@ -205,12 +222,16 @@ export function CreateStandingApprovalDialog({
   function resetForm() {
     setStep(hasInitialContext ? 3 : 1);
     setAgentId(ctxAgentId ?? "");
-    setSelectedConfigId(
-      isEditMode
-        ? (editTarget.source_action_configuration_id ?? CUSTOM_ACTION_SENTINEL)
-        : (ctxActionType ? CUSTOM_ACTION_SENTINEL : ""),
-    );
-    setCustomActionType(ctxActionType ?? "");
+    let nextConfigId = "";
+    if (isEditMode && editTarget) {
+      nextConfigId =
+        editTarget.source_action_configuration_id ??
+        matchingConfigForContext?.id ??
+        "";
+    } else if (hasInitialContext) {
+      nextConfigId = matchingConfigForContext?.id ?? "";
+    }
+    setSelectedConfigId(nextConfigId);
     if (hasInitialContext && ctxConstraints) {
       const values: Record<string, string> = {};
       const modes: Record<string, ParamMode> = {};
@@ -279,25 +300,12 @@ export function CreateStandingApprovalDialog({
         toast.error("Please wait for configurations to finish loading");
         return;
       }
-      if (!selectedConfigId) {
-        toast.error("Please select an action configuration or choose custom");
+      if (!selectedConfigId || !selectedConfig) {
+        toast.error("Please select an action configuration");
         return;
       }
-      if (isCustomAction && !customActionType.trim()) {
-        toast.error("Please enter an action type");
-        return;
-      }
-      if (selectedConfig) {
-        initConstraintsFromRecord(selectedConfig.parameters);
-        setManualConstraintsJson("");
-      } else if (ctxConstraints && isCustomAction) {
-        initConstraintsFromRecord(ctxConstraints);
-        setManualConstraintsJson(JSON.stringify(ctxConstraints, null, 2));
-      } else {
-        setParamValues({});
-        setParamModes({});
-        setManualConstraintsJson("");
-      }
+      initConstraintsFromRecord(selectedConfig.parameters);
+      setManualConstraintsJson("");
       setStep(3);
     } else if (step === 3) {
       if (schemaLoading) {
@@ -517,7 +525,6 @@ export function CreateStandingApprovalDialog({
               onAgentChange={(id) => {
                 setAgentId(id);
                 setSelectedConfigId("");
-                setCustomActionType(ctxActionType ?? "");
                 setParamValues({});
                 setParamModes({});
               }}
@@ -529,11 +536,8 @@ export function CreateStandingApprovalDialog({
             <StepPickAction
               selectedConfigId={selectedConfigId}
               onConfigChange={setSelectedConfigId}
-              customActionType={customActionType}
-              onCustomActionTypeChange={setCustomActionType}
               configsByConnector={configsByConnector}
               configsLoading={configsLoading}
-              isCustomAction={isCustomAction}
             />
           )}
 
