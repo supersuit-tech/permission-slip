@@ -41,12 +41,13 @@ func TestGetAgentCapabilities_MultipleConnectors(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	// Connector 1: with credentials stored
+	// Connector 1: with credentials stored and bound to this agent+connector
 	conn1 := testhelper.GenerateID(t, "conn_")
 	testhelper.InsertConnectorWithDescription(t, tx, conn1, "Gmail", "Send and manage emails")
 	svc1 := testhelper.GenerateID(t, "svc_")
 	testhelper.InsertConnectorRequiredCredential(t, tx, conn1, svc1, "api_key")
-	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, svc1)
+	cred1 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredential(t, tx, cred1, uid, svc1)
 
 	riskLow := "low"
 	schema := json.RawMessage(`{"type":"object","required":["to","subject"]}`)
@@ -78,6 +79,7 @@ func TestGetAgentCapabilities_MultipleConnectors(t *testing.T) {
 	// Enable both connectors for the agent
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn1)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn2)
+	testhelper.InsertAgentConnectorCredential(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, conn1, cred1)
 
 	// Add a standing approval for email.send
 	maxExec := 100
@@ -322,18 +324,17 @@ func TestGetAgentCapabilities_CredentialsReady_NoRequiredCredentials(t *testing.
 	}
 }
 
-func TestGetAgentCapabilities_CredentialsReady_PartialCredentials(t *testing.T) {
+func TestGetAgentCapabilities_CredentialsReady_UnboundGlobalCredentialNotReady(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	// Connector requiring 2 credential services, only 1 provided
+	// User has a matching global credential but no agent_connector_credentials binding.
 	connID := testhelper.GenerateID(t, "conn_")
-	testhelper.InsertConnectorWithDescription(t, tx, connID, "Partial", "Needs two creds")
+	testhelper.InsertConnectorWithDescription(t, tx, connID, "API", "Needs bound credential")
 	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_a", "api_key")
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_b", "api_key")
 	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, "svc_a")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
@@ -345,25 +346,26 @@ func TestGetAgentCapabilities_CredentialsReady_PartialCredentials(t *testing.T) 
 		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
 	}
 	if caps.Connectors[0].CredentialsReady {
-		t.Error("expected credentials_ready=false when only partial credentials stored")
+		t.Error("expected credentials_ready=false when credential exists but is not bound to this agent+connector")
 	}
 }
 
-func TestGetAgentCapabilities_CredentialsReady_AllCredentials(t *testing.T) {
+func TestGetAgentCapabilities_CredentialsReady_BoundCredentialServiceNameMismatch(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	// Connector requiring 2 credential services, both provided
+	// Required row uses an internal service label; stored credential uses connector id
+	// (same rule as assign-credential API: cred.service must match connector id).
 	connID := testhelper.GenerateID(t, "conn_")
 	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_x", "api_key")
-	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_y", "api_key")
-	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, "svc_x")
-	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, "svc_y")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "google", "api_key")
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredential(t, tx, credID, uid, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	testhelper.InsertAgentConnectorCredential(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, connID, credID)
 
 	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
 	if err != nil {
@@ -373,7 +375,7 @@ func TestGetAgentCapabilities_CredentialsReady_AllCredentials(t *testing.T) {
 		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
 	}
 	if !caps.Connectors[0].CredentialsReady {
-		t.Error("expected credentials_ready=true when all credentials stored")
+		t.Error("expected credentials_ready=true when bound credential service matches connector id while required row uses a different service label")
 	}
 }
 
@@ -430,11 +432,13 @@ func TestGetAgentCapabilities_CredentialsReady_OAuth2Connected(t *testing.T) {
 	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, "google_drive", "google", []string{"https://www.googleapis.com/auth/drive"})
 
 	// User has an active OAuth connection for Google with the required scope
-	testhelper.InsertOAuthConnectionFull(t, tx, testhelper.GenerateID(t, "oc_"), uid, "google", testhelper.OAuthConnectionOpts{
+	ocID := testhelper.GenerateID(t, "oc_")
+	testhelper.InsertOAuthConnectionFull(t, tx, ocID, uid, "google", testhelper.OAuthConnectionOpts{
 		Scopes: []string{"https://www.googleapis.com/auth/drive"},
 	})
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	testhelper.InsertAgentConnectorCredentialOAuth(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, connID, ocID)
 
 	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
 	if err != nil {
@@ -444,7 +448,7 @@ func TestGetAgentCapabilities_CredentialsReady_OAuth2Connected(t *testing.T) {
 		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
 	}
 	if !caps.Connectors[0].CredentialsReady {
-		t.Error("expected credentials_ready=true when OAuth2 connection is active with required scopes")
+		t.Error("expected credentials_ready=true when bound OAuth2 connection is active with required scopes")
 	}
 }
 
@@ -461,11 +465,13 @@ func TestGetAgentCapabilities_CredentialsReady_OAuth2InsufficientScopes(t *testi
 	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, "google_drive", "google", []string{"https://www.googleapis.com/auth/drive"})
 
 	// User connected Google but only with email scope (insufficient)
-	testhelper.InsertOAuthConnectionFull(t, tx, testhelper.GenerateID(t, "oc_"), uid, "google", testhelper.OAuthConnectionOpts{
+	ocID := testhelper.GenerateID(t, "oc_")
+	testhelper.InsertOAuthConnectionFull(t, tx, ocID, uid, "google", testhelper.OAuthConnectionOpts{
 		Scopes: []string{"https://www.googleapis.com/auth/gmail.readonly"},
 	})
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	testhelper.InsertAgentConnectorCredentialOAuth(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, connID, ocID)
 
 	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
 	if err != nil {
@@ -475,7 +481,7 @@ func TestGetAgentCapabilities_CredentialsReady_OAuth2InsufficientScopes(t *testi
 		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
 	}
 	if caps.Connectors[0].CredentialsReady {
-		t.Error("expected credentials_ready=false when OAuth2 connection has insufficient scopes")
+		t.Error("expected credentials_ready=false when bound OAuth2 connection has insufficient scopes")
 	}
 }
 
@@ -517,12 +523,14 @@ func TestGetAgentCapabilities_CredentialsReady_OAuth2Revoked(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, "google_drive", "google", []string{"https://www.googleapis.com/auth/drive"})
 
-	testhelper.InsertOAuthConnectionFull(t, tx, testhelper.GenerateID(t, "oc_"), uid, "google", testhelper.OAuthConnectionOpts{
+	ocID := testhelper.GenerateID(t, "oc_")
+	testhelper.InsertOAuthConnectionFull(t, tx, ocID, uid, "google", testhelper.OAuthConnectionOpts{
 		Status: "revoked",
 		Scopes: []string{},
 	})
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	testhelper.InsertAgentConnectorCredentialOAuth(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, connID, ocID)
 
 	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
 	if err != nil {
@@ -532,7 +540,7 @@ func TestGetAgentCapabilities_CredentialsReady_OAuth2Revoked(t *testing.T) {
 		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
 	}
 	if caps.Connectors[0].CredentialsReady {
-		t.Error("expected credentials_ready=false when OAuth2 connection is revoked")
+		t.Error("expected credentials_ready=false when bound OAuth2 connection is revoked")
 	}
 }
 

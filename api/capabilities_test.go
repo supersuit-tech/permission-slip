@@ -35,7 +35,8 @@ func TestGetCapabilities_HappyPath(t *testing.T) {
 	testhelper.InsertConnectorWithDescription(t, tx, conn1, "Gmail", "Send and manage emails")
 	svc1 := testhelper.GenerateID(t, "svc_")
 	testhelper.InsertConnectorRequiredCredential(t, tx, conn1, svc1, "api_key")
-	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, svc1)
+	cred1 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredential(t, tx, cred1, uid, svc1)
 
 	riskLow := "low"
 	sendDesc := "Send an email"
@@ -46,6 +47,7 @@ func TestGetCapabilities_HappyPath(t *testing.T) {
 		ParametersSchema: schema,
 	})
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn1)
+	testhelper.InsertAgentConnectorCredential(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, conn1, cred1)
 
 	// Add a standing approval.
 	saID := testhelper.GenerateID(t, "sa_")
@@ -359,10 +361,12 @@ func TestGetCapabilities_MultipleConnectorsAndActions(t *testing.T) {
 	testhelper.InsertConnectorWithDescription(t, tx, conn1, "Gmail", "Email service")
 	svc1 := testhelper.GenerateID(t, "svc_")
 	testhelper.InsertConnectorRequiredCredential(t, tx, conn1, svc1, "api_key")
-	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, svc1)
+	cred1 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredential(t, tx, cred1, uid, svc1)
 	testhelper.InsertConnectorAction(t, tx, conn1, "email.send", "Send Email")
 	testhelper.InsertConnectorAction(t, tx, conn1, "email.read", "Read Email")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn1)
+	testhelper.InsertAgentConnectorCredential(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, conn1, cred1)
 
 	// Connector 2: Stripe without credentials.
 	conn2 := testhelper.GenerateID(t, "conn_")
@@ -441,6 +445,7 @@ func TestGetCapabilities_WithActionConfigurations(t *testing.T) {
 	testhelper.InsertCredential(t, tx, credID, uid, svc)
 	testhelper.InsertConnectorAction(t, tx, conn, "github.create_issue", "Create Issue")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn)
+	testhelper.InsertAgentConnectorCredential(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, conn, credID)
 
 	// Insert an action configuration with credential bound.
 	cfgID := testhelper.GenerateID(t, "ac_")

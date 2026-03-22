@@ -327,6 +327,8 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
 }
 ```
 
+`credentials_ready` is `true` only when a credential or OAuth connection is **bound** to this agent for that connector (the same binding used at execution time). Storing credentials on the account without assigning them to the agent still yields `credentials_ready: false`.
+
 #### Action Configurations
 
 **Action configurations are the core unit of permission.** A user creates configurations that define exactly how an agent is allowed to use an action — which parameters are locked to specific values, which are free (wildcard `"*"`), and which credential to use. The agent selects from these pre-configured options rather than composing requests from scratch.

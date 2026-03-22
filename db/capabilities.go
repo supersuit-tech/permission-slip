@@ -68,26 +68,40 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 
 	// 1. Enabled connectors with credential readiness.
 	//
-	// For each enabled connector, check if ALL required credential services
-	// have a matching row in the credentials table (for api_key/basic/custom)
-	// or the oauth_connections table (for oauth2) for this user. If a
-	// connector has no required credentials, it's considered ready.
+	// When a connector declares required credentials, readiness is determined only
+	// via agent_connector_credentials: each required row must be satisfied by the
+	// single bound credential or OAuth connection for that agent+connector (the same
+	// binding execution uses). Static credentials match when credentials.service equals
+	// connector_required_credentials.service or the connector id (assign-credential
+	// stores service = connector id). OAuth matches on provider and scopes.
+	//
+	// Connectors with no connector_required_credentials rows are always ready.
 	connRows, err := db.Query(ctx, `
 		SELECT c.id, c.name, c.description,
 		       NOT EXISTS (
 		           SELECT 1 FROM connector_required_credentials crc
 		           WHERE crc.connector_id = c.id
-		             AND NOT EXISTS (
-		               SELECT 1 FROM credentials cr
-		               WHERE cr.user_id = ac.approver_id
-		                 AND cr.service = crc.service
-		             )
-		             AND NOT EXISTS (
-		               SELECT 1 FROM oauth_connections oc
-		               WHERE oc.user_id = ac.approver_id
-		                 AND oc.provider = crc.oauth_provider
-		                 AND oc.status = 'active'
-		                 AND crc.oauth_scopes <@ oc.scopes
+		             AND NOT (
+		                 (crc.auth_type <> 'oauth2' AND EXISTS (
+		                     SELECT 1 FROM agent_connector_credentials acc
+		                     INNER JOIN credentials cr ON cr.id = acc.credential_id
+		                     WHERE acc.agent_id = ac.agent_id
+		                       AND acc.connector_id = c.id
+		                       AND acc.approver_id = ac.approver_id
+		                       AND cr.user_id = ac.approver_id
+		                       AND (cr.service = crc.service OR cr.service = c.id)
+		                 ))
+		                 OR (crc.auth_type = 'oauth2' AND EXISTS (
+		                     SELECT 1 FROM agent_connector_credentials acc
+		                     INNER JOIN oauth_connections oc ON oc.id = acc.oauth_connection_id
+		                     WHERE acc.agent_id = ac.agent_id
+		                       AND acc.connector_id = c.id
+		                       AND acc.approver_id = ac.approver_id
+		                       AND oc.user_id = ac.approver_id
+		                       AND oc.provider = crc.oauth_provider
+		                       AND oc.status = 'active'
+		                       AND crc.oauth_scopes <@ oc.scopes
+		                 ))
 		             )
 		       ) AS credentials_ready
 		FROM agent_connectors ac

@@ -9090,10 +9090,12 @@ components:
         credentials_ready:
           type: boolean
           description: |
-            Whether the user has stored the required credentials for this connector.
+            Whether required credentials for this connector are assigned to this
+            agent+connector pair (via `agent_connector_credentials`). Unassigned
+            global credentials alone do not make this `true`.
 
-            - `true`: Credentials are stored — actions can be executed.
-            - `false`: Credentials are missing — action execution will fail with
+            - `true`: A credential or OAuth connection is bound — actions can be executed.
+            - `false`: No valid binding — action execution will fail with
               `404 credentials_not_found`. The agent should direct the user to
               `credentials_setup_url` to connect their account.
 
