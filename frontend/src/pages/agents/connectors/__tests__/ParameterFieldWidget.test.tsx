@@ -160,6 +160,29 @@ describe("ParameterFieldWidget", () => {
 
       expect(screen.getByText("Loading calendars…")).toBeInTheDocument();
     });
+
+    it("falls back to text input when dynamic calendar loading fails", () => {
+      const calendarProp: SchemaProperty = {
+        type: "string",
+        "x-ui": { widget: "select", options_from: "connector_calendars" },
+      };
+
+      renderWithProviders(
+        <ParameterFieldWidget
+          paramKey="calendar_id"
+          property={calendarProp}
+          value=""
+          onChange={vi.fn()}
+          dynamicSelectLoading={false}
+          dynamicSelectError="Failed to load calendars"
+        />,
+      );
+
+      // Should render a text input instead of a select
+      const input = screen.getByTestId("select-param-calendar_id");
+      expect(input.tagName).toBe("INPUT");
+      expect(input).toHaveAttribute("type", "text");
+    });
   });
 
   describe("textarea widget", () => {

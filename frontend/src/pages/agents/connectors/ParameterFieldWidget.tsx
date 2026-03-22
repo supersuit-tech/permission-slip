@@ -30,6 +30,8 @@ export interface ParameterFieldWidgetProps {
   dynamicSelectOptions?: DynamicSelectOption[];
   /** True while dynamic options are loading. */
   dynamicSelectLoading?: boolean;
+  /** Error message when dynamic options failed to load. */
+  dynamicSelectError?: string | null;
   /**
    * Sibling field value for paired datetime bounds (e.g. time_max when editing time_min).
    * When both sides are concrete datetimes, sets HTML min/max on the datetime-local input.
@@ -51,6 +53,7 @@ export function ParameterFieldWidget({
   placeholder: placeholderOverride,
   dynamicSelectOptions,
   dynamicSelectLoading,
+  dynamicSelectError,
   siblingDatetimeValue,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
@@ -72,6 +75,7 @@ export function ParameterFieldWidget({
         enumValues: property.enum,
         dynamicOptions: useDynamicCalendars ? dynamicSelectOptions : undefined,
         dynamicLoading: useDynamicCalendars ? dynamicSelectLoading : false,
+        dynamicError: useDynamicCalendars ? dynamicSelectError : undefined,
         siblingDatetimeValue,
         datetimeRangeRole: ui?.datetime_range_role,
       })}
@@ -90,6 +94,7 @@ interface WidgetRenderProps {
   enumValues?: string[];
   dynamicOptions?: DynamicSelectOption[];
   dynamicLoading?: boolean;
+  dynamicError?: string | null;
   siblingDatetimeValue?: string;
   datetimeRangeRole?: "lower" | "upper";
 }
@@ -140,6 +145,7 @@ function SelectWidget({
   className,
   dynamicOptions,
   dynamicLoading,
+  dynamicError,
 }: WidgetRenderProps) {
   const usingDynamic = dynamicOptions !== undefined;
   const opts = usingDynamic
@@ -150,6 +156,23 @@ function SelectWidget({
     usingDynamic &&
     value !== "" &&
     !opts.some((o) => o.value === value);
+
+  // When dynamic options fail to load, fall back to a text input so the user
+  // can type a calendar ID manually instead of being stuck.
+  if (dynamicError && !dynamicLoading) {
+    return (
+      <Input
+        id={inputId}
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        placeholder={placeholder ?? "Enter calendar ID manually"}
+        className={className}
+        data-testid={`select-${inputId}`}
+      />
+    );
+  }
 
   return (
     <select

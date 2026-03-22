@@ -273,6 +273,7 @@ function ParameterField({
             placeholder={widgetPlaceholder}
             dynamicSelectOptions={useCalendarOptions ? calendarSelectOptions : undefined}
             dynamicSelectLoading={useCalendarOptions ? calendarsLoading : false}
+            dynamicSelectError={useCalendarOptions ? calendarsError : undefined}
             siblingDatetimeValue={siblingDatetimeValue}
           />
         )
@@ -287,6 +288,7 @@ function ParameterField({
           placeholder={widgetPlaceholder}
           dynamicSelectOptions={useCalendarOptions ? calendarSelectOptions : undefined}
           dynamicSelectLoading={useCalendarOptions ? calendarsLoading : false}
+          dynamicSelectError={useCalendarOptions ? calendarsError : undefined}
           siblingDatetimeValue={siblingDatetimeValue}
         />
       )}
