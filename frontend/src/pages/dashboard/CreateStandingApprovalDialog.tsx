@@ -1,4 +1,4 @@
-import { type FormEvent, useState, useMemo, useEffect } from "react";
+import { type FormEvent, useState, useMemo, useEffect, useRef } from "react";
 import { Loader2, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -153,9 +153,8 @@ export function CreateStandingApprovalDialog({
 
   const activeAgents = agents.filter((a) => a.status !== "deactivated");
 
-  const { configs, isLoading: configsLoading } = useActionConfigs(
-    typeof agentId === "number" ? agentId : 0,
-  );
+  const { configs, isLoading: configsLoading, isFetched: configsFetched } =
+    useActionConfigs(typeof agentId === "number" ? agentId : 0);
 
   const activeConfigs = useMemo(
     () => configs.filter((c) => c.status === "active"),
@@ -175,25 +174,40 @@ export function CreateStandingApprovalDialog({
     return activeConfigs.find((c) => c.action_type === ctxActionType) ?? null;
   }, [activeConfigs, ctxActionType]);
 
+  /** Avoid resetting selectedConfigId when configs refetch mid-wizard (e.g. refetchOnWindowFocus). */
+  const didApplyInitialConfigSelectionRef = useRef(false);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      didApplyInitialConfigSelectionRef.current = false;
+      return;
+    }
+    const shouldSyncFromContext =
+      (isEditMode && !!editTarget) || hasInitialContext;
+    if (!shouldSyncFromContext) return;
+    if (configsLoading) return;
+    if (typeof agentId === "number" && agentId > 0 && !configsFetched) return;
+    if (didApplyInitialConfigSelectionRef.current) return;
+
     if (isEditMode && editTarget) {
       if (editTarget.source_action_configuration_id) {
         setSelectedConfigId(editTarget.source_action_configuration_id);
       } else {
         setSelectedConfigId(matchingConfigForContext?.id ?? "");
       }
-      return;
-    }
-    if (hasInitialContext) {
+    } else if (hasInitialContext) {
       setSelectedConfigId(matchingConfigForContext?.id ?? "");
     }
+    didApplyInitialConfigSelectionRef.current = true;
   }, [
     open,
+    configsLoading,
+    configsFetched,
+    agentId,
     isEditMode,
     editTarget,
     hasInitialContext,
-    matchingConfigForContext?.id,
+    matchingConfigForContext,
   ]);
 
   const effectiveActionType =

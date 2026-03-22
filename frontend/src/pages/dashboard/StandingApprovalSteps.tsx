@@ -69,6 +69,13 @@ export function StepPickAction({
             Loading configurations...
           </span>
         </div>
+      ) : connectorIds.length === 0 ? (
+        <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
+          <p className="text-muted-foreground text-xs leading-relaxed">
+            No active action configurations found for this agent. Configure an
+            action in the agent settings before creating a standing approval.
+          </p>
+        </div>
       ) : (
         <>
           <select

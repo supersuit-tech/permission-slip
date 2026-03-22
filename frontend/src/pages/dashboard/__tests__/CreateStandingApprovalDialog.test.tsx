@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
-import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
+import { mockGet, mockPost, resetClientMocks } from "../../../api/__mocks__/client";
 import { CreateStandingApprovalDialog } from "../CreateStandingApprovalDialog";
 import type { Agent } from "../../../hooks/useAgents";
 
@@ -288,6 +288,76 @@ describe("CreateStandingApprovalDialog", () => {
     // Should skip to step 3 (constraints), shown as step 1 of 2
     expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
     expect(screen.getByText(/Set Constraints/)).toBeInTheDocument();
+  });
+
+  it("auto-selected matching config submits create with source_action_configuration_id", async () => {
+    const user = userEvent.setup();
+    mockPost.mockResolvedValue({ data: { standing_approval_id: "sa_test" } });
+
+    render(
+      <CreateStandingApprovalDialog
+        agents={mockAgents}
+        open={true}
+        onOpenChange={vi.fn()}
+        initialAgentId={1}
+        initialActionType="github.create_issue"
+        initialConstraints={mockConfigs[0].parameters}
+      />,
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/Standing approvals require parameter constraints/),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Next"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Step 2 of 2/)).toBeInTheDocument();
+      expect(screen.getByText(/Set Limits/)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByText("Create"));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith(
+        "/v1/standing-approvals/create",
+        expect.objectContaining({
+          body: expect.objectContaining({
+            agent_id: 1,
+            action_type: "github.create_issue",
+            source_action_configuration_id: "ac_config1",
+          }),
+        }),
+      );
+    });
+  });
+
+  it("shows empty state on step 2 when agent has no action configurations", async () => {
+    const user = userEvent.setup();
+    render(
+      <CreateStandingApprovalDialog
+        agents={mockAgents}
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await user.selectOptions(screen.getByLabelText("Agent"), "2");
+    await user.click(screen.getByText("Next"));
+
+    await waitFor(() => {
+      expect(screen.getByText(/Step 2 of 4/)).toBeInTheDocument();
+    });
+
+    expect(
+      screen.getByText(
+        /No active action configurations found for this agent/,
+      ),
+    ).toBeInTheDocument();
   });
 
   it("filters out deactivated agents", () => {
