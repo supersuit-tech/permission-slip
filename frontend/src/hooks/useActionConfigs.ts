@@ -33,6 +33,8 @@ export function useActionConfigs(agentId: number) {
   return {
     configs: query.data?.data ?? [],
     isLoading: query.isLoading,
+    /** True after this query has finished a fetch (success or error), including empty results. */
+    isFetched: query.isFetched,
     error: query.isError
       ? "Unable to load action configurations. Please try again later."
       : null,

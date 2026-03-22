@@ -1,4 +1,4 @@
-import { Pencil, Trash2 } from "lucide-react";
+import { Ban, Check, Pencil, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
@@ -26,9 +26,17 @@ export function ActionConfigRow({
     : actions.find((a) => a.action_type === config.action_type);
 
   const paramEntries = Object.entries(config.parameters);
+  const isDisabled = config.status === "disabled";
 
   return (
-    <TableRow>
+    <TableRow
+      className={
+        isDisabled
+          ? "bg-muted/40 text-muted-foreground [&_td]:opacity-90"
+          : undefined
+      }
+      data-status={config.status}
+    >
       <TableCell>
         <div>
           <p className="font-medium">{config.name}</p>
@@ -120,16 +128,15 @@ function ParameterPill({ name, value }: { name: string; value: unknown }) {
 function StatusBadge({ status }: { status: "active" | "disabled" }) {
   if (status === "active") {
     return (
-      <Badge
-        variant="secondary"
-        className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-      >
+      <Badge variant="success-soft" className="gap-1 pr-2">
+        <Check className="size-3 shrink-0" aria-hidden />
         Active
       </Badge>
     );
   }
   return (
-    <Badge variant="secondary" className="text-muted-foreground">
+    <Badge variant="destructive-soft" className="gap-1 pr-2">
+      <Ban className="size-3 shrink-0" aria-hidden />
       Disabled
     </Badge>
   );
