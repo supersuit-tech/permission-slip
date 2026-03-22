@@ -13,6 +13,9 @@ export interface VisibleWhen {
   equals: string | boolean | number;
 }
 
+/** Dynamic option sources for select widgets (fetched at runtime). */
+export type OptionsFromSource = "connector_calendars";
+
 /** Property-level `x-ui` rendering hints for a single parameter. */
 export interface SchemaPropertyUI {
   widget?: "text" | "select" | "textarea" | "toggle" | "number" | "date" | "datetime" | "list";
@@ -22,6 +25,8 @@ export interface SchemaPropertyUI {
   help_url?: string;
   help_text?: string;
   visible_when?: VisibleWhen;
+  /** When set with widget "select", options are loaded from the API instead of `enum`. */
+  options_from?: OptionsFromSource;
   /**
    * Sibling parameter key for datetime range pairing (e.g. time_min ↔ time_max).
    * Use with `datetime_range_role` so the sibling's fixed value sets HTML min/max on this input.
@@ -274,6 +279,9 @@ function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
   if (typeof obj.group === "string") ui.group = obj.group;
   if (typeof obj.help_url === "string") ui.help_url = obj.help_url;
   if (typeof obj.help_text === "string") ui.help_text = obj.help_text;
+  if (obj.options_from === "connector_calendars") {
+    ui.options_from = "connector_calendars";
+  }
   if (obj.visible_when && typeof obj.visible_when === "object") {
     const vw = obj.visible_when as Record<string, unknown>;
     if (

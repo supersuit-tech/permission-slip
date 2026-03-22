@@ -27,13 +27,14 @@ func (a *createCalendarEventAction) ParameterAliases() map[string]string {
 
 // createCalendarEventParams is the user-facing parameter schema.
 type createCalendarEventParams struct {
-	Subject   string   `json:"subject"`
-	Start     string   `json:"start"`
-	End       string   `json:"end"`
-	TimeZone  string   `json:"time_zone"`
-	Body      string   `json:"body,omitempty"`
-	Attendees []string `json:"attendees,omitempty"`
-	Location  string   `json:"location,omitempty"`
+	CalendarID string   `json:"calendar_id"`
+	Subject    string   `json:"subject"`
+	Start      string   `json:"start"`
+	End        string   `json:"end"`
+	TimeZone   string   `json:"time_zone"`
+	Body       string   `json:"body,omitempty"`
+	Attendees  []string `json:"attendees,omitempty"`
+	Location   string   `json:"location,omitempty"`
 }
 
 func (p *createCalendarEventParams) validate() error {
@@ -122,8 +123,10 @@ func (a *createCalendarEventAction) Execute(ctx context.Context, req connectors.
 		graphReq.Location = &graphEventLocation{DisplayName: params.Location}
 	}
 
+	path := microsoftCalendarEventsBasePath(params.CalendarID)
+
 	var resp graphEventResponse
-	if err := a.conn.doRequest(ctx, http.MethodPost, "/me/events", req.Credentials, graphReq, &resp); err != nil {
+	if err := a.conn.doRequest(ctx, http.MethodPost, path, req.Credentials, graphReq, &resp); err != nil {
 		return nil, err
 	}
 

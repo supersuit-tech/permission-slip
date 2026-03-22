@@ -110,6 +110,56 @@ describe("ParameterFieldWidget", () => {
 
       expect(onChange).toHaveBeenCalledWith("eur");
     });
+
+    it("renders dynamic calendar options when options_from is connector_calendars", () => {
+      const calendarProp: SchemaProperty = {
+        type: "string",
+        "x-ui": {
+          widget: "select",
+          options_from: "connector_calendars",
+          placeholder: "Pick one",
+        },
+      };
+
+      renderWithProviders(
+        <ParameterFieldWidget
+          paramKey="calendar_id"
+          property={calendarProp}
+          value=""
+          onChange={vi.fn()}
+          dynamicSelectOptions={[
+            { value: "primary", label: "Primary (primary)" },
+            { value: "other", label: "Other" },
+          ]}
+          dynamicSelectLoading={false}
+        />,
+      );
+
+      const select = screen.getByTestId("select-param-calendar_id");
+      expect(select).toBeInTheDocument();
+      expect(screen.getByText("Primary (primary)")).toBeInTheDocument();
+      expect(screen.getByText("Other")).toBeInTheDocument();
+    });
+
+    it("shows loading placeholder for dynamic calendar select", () => {
+      const calendarProp: SchemaProperty = {
+        type: "string",
+        "x-ui": { widget: "select", options_from: "connector_calendars" },
+      };
+
+      renderWithProviders(
+        <ParameterFieldWidget
+          paramKey="calendar_id"
+          property={calendarProp}
+          value=""
+          onChange={vi.fn()}
+          dynamicSelectOptions={[]}
+          dynamicSelectLoading
+        />,
+      );
+
+      expect(screen.getByText("Loading calendars…")).toBeInTheDocument();
+    });
   });
 
   describe("textarea widget", () => {

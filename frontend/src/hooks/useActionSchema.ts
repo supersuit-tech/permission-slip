@@ -30,6 +30,7 @@ export function useActionSchema(actionType: string): {
   displayTemplate: string | null;
   preview: ActionPreviewConfig | null;
   connectorName: string | null;
+  connectorId: string | null;
   connectorLogoSvg: string | null;
   isLoading: boolean;
 } {
@@ -44,6 +45,7 @@ export function useActionSchema(actionType: string): {
         displayTemplate: null,
         preview: null,
         connectorName: null,
+        connectorId: null,
         connectorLogoSvg: null,
       };
     }
@@ -58,6 +60,7 @@ export function useActionSchema(actionType: string): {
         displayTemplate: null,
         preview: null,
         connectorName: connector.name ?? null,
+        connectorId: connector.id ?? null,
         connectorLogoSvg: connector.logo_svg ?? null,
       };
     }
@@ -92,6 +95,7 @@ export function useActionSchema(actionType: string): {
       displayTemplate: action.display_template ?? null,
       preview,
       connectorName: connector.name ?? null,
+      connectorId: connector.id ?? null,
       connectorLogoSvg: connector.logo_svg ?? null,
     };
   }, [connector, actionType]);

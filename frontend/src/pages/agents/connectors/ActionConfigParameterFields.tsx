@@ -5,7 +5,9 @@ import { Label } from "@/components/ui/label";
 import { Asterisk, ChevronDown, ChevronRight } from "lucide-react";
 import type { ParamMode } from "./ActionConfigFormFields";
 import { ParameterFieldWidget } from "./ParameterFieldWidget";
+import type { DynamicSelectOption } from "./ParameterFieldWidget";
 import type { ParametersSchema, SchemaProperty, FieldGroup } from "@/lib/parameterSchema";
+import { useAgentConnectorCalendars } from "@/hooks/useAgentConnectorCalendars";
 import {
   getOrderedFieldKeys,
   getFieldLabel,
@@ -20,6 +22,9 @@ interface ActionConfigParameterFieldsProps {
   modes: Record<string, ParamMode>;
   onModeChange: (key: string, mode: ParamMode) => void;
   disabled?: boolean;
+  /** When set with a connector that supports calendar listing, calendar_id selects load options from the API. */
+  agentId?: number;
+  connectorId?: string;
 }
 
 /**
@@ -38,7 +43,29 @@ export function ActionConfigParameterFields({
   modes,
   onModeChange,
   disabled,
+  agentId = 0,
+  connectorId,
 }: ActionConfigParameterFieldsProps) {
+  const needsConnectorCalendars =
+    !!connectorId &&
+    agentId > 0 &&
+    !!parametersSchema?.properties &&
+    Object.values(parametersSchema.properties).some(
+      (p) => p["x-ui"]?.options_from === "connector_calendars",
+    );
+
+  const {
+    calendars,
+    isLoading: calendarsLoading,
+    error: calendarsError,
+  } = useAgentConnectorCalendars(connectorId ?? "", agentId, needsConnectorCalendars);
+
+  const calendarSelectOptions: DynamicSelectOption[] | undefined =
+    calendars?.map((c) => ({
+      value: c.id,
+      label: c.is_primary ? `${c.name} (primary)` : c.name,
+    }));
+
   if (!parametersSchema?.properties) {
     return (
       <p className="text-muted-foreground text-sm">
@@ -79,6 +106,9 @@ export function ActionConfigParameterFields({
         disabled={disabled}
         onValueChange={onValueChange}
         onModeChange={onModeChange}
+        calendarSelectOptions={calendarSelectOptions}
+        calendarsLoading={calendarsLoading}
+        calendarsError={calendarsError}
       />
     );
   }
@@ -154,6 +184,9 @@ function ParameterField({
   disabled,
   onValueChange,
   onModeChange,
+  calendarSelectOptions,
+  calendarsLoading,
+  calendarsError,
 }: {
   paramKey: string;
   property: SchemaProperty;
@@ -165,6 +198,9 @@ function ParameterField({
   disabled?: boolean;
   onValueChange: (key: string, value: string) => void;
   onModeChange: (key: string, mode: ParamMode) => void;
+  calendarSelectOptions?: DynamicSelectOption[];
+  calendarsLoading?: boolean;
+  calendarsError?: string | null;
 }) {
   const isWildcard = mode === "wildcard";
   const widgetValue = isWildcard ? "" : value;
@@ -173,6 +209,8 @@ function ParameterField({
   const widgetPlaceholder = isWildcard ? "Agent can use any value" : undefined;
   const effectiveWidget = property["x-ui"]?.widget ?? inferWidgetFromProperty(property);
   const isMultiRow = effectiveWidget === "list";
+  const useCalendarOptions =
+    property["x-ui"]?.options_from === "connector_calendars";
 
   // In constraint context, use plain text only when the value needs freeform entry
   // (wildcards / patterns). Otherwise keep datetime-local so bounds like time_min /
@@ -233,6 +271,8 @@ function ParameterField({
             disabled={widgetDisabled}
             className={widgetClassName}
             placeholder={widgetPlaceholder}
+            dynamicSelectOptions={useCalendarOptions ? calendarSelectOptions : undefined}
+            dynamicSelectLoading={useCalendarOptions ? calendarsLoading : false}
             siblingDatetimeValue={siblingDatetimeValue}
           />
         )
@@ -245,8 +285,13 @@ function ParameterField({
           disabled={widgetDisabled}
           className={widgetClassName}
           placeholder={widgetPlaceholder}
+          dynamicSelectOptions={useCalendarOptions ? calendarSelectOptions : undefined}
+          dynamicSelectLoading={useCalendarOptions ? calendarsLoading : false}
           siblingDatetimeValue={siblingDatetimeValue}
         />
+      )}
+      {useCalendarOptions && calendarsError && !isWildcard && (
+        <p className="text-destructive text-xs">{calendarsError}</p>
       )}
       {!isWildcard && value.includes("*") && (
         <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
