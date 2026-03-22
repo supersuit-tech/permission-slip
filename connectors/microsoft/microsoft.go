@@ -4,9 +4,9 @@
 package microsoft
 
 import (
-	_ "embed"
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,11 +57,17 @@ func newForTest(client *http.Client, baseURL string) *MicrosoftConnector {
 	}
 }
 
+// NewForTest is the exported test helper for cross-package API tests.
+func NewForTest(client *http.Client, baseURL string) *MicrosoftConnector {
+	return newForTest(client, baseURL)
+}
+
 // ID returns "microsoft", matching the connectors.id in the database.
 func (c *MicrosoftConnector) ID() string { return "microsoft" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -205,7 +211,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-			ActionType:  "microsoft.list_drive_files",
+				ActionType:  "microsoft.list_drive_files",
 				Name:        "List Drive Files",
 				Description: "List files and folders in OneDrive",
 				RiskLevel:   "low",
@@ -689,7 +695,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"top":"*","calendar_id":"*"}`),
 			},
 			{
-			ID:          "tpl_microsoft_list_drive_files",
+				ID:          "tpl_microsoft_list_drive_files",
 				ActionType:  "microsoft.list_drive_files",
 				Name:        "Browse OneDrive files",
 				Description: "Agent can list files and folders in OneDrive.",
