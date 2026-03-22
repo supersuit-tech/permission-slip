@@ -360,14 +360,15 @@ describe("ActionConfigurationsSection", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows Enable All Actions footer link when configs exist and none are wildcard", () => {
+  it("shows Enable All Actions in the header when configs exist and none are wildcard", () => {
     renderSection({ configs: mockConfigs });
-    // The table has configs, so a footer link should appear
-    const footerLink = screen.getByRole("button", { name: /Enable All Actions/ });
-    expect(footerLink).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Enable All Actions/ }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Add Configuration")).toBeInTheDocument();
   });
 
-  it("hides Enable All Actions footer link when a wildcard config exists", () => {
+  it("hides Enable All Actions header button when a wildcard config exists", () => {
     const wildcardConfig: ActionConfiguration[] = [
       {
         id: "ac_wildcard",
@@ -383,7 +384,6 @@ describe("ActionConfigurationsSection", () => {
       },
     ];
     renderSection({ configs: wildcardConfig });
-    // Footer button must not be rendered
     expect(
       screen.queryByRole("button", { name: /Enable All Actions/ }),
     ).not.toBeInTheDocument();
@@ -391,7 +391,7 @@ describe("ActionConfigurationsSection", () => {
     expect(screen.getByText("All Actions")).toBeInTheDocument();
   });
 
-  it("calls create with wildcard action_type when clicking footer Enable All Actions", async () => {
+  it("calls create with wildcard action_type when clicking header Enable All Actions with existing configs", async () => {
     const user = userEvent.setup();
     mockPost.mockResolvedValue({
       data: {
