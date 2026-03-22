@@ -28,7 +28,7 @@ function StatusBadge({ status }: { status: Subscription["status"] }) {
   return <Badge variant="secondary">Cancelled</Badge>;
 }
 
-export function PlanCard({ plan, effectiveLimits, subscription, pricing }: PlanCardProps) {
+export function PlanCard({ plan, subscription, pricing }: PlanCardProps) {
   const isFree = plan.id === "free";
   const isFreePro = plan.id === "free_pro";
 
