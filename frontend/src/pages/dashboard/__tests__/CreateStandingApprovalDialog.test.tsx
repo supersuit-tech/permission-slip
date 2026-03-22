@@ -301,7 +301,11 @@ describe("CreateStandingApprovalDialog", () => {
         onOpenChange={vi.fn()}
         initialAgentId={1}
         initialActionType="github.create_issue"
-        initialConstraints={mockConfigs[0].parameters}
+        initialConstraints={{
+          repo: "supersuit-tech/webapp",
+          title: "*",
+          body: "*",
+        }}
       />,
       { wrapper },
     );
