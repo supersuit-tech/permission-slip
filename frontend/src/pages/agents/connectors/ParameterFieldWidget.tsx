@@ -6,6 +6,11 @@ import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
 import { inferWidgetFromProperty } from "@/lib/parameterSchema";
 
+export interface CalendarSelectOption {
+  value: string;
+  label: string;
+}
+
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
   paramKey: string;
@@ -21,6 +26,10 @@ export interface ParameterFieldWidgetProps {
   className?: string;
   /** Override the placeholder from x-ui (e.g. for constraint mode hints). */
   placeholder?: string;
+  /** Runtime options for `x-ui.options_from` select widgets. */
+  dynamicSelectOptions?: CalendarSelectOption[];
+  /** True while dynamic options are loading. */
+  dynamicSelectLoading?: boolean;
 }
 
 /**
@@ -35,11 +44,15 @@ export function ParameterFieldWidget({
   disabled,
   className,
   placeholder: placeholderOverride,
+  dynamicSelectOptions,
+  dynamicSelectLoading,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
   const widget: WidgetType = ui?.widget ?? inferWidgetFromProperty(property);
   const placeholder = placeholderOverride ?? ui?.placeholder;
   const inputId = `param-${paramKey}`;
+  const useDynamicCalendars =
+    widget === "select" && ui?.options_from === "connector_calendars";
 
   return (
     <div className="space-y-1">
@@ -51,6 +64,8 @@ export function ParameterFieldWidget({
         placeholder,
         className,
         enumValues: property.enum,
+        dynamicOptions: useDynamicCalendars ? dynamicSelectOptions : undefined,
+        dynamicLoading: useDynamicCalendars ? dynamicSelectLoading : false,
       })}
       <FieldHints ui={ui} />
     </div>
@@ -65,6 +80,8 @@ interface WidgetRenderProps {
   placeholder?: string;
   className?: string;
   enumValues?: string[];
+  dynamicOptions?: CalendarSelectOption[];
+  dynamicLoading?: boolean;
 }
 
 function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
@@ -103,22 +120,49 @@ function TextWidget({ inputId, value, onChange, disabled, placeholder, className
   );
 }
 
-function SelectWidget({ inputId, value, onChange, disabled, placeholder, enumValues, className }: WidgetRenderProps) {
+function SelectWidget({
+  inputId,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  enumValues,
+  className,
+  dynamicOptions,
+  dynamicLoading,
+}: WidgetRenderProps) {
+  const usingDynamic = dynamicOptions !== undefined;
+  const opts = usingDynamic
+    ? dynamicOptions
+    : (enumValues ?? []).filter((opt) => opt !== "").map((v) => ({ value: v, label: v }));
+
+  const showCustom =
+    usingDynamic &&
+    value !== "" &&
+    !opts.some((o) => o.value === value);
+
   return (
     <select
       id={inputId}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      disabled={disabled}
+      disabled={disabled || dynamicLoading}
       className={`border-input bg-background ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50${className ? ` ${className}` : ""}`}
       data-testid={`select-${inputId}`}
     >
-      <option value="">{placeholder ?? "Select…"}</option>
-      {(enumValues ?? []).filter((opt) => opt !== "").map((opt) => (
-        <option key={opt} value={opt}>
-          {opt}
+      <option value="">
+        {dynamicLoading ? "Loading calendars…" : (placeholder ?? "Select…")}
+      </option>
+      {opts.map((opt) => (
+        <option key={opt.value} value={opt.value}>
+          {opt.label}
         </option>
       ))}
+      {showCustom && (
+        <option value={value}>
+          {value} (custom)
+        </option>
+      )}
     </select>
   );
 }
