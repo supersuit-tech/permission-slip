@@ -6,7 +6,7 @@ import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
 import { inferWidgetFromProperty } from "@/lib/parameterSchema";
 
-export interface CalendarSelectOption {
+export interface DynamicSelectOption {
   value: string;
   label: string;
 }
@@ -27,7 +27,7 @@ export interface ParameterFieldWidgetProps {
   /** Override the placeholder from x-ui (e.g. for constraint mode hints). */
   placeholder?: string;
   /** Runtime options for `x-ui.options_from` select widgets. */
-  dynamicSelectOptions?: CalendarSelectOption[];
+  dynamicSelectOptions?: DynamicSelectOption[];
   /** True while dynamic options are loading. */
   dynamicSelectLoading?: boolean;
 }
@@ -80,7 +80,7 @@ interface WidgetRenderProps {
   placeholder?: string;
   className?: string;
   enumValues?: string[];
-  dynamicOptions?: CalendarSelectOption[];
+  dynamicOptions?: DynamicSelectOption[];
   dynamicLoading?: boolean;
 }
 

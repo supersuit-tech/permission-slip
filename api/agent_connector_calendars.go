@@ -5,8 +5,6 @@ import (
 	"net/http"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
-	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
-	"github.com/supersuit-tech/permission-slip-web/connectors/microsoft"
 )
 
 type userCalendarResponse struct {
@@ -44,10 +42,9 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 		}
 
 		connectorID := r.PathValue("connector_id")
-		if connectorID == "" {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "connector_id is required"))
-			return
-		}
+
+		// External provider calls below are bounded by the global per-IP rate limit
+		// middleware on the API router; no separate calendar-specific limiter.
 
 		if deps.Vault == nil {
 			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Credential vault is not configured"))
@@ -75,16 +72,14 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		var cals []connectors.UserCalendar
-		switch c := conn.(type) {
-		case *googleconnector.GoogleConnector:
-			cals, err = c.ListUserCalendars(r.Context(), creds)
-		case *microsoft.MicrosoftConnector:
-			cals, err = c.ListUserCalendars(r.Context(), creds)
-		default:
+		lister, ok := conn.(connectors.CalendarLister)
+		if !ok {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "This connector does not support calendar listing"))
 			return
 		}
+
+		var cals []connectors.UserCalendar
+		cals, err = lister.ListUserCalendars(r.Context(), creds)
 
 		if err != nil {
 			if handleConnectorError(w, r, err, ConnectorContext{ConnectorID: connectorID}) {

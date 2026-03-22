@@ -5,7 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Asterisk, ChevronDown, ChevronRight } from "lucide-react";
 import type { ParamMode } from "./ActionConfigFormFields";
 import { ParameterFieldWidget } from "./ParameterFieldWidget";
-import type { CalendarSelectOption } from "./ParameterFieldWidget";
+import type { DynamicSelectOption } from "./ParameterFieldWidget";
 import type { ParametersSchema, SchemaProperty, FieldGroup } from "@/lib/parameterSchema";
 import { useAgentConnectorCalendars } from "@/hooks/useAgentConnectorCalendars";
 import {
@@ -60,7 +60,7 @@ export function ActionConfigParameterFields({
     error: calendarsError,
   } = useAgentConnectorCalendars(connectorId ?? "", agentId, needsConnectorCalendars);
 
-  const calendarSelectOptions: CalendarSelectOption[] | undefined =
+  const calendarSelectOptions: DynamicSelectOption[] | undefined =
     calendars?.map((c) => ({
       value: c.id,
       label: c.is_primary ? `${c.name} (primary)` : c.name,
@@ -195,7 +195,7 @@ function ParameterField({
   disabled?: boolean;
   onValueChange: (key: string, value: string) => void;
   onModeChange: (key: string, mode: ParamMode) => void;
-  calendarSelectOptions?: CalendarSelectOption[];
+  calendarSelectOptions?: DynamicSelectOption[];
   calendarsLoading?: boolean;
   calendarsError?: string | null;
 }) {

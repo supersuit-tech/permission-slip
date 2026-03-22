@@ -49,28 +49,14 @@ export function useAgentConnectorCalendars(
       const rows = data?.data;
       if (!Array.isArray(rows)) return [];
 
-      const out: UserCalendarOption[] = [];
-      for (const row of rows) {
-        if (
-          row &&
-          typeof row === "object" &&
-          typeof (row as { id?: unknown }).id === "string" &&
-          typeof (row as { name?: unknown }).name === "string"
-        ) {
-          const r = row as {
-            id: string;
-            name: string;
-            description?: string | null;
-            is_primary?: boolean;
-          };
-          out.push({
-            id: r.id,
-            name: r.name,
-            description: r.description ?? undefined,
-            is_primary: Boolean(r.is_primary),
-          });
-        }
-      }
+      const out: UserCalendarOption[] = rows
+        .filter((r) => Boolean(r?.id && r?.name))
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          description: r.description ?? undefined,
+          is_primary: Boolean(r.is_primary),
+        }));
 
       out.sort((a, b) => {
         if (a.is_primary !== b.is_primary) return a.is_primary ? -1 : 1;

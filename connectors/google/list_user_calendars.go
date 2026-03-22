@@ -20,6 +20,10 @@ type googleCalendarListResponse struct {
 
 // ListUserCalendars returns calendars from the Google Calendar API calendarList
 // endpoint for the authenticated user.
+//
+// Uses maxResults=250 (API max per page) without following nextPageToken, so
+// users with more than 250 calendars see a truncated list — rare; extend with
+// pagination if needed.
 func (c *GoogleConnector) ListUserCalendars(ctx context.Context, creds connectors.Credentials) ([]connectors.UserCalendar, error) {
 	q := url.Values{}
 	q.Set("maxResults", "250")
