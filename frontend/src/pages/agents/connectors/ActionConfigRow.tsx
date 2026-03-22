@@ -39,9 +39,7 @@ export function ActionConfigRow({
     >
       <TableCell>
         <div>
-          <p className={`font-medium ${isDisabled ? "text-muted-foreground" : ""}`}>
-            {config.name}
-          </p>
+          <p className="font-medium">{config.name}</p>
           {config.description && (
             <p className="text-muted-foreground text-sm">
               {config.description}
@@ -59,9 +57,7 @@ export function ActionConfigRow({
           </div>
         ) : (
           <div>
-            <p className={`text-sm ${isDisabled ? "text-muted-foreground" : ""}`}>
-              {action?.name ?? config.action_type}
-            </p>
+            <p className="text-sm">{action?.name ?? config.action_type}</p>
             <p className="text-muted-foreground font-mono text-xs">
               {config.action_type}
             </p>
