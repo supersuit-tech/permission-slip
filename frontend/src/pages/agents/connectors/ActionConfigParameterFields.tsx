@@ -101,6 +101,7 @@ export function ActionConfigParameterFields({
         label={label}
         isRequired={isRequired}
         value={currentValue}
+        allValues={values}
         mode={mode}
         disabled={disabled}
         onValueChange={onValueChange}
@@ -178,6 +179,7 @@ function ParameterField({
   label,
   isRequired,
   value,
+  allValues,
   mode,
   disabled,
   onValueChange,
@@ -191,6 +193,7 @@ function ParameterField({
   label: string;
   isRequired: boolean;
   value: string;
+  allValues: Record<string, string>;
   mode: ParamMode;
   disabled?: boolean;
   onValueChange: (key: string, value: string) => void;
@@ -209,18 +212,17 @@ function ParameterField({
   const useCalendarOptions =
     property["x-ui"]?.options_from === "connector_calendars";
 
-  // In constraint context, datetime fields render as plain text so users can
-  // enter patterns like "2026-*" rather than being forced to use a date picker.
+  // In constraint context, use plain text only when the value needs freeform entry
+  // (wildcards / patterns). Otherwise keep datetime-local so bounds like time_min /
+  // time_max are easy to set; pair hints still apply via x-ui.datetime_range_*.
   const constraintProperty: typeof property =
-    property.format === "date-time" ||
-    property["x-ui"]?.widget === "datetime" ||
-    (property.type === "string" && property.description &&
-      (() => {
-        const d = property.description.toLowerCase();
-        return (d.includes("rfc 3339") || d.includes("rfc3339") || d.includes("iso 8601")) && !d.includes("epoch");
-      })())
+    isDatetimeLikeProperty(property) && shouldUseTextDatetimeConstraint(value)
       ? { ...property, "x-ui": { ...(property["x-ui"] ?? {}), widget: "text" } }
       : property;
+
+  const pairKey = property["x-ui"]?.datetime_range_pair;
+  const siblingDatetimeValue =
+    pairKey && allValues[pairKey] !== undefined ? allValues[pairKey] : undefined;
 
   const anyValueCheckbox = (
     <label
@@ -271,6 +273,7 @@ function ParameterField({
             placeholder={widgetPlaceholder}
             dynamicSelectOptions={useCalendarOptions ? calendarSelectOptions : undefined}
             dynamicSelectLoading={useCalendarOptions ? calendarsLoading : false}
+            siblingDatetimeValue={siblingDatetimeValue}
           />
         )
       ) : (
@@ -284,6 +287,7 @@ function ParameterField({
           placeholder={widgetPlaceholder}
           dynamicSelectOptions={useCalendarOptions ? calendarSelectOptions : undefined}
           dynamicSelectLoading={useCalendarOptions ? calendarsLoading : false}
+          siblingDatetimeValue={siblingDatetimeValue}
         />
       )}
       {useCalendarOptions && calendarsError && !isWildcard && (
@@ -337,6 +341,33 @@ function CollapsibleFieldGroup({
   );
 }
 
+
+function isDatetimeLikeProperty(prop: SchemaProperty): boolean {
+  if (prop.format === "date-time") return true;
+  if (prop["x-ui"]?.widget === "datetime") return true;
+  if (prop.type === "string" && prop.description) {
+    const d = prop.description.toLowerCase();
+    return (
+      (d.includes("rfc 3339") || d.includes("rfc3339") || d.includes("iso 8601")) &&
+      !d.includes("epoch")
+    );
+  }
+  return false;
+}
+
+/** True when the value is a single concrete instant (not a wildcard pattern). */
+function isConcreteDatetimeString(value: string): boolean {
+  if (!value || value.includes("*")) return false;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return true;
+  const t = new Date(value).getTime();
+  return !Number.isNaN(t);
+}
+
+function shouldUseTextDatetimeConstraint(value: string): boolean {
+  if (value.includes("*")) return true;
+  if (value !== "" && !isConcreteDatetimeString(value)) return true;
+  return false;
+}
 
 // Re-export the shared parseParametersSchema so callers don't break.
 export { parseParametersSchema } from "@/lib/parameterSchema";

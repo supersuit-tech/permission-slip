@@ -12,6 +12,7 @@ function renderWidget(
   value = "",
   onChange = vi.fn(),
   disabled = false,
+  opts?: { siblingDatetimeValue?: string },
 ) {
   return {
     onChange,
@@ -22,6 +23,7 @@ function renderWidget(
         value={value}
         onChange={onChange}
         disabled={disabled}
+        siblingDatetimeValue={opts?.siblingDatetimeValue}
       />,
     ),
   };
@@ -333,6 +335,60 @@ describe("ParameterFieldWidget", () => {
 
       const input = document.getElementById("param-test_field") as HTMLInputElement;
       expect(input).toBeDisabled();
+    });
+
+    it("sets min from sibling when datetime_range_role is upper", () => {
+      const prop: SchemaProperty = {
+        type: "string",
+        "x-ui": {
+          widget: "datetime",
+          datetime_range_role: "upper",
+          datetime_range_pair: "time_min",
+        },
+      };
+
+      renderWidget(prop, "", vi.fn(), false, {
+        siblingDatetimeValue: "2026-03-16T12:00:00-05:00",
+      });
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      expect(input.min).toMatch(/^2026-03-16T\d{2}:\d{2}$/);
+    });
+
+    it("sets max from sibling when datetime_range_role is lower", () => {
+      const prop: SchemaProperty = {
+        type: "string",
+        "x-ui": {
+          widget: "datetime",
+          datetime_range_role: "lower",
+          datetime_range_pair: "time_max",
+        },
+      };
+
+      renderWidget(prop, "", vi.fn(), false, {
+        siblingDatetimeValue: "2026-03-20T15:00:00Z",
+      });
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      expect(input.max).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
+    });
+
+    it("does not set min/max when sibling is a wildcard pattern", () => {
+      const prop: SchemaProperty = {
+        type: "string",
+        "x-ui": {
+          widget: "datetime",
+          datetime_range_role: "upper",
+        },
+      };
+
+      renderWidget(prop, "", vi.fn(), false, {
+        siblingDatetimeValue: "2026-*",
+      });
+
+      const input = document.getElementById("param-test_field") as HTMLInputElement;
+      expect(input.min).toBe("");
+      expect(input.max).toBe("");
     });
   });
 

@@ -537,6 +537,58 @@ describe("ActionConfigParameterFields", () => {
 
       expect(screen.queryByText("matches any text")).not.toBeInTheDocument();
     });
+
+    it("uses datetime-local for paired range fields when value is empty (fixed mode)", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          time_min: {
+            type: "string",
+            format: "date-time",
+            description: "Lower bound in RFC 3339 format",
+            "x-ui": {
+              datetime_range_pair: "time_max",
+              datetime_range_role: "lower",
+            },
+          },
+          time_max: {
+            type: "string",
+            format: "date-time",
+            description: "Upper bound in RFC 3339 format",
+            "x-ui": {
+              datetime_range_pair: "time_min",
+              datetime_range_role: "upper",
+            },
+          },
+        },
+      };
+
+      renderFields(schema, { values: { time_min: "", time_max: "" } });
+
+      const minInput = document.getElementById("param-time_min") as HTMLInputElement;
+      const maxInput = document.getElementById("param-time_max") as HTMLInputElement;
+      expect(minInput.type).toBe("datetime-local");
+      expect(maxInput.type).toBe("datetime-local");
+    });
+
+    it("uses text input for datetime field when value contains a wildcard pattern", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        properties: {
+          time_min: {
+            type: "string",
+            format: "date-time",
+            description: "Lower bound in RFC 3339 format",
+          },
+        },
+      };
+
+      renderFields(schema, { values: { time_min: "2026-*" } });
+
+      const input = screen.getByLabelText("Time Min");
+      expect(input).toHaveAttribute("type", "text");
+      expect(input).toHaveValue("2026-*");
+    });
   });
 
   describe("auto-mapping", () => {
