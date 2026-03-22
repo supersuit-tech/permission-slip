@@ -144,11 +144,11 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 // resolvedPaymentMethod holds the validated payment method state between
 // validation (pre-execution) and transaction recording (post-execution).
 type resolvedPaymentMethod struct {
-	paymentMethodID      string
+	paymentMethodID       string
 	stripePaymentMethodID string
-	brand                string
-	last4                string
-	amount               int
+	brand                 string
+	last4                 string
+	amount                int
 }
 
 // validatePaymentMethod validates the payment method, enforces ownership and
@@ -357,9 +357,6 @@ func resolveOAuthCredentialsFromConnection(ctx context.Context, deps *Deps, conn
 	if deps.Vault == nil {
 		return zero, fmt.Errorf("credential vault is not configured but connector requires OAuth credentials")
 	}
-	if deps.OAuthProviders == nil {
-		return zero, fmt.Errorf("OAuth provider registry is not configured")
-	}
 
 	return credentialsFromOAuthConnection(ctx, deps, conn)
 }
@@ -383,6 +380,9 @@ func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OA
 
 	// Refresh the token if expired or within pre-emptive buffer.
 	if conn.TokenExpiry != nil && time.Now().After(conn.TokenExpiry.Add(-oauth.TokenExpiryBuffer)) {
+		if deps.OAuthProviders == nil {
+			return zero, fmt.Errorf("OAuth provider registry is not configured")
+		}
 		if err := refreshOAuthConnection(ctx, deps, conn, conn.Provider); err != nil {
 			return zero, err
 		}
@@ -534,5 +534,3 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 
 	return nil
 }
-
-
