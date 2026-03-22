@@ -7,7 +7,6 @@ import {
   CardHeader,
   CardTitle,
   CardContent,
-  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -53,6 +52,10 @@ export function ActionConfigurationsSection({
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const hasWildcardConfig = configs.some(
+    (c) => c.action_type === WILDCARD_ACTION_TYPE,
+  );
+
   const { createActionConfig, isPending: isEnablingAll } =
     useCreateActionConfig();
 
@@ -83,15 +86,35 @@ export function ActionConfigurationsSection({
           <CardTitle>Action Configurations</CardTitle>
         </div>
         {configs.length > 0 && (
-          <Button
-            size="sm"
-            className="shrink-0 self-start sm:self-center"
-            onClick={() => setAddDialogOpen(true)}
-            disabled={actions.length === 0}
-          >
-            <Plus className="size-4" />
-            Add Configuration
-          </Button>
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+            {!hasWildcardConfig && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={handleEnableAll}
+                disabled={isEnablingAll || actions.length === 0}
+              >
+                {isEnablingAll ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Zap className="size-4" aria-hidden="true" />
+                )}
+                Enable All Actions
+              </Button>
+            )}
+            <Button
+              type="button"
+              size="sm"
+              className="shrink-0"
+              onClick={() => setAddDialogOpen(true)}
+              disabled={actions.length === 0}
+            >
+              <Plus className="size-4" />
+              Add Configuration
+            </Button>
+          </div>
         )}
       </CardHeader>
       <CardContent>
@@ -148,25 +171,6 @@ export function ActionConfigurationsSection({
           </div>
         )}
       </CardContent>
-
-      {configs.length > 0 &&
-        !configs.some((c) => c.action_type === WILDCARD_ACTION_TYPE) && (
-          <CardFooter className="justify-center border-t pt-4">
-            <button
-              type="button"
-              onClick={handleEnableAll}
-              disabled={isEnablingAll || actions.length === 0}
-              className="text-muted-foreground hover:text-foreground disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-1 text-xs transition-colors"
-            >
-              {isEnablingAll ? (
-                <Loader2 className="size-3 animate-spin" />
-              ) : (
-                <Zap className="size-3" />
-              )}
-              Enable All Actions
-            </button>
-          </CardFooter>
-        )}
 
       <AddActionConfigDialog
         open={addDialogOpen}
