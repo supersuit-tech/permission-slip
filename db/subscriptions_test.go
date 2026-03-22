@@ -252,6 +252,52 @@ func TestUpdateSubscriptionPeriod(t *testing.T) {
 	}
 }
 
+func TestClearSubscriptionQuotaGrace_ReturnsNilWhenNoActiveGrace(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	future := time.Now().Add(48 * time.Hour)
+	testhelper.MustExec(t, tx,
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
+		uid, db.PlanPayAsYouGo, future)
+
+	cleared, err := db.ClearSubscriptionQuotaGrace(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("ClearSubscriptionQuotaGrace: %v", err)
+	}
+	if cleared == nil {
+		t.Fatal("expected subscription row after first clear")
+	}
+	if cleared.QuotaPlanID != nil || cleared.QuotaEntitlementsUntil != nil {
+		t.Fatalf("expected quota columns nil after clear, got plan=%v until=%v",
+			cleared.QuotaPlanID, cleared.QuotaEntitlementsUntil)
+	}
+
+	again, err := db.ClearSubscriptionQuotaGrace(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("second ClearSubscriptionQuotaGrace: %v", err)
+	}
+	if again != nil {
+		t.Fatal("expected nil when no active quota grace row matches (handler 409 branch)")
+	}
+
+	past := time.Now().Add(-48 * time.Hour)
+	testhelper.MustExec(t, tx,
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
+		uid, db.PlanPayAsYouGo, past)
+	expired, err := db.ClearSubscriptionQuotaGrace(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("ClearSubscriptionQuotaGrace with past until: %v", err)
+	}
+	if expired != nil {
+		t.Fatal("expected nil when quota_entitlements_until is not in the future")
+	}
+}
+
 func TestEffectiveQuotaPlan(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()

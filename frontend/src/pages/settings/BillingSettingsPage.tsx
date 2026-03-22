@@ -124,7 +124,8 @@ export function BillingSettingsPage() {
           {billingPlan.subscription.can_upgrade && (
             <UpgradeCTA plan={billingPlan.plan} pricing={billingPlan.pricing} />
           )}
-          {billingPlan.subscription.can_downgrade && (
+          {(billingPlan.subscription.can_downgrade ||
+            billingPlan.subscription.can_end_quota_grace_now) && (
             <PlanDetailsCard
               subscription={billingPlan.subscription}
               usage={billingPlan.usage}

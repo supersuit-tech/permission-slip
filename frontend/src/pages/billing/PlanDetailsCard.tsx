@@ -21,6 +21,7 @@ import type { Subscription, UsageSummary } from "@/hooks/useBillingPlan";
 import { DetailRow } from "./DetailRow";
 import { formatCents, formatDate, isStripeUrl } from "./formatters";
 import { DowngradeConfirmDialog } from "./DowngradeConfirmDialog";
+import { EndQuotaGraceConfirmDialog } from "./EndQuotaGraceConfirmDialog";
 
 interface PlanDetailsCardProps {
   subscription: Subscription;
@@ -131,6 +132,7 @@ interface DowngradeSectionProps {
 function DowngradeSection({ usage, subscription }: DowngradeSectionProps) {
   const { downgrade, isDowngrading } = useDowngradePlan();
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showEndGraceConfirm, setShowEndGraceConfirm] = useState(false);
   const [downgradeError, setDowngradeError] = useState<string | null>(null);
 
   async function handleDowngrade() {
@@ -138,13 +140,18 @@ function DowngradeSection({ usage, subscription }: DowngradeSectionProps) {
     try {
       const result = await downgrade();
       setShowConfirm(false);
+      setShowEndGraceConfirm(false);
       const quotaMsg = result?.quota_entitlements_until
         ? ` Paid-plan limits apply until ${formatDate(result.quota_entitlements_until)}.`
         : "";
       const retentionMsg = result?.grace_period_ends_at
         ? ` Extended audit retention until ${formatDate(result.grace_period_ends_at)}.`
         : "";
-      toast.success(`Your plan has been downgraded to Free.${quotaMsg}${retentionMsg}`);
+      const base =
+        subscription.can_end_quota_grace_now && !subscription.can_downgrade
+          ? "Free plan limits now apply to your account."
+          : "Your plan has been downgraded to Free.";
+      toast.success(`${base}${quotaMsg}${retentionMsg}`);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to downgrade. Please try again.";
       setDowngradeError(message);
@@ -153,16 +160,30 @@ function DowngradeSection({ usage, subscription }: DowngradeSectionProps) {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => {
-          setDowngradeError(null);
-          setShowConfirm(true);
-        }}
-      >
-        Downgrade to Free
-      </Button>
+      {subscription.can_downgrade && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setDowngradeError(null);
+            setShowConfirm(true);
+          }}
+        >
+          Downgrade to Free
+        </Button>
+      )}
+      {subscription.can_end_quota_grace_now && subscription.quota_entitlements_until && (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            setDowngradeError(null);
+            setShowEndGraceConfirm(true);
+          }}
+        >
+          Downgrade now
+        </Button>
+      )}
       <DowngradeConfirmDialog
         open={showConfirm}
         onOpenChange={setShowConfirm}
@@ -172,6 +193,17 @@ function DowngradeSection({ usage, subscription }: DowngradeSectionProps) {
         usage={usage}
         freeLimitsApplyDate={formatDate(subscription.current_period_end)}
       />
+      {subscription.quota_entitlements_until && (
+        <EndQuotaGraceConfirmDialog
+          open={showEndGraceConfirm}
+          onOpenChange={setShowEndGraceConfirm}
+          onConfirm={handleDowngrade}
+          isPending={isDowngrading}
+          error={downgradeError}
+          usage={usage}
+          paidEntitlementsEndDate={formatDate(subscription.quota_entitlements_until)}
+        />
+      )}
     </>
   );
 }
@@ -202,8 +234,8 @@ export function PlanDetailsCard({ subscription, usage }: PlanDetailsCardProps) {
             <InvoicesList />
           </div>
 
-          {subscription.can_downgrade && (
-            <div className="border-t pt-4">
+          {(subscription.can_downgrade || subscription.can_end_quota_grace_now) && (
+            <div className="border-t pt-4 flex flex-wrap gap-2">
               <DowngradeSection usage={usage} subscription={subscription} />
             </div>
           )}

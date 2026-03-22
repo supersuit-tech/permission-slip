@@ -27,6 +27,7 @@ export const freePlanResponse = {
     has_payment_method: false,
     can_upgrade: true,
     can_downgrade: false,
+    can_end_quota_grace_now: false,
     grace_period_ends_at: null,
     quota_entitlements_until: null,
   },
@@ -65,6 +66,7 @@ export const paidPlanResponse = {
     has_payment_method: true,
     can_upgrade: false,
     can_downgrade: true,
+    can_end_quota_grace_now: false,
     grace_period_ends_at: null,
     quota_entitlements_until: null,
   },
@@ -79,6 +81,20 @@ export const paidPlanResponse = {
     price_per_request_display: "$0.005",
   },
   coupon_redemption_enabled: false,
+};
+
+/** Free plan with active paid-quota grace (cancelled pay-as-you-go, period not ended). */
+export const freeWithQuotaGraceResponse = {
+  ...freePlanResponse,
+  effective_limits: paidPlanLimits,
+  subscription: {
+    ...freePlanResponse.subscription,
+    status: "cancelled" as const,
+    can_upgrade: true,
+    can_downgrade: false,
+    can_end_quota_grace_now: true,
+    quota_entitlements_until: "2026-04-01T00:00:00Z",
+  },
 };
 
 /** Paid plan where usage exceeds all free plan limits. */

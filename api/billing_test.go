@@ -218,6 +218,9 @@ func TestGetBillingPlan_QuotaGraceEffectiveLimits(t *testing.T) {
 	if !resp.Subscription.QuotaEntitlementsUntil.Equal(future) {
 		t.Errorf("quota_entitlements_until mismatch: want %v got %v", future, resp.Subscription.QuotaEntitlementsUntil)
 	}
+	if !resp.Subscription.CanEndQuotaGraceNow {
+		t.Error("expected subscription.can_end_quota_grace_now=true during quota grace on free plan")
+	}
 }
 
 func TestGetBillingPlan_PaidPlan(t *testing.T) {
@@ -830,6 +833,83 @@ func TestDowngrade_AlreadyFree(t *testing.T) {
 	var errResp ErrorResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
 		t.Fatalf("failed to parse error response: %v", err)
+	}
+	if errResp.Error.Code != ErrAlreadyDowngraded {
+		t.Errorf("expected error code %s, got %s", ErrAlreadyDowngraded, errResp.Error.Code)
+	}
+}
+
+func TestDowngrade_EndQuotaGraceNow_ClearsPaidQuotas(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	future := time.Now().Add(48 * time.Hour)
+	testhelper.MustExec(t, tx,
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = now() WHERE user_id = $1`,
+		uid, db.PlanPayAsYouGo, future)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp downgradeResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("parse: %v", err)
+	}
+	if resp.PlanID != db.PlanFree {
+		t.Errorf("expected plan_id=free, got %s", resp.PlanID)
+	}
+	if resp.QuotaEntitlementsUntil != nil {
+		t.Errorf("expected quota_entitlements_until nil in response, got %v", resp.QuotaEntitlementsUntil)
+	}
+
+	sub, err := db.GetSubscriptionByUserID(context.Background(), tx, uid)
+	if err != nil {
+		t.Fatalf("GetSubscriptionByUserID: %v", err)
+	}
+	if sub.QuotaPlanID != nil || sub.QuotaEntitlementsUntil != nil {
+		t.Errorf("expected quota grace cleared in DB, got quota_plan_id=%v quota_entitlements_until=%v",
+			sub.QuotaPlanID, sub.QuotaEntitlementsUntil)
+	}
+}
+
+func TestDowngrade_EndQuotaGraceNow_PastEntitlementsReturnsAlreadyDowngraded(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	past := time.Now().Add(-48 * time.Hour)
+	testhelper.MustExec(t, tx,
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
+		uid, db.PlanPayAsYouGo, past)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("parse error: %v", err)
 	}
 	if errResp.Error.Code != ErrAlreadyDowngraded {
 		t.Errorf("expected error code %s, got %s", ErrAlreadyDowngraded, errResp.Error.Code)

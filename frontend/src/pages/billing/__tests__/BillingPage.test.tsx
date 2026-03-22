@@ -7,6 +7,7 @@ import { mockGet, mockPost, resetClientMocks } from "../../../api/__mocks__/clie
 import { BillingPage } from "../BillingPage";
 import {
   freePlanResponse,
+  freeWithQuotaGraceResponse,
   paidPlanResponse,
   usageDetailResponse,
   freeUsageDetailResponse,
@@ -21,7 +22,10 @@ vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 function mockBillingApi(
-  planResponse: typeof freePlanResponse | typeof paidPlanResponse,
+  planResponse:
+    | typeof freePlanResponse
+    | typeof paidPlanResponse
+    | typeof freeWithQuotaGraceResponse,
   usageResponse: typeof usageDetailResponse | typeof freeUsageDetailResponse | typeof paidUnderAllowanceUsageResponse = usageDetailResponse,
 ) {
   setupAuthMocks({ authenticated: true });
@@ -146,6 +150,17 @@ describe("BillingPage", () => {
         expect(screen.getByText("Current Plan")).toBeInTheDocument();
       });
       expect(screen.queryByText("Plan Details")).not.toBeInTheDocument();
+    });
+
+    it("shows Downgrade now when free plan still has paid entitlements", async () => {
+      mockBillingApi(freeWithQuotaGraceResponse, freeUsageDetailResponse);
+
+      render(<BillingPage />, { wrapper });
+
+      await waitFor(() => {
+        expect(screen.getByRole("button", { name: "Downgrade now" })).toBeInTheDocument();
+      });
+      expect(screen.getByText("Plan Details")).toBeInTheDocument();
     });
 
     it("opens upgrade confirmation dialog on upgrade click", async () => {
