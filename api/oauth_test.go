@@ -394,7 +394,8 @@ func TestOAuthAuthorize_Slack_NoBotScopeQueryParam(t *testing.T) {
 	if _, hasScope := q["scope"]; hasScope {
 		t.Errorf("Slack authorize URL must not include bot \"scope\" query key; got scope=%q", q.Get("scope"))
 	}
-	if us := q.Get("user_scope"); us == "" {
+	us := q.Get("user_scope")
+	if us == "" {
 		t.Fatal("expected user_scope query param")
 	}
 	if !strings.Contains(us, "chat:write") {
