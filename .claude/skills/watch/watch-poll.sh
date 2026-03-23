@@ -10,8 +10,12 @@
 #   --work-dir <path> Reuse an existing work directory (preserves state
 #                     across invocations: last-seen IDs, action log, cache)
 #   --max-turns <N>   Maximum number of agent turns before ending the session.
-#                     Each turn = one AGENT_NEEDED signal (one round of AI work).
-#                     When reached, the session wraps up as if idle-timeout.
+#                     Each turn = one AGENT_NEEDED exit (one round of AI work).
+#                     The turn counter increments on each AGENT_NEEDED; wrap-up and
+#                     IDLE_TIMEOUT happen on the *next* run when turns >= N (or on
+#                     idle timeout). Re-invoke with the same --work-dir after each
+#                     AGENT_NEEDED — stopping after the first AGENT_NEEDED skips
+#                     wrap-up and watch-post.sh (CI/merge).
 #
 # Environment:
 #   GH_HOST, GH_REPO — set by caller (defaults provided below)
