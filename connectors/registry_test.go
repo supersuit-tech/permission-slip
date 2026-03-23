@@ -20,8 +20,8 @@ type stubConnector struct {
 	actions map[string]Action
 }
 
-func (c *stubConnector) ID() string                  { return c.id }
-func (c *stubConnector) Actions() map[string]Action   { return c.actions }
+func (c *stubConnector) ID() string                 { return c.id }
+func (c *stubConnector) Actions() map[string]Action { return c.actions }
 func (c *stubConnector) ValidateCredentials(_ context.Context, _ Credentials) error {
 	return nil
 }
@@ -206,5 +206,20 @@ func TestRegistry_GetActionMultipleDots(t *testing.T) {
 	}
 	if action == nil {
 		t.Fatal("expected non-nil action")
+	}
+}
+
+func TestRegistry_Remove(t *testing.T) {
+	t.Parallel()
+	r := NewRegistry()
+	r.Register(newStubConnector("tmp", "tmp.ping"))
+	if !r.Remove("tmp") {
+		t.Fatal("Remove: expected true for existing id")
+	}
+	if _, ok := r.Get("tmp"); ok {
+		t.Error("expected connector removed")
+	}
+	if r.Remove("tmp") {
+		t.Error("Remove: expected false for missing id")
 	}
 }

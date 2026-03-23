@@ -142,6 +142,23 @@ func TestListConnectorIDs_Empty(t *testing.T) {
 	}
 }
 
+func TestDeleteConnectorByID(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	testhelper.InsertConnector(t, tx, "gone")
+	if err := db.DeleteConnectorByID(context.Background(), tx, "gone"); err != nil {
+		t.Fatalf("DeleteConnectorByID: %v", err)
+	}
+	ids, err := db.ListConnectorIDs(context.Background(), tx)
+	if err != nil {
+		t.Fatalf("ListConnectorIDs: %v", err)
+	}
+	if len(ids) != 0 {
+		t.Fatalf("expected connector deleted, still have %v", ids)
+	}
+}
+
 func TestListConnectorIDs_ReturnsAll(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
