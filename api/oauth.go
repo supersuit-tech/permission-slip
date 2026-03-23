@@ -621,13 +621,13 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		// is likely still configured for bot scopes only — fail with a clear
 		// message instead of storing a bot token the connector cannot use.
 		if providerID == "slack" {
-			if extractSlackUserToken(token) == "" {
+			if oauth.SlackAuthedUserAccessToken(token) == "" {
 				redirectToFrontend(w, r, deps, providerID, "error",
 					"Slack did not return a user OAuth token. In your Slack app settings, add the required User Token Scopes, remove Bot Token Scopes from the install flow, then connect again.",
 					state.ReturnTo, "")
 				return
 			}
-			token = slackUserTokenAsPrimary(token)
+			token = oauth.NormalizeSlackUserOAuthToken(token)
 		}
 
 		// Store tokens in vault within a transaction. Use scopes from the
@@ -1224,31 +1224,6 @@ func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, prov
 	}
 	parsedURL.RawQuery = q.Encode()
 	http.Redirect(w, r, parsedURL.String(), http.StatusTemporaryRedirect)
-}
-
-// extractSlackUserToken extracts the user access token from a Slack OAuth v2
-// token response (authed_user.access_token). Returns "" if absent.
-func extractSlackUserToken(token *oauth2.Token) string {
-	authedUser, ok := token.Extra("authed_user").(map[string]any)
-	if !ok {
-		return ""
-	}
-	userToken, _ := authedUser["access_token"].(string)
-	return userToken
-}
-
-// slackUserTokenAsPrimary returns a token whose AccessToken is the Slack user
-// token when authed_user.access_token is present; otherwise returns token unchanged.
-func slackUserTokenAsPrimary(token *oauth2.Token) *oauth2.Token {
-	if token == nil {
-		return token
-	}
-	if u := extractSlackUserToken(token); u != "" {
-		t := *token
-		t.AccessToken = u
-		return &t
-	}
-	return token
 }
 
 // extractSlackTeamName extracts the workspace name from a Slack OAuth v2

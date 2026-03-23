@@ -64,5 +64,23 @@ func RefreshTokens(ctx context.Context, provider Provider, refreshToken string) 
 		result.RefreshToken = refreshToken
 	}
 
+	// Slack oauth.v2.access nests rotated user tokens under authed_user; the
+	// top-level refresh_token often refers to the bot. Normalize so we persist
+	// and rotate the user refresh_token with the user access_token.
+	if provider.ID == "slack" {
+		norm := NormalizeSlackUserOAuthToken(newToken)
+		result.AccessToken = norm.AccessToken
+		if norm.RefreshToken != "" {
+			result.RefreshToken = norm.RefreshToken
+		} else {
+			result.RefreshToken = refreshToken
+		}
+		if !norm.Expiry.IsZero() {
+			result.Expiry = norm.Expiry
+		} else if !newToken.Expiry.IsZero() {
+			result.Expiry = newToken.Expiry
+		}
+	}
+
 	return result, nil
 }
