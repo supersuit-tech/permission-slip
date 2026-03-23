@@ -6,11 +6,6 @@ import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
 import { inferWidgetFromProperty } from "@/lib/parameterSchema";
 
-export interface DynamicSelectOption {
-  value: string;
-  label: string;
-}
-
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
   paramKey: string;
@@ -26,12 +21,6 @@ export interface ParameterFieldWidgetProps {
   className?: string;
   /** Override the placeholder from x-ui (e.g. for constraint mode hints). */
   placeholder?: string;
-  /** Runtime options for `x-ui.options_from` select widgets. */
-  dynamicSelectOptions?: DynamicSelectOption[];
-  /** True while dynamic options are loading. */
-  dynamicSelectLoading?: boolean;
-  /** Error message when dynamic options failed to load. */
-  dynamicSelectError?: string | null;
   /**
    * Sibling field value for paired datetime bounds (e.g. time_max when editing time_min).
    * When both sides are concrete datetimes, sets HTML min/max on the datetime-local input.
@@ -51,17 +40,12 @@ export function ParameterFieldWidget({
   disabled,
   className,
   placeholder: placeholderOverride,
-  dynamicSelectOptions,
-  dynamicSelectLoading,
-  dynamicSelectError,
   siblingDatetimeValue,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
   const widget: WidgetType = ui?.widget ?? inferWidgetFromProperty(property);
   const placeholder = placeholderOverride ?? ui?.placeholder;
   const inputId = `param-${paramKey}`;
-  const useDynamicCalendars =
-    widget === "select" && ui?.options_from === "connector_calendars";
 
   return (
     <div className="space-y-1">
@@ -73,9 +57,6 @@ export function ParameterFieldWidget({
         placeholder,
         className,
         enumValues: property.enum,
-        dynamicOptions: useDynamicCalendars ? dynamicSelectOptions : undefined,
-        dynamicLoading: useDynamicCalendars ? dynamicSelectLoading : false,
-        dynamicError: useDynamicCalendars ? dynamicSelectError : undefined,
         siblingDatetimeValue,
         datetimeRangeRole: ui?.datetime_range_role,
       })}
@@ -92,9 +73,6 @@ interface WidgetRenderProps {
   placeholder?: string;
   className?: string;
   enumValues?: string[];
-  dynamicOptions?: DynamicSelectOption[];
-  dynamicLoading?: boolean;
-  dynamicError?: string | null;
   siblingDatetimeValue?: string;
   datetimeRangeRole?: "lower" | "upper";
 }
@@ -135,67 +113,22 @@ function TextWidget({ inputId, value, onChange, disabled, placeholder, className
   );
 }
 
-function SelectWidget({
-  inputId,
-  value,
-  onChange,
-  disabled,
-  placeholder,
-  enumValues,
-  className,
-  dynamicOptions,
-  dynamicLoading,
-  dynamicError,
-}: WidgetRenderProps) {
-  const usingDynamic = dynamicOptions !== undefined;
-  const opts = usingDynamic
-    ? dynamicOptions
-    : (enumValues ?? []).filter((opt) => opt !== "").map((v) => ({ value: v, label: v }));
-
-  const showCustom =
-    usingDynamic &&
-    value !== "" &&
-    !opts.some((o) => o.value === value);
-
-  // When dynamic options fail to load, fall back to a text input so the user
-  // can type a calendar ID manually instead of being stuck.
-  if (dynamicError && !dynamicLoading) {
-    return (
-      <Input
-        id={inputId}
-        type="text"
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        disabled={disabled}
-        placeholder={placeholder ?? "Enter calendar ID manually"}
-        className={className}
-        data-testid={`select-${inputId}`}
-      />
-    );
-  }
-
+function SelectWidget({ inputId, value, onChange, disabled, placeholder, enumValues, className }: WidgetRenderProps) {
   return (
     <select
       id={inputId}
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      disabled={disabled || dynamicLoading}
+      disabled={disabled}
       className={`border-input bg-background ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50${className ? ` ${className}` : ""}`}
       data-testid={`select-${inputId}`}
     >
-      <option value="">
-        {dynamicLoading ? "Loading calendars…" : (placeholder ?? "Select…")}
-      </option>
-      {opts.map((opt) => (
-        <option key={opt.value} value={opt.value}>
-          {opt.label}
+      <option value="">{placeholder ?? "Select…"}</option>
+      {(enumValues ?? []).filter((opt) => opt !== "").map((opt) => (
+        <option key={opt} value={opt}>
+          {opt}
         </option>
       ))}
-      {showCustom && (
-        <option value={value}>
-          {value} (custom)
-        </option>
-      )}
     </select>
   );
 }

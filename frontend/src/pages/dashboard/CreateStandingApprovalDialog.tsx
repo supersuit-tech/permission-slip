@@ -217,7 +217,6 @@ export function CreateStandingApprovalDialog({
     schema: fetchedSchema,
     isLoading: schemaLoading,
     connectorName,
-    connectorId: schemaConnectorId,
     actionName,
     connectorLogoSvg,
   } = useActionSchema(effectiveActionType);
@@ -571,8 +570,6 @@ export function CreateStandingApprovalDialog({
               manualConstraintsJson={manualConstraintsJson}
               onManualConstraintsJsonChange={setManualConstraintsJson}
               isPending={isPending}
-              agentId={typeof agentId === "number" ? agentId : undefined}
-              connectorId={schemaConnectorId ?? undefined}
             />
           )}
 

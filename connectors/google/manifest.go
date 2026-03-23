@@ -112,12 +112,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')",
-							"x-ui": {
-								"widget": "select",
-								"options_from": "connector_calendars",
-								"placeholder": "Choose calendar…"
-							}
+							"description": "Calendar ID (defaults to 'primary')"
 						}
 					}
 				}`)),
@@ -134,12 +129,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')",
-							"x-ui": {
-								"widget": "select",
-								"options_from": "connector_calendars",
-								"placeholder": "Choose calendar…"
-							}
+							"description": "Calendar ID (defaults to 'primary')"
 						},
 						"max_results": {
 							"type": "integer",
@@ -499,12 +489,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')",
-							"x-ui": {
-								"widget": "select",
-								"options_from": "connector_calendars",
-								"placeholder": "Choose calendar…"
-							}
+							"description": "Calendar ID (defaults to 'primary')"
 						}
 					}
 				}`)),
@@ -627,12 +612,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')",
-							"x-ui": {
-								"widget": "select",
-								"options_from": "connector_calendars",
-								"placeholder": "Choose calendar…"
-							}
+							"description": "Calendar ID (defaults to 'primary')"
 						},
 						"summary": {
 							"type": "string",
@@ -685,12 +665,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')",
-							"x-ui": {
-								"widget": "select",
-								"options_from": "connector_calendars",
-								"placeholder": "Choose calendar…"
-							}
+							"description": "Calendar ID (defaults to 'primary')"
 						}
 					}
 				}`)),
