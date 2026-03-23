@@ -23,7 +23,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.send_message",
 				Name:        "Send Message",
-				Description: "Send a message to a Slack channel",
+				Description: "Send a message to a Slack channel. When the connection has a Slack user OAuth token with chat:write, the message is sent as the authorizing user; otherwise it is sent as the app bot.",
 				RiskLevel:   "low",
 				Preview: &connectors.ActionPreview{
 					Layout: "message",
@@ -69,7 +69,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.list_channels",
 				Name:        "List Channels",
-				Description: "List Slack channels visible to the bot. Returns all channel types (public, private, group DMs, DMs) by default.",
+				Description: "List Slack channels. Uses the bot token for conversations.list and, when a user OAuth token is present, merges in the authorizing user's DMs and private conversations from users.conversations (so 1:1 DMs the bot is not in still appear). Returns all channel types (public, private, group DMs, DMs) by default when a matching profile email is available.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -77,7 +77,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"types": {
 							"type": "string",
 							"default": "public_channel,private_channel,mpim,im",
-							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set."
+							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set. im/mpim/private_channel results are filtered to the authorizing user; user-token merge fills in human-only DMs when configured."
 						},
 						"limit": {
 							"type": "integer",
@@ -99,7 +99,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.read_channel_messages",
 				Name:        "Read Channel Messages",
-				Description: "Read recent messages from a Slack channel",
+				Description: "Read recent messages from a Slack channel, DM (D…), or group DM (G…). For D and G channels, uses the authorizing user's OAuth token when available so history matches the human participant.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -107,7 +107,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID (e.g. C01234567)"
+							"description": "Channel ID: C… (channel), D… (DM), or G… (group DM)"
 						},
 						"limit": {
 							"type": "integer",
@@ -132,7 +132,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.read_thread",
 				Name:        "Read Thread",
-				Description: "Read replies in a Slack thread",
+				Description: "Read replies in a Slack thread. For threads in DMs or group DMs, uses the authorizing user's OAuth token when available.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -140,7 +140,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID containing the thread (e.g. C01234567)"
+							"description": "Channel ID containing the thread: C…, D…, or G…"
 						},
 						"thread_ts": {
 							"type": "string",
@@ -161,7 +161,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.schedule_message",
 				Name:        "Schedule Message",
-				Description: "Schedule a message for future delivery to a Slack channel",
+				Description: "Schedule a message for future delivery to a Slack channel. When a user OAuth token with chat:write is present, schedules as the authorizing user.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -280,7 +280,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.send_dm",
 				Name:        "Send Direct Message",
-				Description: "Send a direct message to a Slack user",
+				Description: "Send a direct message to a Slack user. When a user OAuth token with chat:write is present, opens and posts as the authorizing user.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -301,7 +301,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.update_message",
 				Name:        "Update Message",
-				Description: "Edit an existing message in a Slack channel",
+				Description: "Edit an existing message. With a user OAuth token, only messages sent as that user can be updated.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -326,7 +326,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.delete_message",
 				Name:        "Delete Message",
-				Description: "Delete a message from a Slack channel",
+				Description: "Delete a message. With a user OAuth token, only messages that user may delete can be removed.",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
