@@ -302,18 +302,20 @@ func main() {
 	// Load external connectors from CONNECTORS_DIR (or ~/.permission_slip/connectors/).
 	loadExternalConnectors(registry, deps.DB)
 
-	// Built-in connectors with connectors/<id>/disabled are omitted from the registry
-	// above; purge their DB rows so list APIs stay consistent.
+	// Built-in connectors with connectors/<id>/disabled never register above, so the
+	// in-memory registry is already clean; purge any stale DB rows so list APIs stay consistent.
 	for _, id := range connectors.DisabledBuiltInConnectorIDs() {
-		registry.Remove(id)
 		if deps.DB == nil {
 			continue
 		}
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		err := db.DeleteConnectorByID(ctx, deps.DB, id)
+		n, err := db.DeleteConnectorByID(ctx, deps.DB, id)
 		cancel()
 		if err != nil {
 			log.Printf("Warning: failed to delete disabled connector %q from database: %v", id, err)
+			continue
+		}
+		if n == 0 {
 			continue
 		}
 		if msg := connectors.DisabledBuiltInConnectorReason(id); msg != "" {
