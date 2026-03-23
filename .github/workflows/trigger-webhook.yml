@@ -32,7 +32,7 @@ jobs:
             exit 1
           fi
 
-          ACTOR="@${{ github.actor }}"
+          ACTOR="@${GITHUB_ACTOR}"
 
           if [ -n "$MESSAGE_OVERRIDE" ]; then
             MESSAGE="permission-slip: ${MESSAGE_OVERRIDE}"
