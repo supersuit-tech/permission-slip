@@ -28,6 +28,7 @@ describe("RemoteSelectWidget", () => {
       isFetching: false,
       error: null,
       hasCredential: false,
+      isCredentialBindingPending: false,
       refetch: vi.fn(),
     });
 
@@ -53,13 +54,14 @@ describe("RemoteSelectWidget", () => {
     const onChange = vi.fn();
     mockUseCalendars.mockReturnValue({
       calendars: [
-        { id: "primary", summary: "Primary" },
+        { id: "primary", summary: "Primary", primary: true },
         { id: "work@x", summary: "Work" },
       ],
       isLoading: false,
       isFetching: false,
       error: null,
       hasCredential: true,
+      isCredentialBindingPending: false,
       refetch: vi.fn(),
     });
 
@@ -77,6 +79,7 @@ describe("RemoteSelectWidget", () => {
     const select = screen.getByTestId("remote-select-param-calendar_id");
     await user.selectOptions(select, "work@x");
     expect(onChange).toHaveBeenCalledWith("work@x");
+    expect(screen.getByRole("option", { name: /Primary \(primary\)/ })).toBeInTheDocument();
   });
 
   it("switches to manual entry on button click", async () => {
@@ -87,6 +90,7 @@ describe("RemoteSelectWidget", () => {
       isFetching: false,
       error: null,
       hasCredential: true,
+      isCredentialBindingPending: false,
       refetch: vi.fn(),
     });
 
@@ -105,5 +109,33 @@ describe("RemoteSelectWidget", () => {
     expect(
       screen.getByTestId("remote-select-manual-param-calendar_id"),
     ).toBeInTheDocument();
+  });
+
+  it("shows checking credentials while binding is loading", () => {
+    mockUseCalendars.mockReturnValue({
+      calendars: [],
+      isLoading: false,
+      isFetching: false,
+      error: null,
+      hasCredential: false,
+      isCredentialBindingPending: true,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(
+      <RemoteSelectWidget
+        inputId="param-calendar_id"
+        value=""
+        onChange={vi.fn()}
+        agentId={1}
+        connectorId="google"
+        ui={baseUi}
+      />,
+    );
+
+    expect(
+      screen.getByTestId("remote-select-binding-pending-param-calendar_id"),
+    ).toBeDisabled();
+    expect(screen.getByText("Checking credentials…")).toBeInTheDocument();
   });
 });

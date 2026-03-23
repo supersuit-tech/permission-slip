@@ -47,6 +47,21 @@ function readLabel(row: Record<string, unknown>, labelKey: string): string {
   return typeof id === "string" ? id : "";
 }
 
+function formatOptionLabel(
+  baseLabel: string,
+  row: Record<string, unknown>,
+): string {
+  if (row.primary === true) {
+    return baseLabel.includes("(primary)") ? baseLabel : `${baseLabel} (primary)`;
+  }
+  if (row.isDefaultCalendar === true) {
+    return baseLabel.includes("(default)")
+      ? baseLabel
+      : `${baseLabel} (default)`;
+  }
+  return baseLabel;
+}
+
 /**
  * Select populated from a session-authenticated API path, with manual entry fallback.
  */
@@ -62,8 +77,15 @@ export function RemoteSelectWidget({
   ui,
 }: RemoteSelectWidgetProps) {
   const [manual, setManual] = useState(false);
-  const { calendars, isLoading, isFetching, error, hasCredential } =
-    useAgentConnectorCalendars(agentId, connectorId);
+  const {
+    calendars,
+    isLoading,
+    isFetching,
+    error,
+    hasCredential,
+    isCredentialBindingPending,
+    refetch,
+  } = useAgentConnectorCalendars(agentId, connectorId);
 
   const { idKey, labelKey } = optionKeys(ui);
 
@@ -71,8 +93,9 @@ export function RemoteSelectWidget({
     const rows = calendars.map((row) => {
       const idRaw = row[idKey];
       const id = typeof idRaw === "string" ? idRaw : String(idRaw ?? "");
-      const label = readLabel(row, labelKey);
-      return { id, label: label || id };
+      const raw = readLabel(row, labelKey);
+      const base = raw || id;
+      return { id, label: formatOptionLabel(base, row) };
     });
     if (value && !rows.some((r) => r.id === value)) {
       return [{ id: value, label: value }, ...rows];
@@ -82,6 +105,8 @@ export function RemoteSelectWidget({
 
   const noCredentialText = ui.help_text?.trim() || DEFAULT_NO_CREDENTIAL;
   const selectDisabled = disabled || isLoading || isFetching;
+  const calendarsReady =
+    hasCredential && !isLoading && !isFetching && !error;
 
   if (manual) {
     return (
@@ -114,6 +139,23 @@ export function RemoteSelectWidget({
     );
   }
 
+  if (isCredentialBindingPending) {
+    return (
+      <div className="space-y-2">
+        <select
+          id={inputId}
+          value=""
+          disabled
+          aria-busy="true"
+          className={`border-input bg-muted ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none disabled:opacity-50${className ? ` ${className}` : ""}`}
+          data-testid={`remote-select-binding-pending-${inputId}`}
+        >
+          <option value="">Checking credentials…</option>
+        </select>
+      </div>
+    );
+  }
+
   if (!hasCredential) {
     return (
       <div className="space-y-2">
@@ -126,6 +168,16 @@ export function RemoteSelectWidget({
         >
           <option value="">{noCredentialText}</option>
         </select>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto px-0 text-xs"
+          disabled={disabled}
+          onClick={() => setManual(true)}
+        >
+          Enter calendar ID manually
+        </Button>
       </div>
     );
   }
@@ -134,7 +186,16 @@ export function RemoteSelectWidget({
     return (
       <div className="space-y-2">
         <p className="text-muted-foreground text-xs">
-          Could not load options.{" "}
+          Could not load calendars.{" "}
+          <button
+            type="button"
+            className="text-foreground underline"
+            disabled={disabled}
+            onClick={() => void refetch()}
+          >
+            Retry
+          </button>
+          {" · "}
           <button
             type="button"
             className="text-foreground underline"
@@ -155,6 +216,7 @@ export function RemoteSelectWidget({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         disabled={selectDisabled || disabled}
+        aria-busy={isLoading || isFetching ? "true" : undefined}
         className={`border-input bg-background ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50${className ? ` ${className}` : ""}`}
         data-testid={`remote-select-${inputId}`}
       >
@@ -167,6 +229,20 @@ export function RemoteSelectWidget({
           </option>
         ))}
       </select>
+
+      {calendarsReady && options.length === 0 && (
+        <p className="text-muted-foreground text-xs">
+          No calendars returned.{" "}
+          <button
+            type="button"
+            className="text-foreground underline"
+            disabled={disabled}
+            onClick={() => setManual(true)}
+          >
+            Enter a calendar ID manually
+          </button>
+        </p>
+      )}
 
       <Button
         type="button"

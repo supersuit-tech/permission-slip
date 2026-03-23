@@ -8,7 +8,8 @@ export type RemoteCalendarRow = Record<string, unknown>;
 export function useAgentConnectorCalendars(agentId: number, connectorId: string) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
-  const { binding } = useAgentConnectorCredential(agentId, connectorId);
+  const { binding, isCredentialBindingPending } =
+    useAgentConnectorCredential(agentId, connectorId);
 
   const hasCredential = !!(
     binding?.oauth_connection_id ?? binding?.credential_id
@@ -41,6 +42,7 @@ export function useAgentConnectorCalendars(agentId: number, connectorId: string)
     isFetching: query.isFetching,
     error: query.isError ? query.error : null,
     hasCredential,
+    isCredentialBindingPending,
     refetch: query.refetch,
   };
 }

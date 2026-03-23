@@ -33,6 +33,8 @@ export function useAgentConnectorCredential(
   return {
     binding: query.data ?? null,
     isLoading: query.isLoading,
+    /** True while the first credential binding fetch is in flight (avoids UI flash). */
+    isCredentialBindingPending: query.isPending,
     error: query.isError
       ? "Unable to load credential binding."
       : null,
@@ -84,6 +86,13 @@ export function useAssignAgentConnectorCredential() {
           variables.connectorId,
         ],
       });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "agent-connector-calendars",
+          variables.agentId,
+          variables.connectorId,
+        ],
+      });
     },
   });
 
@@ -126,6 +135,13 @@ export function useRemoveAgentConnectorCredential() {
       queryClient.invalidateQueries({
         queryKey: [
           "agent-connector-credential",
+          variables.agentId,
+          variables.connectorId,
+        ],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "agent-connector-calendars",
           variables.agentId,
           variables.connectorId,
         ],
