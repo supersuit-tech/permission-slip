@@ -55,6 +55,8 @@ type listChannelEntry struct {
 	Name       string `json:"name"`
 	User       string `json:"user,omitempty"`
 	IsPrivate  bool   `json:"is_private"`
+	IsIM       bool   `json:"is_im"`
+	IsMPIM     bool   `json:"is_mpim"`
 	IsArchived bool   `json:"is_archived"`
 	NumMembers int    `json:"num_members"`
 	Topic      struct {
@@ -84,7 +86,9 @@ type listChannelSummary struct {
 	NumMembers int    `json:"num_members"`
 }
 
-// Execute lists Slack channels visible to the bot.
+// Execute lists Slack channels visible to the bot, merged with the authorizing
+// user's DMs/group DMs/private channels from users.conversations when a user
+// token is present (so 1:1 DMs where the bot is not a member still appear).
 func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listChannelsParams
 	if err := parseAndValidate(req.Parameters, &params); err != nil {
@@ -112,6 +116,7 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 	// of returning an error. This preserves backward compatibility for callers
 	// that previously relied on the old public_channel-only default.
 	var userChannelIDs map[string]bool
+	var userPrivateMerge []listChannelEntry
 	if channelTypesIncludePrivate(types) {
 		if req.UserEmail == "" {
 			if explicitTypes {
@@ -135,9 +140,14 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 			// Only fetch memberships for private channel types — public channels
 			// are never filtered, so including them wastes API quota.
 			privateTypes := filterPrivateTypes(types)
-			userChannelIDs, err = a.conn.getUserChannelIDs(ctx, req.Credentials, slackUserID, privateTypes)
+			userPrivateChs, err := a.conn.getUserPrivateConversations(ctx, req.Credentials, slackUserID, privateTypes)
 			if err != nil {
 				return nil, fmt.Errorf("fetching user channel memberships: %w", err)
+			}
+			userPrivateMerge = userPrivateChs
+			userChannelIDs = make(map[string]bool, len(userPrivateChs))
+			for _, ch := range userPrivateChs {
+				userChannelIDs[ch.ID] = true
 			}
 		}
 	}
@@ -161,8 +171,9 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, mapSlackError(resp.Error)
 	}
 
+	seen := make(map[string]bool)
 	result := listChannelsResult{
-		Channels: make([]listChannelSummary, 0, len(resp.Channels)),
+		Channels: make([]listChannelSummary, 0, len(resp.Channels)+len(userPrivateMerge)),
 	}
 	for _, ch := range resp.Channels {
 		// For private channel types, filter to only channels the user is a member of.
@@ -172,6 +183,30 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 				continue
 			}
 		}
+		seen[ch.ID] = true
+		result.Channels = append(result.Channels, listChannelSummary{
+			ID:         ch.ID,
+			Name:       ch.Name,
+			User:       ch.User,
+			IsPrivate:  ch.IsPrivate,
+			Topic:      ch.Topic.Value,
+			Purpose:    ch.Purpose.Value,
+			NumMembers: ch.NumMembers,
+		})
+	}
+	// Add human-only DMs / MPIMs / private channels from users.conversations that
+	// conversations.list (bot token) did not return.
+	for _, ch := range userPrivateMerge {
+		if excludeArchived && ch.IsArchived {
+			continue
+		}
+		if !listChannelEntryMatchesTypes(types, ch) {
+			continue
+		}
+		if seen[ch.ID] {
+			continue
+		}
+		seen[ch.ID] = true
 		result.Channels = append(result.Channels, listChannelSummary{
 			ID:         ch.ID,
 			Name:       ch.Name,
@@ -187,4 +222,37 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	return connectors.JSONResult(result)
+}
+
+// listChannelEntryMatchesTypes returns whether ch should be included for the
+// given comma-separated conversations.list types string.
+func listChannelEntryMatchesTypes(types string, ch listChannelEntry) bool {
+	for _, raw := range strings.Split(types, ",") {
+		t := strings.TrimSpace(raw)
+		switch t {
+		case "im":
+			if ch.IsIM || (len(ch.ID) > 0 && ch.ID[0] == 'D') {
+				return true
+			}
+		case "mpim":
+			if ch.IsMPIM {
+				return true
+			}
+			// Fallback if API omits is_mpim: treat G-prefix non-DM as mpim (Slack encodes
+			// group DMs as G; legacy G-prefix private channels are rare and usually include is_mpim=false).
+			if len(ch.ID) > 0 && ch.ID[0] == 'G' && !ch.IsIM {
+				return true
+			}
+		case "private_channel":
+			// Private channels (C or legacy G) but not DMs or MPIMs — avoids treating
+			// is_private DMs as private_channel when only private_channel was requested.
+			if ch.IsIM || ch.IsMPIM {
+				break
+			}
+			if ch.IsPrivate && len(ch.ID) > 0 && (ch.ID[0] == 'C' || ch.ID[0] == 'G') {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -52,8 +52,9 @@ func (a *deleteMessageAction) Execute(ctx context.Context, req connectors.Action
 		TS:      params.TS,
 	}
 
+	creds := credentialsForChat(req.Credentials)
 	var resp deleteMessageResponse
-	if err := a.conn.doPost(ctx, "chat.delete", req.Credentials, body, &resp); err != nil {
+	if err := a.conn.doPost(ctx, "chat.delete", creds, body, &resp); err != nil {
 		return nil, err
 	}
 
