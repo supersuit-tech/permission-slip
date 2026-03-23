@@ -1634,49 +1634,6 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /v1/agents/{agent_id}/connectors/{connector_id}/calendars:
-    get:
-      operationId: listAgentConnectorCalendars
-      summary: List Calendars for Agent Connector
-      description: |
-        Returns calendars from the external provider (Google Calendar or Microsoft Graph) using
-        the credential bound to this agent+connector. Used by the dashboard to populate calendar
-        ID dropdowns when configuring actions.
-
-        Requires a credential assignment for the connector — the same binding used at action
-        execution time.
-      tags:
-        - Agents
-      security:
-        - SupabaseSession: []
-      parameters:
-        - $ref: '#/components/parameters/AgentId'
-        - $ref: '#/components/parameters/ConnectorId'
-      responses:
-        '200':
-          description: Calendars listed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/AgentConnectorCalendarListResponse'
-        '400':
-          description: Connector does not support calendar listing or validation error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: Agent not found, not owned by user, or connector not registered
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
   /v1/registration-invites:
     post:
       operationId: createRegistrationInvite
@@ -11641,48 +11598,6 @@ components:
           type: string
           description: OAuth connection ID to assign.
           example: oc_def456
-    UserCalendar:
-      type: object
-      required:
-        - id
-        - name
-        - is_primary
-      properties:
-        id:
-          type: string
-          description: |
-            Provider calendar identifier. For Google Calendar this may be `primary` or an
-            email-style calendar ID. For Microsoft Graph this is the calendar object ID.
-        name:
-          type: string
-          description: Human-readable calendar name.
-        description:
-          type: string
-          description: Optional subtitle (e.g. owner address for shared calendars).
-        is_primary:
-          type: boolean
-          description: True when this is the user's primary or default calendar.
-    AgentConnectorCalendarListResponse:
-      type: object
-      required:
-        - data
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/UserCalendar'
-          description: |
-            Calendars visible to the connected account, sorted for display. Used to populate
-            action configuration UI for Google and Microsoft calendar actions.
-      example:
-        data:
-          - id: primary
-            name: Primary
-            is_primary: true
-          - id: work@group.calendar.google.com
-            name: Team Calendar
-            description: work@example.com
-            is_primary: false
     RetentionMeta:
       type: object
       description: |
