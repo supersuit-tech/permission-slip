@@ -20,7 +20,7 @@ watch-poll.sh          — Deterministic polling loop (no AI needed)
   ├── Merges from main, detects conflicts
   ├── Parses PR body for unchecked Claude Code checklist items
   ├── Writes work-items.json when there's actionable work
-  └── Generates wrap-up comment from action-log.json on idle timeout
+  └── Generates wrap-up comment from action-log.json on idle timeout **or** when `--max-turns` is satisfied (see below)
 
 watch-post.sh          — Post-session tasks (no AI needed)
   ├── Triggers CI and audit workflows
@@ -87,7 +87,7 @@ The script handles:
 - Parsing the PR body for unchecked `### Claude Code` checklist items
 - Idle counter tracking (6 consecutive empty cycles = timeout)
 - Turn limit tracking (exits when `--max-turns` agent invocations reached)
-- Generating and posting the wrap-up comment on idle timeout
+- Generating and posting the wrap-up comment on idle timeout **or** at the **start** of the next poll after the turn counter reaches `--max-turns`
 
 ### Step 2: Check script output
 
@@ -122,6 +122,14 @@ The script communicates via stdout signals and exit codes:
 ```
 
 **Exit code 0 + `IDLE_TIMEOUT`**: The session ended due to inactivity or the `--max-turns` limit being reached. The script already posted the wrap-up comment (and recorded its id under `WORK_DIR` for later edits). Proceed to Step 5 (post-session / CI loop).
+
+#### Critical: `AGENT_NEEDED` is not the end of the session
+
+When the script prints **`AGENT_NEEDED`** and exits **0**, it has **not** posted the wrap-up and **has not** emitted `IDLE_TIMEOUT`. The orchestrator **must** run **Step 1 again** with the **same `--work-dir`** (and the **same** `--max-turns` if any) after finishing Step 3 — **unless** the user explicitly asked to stop mid-session.
+
+- **Why:** On an `AGENT_NEEDED` exit, `watch-poll.sh` increments `turns-count` in `WORK_DIR` and exits. The **next** invocation either (a) hits **idle** after empty poll cycles and posts wrap-up + `IDLE_TIMEOUT`, or (b) with **`--max-turns N`**, sees `turns-count >= N` **at the start** of that next run, posts wrap-up, then prints `IDLE_TIMEOUT` **immediately** (no extra agent work). Skipping that second poll is why wrap-up and **`watch-post.sh` never ran.
+
+- **`--max-turns 1`:** Expect **two** poll runs in the common case: first run → `AGENT_NEEDED` (do work); second run → `IDLE_TIMEOUT` (wrap-up posted) → **Step 5**.
 
 **Exit code 100**: Pre-poll merge conflict. The script detected conflicts before the polling loop started. Read `WORK_ITEMS_FILE` for conflict details and resolve them (see Step 3), then re-run the polling script.
 
@@ -359,6 +367,8 @@ Use **`ci_remediation`** / **`audit_remediation`** after each failed post-sessio
 After the agent finishes processing work items, go back to **Step 1** and run the polling script again. The script maintains state across invocations via temp files in its work directory.
 
 **Important**: Pass the same work directory to the script on subsequent runs so it preserves last-seen IDs and the action log. The script's `WORK_DIR` is printed in its session context output — capture it on the first run and reuse it.
+
+**Do not stop after one `AGENT_NEEDED`:** Keep looping Step 1 → (Step 2–3 only when needed) until Step 2 shows **`IDLE_TIMEOUT`**. Only then run **Step 5** (`watch-post.sh`). Stopping after a single agent turn is an orchestration failure, not a successful watch completion.
 
 ### Step 5: Post-session tasks — CI / audit loop until green
 
