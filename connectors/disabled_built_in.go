@@ -12,7 +12,7 @@ import (
 // seed the database, or appear in connector/OAuth listings. Add an empty file
 // at connectors/<connector_id>/disabled (this path is next to this .go file).
 //
-//go:embed kroger/disabled quickbooks/disabled salesforce/disabled
+//go:embed kroger/disabled quickbooks/disabled
 var disabledBuiltInMarkerFS embed.FS
 
 const disabledMarkerFile = "disabled"

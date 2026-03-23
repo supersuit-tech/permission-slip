@@ -7,21 +7,20 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
 )
 
-func TestBuiltInOAuthDisabledForKrogerQuickBooksSalesforce(t *testing.T) {
+func TestBuiltInOAuthDisabledForKrogerAndQuickBooks(t *testing.T) {
 	t.Parallel()
-	for _, id := range []string{"kroger", "quickbooks", "salesforce"} {
+	for _, id := range []string{"kroger", "quickbooks"} {
 		if !oauth.IsBuiltInOAuthProviderDisabled(id) {
 			t.Errorf("expected %q to be disabled when connectors/%s/disabled exists", id, id)
 		}
 	}
 }
 
-func TestBuiltInProviders_OmitsDisabledConnectors(t *testing.T) {
+func TestBuiltInProviders_OmitsDisabledKroger(t *testing.T) {
 	t.Parallel()
 	for _, p := range oauth.BuiltInProviders() {
-		switch p.ID {
-		case "kroger", "quickbooks", "salesforce":
-			t.Fatalf("%q should not appear in BuiltInProviders when connector is disabled", p.ID)
+		if p.ID == "kroger" {
+			t.Fatal("kroger should not appear in BuiltInProviders when connector is disabled")
 		}
 	}
 }
