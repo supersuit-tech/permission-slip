@@ -1,7 +1,6 @@
 package api
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 
@@ -59,7 +58,12 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		listAction := fmt.Sprintf("%s.list_calendar_events", connectorID)
+		listAction := lister.CalendarListCredentialActionType()
+		connErrCtx := ConnectorContext{
+			ConnectorID: connectorID,
+			ActionType:  listAction,
+			AgentID:     agentID,
+		}
 		reqCreds, err := db.GetRequiredCredentialsByActionType(r.Context(), deps.DB, listAction)
 		if err != nil {
 			log.Printf("[%s] ListAgentConnectorCalendars required creds: %v", TraceID(r.Context()), err)
@@ -70,7 +74,7 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 
 		creds, err := resolveCredentialsWithFallback(r.Context(), deps, agentID, userID, listAction, connectorID, reqCreds)
 		if err != nil {
-			if handleConnectorError(w, r, err, ConnectorContext{ConnectorID: connectorID}) {
+			if handleConnectorError(w, r, err, connErrCtx) {
 				return
 			}
 			log.Printf("[%s] ListAgentConnectorCalendars resolve creds: %v", TraceID(r.Context()), err)
@@ -80,7 +84,7 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 		}
 
 		if err := conn.ValidateCredentials(r.Context(), creds); err != nil {
-			if handleConnectorError(w, r, err, ConnectorContext{ConnectorID: connectorID}) {
+			if handleConnectorError(w, r, err, connErrCtx) {
 				return
 			}
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Credential validation failed"))
@@ -89,7 +93,7 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 
 		items, err := lister.ListCalendars(r.Context(), creds)
 		if err != nil {
-			if handleConnectorError(w, r, err, ConnectorContext{ConnectorID: connectorID}) {
+			if handleConnectorError(w, r, err, connErrCtx) {
 				return
 			}
 			log.Printf("[%s] ListCalendars: %v", TraceID(r.Context()), err)

@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
 import { inferWidgetFromProperty } from "@/lib/parameterSchema";
-import { RemoteSelectWidget } from "./RemoteSelectWidget";
+import { CalendarRemoteSelectWidget } from "./CalendarRemoteSelectWidget";
 
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
@@ -142,7 +142,7 @@ function RemoteSelectField({
     );
   }
   return (
-    <RemoteSelectWidget
+    <CalendarRemoteSelectWidget
       inputId={inputId}
       value={value}
       onChange={onChange}

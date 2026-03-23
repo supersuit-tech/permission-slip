@@ -17,6 +17,7 @@ export function useAgentConnectorCalendars(agentId: number, connectorId: string)
 
   const query = useQuery({
     queryKey: ["agent-connector-calendars", agentId, connectorId],
+    staleTime: 60_000,
     queryFn: async () => {
       if (!accessToken) throw new Error("Missing access token");
       const { data, error } = await client.GET(

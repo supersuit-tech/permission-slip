@@ -2,7 +2,7 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { renderWithProviders } from "../../../../test-helpers";
-import { RemoteSelectWidget } from "../RemoteSelectWidget";
+import { CalendarRemoteSelectWidget } from "../CalendarRemoteSelectWidget";
 
 vi.mock("../../../../lib/supabaseClient");
 
@@ -33,7 +33,7 @@ describe("RemoteSelectWidget", () => {
     });
 
     renderWithProviders(
-      <RemoteSelectWidget
+      <CalendarRemoteSelectWidget
         inputId="param-calendar_id"
         value=""
         onChange={vi.fn()}
@@ -66,7 +66,7 @@ describe("RemoteSelectWidget", () => {
     });
 
     renderWithProviders(
-      <RemoteSelectWidget
+      <CalendarRemoteSelectWidget
         inputId="param-calendar_id"
         value=""
         onChange={onChange}
@@ -95,7 +95,7 @@ describe("RemoteSelectWidget", () => {
     });
 
     renderWithProviders(
-      <RemoteSelectWidget
+      <CalendarRemoteSelectWidget
         inputId="param-calendar_id"
         value=""
         onChange={vi.fn()}
@@ -123,7 +123,7 @@ describe("RemoteSelectWidget", () => {
     });
 
     renderWithProviders(
-      <RemoteSelectWidget
+      <CalendarRemoteSelectWidget
         inputId="param-calendar_id"
         value=""
         onChange={vi.fn()}

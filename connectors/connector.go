@@ -124,5 +124,8 @@ type CalendarListItem struct {
 // user's calendars for UI configuration (session-authenticated proxy endpoints).
 type CalendarLister interface {
 	ListCalendars(ctx context.Context, creds Credentials) ([]CalendarListItem, error)
+	// CalendarListCredentialActionType is the connector_actions.action_type used
+	// to look up required credentials for this list call (must exist in the DB).
+	CalendarListCredentialActionType() string
 }
 

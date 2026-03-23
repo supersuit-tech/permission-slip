@@ -46,6 +46,11 @@ func (c *MicrosoftConnector) ListCalendars(ctx context.Context, creds connectors
 	return out, nil
 }
 
+// CalendarListCredentialActionType implements connectors.CalendarLister.
+func (c *MicrosoftConnector) CalendarListCredentialActionType() string {
+	return "microsoft.list_calendar_events"
+}
+
 // graphNextRelativePath turns an absolute @odata.nextLink into a path+query
 // relative to the connector base URL, or empty if parsing fails.
 func graphNextRelativePath(baseURL, nextLink string) string {

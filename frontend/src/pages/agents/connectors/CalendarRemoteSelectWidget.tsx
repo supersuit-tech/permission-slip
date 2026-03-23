@@ -4,7 +4,12 @@ import { Button } from "@/components/ui/button";
 import type { SchemaPropertyUI } from "@/lib/parameterSchema";
 import { useAgentConnectorCalendars } from "@/hooks/useAgentConnectorCalendars";
 
-export interface RemoteSelectWidgetProps {
+/**
+ * Calendar picker backed by GET .../calendars (agent-bound OAuth).
+ * The manifest uses x-ui.widget "remote-select"; this component is calendar-specific until
+ * a generic path-driven fetch exists.
+ */
+export interface CalendarRemoteSelectWidgetProps {
   inputId: string;
   value: string;
   onChange: (value: string) => void;
@@ -26,7 +31,7 @@ export interface RemoteSelectWidgetProps {
 const DEFAULT_NO_CREDENTIAL =
   "Connect a credential to select a calendar.";
 
-function optionKeys(ui: RemoteSelectWidgetProps["ui"]): {
+function optionKeys(ui: CalendarRemoteSelectWidgetProps["ui"]): {
   idKey: string;
   labelKey: string;
 } {
@@ -62,10 +67,7 @@ function formatOptionLabel(
   return baseLabel;
 }
 
-/**
- * Select populated from a session-authenticated API path, with manual entry fallback.
- */
-export function RemoteSelectWidget({
+export function CalendarRemoteSelectWidget({
   inputId,
   value,
   onChange,
@@ -75,7 +77,7 @@ export function RemoteSelectWidget({
   agentId,
   connectorId,
   ui,
-}: RemoteSelectWidgetProps) {
+}: CalendarRemoteSelectWidgetProps) {
   const [manual, setManual] = useState(false);
   const {
     calendars,
@@ -215,7 +217,7 @@ export function RemoteSelectWidget({
         id={inputId}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        disabled={selectDisabled || disabled}
+        disabled={selectDisabled}
         aria-busy={isLoading || isFetching ? "true" : undefined}
         className={`border-input bg-background ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:opacity-50${className ? ` ${className}` : ""}`}
         data-testid={`remote-select-${inputId}`}

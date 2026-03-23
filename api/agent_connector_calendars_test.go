@@ -38,6 +38,10 @@ func (s *stubCalendarConnector) ListCalendars(ctx context.Context, creds connect
 	}, nil
 }
 
+func (s *stubCalendarConnector) CalendarListCredentialActionType() string {
+	return s.id + ".list_calendar_events"
+}
+
 func decodeCalendarList(t *testing.T, body []byte) calendarListResponse {
 	t.Helper()
 	var resp calendarListResponse

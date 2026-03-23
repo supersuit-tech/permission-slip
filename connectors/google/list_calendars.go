@@ -16,9 +16,10 @@ func (c *GoogleConnector) ListCalendars(ctx context.Context, creds connectors.Cr
 	}
 
 	const pageSize = 250
+	const maxPages = 20
 	var out []connectors.CalendarListItem
 	var pageToken string
-	for {
+	for page := 0; page < maxPages; page++ {
 		q := url.Values{}
 		q.Set("maxResults", fmt.Sprintf("%d", pageSize))
 		if pageToken != "" {
@@ -54,9 +55,14 @@ func (c *GoogleConnector) ListCalendars(ctx context.Context, creds connectors.Cr
 			})
 		}
 		if payload.NextPageToken == "" {
-			break
+			return out, nil
 		}
 		pageToken = payload.NextPageToken
 	}
 	return out, nil
+}
+
+// CalendarListCredentialActionType implements connectors.CalendarLister.
+func (c *GoogleConnector) CalendarListCredentialActionType() string {
+	return "google.list_calendar_events"
 }
