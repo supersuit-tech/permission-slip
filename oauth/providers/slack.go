@@ -15,13 +15,10 @@ func init() {
 			AuthorizeURL: "https://slack.com/oauth/v2/authorize",
 			TokenURL:     "https://slack.com/api/oauth.v2.access",
 			Scopes:       slackconnector.OAuthScopes,
-			// Slack V2 OAuth requires comma-separated scopes instead of the
-			// standard space-separated format. User scopes (for endpoints
-			// like search.messages that require a user token) are passed via
-			// the separate "user_scope" parameter.
+			// Slack V2 OAuth requires comma-separated scopes. User-token-only
+			// apps request scopes via "user_scope" only (no bot "scope" param).
 			AuthorizeParams: map[string]string{
-				"scope":      strings.Join(slackconnector.OAuthScopes, ","),
-				"user_scope": strings.Join(slackconnector.OAuthUserScopes, ","),
+				"user_scope": strings.Join(slackconnector.OAuthScopes, ","),
 			},
 			ClientID:     os.Getenv("SLACK_CLIENT_ID"),
 			ClientSecret: os.Getenv("SLACK_CLIENT_SECRET"),

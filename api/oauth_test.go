@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
@@ -81,6 +82,31 @@ func oauthDeps(tx db.DBTX) *Deps {
 		Scopes:       []string{"read"},
 		Source:       oauth.SourceManifest,
 		// No client credentials
+	})
+	return &Deps{
+		DB:                tx,
+		Vault:             vault.NewMockVaultStore(),
+		SupabaseJWTSecret: testJWTSecret,
+		OAuthProviders:    reg,
+		OAuthStateSecret:  testOAuthStateSecret,
+		BaseURL:           "http://localhost:3000",
+	}
+}
+
+// oauthDepsWithSlack registers the Slack provider like production (user_scope only).
+func oauthDepsWithSlack(tx db.DBTX) *Deps {
+	reg := oauth.NewRegistry()
+	_ = reg.Register(oauth.Provider{
+		ID:           "slack",
+		AuthorizeURL: "https://slack.com/oauth/v2/authorize",
+		TokenURL:     "https://slack.com/api/oauth.v2.access",
+		Scopes:       slackconnector.OAuthScopes,
+		AuthorizeParams: map[string]string{
+			"user_scope": strings.Join(slackconnector.OAuthScopes, ","),
+		},
+		ClientID:     "test-slack-client-id",
+		ClientSecret: "test-slack-client-secret",
+		Source:       oauth.SourceBuiltIn,
 	})
 	return &Deps{
 		DB:                tx,
@@ -337,6 +363,42 @@ func TestOAuthAuthorize_Redirect(t *testing.T) {
 	}
 	if !strings.Contains(parsed.Query().Get("redirect_uri"), "/api/v1/oauth/google/callback") {
 		t.Errorf("expected callback URL in redirect_uri, got %s", parsed.Query().Get("redirect_uri"))
+	}
+}
+
+func TestOAuthAuthorize_Slack_NoBotScopeQueryParam(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDepsWithSlack(tx)
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/oauth/slack/authorize", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+	loc := w.Header().Get("Location")
+	if loc == "" {
+		t.Fatal("expected Location header")
+	}
+	parsed, err := url.Parse(loc)
+	if err != nil {
+		t.Fatalf("parse location: %v", err)
+	}
+	q := parsed.Query()
+	if _, hasScope := q["scope"]; hasScope {
+		t.Errorf("Slack authorize URL must not include bot \"scope\" query key; got scope=%q", q.Get("scope"))
+	}
+	if us := q.Get("user_scope"); us == "" {
+		t.Fatal("expected user_scope query param")
+	}
+	if !strings.Contains(us, "chat:write") {
+		t.Errorf("user_scope should include chat:write, got %q", us)
 	}
 }
 
@@ -804,7 +866,7 @@ func TestStoreOAuthTokens_CreateNew(t *testing.T) {
 		TokenType:    "Bearer",
 	}
 
-	_, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token, nil, "", "")
+	_, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token, nil, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}
@@ -843,7 +905,7 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, "", ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -860,7 +922,7 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID, ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -892,7 +954,7 @@ func TestStoreOAuthTokens_ReauthWithoutRefreshToken_PreservesOld(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, "", ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -914,7 +976,7 @@ func TestStoreOAuthTokens_ReauthWithoutRefreshToken_PreservesOld(t *testing.T) {
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID, ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -965,7 +1027,7 @@ func TestStoreOAuthTokens_ReauthWithNewRefreshToken_ReplacesOld(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, "", ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -982,7 +1044,7 @@ func TestStoreOAuthTokens_ReauthWithNewRefreshToken_ReplacesOld(t *testing.T) {
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token2, nil, conn1.ID, ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -1307,7 +1369,7 @@ func TestStoreOAuthTokens_WithStateExtra(t *testing.T) {
 	}
 
 	stateExtra := map[string]string{"shop_domain": "mystore.myshopify.com"}
-	_, err := storeOAuthTokens(t.Context(), deps, uid, "shopify", []string{"write_orders"}, token, stateExtra, "", "")
+	_, err := storeOAuthTokens(t.Context(), deps, uid, "shopify", []string{"write_orders"}, token, stateExtra, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}
@@ -1564,7 +1626,7 @@ func TestIsURLExtraKey(t *testing.T) {
 		want bool
 	}{
 		{"instance_url", true},
-		{"base_url", false},  // validated in fetchDocuSignUserInfo, not here
+		{"base_url", false}, // validated in fetchDocuSignUserInfo, not here
 		{"shop_domain", false},
 		{"account_id", false},
 	}
@@ -1818,7 +1880,7 @@ func TestStoreOAuthTokens_WithZendeskSubdomain(t *testing.T) {
 	}
 
 	stateExtra := map[string]string{"subdomain": "mycompany"}
-	_, err := storeOAuthTokens(t.Context(), deps, uid, "zendesk", []string{"read", "write"}, token, stateExtra, "", "")
+	_, err := storeOAuthTokens(t.Context(), deps, uid, "zendesk", []string{"read", "write"}, token, stateExtra, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}

@@ -144,11 +144,11 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 // resolvedPaymentMethod holds the validated payment method state between
 // validation (pre-execution) and transaction recording (post-execution).
 type resolvedPaymentMethod struct {
-	paymentMethodID      string
+	paymentMethodID       string
 	stripePaymentMethodID string
-	brand                string
-	last4                string
-	amount               int
+	brand                 string
+	last4                 string
+	amount                int
 }
 
 // validatePaymentMethod validates the payment method, enforces ownership and
@@ -404,20 +404,10 @@ func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OA
 		}
 	}
 
-	// Resolve the user access token from vault if present (e.g. Slack OAuth v2
-	// stores both a bot token and a user token). The vault ID is stored in
-	// extra_data and must not leak into the credential map.
-	if userVaultID, ok := creds[userTokenVaultIDKey]; ok {
-		delete(creds, userTokenVaultIDKey)
-		userTokenBytes, readErr := deps.Vault.ReadSecret(ctx, deps.DB, userVaultID)
-		if readErr != nil {
-			// Log but don't fail — the user token is optional for most actions.
-			// Actions that require it (e.g. search_messages) will return a clear
-			// error when the credential is missing.
-			log.Printf("failed to read user access token from vault %s: %v", userVaultID, readErr)
-		} else {
-			creds["user_access_token"] = string(userTokenBytes)
-		}
+	// Legacy Slack connections stored user_access_token_vault_id in extra_data.
+	// User-token-only OAuth uses a single vault secret; never expose the old key as a credential.
+	if conn.Provider == "slack" {
+		delete(creds, "user_access_token_vault_id")
 	}
 
 	// Set access_token AFTER merging extra_data so that a tampered extra_data
@@ -531,5 +521,3 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 
 	return nil
 }
-
-

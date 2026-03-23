@@ -18,12 +18,9 @@ import (
 )
 
 const (
-	defaultBaseURL           = "https://slack.com/api"
-	defaultTimeout           = 30 * time.Second
-	credKeyAccessToken       = "access_token"
-	credKeyUserAccessToken   = "user_access_token"
-	credKeyBotToken          = "bot_token"
-	botTokenPrefix           = "xoxb-"
+	defaultBaseURL     = "https://slack.com/api"
+	defaultTimeout     = 30 * time.Second
+	credKeyAccessToken = "access_token"
 
 	// defaultRetryAfter is used when the Slack API returns a rate limit
 	// response without a Retry-After header (or an unparseable one).
@@ -36,53 +33,32 @@ const (
 	maxResponseBytes = 10 << 20 // 10 MB
 )
 
-// OAuthScopes is the canonical list of bot-level OAuth scopes required by
-// Slack connector actions. These are requested via the "scope" parameter in
-// the Slack OAuth v2 authorization URL and result in a bot token (xoxb-).
-//
-// Note: search:read.* scopes have been moved to OAuthUserScopes because
-// Slack's search.messages endpoint only supports user tokens (xoxp-).
+// OAuthScopes is the canonical list of user-level OAuth scopes for Slack.
+// These are requested via the "user_scope" parameter in the Slack OAuth v2
+// authorization URL (no bot "scope" param). The resulting user token (xoxp-)
+// is stored as the connection's primary access_token.
 var OAuthScopes = []string{
 	"channels:history",
-	"channels:join",
-	"channels:manage",
 	"channels:read",
+	"channels:write",
+	"channels:write.topic",
 	"chat:write",
+	"files:read",
 	"files:write",
 	"groups:history",
 	"groups:read",
+	"groups:write",
 	"im:history",
 	"im:read",
 	"im:write",
 	"mpim:history",
 	"mpim:read",
 	"mpim:write",
+	"reactions:read",
 	"reactions:write",
+	"search:read",
 	"users:read",
 	"users:read.email",
-}
-
-// OAuthUserScopes is the list of user-level OAuth scopes requested via the
-// "user_scope" parameter in the Slack OAuth v2 authorization URL. These
-// result in a user token (xoxp-) returned in the authed_user field of the
-// OAuth response. Scope groups are labeled inline below.
-var OAuthUserScopes = []string{
-	// Search (search.messages does not accept bot tokens)
-	"search:read.public",
-	"search:read.private",
-	"search:read.im",
-	"search:read.mpim",
-	"search:read.files",
-	// Chat actions as the authorizing user
-	"chat:write",
-	// DM/MPIM history (conversations.history / conversations.replies on user token)
-	"im:history",
-	"mpim:history",
-	// users.conversations — list DMs / private convos the bot is not in
-	"channels:read",
-	"groups:read",
-	"im:read",
-	"mpim:read",
 }
 
 // SlackConnector owns the shared HTTP client and base URL used by all
@@ -134,23 +110,13 @@ func (c *SlackConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks that the provided credentials contain either a
-// non-empty access_token (OAuth) or a bot_token with the xoxb- prefix.
-// OAuth access tokens are accepted without format validation since they are
-// managed by the platform's OAuth infrastructure.
+// ValidateCredentials checks that the provided credentials contain a non-empty
+// access_token (Slack user OAuth token from the platform).
 func (c *SlackConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
-	// Prefer access_token (OAuth path).
 	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
 		return nil
 	}
-	// Fall back to bot_token (legacy path).
-	if token, ok := creds.Get(credKeyBotToken); ok && token != "" {
-		if len(token) < len(botTokenPrefix) || token[:len(botTokenPrefix)] != botTokenPrefix {
-			return &connectors.ValidationError{Message: "bot_token must start with \"xoxb-\""}
-		}
-		return nil
-	}
-	return &connectors.ValidationError{Message: "missing required credential: access_token or bot_token"}
+	return &connectors.ValidationError{Message: "missing required credential: access_token"}
 }
 
 // slackResponse is the common envelope for Slack Web API responses.
@@ -261,46 +227,12 @@ func validateLimit(limit int) error {
 	return nil
 }
 
-// getToken extracts the auth token from credentials, preferring access_token
-// (OAuth) over bot_token (legacy). Both token types use Bearer auth with the
-// Slack API.
+// getToken extracts the Slack user OAuth access_token from credentials.
 func (c *SlackConnector) getToken(creds connectors.Credentials) (string, error) {
 	if token, ok := creds.Get(credKeyAccessToken); ok && token != "" {
 		return token, nil
 	}
-	if token, ok := creds.Get(credKeyBotToken); ok && token != "" {
-		return token, nil
-	}
-	return "", &connectors.ValidationError{Message: "credential is missing: access_token or bot_token"}
-}
-
-// credentialsForChat returns credentials for Slack chat.* and conversations.open
-// calls: when user_access_token is set (OAuth user token / xoxp-), it is swapped
-// into access_token so doPost posts as the authorizing user; otherwise the
-// original credentials are used (bot token path).
-func credentialsForChat(creds connectors.Credentials) connectors.Credentials {
-	if userToken, ok := creds.Get(credKeyUserAccessToken); ok && userToken != "" {
-		return connectors.NewCredentials(map[string]string{credKeyAccessToken: userToken})
-	}
-	return creds
-}
-
-// credentialsForUserTokenIfDirectOrGroupDM selects the user OAuth token for API
-// calls scoped to a DM (D…) or group DM (G…) when user_access_token is present.
-// The bot is often not a member of the user’s 1:1 and MPIM conversations, so
-// conversations.members and conversations.history fail with the bot token even
-// when the authorizing human is a participant.
-func credentialsForUserTokenIfDirectOrGroupDM(creds connectors.Credentials, channelID string) connectors.Credentials {
-	if channelID == "" {
-		return creds
-	}
-	switch channelID[0] {
-	case 'D', 'G':
-		if userToken, ok := creds.Get(credKeyUserAccessToken); ok && userToken != "" {
-			return connectors.NewCredentials(map[string]string{credKeyAccessToken: userToken})
-		}
-	}
-	return creds
+	return "", &connectors.ValidationError{Message: "credential is missing: access_token"}
 }
 
 // doPost is the shared request lifecycle for all Slack actions. It marshals
@@ -408,9 +340,9 @@ func mapSlackError(slackErr string) error {
 	case "not_authed", "invalid_auth", "token_revoked", "token_expired", "account_inactive":
 		return &connectors.AuthError{Message: fmt.Sprintf("Slack auth error: %s", slackErr)}
 	case "missing_scope":
-		return &connectors.AuthError{Message: "Slack token is missing a required OAuth scope — if posting as yourself, re-authorize the Slack connection so your user token includes chat:write; otherwise check bot scopes at https://api.slack.com/apps"}
+		return &connectors.AuthError{Message: "Slack token is missing a required OAuth scope — re-authorize the Slack connection at https://api.slack.com/apps"}
 	case "not_allowed_token_type":
-		return &connectors.AuthError{Message: "Slack rejected this request for the token type in use — reconnect Slack or use an action that supports your current token (user vs bot)"}
+		return &connectors.AuthError{Message: "Slack rejected this request for the token type in use — reconnect Slack"}
 
 	// Rate limiting
 	case "ratelimited":
@@ -418,9 +350,9 @@ func mapSlackError(slackErr string) error {
 
 	// Channel errors
 	case "channel_not_found":
-		return &connectors.ExternalError{StatusCode: 200, Message: "Slack channel not found — verify the channel ID exists and the bot has access"}
+		return &connectors.ExternalError{StatusCode: 200, Message: "Slack channel not found — verify the channel ID exists and you have access"}
 	case "not_in_channel":
-		return &connectors.ExternalError{StatusCode: 200, Message: "bot is not a member of this channel — invite the bot first"}
+		return &connectors.ExternalError{StatusCode: 200, Message: "you are not a member of this channel"}
 	case "is_archived":
 		return &connectors.ExternalError{StatusCode: 200, Message: "cannot perform this action on an archived channel"}
 
@@ -434,7 +366,7 @@ func mapSlackError(slackErr string) error {
 	case "already_in_channel":
 		return &connectors.ExternalError{StatusCode: 200, Message: "one or more users are already members of this channel"}
 	case "cant_invite_self":
-		return &connectors.ExternalError{StatusCode: 200, Message: "the bot cannot invite itself to a channel"}
+		return &connectors.ExternalError{StatusCode: 200, Message: "you cannot invite yourself to a channel"}
 	case "user_not_found":
 		return &connectors.ExternalError{StatusCode: 200, Message: "one or more user IDs were not found — verify the user IDs are correct"}
 
@@ -442,11 +374,11 @@ func mapSlackError(slackErr string) error {
 	case "message_not_found":
 		return &connectors.ExternalError{StatusCode: 200, Message: "message not found — verify the channel ID and message timestamp are correct"}
 	case "cant_delete_message":
-		return &connectors.ExternalError{StatusCode: 200, Message: "cannot delete this message — bots can only delete their own messages"}
+		return &connectors.ExternalError{StatusCode: 200, Message: "cannot delete this message — you can only delete your own messages"}
 	case "edit_window_closed":
 		return &connectors.ExternalError{StatusCode: 200, Message: "the message editing window has closed — messages can only be edited within a limited time"}
 	case "cant_update_message":
-		return &connectors.ExternalError{StatusCode: 200, Message: "cannot update this message — bots can only edit their own messages"}
+		return &connectors.ExternalError{StatusCode: 200, Message: "cannot update this message — you can only edit your own messages"}
 
 	// Message errors
 	case "time_in_past":

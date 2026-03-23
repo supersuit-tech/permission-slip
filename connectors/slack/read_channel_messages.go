@@ -67,9 +67,8 @@ func (a *readChannelMessagesAction) Execute(ctx context.Context, req connectors.
 		body.Limit = 20
 	}
 
-	historyCreds := credentialsForUserTokenIfDirectOrGroupDM(req.Credentials, params.Channel)
 	var resp messagesResponse
-	if err := a.conn.doPost(ctx, "conversations.history", historyCreds, body, &resp); err != nil {
+	if err := a.conn.doPost(ctx, "conversations.history", req.Credentials, body, &resp); err != nil {
 		return nil, err
 	}
 

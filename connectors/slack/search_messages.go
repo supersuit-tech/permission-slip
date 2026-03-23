@@ -10,11 +10,7 @@ import (
 // searchMessagesAction implements connectors.Action for slack.search_messages.
 // It searches messages across channels via POST /search.messages.
 //
-// This Slack endpoint requires a user token (xoxp-) with the search:read.*
-// scopes. Bot tokens (xoxb-) do NOT support search.messages. The action
-// automatically uses the user_access_token credential (populated by the Slack
-// OAuth v2 flow) when available, falling back to the default access_token
-// with a clear error if search fails due to missing permissions.
+// This Slack endpoint requires a user token (xoxp-) with search:read.
 type searchMessagesAction struct {
 	conn *SlackConnector
 }
@@ -136,13 +132,8 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		body.Page = 1
 	}
 
-	// Use the user access token for search (bot tokens don't support search.messages).
-	// If no user token is available, fall back to the default token — the Slack API
-	// will return a clear permission error.
-	creds := credentialsForChat(req.Credentials)
-
 	var resp searchMessagesResponse
-	if err := a.conn.doPost(ctx, "search.messages", creds, body, &resp); err != nil {
+	if err := a.conn.doPost(ctx, "search.messages", req.Credentials, body, &resp); err != nil {
 		return nil, err
 	}
 

@@ -9,6 +9,9 @@
 //     and creates an oauth_connections row
 //  6. Server redirects to /settings?oauth_status=success (or error)
 //
+// Slack uses user-token-only OAuth: the callback requires authed_user.access_token
+// and rejects exchanges that only return a bot token (misconfigured Slack app).
+//
 // Security:
 //   - CSRF protection via signed JWT state tokens (HS256, 10-min TTL)
 //   - State encodes user ID + provider to prevent session fixation
@@ -460,6 +463,13 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			cfg.Scopes = deduplicateScopes(append(cfg.Scopes, extraScopes...))
 		}
 
+		// Slack user-token-only OAuth: scopes are sent as user_scope via
+		// AuthorizeParams; the oauth2 library must not add a bot "scope" query param.
+		storedOAuthScopes := cfg.Scopes
+		if providerID == "slack" {
+			cfg.Scopes = nil
+		}
+
 		// Create the CSRF state token after computing the final scope list so
 		// the callback can store exactly which scopes were requested.
 		returnTo := r.URL.Query().Get("return_to")
@@ -470,7 +480,7 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		// Optional: replace an existing connection instead of creating alongside.
 		replaceID := r.URL.Query().Get("replace")
 		profile := Profile(r.Context())
-		state, err := createOAuthState(deps, profile.ID, providerID, cfg.Scopes, instanceID, returnTo, replaceID)
+		state, err := createOAuthState(deps, profile.ID, providerID, storedOAuthScopes, instanceID, returnTo, replaceID)
 		if err != nil {
 			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -605,13 +615,19 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Slack-specific: extract the user access token from the OAuth v2
-		// response. Slack returns both a bot token (access_token) and a user
-		// token (authed_user.access_token). The user token is needed for
-		// endpoints like search.messages that don't support bot tokens.
-		var userAccessToken string
+		// Slack user-token-only OAuth: the Web API user token is nested under
+		// authed_user.access_token; promote it to the primary access_token we
+		// store and use for all connector actions. If Slack omits it, the app
+		// is likely still configured for bot scopes only — fail with a clear
+		// message instead of storing a bot token the connector cannot use.
 		if providerID == "slack" {
-			userAccessToken = extractSlackUserToken(token)
+			if oauth.SlackAuthedUserAccessToken(token) == "" {
+				redirectToFrontend(w, r, deps, providerID, "error",
+					"Slack did not return a user OAuth token. In your Slack app settings, add the required User Token Scopes, remove Bot Token Scopes from the install flow, then connect again.",
+					state.ReturnTo, "")
+				return
+			}
+			token = oauth.NormalizeSlackUserOAuthToken(token)
 		}
 
 		// Store tokens in vault within a transaction. Use scopes from the
@@ -674,12 +690,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 
 		// Run best-effort email enrichers (fetches user email from provider
 		// userinfo endpoints). Failures are logged but don't block the flow.
-		// For Slack, the OIDC userinfo endpoint requires the user token (not
-		// the bot token returned as the primary access_token).
 		enricherToken := token.AccessToken
-		if providerID == "slack" && userAccessToken != "" {
-			enricherToken = userAccessToken
-		}
 		if softExtra := runSoftEnrichers(ctx, providerID, enricherToken); softExtra != nil {
 			if stateExtraData == nil {
 				stateExtraData = make(map[string]string)
@@ -694,7 +705,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		connID, err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData, state.ReplaceID, userAccessToken)
+		connID, err := storeOAuthTokens(r.Context(), deps, profile.ID, providerID, storedScopes, token, stateExtraData, state.ReplaceID)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: store tokens: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -718,12 +729,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 // replaceID, if non-empty, is the ID of an existing connection to replace.
 // When set, only that specific connection is deleted. When empty, a new
 // connection is created alongside any existing ones for the same provider.
-//
-// userAccessToken, if non-empty, is a user-level access token returned by
-// providers that issue both bot and user tokens (e.g. Slack OAuth v2). It
-// is stored in a separate vault secret and its vault ID is persisted in
-// extra_data as "user_access_token_vault_id" for resolution at execution time.
-func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string, replaceID string, userAccessToken string) (string, error) {
+func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string, replaceID string) (string, error) {
 	tx, owned, err := db.BeginOrContinue(ctx, deps.DB)
 	if err != nil {
 		return "", fmt.Errorf("begin tx: %w", err)
@@ -784,16 +790,6 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		}
 	}
 
-	// Clean up old user access token vault secret from the replaced connection.
-	if oldConn != nil {
-		if oldUserVaultID := userTokenVaultIDFromExtraData(oldConn.ExtraData); oldUserVaultID != "" {
-			if err := deps.Vault.DeleteSecret(ctx, tx, oldUserVaultID); err != nil {
-				log.Printf("[%s] storeOAuthTokens: failed to delete old user access token vault secret %q: %v", TraceID(ctx), oldUserVaultID, err)
-				// Non-fatal: orphaned vault secrets are cleaned up eventually.
-			}
-		}
-	}
-
 	connID, err := generatePrefixedID("oconn_", 16)
 	if err != nil {
 		return "", fmt.Errorf("generate connection ID: %w", err)
@@ -822,19 +818,6 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 	var tokenExpiry *time.Time
 	if !token.Expiry.IsZero() {
 		tokenExpiry = &token.Expiry
-	}
-
-	// Store the user access token in vault if provided (e.g. Slack OAuth v2).
-	// The vault ID is persisted in extra_data and resolved at execution time.
-	if userAccessToken != "" {
-		userVaultID, vaultErr := deps.Vault.CreateSecret(ctx, tx, connID+"_user_access", []byte(userAccessToken))
-		if vaultErr != nil {
-			return "", fmt.Errorf("vault create user access token: %w", vaultErr)
-		}
-		if stateExtra == nil {
-			stateExtra = make(map[string]string)
-		}
-		stateExtra[userTokenVaultIDKey] = userVaultID
 	}
 
 	// Extract provider-specific extra data from the token response.
@@ -1184,14 +1167,6 @@ func handleDeleteOAuthConnection(deps *Deps) http.HandlerFunc {
 				return
 			}
 		}
-		// Clean up user access token vault secret if present (e.g. Slack).
-		if userVaultID := userTokenVaultIDFromExtraData(conn.ExtraData); userVaultID != "" {
-			if err := deps.Vault.DeleteSecret(r.Context(), tx, userVaultID); err != nil {
-				log.Printf("[%s] DeleteOAuthConnection: vault delete user access token: %v", TraceID(r.Context()), err)
-				// Non-fatal: the connection row is already deleted. Log and continue.
-			}
-		}
-
 		if owned {
 			if err := db.CommitTx(r.Context(), tx); err != nil {
 				log.Printf("[%s] DeleteOAuthConnection: commit: %v", TraceID(r.Context()), err)
@@ -1251,23 +1226,6 @@ func redirectToFrontend(w http.ResponseWriter, r *http.Request, deps *Deps, prov
 	http.Redirect(w, r, parsedURL.String(), http.StatusTemporaryRedirect)
 }
 
-// userTokenVaultIDKey is the extra_data key used to store the vault secret ID
-// for a user-level access token (e.g., Slack's authed_user.access_token).
-const userTokenVaultIDKey = "user_access_token_vault_id"
-
-// extractSlackUserToken extracts the user access token from a Slack OAuth v2
-// token response. Slack returns both a bot token (the primary access_token)
-// and a user token nested under authed_user.access_token. Returns "" if the
-// user token is not present in the response.
-func extractSlackUserToken(token *oauth2.Token) string {
-	authedUser, ok := token.Extra("authed_user").(map[string]any)
-	if !ok {
-		return ""
-	}
-	userToken, _ := authedUser["access_token"].(string)
-	return userToken
-}
-
 // extractSlackTeamName extracts the workspace name from a Slack OAuth v2
 // token response. The team object is always present in a successful response.
 func extractSlackTeamName(token *oauth2.Token) string {
@@ -1277,17 +1235,4 @@ func extractSlackTeamName(token *oauth2.Token) string {
 	}
 	name, _ := team["name"].(string)
 	return name
-}
-
-// userTokenVaultIDFromExtraData extracts the user access token vault ID from
-// an OAuth connection's extra_data JSON. Returns "" if not present.
-func userTokenVaultIDFromExtraData(extraData json.RawMessage) string {
-	if len(extraData) == 0 {
-		return ""
-	}
-	var extra map[string]string
-	if err := json.Unmarshal(extraData, &extra); err != nil {
-		return ""
-	}
-	return extra[userTokenVaultIDKey]
 }

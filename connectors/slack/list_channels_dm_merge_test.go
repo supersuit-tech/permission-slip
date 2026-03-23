@@ -36,10 +36,10 @@ func TestListChannels_MergesHumanDMNotVisibleToBot(t *testing.T) {
 				},
 			})
 		case "/conversations.list":
-			if got := r.Header.Get("Authorization"); got != "Bearer xoxb-bot" {
-				t.Errorf("conversations.list: expected bot token, got %q", got)
+			if got := r.Header.Get("Authorization"); got != "Bearer xoxp-user" {
+				t.Errorf("conversations.list: expected user token, got %q", got)
 			}
-			// Bot is not in the human-to-human DM — only public channel.
+			// User token list may omit a human-to-human DM — only public channel here.
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
 				"channels": []map[string]any{
@@ -56,8 +56,7 @@ func TestListChannels_MergesHumanDMNotVisibleToBot(t *testing.T) {
 	action := &listChannelsAction{conn: conn}
 	params, _ := json.Marshal(listChannelsParams{Types: "public_channel,im"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{

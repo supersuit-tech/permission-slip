@@ -226,8 +226,8 @@ func TestExecuteConnectorAction_OAuthPath_Success(t *testing.T) {
 	f := setupOAuthExecutionTest(t, oauthExecOpts{
 		OnExec: func(creds connectors.Credentials) { capturedCreds = creds },
 		Connection: &testhelper.OAuthConnectionOpts{
-			Scopes:  []string{"https://www.googleapis.com/auth/gmail.send"},
-			Status:  "active",
+			Scopes: []string{"https://www.googleapis.com/auth/gmail.send"},
+			Status: "active",
 		},
 	})
 
@@ -1563,5 +1563,50 @@ func TestHandleConnectorError_PaymentError_InvalidAmount(t *testing.T) {
 	}
 	if code, _ := errObj["code"].(string); code != string(ErrInvalidRequest) {
 		t.Errorf("expected error code %q, got %q", ErrInvalidRequest, code)
+	}
+}
+
+func TestCredentialsFromOAuthConnection_SlackStripsLegacyUserVaultKey(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	v := vault.NewMockVaultStore()
+	vaultID := "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
+	v.SeedSecretForTest(vaultID, []byte("xoxp-secret"))
+
+	connID := testhelper.GenerateID(t, "oconn_")
+	extra := []byte(`{"user_access_token_vault_id":"should-not-leak","team_name":"Acme"}`)
+	testhelper.InsertOAuthConnectionFull(t, tx, connID, uid, "slack", testhelper.OAuthConnectionOpts{
+		AccessTokenVaultID: vaultID,
+		Scopes:             []string{"chat:write"},
+		ExtraData:          extra,
+	})
+
+	conn, err := db.GetOAuthConnectionByProvider(t.Context(), tx, uid, "slack")
+	if err != nil {
+		t.Fatalf("get connection: %v", err)
+	}
+	if conn == nil {
+		t.Fatal("expected oauth connection")
+	}
+
+	deps := &Deps{DB: tx, Vault: v}
+	creds, err := credentialsFromOAuthConnection(t.Context(), deps, conn)
+	if err != nil {
+		t.Fatalf("credentialsFromOAuthConnection: %v", err)
+	}
+
+	if _, ok := creds.Get("user_access_token_vault_id"); ok {
+		t.Error("legacy user_access_token_vault_id must not be passed to connectors for Slack")
+	}
+	team, _ := creds.Get("team_name")
+	if team != "Acme" {
+		t.Errorf("team_name = %q, want Acme", team)
+	}
+	tok, _ := creds.Get("access_token")
+	if tok != "xoxp-secret" {
+		t.Errorf("access_token = %q, want xoxp-secret", tok)
 	}
 }
