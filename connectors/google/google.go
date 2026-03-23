@@ -123,11 +123,6 @@ func newCalendarForTest(client *http.Client, calendarBaseURL string) *GoogleConn
 	}
 }
 
-// NewCalendarForTest is the exported test helper for calendar-only Google API calls.
-func NewCalendarForTest(client *http.Client, calendarBaseURL string) *GoogleConnector {
-	return newCalendarForTest(client, calendarBaseURL)
-}
-
 // newGmailForTest creates a GoogleConnector with only gmailBaseURL set,
 // for Gmail action tests.
 func newGmailForTest(client *http.Client, gmailBaseURL string) *GoogleConnector {
