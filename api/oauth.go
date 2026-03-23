@@ -252,8 +252,9 @@ func newOAuth2Config(deps *Deps, provider oauth.Provider) *oauth2.Config {
 		ClientID:     provider.ClientID,
 		ClientSecret: provider.ClientSecret,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  provider.AuthorizeURL,
-			TokenURL: provider.TokenURL,
+			AuthURL:   provider.AuthorizeURL,
+			TokenURL:  provider.TokenURL,
+			AuthStyle: provider.AuthStyle,
 		},
 		RedirectURL: oauthCallbackURL(deps, provider.ID),
 		Scopes:      scopes,

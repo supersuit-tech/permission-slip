@@ -24,6 +24,8 @@ import (
 	"sort"
 	"sync"
 	"time"
+
+	"golang.org/x/oauth2"
 )
 
 // Provider holds the configuration for an OAuth 2.0 provider. Built-in
@@ -59,6 +61,13 @@ type Provider struct {
 	// set (e.g. Atlassian needs audience=api.atlassian.com for 3LO, Slack needs
 	// comma-separated scopes via a "scope" override).
 	AuthorizeParams map[string]string
+
+	// AuthStyle specifies how the token endpoint expects client credentials.
+	// Zero value (AuthStyleAutoDetect) tries Basic auth first, then falls back
+	// to POST body params on HTTP 401. Providers whose token endpoints return
+	// HTTP 200 for errors (e.g. Slack) must set AuthStyleInParams explicitly,
+	// because auto-detect never sees a 401 and never retries.
+	AuthStyle oauth2.AuthStyle
 
 	// Source indicates where the provider configuration originated.
 	Source ProviderSource

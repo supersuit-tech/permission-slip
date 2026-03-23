@@ -32,7 +32,8 @@ func RefreshTokens(ctx context.Context, provider Provider, refreshToken string) 
 		ClientID:     provider.ClientID,
 		ClientSecret: provider.ClientSecret,
 		Endpoint: oauth2.Endpoint{
-			TokenURL: provider.TokenURL,
+			TokenURL:  provider.TokenURL,
+			AuthStyle: provider.AuthStyle,
 		},
 	}
 
