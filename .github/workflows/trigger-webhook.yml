@@ -32,14 +32,16 @@ jobs:
             exit 1
           fi
 
+          ACTOR="@${{ github.actor }}"
+
           if [ -n "$MESSAGE_OVERRIDE" ]; then
             MESSAGE="permission-slip: ${MESSAGE_OVERRIDE}"
           elif [ -n "$PR_URL" ] && [ -n "$PR_TITLE" ]; then
-            MESSAGE="permission-slip: ${PR_TITLE} — ${PR_URL}"
+            MESSAGE="permission-slip: ${ACTOR} — ${PR_TITLE} — ${PR_URL}"
           elif [ -n "$PR_URL" ]; then
-            MESSAGE="permission-slip: PR needs attention — ${PR_URL}"
+            MESSAGE="permission-slip: ${ACTOR} — PR needs attention — ${PR_URL}"
           else
-            MESSAGE="permission-slip: @${{ github.actor }} needs your attention"
+            MESSAGE="permission-slip: ${ACTOR} needs your attention"
           fi
 
           PAYLOAD=$(jq -n --arg msg "$MESSAGE" --arg secret "$NOTIFY_WEBHOOK_SECRET" \
