@@ -116,7 +116,7 @@ func TestUpdateMessage_PrefersUserAccessToken(t *testing.T) {
 	action := &updateMessageAction{conn: conn}
 	params, _ := json.Marshal(updateMessageParams{Channel: "C01234567", TS: "1.0", Message: "x"})
 	creds := connectors.NewCredentials(map[string]string{
-		"bot_token":         "xoxb-bot",
+		"access_token":      "xoxb-bot",
 		"user_access_token": "xoxp-user",
 	})
 

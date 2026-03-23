@@ -55,6 +55,8 @@ type listChannelEntry struct {
 	Name       string `json:"name"`
 	User       string `json:"user,omitempty"`
 	IsPrivate  bool   `json:"is_private"`
+	IsIM       bool   `json:"is_im"`
+	IsMPIM     bool   `json:"is_mpim"`
 	IsArchived bool   `json:"is_archived"`
 	NumMembers int    `json:"num_members"`
 	Topic      struct {
@@ -229,15 +231,25 @@ func listChannelEntryMatchesTypes(types string, ch listChannelEntry) bool {
 		t := strings.TrimSpace(raw)
 		switch t {
 		case "im":
-			if len(ch.ID) > 0 && ch.ID[0] == 'D' {
+			if ch.IsIM || (len(ch.ID) > 0 && ch.ID[0] == 'D') {
 				return true
 			}
 		case "mpim":
-			if len(ch.ID) > 0 && ch.ID[0] == 'G' {
+			if ch.IsMPIM {
+				return true
+			}
+			// Fallback if API omits is_mpim: treat G-prefix non-DM as mpim (Slack encodes
+			// group DMs as G; legacy G-prefix private channels are rare and usually include is_mpim=false).
+			if len(ch.ID) > 0 && ch.ID[0] == 'G' && !ch.IsIM {
 				return true
 			}
 		case "private_channel":
-			if len(ch.ID) > 0 && ch.ID[0] == 'C' && ch.IsPrivate {
+			// Private channels (C or legacy G) but not DMs or MPIMs — avoids treating
+			// is_private DMs as private_channel when only private_channel was requested.
+			if ch.IsIM || ch.IsMPIM {
+				break
+			}
+			if ch.IsPrivate && len(ch.ID) > 0 && (ch.ID[0] == 'C' || ch.ID[0] == 'G') {
 				return true
 			}
 		}

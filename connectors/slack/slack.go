@@ -65,25 +65,20 @@ var OAuthScopes = []string{
 // OAuthUserScopes is the list of user-level OAuth scopes requested via the
 // "user_scope" parameter in the Slack OAuth v2 authorization URL. These
 // result in a user token (xoxp-) returned in the authed_user field of the
-// OAuth response. The search:read.* scopes are here because Slack's
-// search.messages endpoint requires a user token — bot tokens are not supported.
-// chat:write is required for chat.postMessage, chat.update, chat.delete, and
-// chat.scheduleMessage when using the user token so messages can be sent as the user.
-// im:history and mpim:history are required on the user token for conversations.history
-// and conversations.replies in DMs and group DMs (Slack documents these scopes for
-// user tokens — not chat:read).
-// User read scopes for users.conversations (listing DMs / shared private convos the bot
-// is not in). Slack documents channels:read, groups:read, im:read, mpim:read for this
-// method on user tokens alongside bot tokens.
+// OAuth response. Scope groups are labeled inline below.
 var OAuthUserScopes = []string{
+	// Search (search.messages does not accept bot tokens)
 	"search:read.public",
 	"search:read.private",
 	"search:read.im",
 	"search:read.mpim",
 	"search:read.files",
+	// Chat actions as the authorizing user
 	"chat:write",
+	// DM/MPIM history (conversations.history / conversations.replies on user token)
 	"im:history",
 	"mpim:history",
+	// users.conversations — list DMs / private convos the bot is not in
 	"channels:read",
 	"groups:read",
 	"im:read",
