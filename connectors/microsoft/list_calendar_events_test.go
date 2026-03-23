@@ -80,37 +80,6 @@ func TestListCalendarEvents_Success(t *testing.T) {
 	}
 }
 
-func TestListCalendarEvents_WithCalendarID(t *testing.T) {
-	t.Parallel()
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet {
-			t.Errorf("expected GET, got %s", r.Method)
-		}
-		wantPrefix := "/me/calendars/cal-abc123/events"
-		if r.URL.Path != wantPrefix {
-			t.Errorf("expected path %q, got %s", wantPrefix, r.URL.Path)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(map[string]any{"value": []any{}})
-	}))
-	defer srv.Close()
-
-	conn := newForTest(srv.Client(), srv.URL)
-	action := &listCalendarEventsAction{conn: conn}
-
-	params, _ := json.Marshal(listCalendarEventsParams{CalendarID: "cal-abc123", Top: 5})
-
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
-		ActionType:  "microsoft.list_calendar_events",
-		Parameters:  params,
-		Credentials: validCreds(),
-	})
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-}
-
 func TestListCalendarEvents_DefaultParams(t *testing.T) {
 	t.Parallel()
 

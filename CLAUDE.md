@@ -224,6 +224,7 @@ The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API typ
 - **Ask clarifying questions before creating the issue.** If a task has open design decisions, ambiguous requirements, or choices that need human judgment, ask the user directly in chat first. Resolve all decisions upfront — the issue should be actionable from the start with no "Option A vs Option B" or "TBD" items. Never put unresolved questions or option comparisons in an issue.
 - When creating issues, default to using checklists (`- [ ]`) instead of bullet points for work items that can be completed independently. This makes it easy to track progress directly in the issue.
 - When you encounter an issue with a checklist that is out of date (items completed but not checked off, missing items, irrelevant items), update the checklist to reflect the current state.
+- **Never assume issue scope.** If you can't access an issue (e.g., a link doesn't work or returns an error), try fetching it with the `gh` CLI (`GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh issue view <number>`). If you still can't access it, ask the user for the issue details — do not guess or infer what the issue is about.
 
 ## Go Toolchain Setup
 

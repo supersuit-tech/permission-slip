@@ -528,7 +528,6 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 		var prop struct {
 			XUI *struct {
 				Widget      string `json:"widget"`
-				OptionsFrom string `json:"options_from"`
 				Group       string `json:"group"`
 				HelpURL     string `json:"help_url"`
 				VisibleWhen *struct {
@@ -546,14 +545,12 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 		if prop.XUI.Widget != "" && !validWidgets[prop.XUI.Widget] {
 			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, textarea, toggle, number, date", actionIdx, propName, prop.XUI.Widget)
 		}
-		// A "select" widget needs enum values or a dynamic options_from hint.
+		// A "select" widget needs enum values to populate the dropdown.
 		if prop.XUI.Widget == "select" {
 			var propObj map[string]json.RawMessage
 			if err := json.Unmarshal(propRaw, &propObj); err == nil {
-				_, hasEnum := propObj["enum"]
-				hasDynamic := prop.XUI.OptionsFrom != ""
-				if !hasEnum && !hasDynamic {
-					return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget \"select\" requires an \"enum\" array or x-ui.options_from", actionIdx, propName)
+				if _, hasEnum := propObj["enum"]; !hasEnum {
+					return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget \"select\" requires an \"enum\" array on the property", actionIdx, propName)
 				}
 			}
 		}

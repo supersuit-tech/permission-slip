@@ -4,9 +4,9 @@
 package microsoft
 
 import (
+	_ "embed"
 	"bytes"
 	"context"
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,17 +57,11 @@ func newForTest(client *http.Client, baseURL string) *MicrosoftConnector {
 	}
 }
 
-// NewForTest is the exported test helper for cross-package API tests.
-func NewForTest(client *http.Client, baseURL string) *MicrosoftConnector {
-	return newForTest(client, baseURL)
-}
-
 // ID returns "microsoft", matching the connectors.id in the database.
 func (c *MicrosoftConnector) ID() string { return "microsoft" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
-//
 //go:embed logo.svg
 var logoSVG string
 
@@ -170,15 +164,6 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						"location": {
 							"type": "string",
 							"description": "Event location"
-						},
-						"calendar_id": {
-							"type": "string",
-							"description": "Microsoft Graph calendar ID (omit for default calendar)",
-							"x-ui": {
-								"widget": "select",
-								"options_from": "connector_calendars",
-								"placeholder": "Default calendar"
-							}
 						}
 					}
 				}`)),
@@ -191,15 +176,6 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
-						"calendar_id": {
-							"type": "string",
-							"description": "Microsoft Graph calendar ID (omit for default calendar)",
-							"x-ui": {
-								"widget": "select",
-								"options_from": "connector_calendars",
-								"placeholder": "Default calendar"
-							}
-						},
 						"top": {
 							"type": "integer",
 							"default": 10,
@@ -211,7 +187,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_drive_files",
+			ActionType:  "microsoft.list_drive_files",
 				Name:        "List Drive Files",
 				Description: "List files and folders in OneDrive",
 				RiskLevel:   "low",
@@ -685,17 +661,17 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "microsoft.create_calendar_event",
 				Name:        "Create calendar events",
 				Description: "Agent can create events on the calendar with any details.",
-				Parameters:  json.RawMessage(`{"subject":"*","start":"*","end":"*","time_zone":"*","body":"*","attendees":"*","location":"*","calendar_id":"*"}`),
+				Parameters:  json.RawMessage(`{"subject":"*","start":"*","end":"*","time_zone":"*","body":"*","attendees":"*","location":"*"}`),
 			},
 			{
 				ID:          "tpl_microsoft_list_events",
 				ActionType:  "microsoft.list_calendar_events",
 				Name:        "View calendar",
 				Description: "Agent can view upcoming calendar events.",
-				Parameters:  json.RawMessage(`{"top":"*","calendar_id":"*"}`),
+				Parameters:  json.RawMessage(`{"top":"*"}`),
 			},
 			{
-				ID:          "tpl_microsoft_list_drive_files",
+			ID:          "tpl_microsoft_list_drive_files",
 				ActionType:  "microsoft.list_drive_files",
 				Name:        "Browse OneDrive files",
 				Description: "Agent can list files and folders in OneDrive.",
