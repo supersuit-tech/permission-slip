@@ -84,6 +84,16 @@ func (m *MockVaultStore) HasSecret(id string) bool {
 	return ok
 }
 
+// SeedSecretForTest stores plaintext at an explicit secret ID. Use when OAuth
+// fixtures reference a fixed access_token_vault_id (tests only).
+func (m *MockVaultStore) SeedSecretForTest(secretID string, secret []byte) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	stored := make([]byte, len(secret))
+	copy(stored, secret)
+	m.secrets[secretID] = stored
+}
+
 // randomUUID generates a v4 UUID string.
 func randomUUID() (string, error) {
 	var b [16]byte

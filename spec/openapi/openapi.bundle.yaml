@@ -1634,6 +1634,45 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/agents/{agent_id}/connectors/{connector_id}/calendars:
+    get:
+      operationId: listAgentConnectorCalendars
+      summary: List calendars for agent connector
+      description: |
+        Returns calendars visible to the OAuth credential assigned to this agent–connector pair.
+        Used by the dashboard to populate calendar pickers for Google and Microsoft calendar actions.
+
+        Requires session authentication (Supabase JWT). The agent must belong to the current user.
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      responses:
+        '200':
+          description: Calendars listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorCalendarListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent, connector, or calendar listing not supported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/registration-invites:
     post:
       operationId: createRegistrationInvite
@@ -11598,6 +11637,35 @@ components:
           type: string
           description: OAuth connection ID to assign.
           example: oc_def456
+    CalendarListItem:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Provider calendar identifier (Google calendar ID or Microsoft Graph calendar id).
+        summary:
+          type: string
+          description: Human-readable name (Google Calendar `summary`).
+        name:
+          type: string
+          description: Human-readable name (Microsoft Graph `name`).
+        primary:
+          type: boolean
+          description: True when this is the user's primary Google calendar.
+        isDefaultCalendar:
+          type: boolean
+          description: True when this is the default Microsoft Graph calendar.
+    AgentConnectorCalendarListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarListItem'
     RetentionMeta:
       type: object
       description: |

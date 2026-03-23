@@ -164,6 +164,19 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						"location": {
 							"type": "string",
 							"description": "Event location"
+						},
+						"calendar_id": {
+							"type": "string",
+							"description": "Microsoft Graph calendar ID. Leave empty to use the default calendar.",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/calendars",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "name",
+								"remote_select_fallback_placeholder": "Enter calendar ID (optional)",
+								"help_text": "Connect a credential to select a calendar.",
+								"label": "Calendar"
+							}
 						}
 					}
 				}`)),
@@ -176,6 +189,19 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
+						"calendar_id": {
+							"type": "string",
+							"description": "Microsoft Graph calendar ID. Leave empty to use the default calendar.",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/calendars",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "name",
+								"remote_select_fallback_placeholder": "Enter calendar ID (optional)",
+								"help_text": "Connect a credential to select a calendar.",
+								"label": "Calendar"
+							}
+						},
 						"top": {
 							"type": "integer",
 							"default": 10,
@@ -661,14 +687,14 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "microsoft.create_calendar_event",
 				Name:        "Create calendar events",
 				Description: "Agent can create events on the calendar with any details.",
-				Parameters:  json.RawMessage(`{"subject":"*","start":"*","end":"*","time_zone":"*","body":"*","attendees":"*","location":"*"}`),
+				Parameters:  json.RawMessage(`{"subject":"*","start":"*","end":"*","time_zone":"*","body":"*","attendees":"*","location":"*","calendar_id":""}`),
 			},
 			{
 				ID:          "tpl_microsoft_list_events",
 				ActionType:  "microsoft.list_calendar_events",
 				Name:        "View calendar",
 				Description: "Agent can view upcoming calendar events.",
-				Parameters:  json.RawMessage(`{"top":"*"}`),
+				Parameters:  json.RawMessage(`{"top":"*","calendar_id":""}`),
 			},
 			{
 			ID:          "tpl_microsoft_list_drive_files",
