@@ -9,6 +9,9 @@
 //     and creates an oauth_connections row
 //  6. Server redirects to /settings?oauth_status=success (or error)
 //
+// Slack uses user-token-only OAuth: the callback requires authed_user.access_token
+// and rejects exchanges that only return a bot token (misconfigured Slack app).
+//
 // Security:
 //   - CSRF protection via signed JWT state tokens (HS256, 10-min TTL)
 //   - State encodes user ID + provider to prevent session fixation
@@ -614,8 +617,16 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 
 		// Slack user-token-only OAuth: the Web API user token is nested under
 		// authed_user.access_token; promote it to the primary access_token we
-		// store and use for all connector actions.
+		// store and use for all connector actions. If Slack omits it, the app
+		// is likely still configured for bot scopes only — fail with a clear
+		// message instead of storing a bot token the connector cannot use.
 		if providerID == "slack" {
+			if extractSlackUserToken(token) == "" {
+				redirectToFrontend(w, r, deps, providerID, "error",
+					"Slack did not return a user OAuth token. In your Slack app settings, add the required User Token Scopes, remove Bot Token Scopes from the install flow, then connect again.",
+					state.ReturnTo, "")
+				return
+			}
 			token = slackUserTokenAsPrimary(token)
 		}
 

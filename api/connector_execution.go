@@ -404,6 +404,12 @@ func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OA
 		}
 	}
 
+	// Legacy Slack connections stored user_access_token_vault_id in extra_data.
+	// User-token-only OAuth uses a single vault secret; never expose the old key as a credential.
+	if conn.Provider == "slack" {
+		delete(creds, "user_access_token_vault_id")
+	}
+
 	// Set access_token AFTER merging extra_data so that a tampered extra_data
 	// field cannot overwrite the vault-sourced access token.
 	creds["access_token"] = string(accessTokenBytes)
