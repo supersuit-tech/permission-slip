@@ -19,6 +19,13 @@ func TestBuiltInProvidersAreRegistered(t *testing.T) {
 	if len(ids) == 0 {
 		t.Fatal("no built-in OAuth providers registered — connectors/providers blank import may not have run")
 	}
+	for _, disabledID := range connectors.DisabledBuiltInConnectorIDs() {
+		for _, id := range ids {
+			if id == disabledID {
+				t.Errorf("BuiltInOAuthProviderIDs: disabled connector %q should not appear", disabledID)
+			}
+		}
+	}
 }
 
 // TestBuiltInConnectorsAreRegistered verifies that importing connectors/all
@@ -27,8 +34,9 @@ func TestBuiltInProvidersAreRegistered(t *testing.T) {
 // is missing, the count will drop and this test will fail.
 func TestBuiltInConnectorsAreRegistered(t *testing.T) {
 	got := connectors.BuiltInConnectors()
-	// There are 47 active built-in connector packages (two may be disabled via
-	// connectors/<id>/disabled). Update this number when adding or removing connectors.
+	// There are 47 active built-in connector packages; kroger and quickbooks are
+	// disabled via connectors/<id>/disabled (embedded in the binary via //go:embed).
+	// Update this number when adding, removing, or re-enabling connectors.
 	const expected = 47
 	if len(got) != expected {
 		t.Fatalf("expected %d built-in connectors, got %d — did you forget to add register.go or a blank import in connectors/all?", expected, len(got))

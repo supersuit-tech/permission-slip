@@ -147,8 +147,12 @@ func TestDeleteConnectorByID(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 
 	testhelper.InsertConnector(t, tx, "gone")
-	if err := db.DeleteConnectorByID(context.Background(), tx, "gone"); err != nil {
+	n, err := db.DeleteConnectorByID(context.Background(), tx, "gone")
+	if err != nil {
 		t.Fatalf("DeleteConnectorByID: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("DeleteConnectorByID: expected 1 row deleted, got %d", n)
 	}
 	ids, err := db.ListConnectorIDs(context.Background(), tx)
 	if err != nil {
@@ -156,6 +160,14 @@ func TestDeleteConnectorByID(t *testing.T) {
 	}
 	if len(ids) != 0 {
 		t.Fatalf("expected connector deleted, still have %v", ids)
+	}
+	// Second delete: idempotent when the row is already gone.
+	n2, err := db.DeleteConnectorByID(context.Background(), tx, "gone")
+	if err != nil {
+		t.Fatalf("DeleteConnectorByID idempotent: %v", err)
+	}
+	if n2 != 0 {
+		t.Fatalf("DeleteConnectorByID idempotent: expected 0 rows, got %d", n2)
 	}
 }
 

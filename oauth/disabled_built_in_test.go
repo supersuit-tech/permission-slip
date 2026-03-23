@@ -16,11 +16,12 @@ func TestBuiltInOAuthDisabledForKrogerAndQuickBooks(t *testing.T) {
 	}
 }
 
-func TestBuiltInProviders_OmitsDisabledKroger(t *testing.T) {
+func TestBuiltInProviders_OmitsDisabledConnectors(t *testing.T) {
 	t.Parallel()
+	disabled := map[string]bool{"kroger": true, "quickbooks": true}
 	for _, p := range oauth.BuiltInProviders() {
-		if p.ID == "kroger" {
-			t.Fatal("kroger should not appear in BuiltInProviders when connector is disabled")
+		if disabled[p.ID] {
+			t.Errorf("%q should not appear in BuiltInProviders when connector is disabled", p.ID)
 		}
 	}
 }

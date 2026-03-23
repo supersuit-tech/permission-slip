@@ -215,9 +215,13 @@ func ListConnectorIDs(ctx context.Context, db DBTX) ([]string, error) {
 
 // DeleteConnectorByID removes a connector and dependent rows (actions,
 // credentials, templates, agent links) via ON DELETE CASCADE.
-func DeleteConnectorByID(ctx context.Context, db DBTX, connectorID string) error {
-	_, err := db.Exec(ctx, `DELETE FROM connectors WHERE id = $1`, connectorID)
-	return err
+// Returns how many rows were deleted (0 if the id was not present).
+func DeleteConnectorByID(ctx context.Context, db DBTX, connectorID string) (int64, error) {
+	ct, err := db.Exec(ctx, `DELETE FROM connectors WHERE id = $1`, connectorID)
+	if err != nil {
+		return 0, err
+	}
+	return ct.RowsAffected(), nil
 }
 
 // GetActionRequiresPaymentMethod checks whether the given action type requires
