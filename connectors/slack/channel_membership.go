@@ -69,6 +69,7 @@ const maxMembershipPages = 50
 // isUserInChannel checks whether the given Slack user ID is a member of the
 // specified channel. Paginates through the member list up to maxMembershipPages.
 func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.Credentials, channelID, slackUserID string) (bool, error) {
+	membersCreds := credentialsForUserTokenIfDirectOrGroupDM(creds, channelID)
 	cursor := ""
 	for page := 0; page < maxMembershipPages; page++ {
 		body := conversationsMembersRequest{
@@ -78,7 +79,7 @@ func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.C
 		}
 
 		var resp conversationsMembersResponse
-		if err := c.doPost(ctx, "conversations.members", creds, body, &resp); err != nil {
+		if err := c.doPost(ctx, "conversations.members", membersCreds, body, &resp); err != nil {
 			return false, err
 		}
 		if !resp.OK {
@@ -243,21 +244,19 @@ type usersConversationsRequest struct {
 
 type usersConversationsResponse struct {
 	slackResponse
-	Channels []struct {
-		ID string `json:"id"`
-	} `json:"channels"`
-	Meta *paginationMeta `json:"response_metadata,omitempty"`
+	Channels []listChannelEntry `json:"channels,omitempty"`
+	Meta     *paginationMeta    `json:"response_metadata,omitempty"`
 }
 
 // maxUserConversationPages limits pagination when fetching a user's channel list.
 const maxUserConversationPages = 50
 
-// getUserChannelIDs returns the set of channel IDs that a Slack user belongs to,
-// filtered to the given channel types (e.g., "private_channel,mpim,im"). This is
-// more efficient than per-channel isUserInChannel calls when filtering a list of
-// channels, as it makes one paginated API call instead of N.
-func (c *SlackConnector) getUserChannelIDs(ctx context.Context, creds connectors.Credentials, slackUserID, types string) (map[string]bool, error) {
-	channelSet := make(map[string]bool)
+// getUserPrivateConversations returns conversation objects for the given Slack user
+// and types via users.conversations, using the authorizing user's OAuth token when
+// present so 1:1 DMs (where the bot is not a participant) are included.
+func (c *SlackConnector) getUserPrivateConversations(ctx context.Context, creds connectors.Credentials, slackUserID, types string) ([]listChannelEntry, error) {
+	creds = credentialsForChat(creds)
+	var out []listChannelEntry
 	cursor := ""
 	for page := 0; page < maxUserConversationPages; page++ {
 		body := usersConversationsRequest{
@@ -275,9 +274,7 @@ func (c *SlackConnector) getUserChannelIDs(ctx context.Context, creds connectors
 			return nil, mapSlackError(resp.Error)
 		}
 
-		for _, ch := range resp.Channels {
-			channelSet[ch.ID] = true
-		}
+		out = append(out, resp.Channels...)
 
 		if resp.Meta == nil || resp.Meta.NextCursor == "" {
 			break
@@ -285,7 +282,7 @@ func (c *SlackConnector) getUserChannelIDs(ctx context.Context, creds connectors
 		cursor = resp.Meta.NextCursor
 	}
 
-	return channelSet, nil
+	return out, nil
 }
 
 // channelTypesIncludePrivate checks whether a comma-separated channel types

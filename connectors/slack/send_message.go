@@ -53,8 +53,9 @@ func (a *sendMessageAction) Execute(ctx context.Context, req connectors.ActionRe
 		Text:    params.Message,
 	}
 
+	creds := credentialsForChat(req.Credentials)
 	var resp sendMessageResponse
-	if err := a.conn.doPost(ctx, "chat.postMessage", req.Credentials, body, &resp); err != nil {
+	if err := a.conn.doPost(ctx, "chat.postMessage", creds, body, &resp); err != nil {
 		return nil, err
 	}
 

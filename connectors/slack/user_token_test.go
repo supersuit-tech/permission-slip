@@ -114,24 +114,41 @@ func TestSearchMessages_FallsBackToBotToken(t *testing.T) {
 	}
 }
 
-func TestOAuthUserScopes_AreSearchScopes(t *testing.T) {
+func TestOAuthUserScopes_IncludesSearchChatWriteAndDMHistory(t *testing.T) {
 	t.Parallel()
 
-	// Verify OAuthUserScopes contains all search:read.* scopes.
-	expected := map[string]bool{
-		"search:read.public":  true,
-		"search:read.private": true,
-		"search:read.im":      true,
-		"search:read.mpim":    true,
-		"search:read.files":   true,
+	// Verify OAuthUserScopes: search, chat:write, DM history, and users.conversations read scopes.
+	expectedSearch := map[string]struct{}{
+		"search:read.public":  {},
+		"search:read.private": {},
+		"search:read.im":      {},
+		"search:read.mpim":    {},
+		"search:read.files":   {},
+	}
+	wantExact := map[string]struct{}{
+		"chat:write":    {},
+		"im:history":    {},
+		"mpim:history":  {},
+		"channels:read": {},
+		"groups:read":   {},
+		"im:read":       {},
+		"mpim:read":     {},
 	}
 	for _, s := range OAuthUserScopes {
-		if !expected[s] {
-			t.Errorf("unexpected user scope: %q", s)
+		if _, ok := expectedSearch[s]; ok {
+			delete(expectedSearch, s)
+			continue
 		}
-		delete(expected, s)
+		if _, ok := wantExact[s]; ok {
+			delete(wantExact, s)
+			continue
+		}
+		t.Errorf("unexpected user scope: %q", s)
 	}
-	for s := range expected {
+	for s := range expectedSearch {
+		t.Errorf("missing user scope: %q", s)
+	}
+	for s := range wantExact {
 		t.Errorf("missing user scope: %q", s)
 	}
 }

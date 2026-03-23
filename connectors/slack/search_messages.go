@@ -139,10 +139,7 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 	// Use the user access token for search (bot tokens don't support search.messages).
 	// If no user token is available, fall back to the default token — the Slack API
 	// will return a clear permission error.
-	creds := req.Credentials
-	if userToken, ok := creds.Get(credKeyUserAccessToken); ok && userToken != "" {
-		creds = connectors.NewCredentials(map[string]string{credKeyAccessToken: userToken})
-	}
+	creds := credentialsForChat(req.Credentials)
 
 	var resp searchMessagesResponse
 	if err := a.conn.doPost(ctx, "search.messages", creds, body, &resp); err != nil {
