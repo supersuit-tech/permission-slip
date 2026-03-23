@@ -139,6 +139,37 @@ AssignCredentialRequest:
       description: OAuth connection ID to assign.
       example: "oc_def456"
 
+CalendarListItem:
+  type: object
+  required:
+    - id
+  properties:
+    id:
+      type: string
+      description: Provider calendar identifier (Google calendar ID or Microsoft Graph calendar id).
+    summary:
+      type: string
+      description: Human-readable name (Google Calendar `summary`).
+    name:
+      type: string
+      description: Human-readable name (Microsoft Graph `name`).
+    primary:
+      type: boolean
+      description: True when this is the user's primary Google calendar.
+    isDefaultCalendar:
+      type: boolean
+      description: True when this is the default Microsoft Graph calendar.
+
+AgentConnectorCalendarListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/agent_connectors.yaml#/CalendarListItem'
+
 AgentConnectorCredentialResponse:
   type: object
   required:

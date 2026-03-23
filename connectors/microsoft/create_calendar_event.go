@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -27,13 +28,14 @@ func (a *createCalendarEventAction) ParameterAliases() map[string]string {
 
 // createCalendarEventParams is the user-facing parameter schema.
 type createCalendarEventParams struct {
-	Subject   string   `json:"subject"`
-	Start     string   `json:"start"`
-	End       string   `json:"end"`
-	TimeZone  string   `json:"time_zone"`
-	Body      string   `json:"body,omitempty"`
-	Attendees []string `json:"attendees,omitempty"`
-	Location  string   `json:"location,omitempty"`
+	CalendarID string   `json:"calendar_id,omitempty"`
+	Subject    string   `json:"subject"`
+	Start      string   `json:"start"`
+	End        string   `json:"end"`
+	TimeZone   string   `json:"time_zone"`
+	Body       string   `json:"body,omitempty"`
+	Attendees  []string `json:"attendees,omitempty"`
+	Location   string   `json:"location,omitempty"`
 }
 
 func (p *createCalendarEventParams) validate() error {
@@ -122,8 +124,13 @@ func (a *createCalendarEventAction) Execute(ctx context.Context, req connectors.
 		graphReq.Location = &graphEventLocation{DisplayName: params.Location}
 	}
 
+	path := "/me/events"
+	if params.CalendarID != "" {
+		path = "/me/calendars/" + url.PathEscape(params.CalendarID) + "/events"
+	}
+
 	var resp graphEventResponse
-	if err := a.conn.doRequest(ctx, http.MethodPost, "/me/events", req.Credentials, graphReq, &resp); err != nil {
+	if err := a.conn.doRequest(ctx, http.MethodPost, path, req.Credentials, graphReq, &resp); err != nil {
 		return nil, err
 	}
 

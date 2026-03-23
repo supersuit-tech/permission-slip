@@ -210,6 +210,44 @@ func TestCaptureConnectorError_NoHubDoesNotPanic(t *testing.T) {
 	CaptureConnectorError(context.Background(), errors.New("test"), ConnectorContext{ActionType: "test.action"})
 }
 
+func TestCaptureConnectorError_ExplicitConnectorID(t *testing.T) {
+	t.Parallel()
+
+	transport := &sentryTestTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://key@sentry.example.com/1",
+		Transport: transport,
+	})
+	if err != nil {
+		t.Fatalf("failed to create sentry client: %v", err)
+	}
+
+	scope := sentry.NewScope()
+	hub := sentry.NewHub(client, scope)
+	ctx := sentry.SetHubOnContext(context.Background(), hub)
+
+	CaptureConnectorError(ctx, errors.New("list calendars"), ConnectorContext{
+		ConnectorID: "google",
+		ActionType:  "google.list_calendar_events",
+		AgentID:     7,
+	})
+
+	events := transport.getEvents()
+	if len(events) == 0 {
+		t.Fatal("expected at least one event to be captured")
+	}
+	event := events[0]
+	if got := event.Tags["connector_id"]; got != "google" {
+		t.Errorf("connector_id tag = %q, want google", got)
+	}
+	if got := event.Tags["action_type"]; got != "google.list_calendar_events" {
+		t.Errorf("action_type tag = %q", got)
+	}
+	if got := event.Tags["agent_id"]; got != "7" {
+		t.Errorf("agent_id tag = %q, want 7", got)
+	}
+}
+
 func TestClassifyConnectorError(t *testing.T) {
 	t.Parallel()
 

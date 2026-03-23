@@ -110,3 +110,22 @@ type ManifestProvider interface {
 	Manifest() *ConnectorManifest
 }
 
+// CalendarListItem is one calendar row for dashboard selectors (Google Calendar
+// and Microsoft Graph). Fields are populated depending on the provider.
+type CalendarListItem struct {
+	ID                string `json:"id"`
+	Summary           string `json:"summary,omitempty"`
+	Name              string `json:"name,omitempty"`
+	Primary           bool   `json:"primary,omitempty"`
+	IsDefaultCalendar bool   `json:"isDefaultCalendar,omitempty"`
+}
+
+// CalendarLister is optionally implemented by connectors that can list the
+// user's calendars for UI configuration (session-authenticated proxy endpoints).
+type CalendarLister interface {
+	ListCalendars(ctx context.Context, creds Credentials) ([]CalendarListItem, error)
+	// CalendarListCredentialActionType is the connector_actions.action_type used
+	// to look up required credentials for this list call (must exist in the DB).
+	CalendarListCredentialActionType() string
+}
+

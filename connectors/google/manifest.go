@@ -112,7 +112,16 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')"
+							"description": "Calendar ID (defaults to 'primary')",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/calendars",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "summary",
+								"remote_select_fallback_placeholder": "Enter calendar ID (e.g. primary)",
+								"help_text": "Connect a credential to select a calendar.",
+								"label": "Calendar"
+							}
 						}
 					}
 				}`)),
@@ -129,7 +138,16 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')"
+							"description": "Calendar ID (defaults to 'primary')",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/calendars",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "summary",
+								"remote_select_fallback_placeholder": "Enter calendar ID (e.g. primary)",
+								"help_text": "Connect a credential to select a calendar.",
+								"label": "Calendar"
+							}
 						},
 						"max_results": {
 							"type": "integer",
@@ -489,7 +507,16 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')"
+							"description": "Calendar ID (defaults to 'primary')",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/calendars",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "summary",
+								"remote_select_fallback_placeholder": "Enter calendar ID (e.g. primary)",
+								"help_text": "Connect a credential to select a calendar.",
+								"label": "Calendar"
+							}
 						}
 					}
 				}`)),
@@ -612,7 +639,16 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')"
+							"description": "Calendar ID (defaults to 'primary')",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/calendars",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "summary",
+								"remote_select_fallback_placeholder": "Enter calendar ID (e.g. primary)",
+								"help_text": "Connect a credential to select a calendar.",
+								"label": "Calendar"
+							}
 						},
 						"summary": {
 							"type": "string",
@@ -665,7 +701,16 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"calendar_id": {
 							"type": "string",
 							"default": "primary",
-							"description": "Calendar ID (defaults to 'primary')"
+							"description": "Calendar ID (defaults to 'primary')",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/calendars",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "summary",
+								"remote_select_fallback_placeholder": "Enter calendar ID (e.g. primary)",
+								"help_text": "Connect a credential to select a calendar.",
+								"label": "Calendar"
+							}
 						}
 					}
 				}`)),

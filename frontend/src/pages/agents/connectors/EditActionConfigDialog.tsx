@@ -34,6 +34,7 @@ interface EditActionConfigDialogProps {
   onOpenChange: (open: boolean) => void;
   config: ActionConfiguration;
   agentId: number;
+  connectorId: string;
   actions: ConnectorAction[];
 }
 
@@ -42,6 +43,7 @@ export function EditActionConfigDialog({
   onOpenChange,
   config,
   agentId,
+  connectorId,
   actions,
 }: EditActionConfigDialogProps) {
   const { updateActionConfig, isPending } = useUpdateActionConfig();
@@ -187,6 +189,8 @@ export function EditActionConfigDialog({
                   modes={paramModes}
                   onModeChange={(key, mode) => setParamModes((prev) => ({ ...prev, [key]: mode }))}
                   disabled={isPending}
+                  agentId={agentId}
+                  connectorId={connectorId}
                 />
               </div>
             ) : null}

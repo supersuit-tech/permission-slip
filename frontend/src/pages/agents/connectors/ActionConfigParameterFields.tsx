@@ -20,6 +20,8 @@ interface ActionConfigParameterFieldsProps {
   modes: Record<string, ParamMode>;
   onModeChange: (key: string, mode: ParamMode) => void;
   disabled?: boolean;
+  agentId?: number;
+  connectorId?: string;
 }
 
 /**
@@ -38,6 +40,8 @@ export function ActionConfigParameterFields({
   modes,
   onModeChange,
   disabled,
+  agentId,
+  connectorId,
 }: ActionConfigParameterFieldsProps) {
   if (!parametersSchema?.properties) {
     return (
@@ -79,6 +83,8 @@ export function ActionConfigParameterFields({
         disabled={disabled}
         onValueChange={onValueChange}
         onModeChange={onModeChange}
+        agentId={agentId}
+        connectorId={connectorId}
       />
     );
   }
@@ -154,6 +160,8 @@ function ParameterField({
   disabled,
   onValueChange,
   onModeChange,
+  agentId,
+  connectorId,
 }: {
   paramKey: string;
   property: SchemaProperty;
@@ -165,6 +173,8 @@ function ParameterField({
   disabled?: boolean;
   onValueChange: (key: string, value: string) => void;
   onModeChange: (key: string, mode: ParamMode) => void;
+  agentId?: number;
+  connectorId?: string;
 }) {
   const isWildcard = mode === "wildcard";
   const widgetValue = isWildcard ? "" : value;
@@ -234,6 +244,8 @@ function ParameterField({
             className={widgetClassName}
             placeholder={widgetPlaceholder}
             siblingDatetimeValue={siblingDatetimeValue}
+            agentId={agentId}
+            connectorId={connectorId}
           />
         )
       ) : (
@@ -246,6 +258,8 @@ function ParameterField({
           className={widgetClassName}
           placeholder={widgetPlaceholder}
           siblingDatetimeValue={siblingDatetimeValue}
+          agentId={agentId}
+          connectorId={connectorId}
         />
       )}
       {!isWildcard && value.includes("*") && (

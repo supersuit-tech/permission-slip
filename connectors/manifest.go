@@ -115,14 +115,15 @@ var validPreviewLayouts = map[string]bool{
 
 // validWidgets are the allowed values for x-ui.widget on schema properties.
 var validWidgets = map[string]bool{
-	"text":     true,
-	"select":   true,
-	"textarea": true,
-	"toggle":   true,
-	"number":   true,
-	"date":     true,
-	"datetime": true,
-	"list":     true,
+	"text":           true,
+	"select":         true,
+	"remote-select":  true,
+	"textarea":       true,
+	"toggle":         true,
+	"number":         true,
+	"date":           true,
+	"datetime":       true,
+	"list":           true,
 }
 
 // validAuthTypes are the allowed values for credential auth types.
@@ -543,7 +544,7 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			continue
 		}
 		if prop.XUI.Widget != "" && !validWidgets[prop.XUI.Widget] {
-			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, textarea, toggle, number, date", actionIdx, propName, prop.XUI.Widget)
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, remote-select, textarea, toggle, number, date, datetime, list", actionIdx, propName, prop.XUI.Widget)
 		}
 		// A "select" widget needs enum values to populate the dropdown.
 		if prop.XUI.Widget == "select" {

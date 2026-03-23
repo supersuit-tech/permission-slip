@@ -73,6 +73,45 @@ func TestCreateCalendarEvent_Success(t *testing.T) {
 	}
 }
 
+func TestCreateCalendarEvent_WithCalendarID(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/me/calendars/cal-xyz/events" {
+			t.Errorf("expected calendar-scoped path, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":      "event-cal",
+			"subject": "X",
+			"start":   map[string]string{"dateTime": "2024-01-15T09:00:00", "timeZone": "UTC"},
+			"end":     map[string]string{"dateTime": "2024-01-15T10:00:00", "timeZone": "UTC"},
+			"webLink": "https://example.com",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(createCalendarEventParams{
+		CalendarID: "cal-xyz",
+		Subject:    "X",
+		Start:      "2024-01-15T09:00:00",
+		End:        "2024-01-15T10:00:00",
+		TimeZone:   "UTC",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestCreateCalendarEvent_WithAttendees(t *testing.T) {
 	t.Parallel()
 

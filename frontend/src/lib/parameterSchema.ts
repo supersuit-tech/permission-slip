@@ -15,12 +15,29 @@ export interface VisibleWhen {
 
 /** Property-level `x-ui` rendering hints for a single parameter. */
 export interface SchemaPropertyUI {
-  widget?: "text" | "select" | "textarea" | "toggle" | "number" | "date" | "datetime" | "list";
+  widget?:
+    | "text"
+    | "select"
+    | "remote-select"
+    | "textarea"
+    | "toggle"
+    | "number"
+    | "date"
+    | "datetime"
+    | "list";
   label?: string;
   placeholder?: string;
   group?: string;
   help_url?: string;
   help_text?: string;
+  /** Path template for openapi-fetch, e.g. `/v1/agents/{agent_id}/connectors/{connector_id}/calendars`. */
+  remote_select_options_path?: string;
+  /** JSON key for option value (default `id`). */
+  remote_select_id_key?: string;
+  /** JSON key for option label (default `summary`, then `name`). */
+  remote_select_label_key?: string;
+  /** Placeholder for manual entry when user toggles fallback. */
+  remote_select_fallback_placeholder?: string;
   visible_when?: VisibleWhen;
   /**
    * Sibling parameter key for datetime range pairing (e.g. time_min ↔ time_max).
@@ -122,7 +139,17 @@ export function parseParametersSchema(
 }
 
 /** All valid widget type values. */
-export const VALID_WIDGETS = ["text", "select", "textarea", "toggle", "number", "date", "datetime", "list"] as const;
+export const VALID_WIDGETS = [
+  "text",
+  "select",
+  "remote-select",
+  "textarea",
+  "toggle",
+  "number",
+  "date",
+  "datetime",
+  "list",
+] as const;
 
 /** Widget type as a union — useful for exhaustive switch checks. */
 export type WidgetType = (typeof VALID_WIDGETS)[number];
@@ -274,6 +301,18 @@ function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
   if (typeof obj.group === "string") ui.group = obj.group;
   if (typeof obj.help_url === "string") ui.help_url = obj.help_url;
   if (typeof obj.help_text === "string") ui.help_text = obj.help_text;
+  if (typeof obj.remote_select_options_path === "string" && obj.remote_select_options_path.length > 0) {
+    ui.remote_select_options_path = obj.remote_select_options_path;
+  }
+  if (typeof obj.remote_select_id_key === "string" && obj.remote_select_id_key.length > 0) {
+    ui.remote_select_id_key = obj.remote_select_id_key;
+  }
+  if (typeof obj.remote_select_label_key === "string" && obj.remote_select_label_key.length > 0) {
+    ui.remote_select_label_key = obj.remote_select_label_key;
+  }
+  if (typeof obj.remote_select_fallback_placeholder === "string") {
+    ui.remote_select_fallback_placeholder = obj.remote_select_fallback_placeholder;
+  }
   if (obj.visible_when && typeof obj.visible_when === "object") {
     const vw = obj.visible_when as Record<string, unknown>;
     if (

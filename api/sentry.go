@@ -50,8 +50,9 @@ func CaptureError(ctx context.Context, err error) {
 
 // ConnectorContext carries connector-specific metadata for Sentry error reports.
 type ConnectorContext struct {
-	ActionType string
-	AgentID    int64
+	ConnectorID string
+	ActionType  string
+	AgentID     int64
 }
 
 // CaptureConnectorError reports a connector execution error to Sentry with
@@ -69,6 +70,10 @@ func CaptureConnectorError(ctx context.Context, err error, cc ConnectorContext) 
 		}
 		if cc.ActionType != "" {
 			scope.SetTag("action_type", cc.ActionType)
+		}
+		if cc.ConnectorID != "" {
+			scope.SetTag("connector_id", cc.ConnectorID)
+		} else if cc.ActionType != "" {
 			if connID := connectorIDFromActionType(cc.ActionType); connID != nil {
 				scope.SetTag("connector_id", *connID)
 			}
