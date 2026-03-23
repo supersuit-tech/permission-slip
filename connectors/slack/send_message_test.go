@@ -19,7 +19,7 @@ func TestSendMessage_Success(t *testing.T) {
 		if r.URL.Path != "/chat.postMessage" {
 			t.Errorf("expected path /chat.postMessage, got %s", r.URL.Path)
 		}
-		if got := r.Header.Get("Authorization"); got != "Bearer xoxb-test-token-123" {
+		if got := r.Header.Get("Authorization"); got != "Bearer xoxp-test-token-123" {
 			t.Errorf("expected Bearer token in Authorization header, got %q", got)
 		}
 		if got := r.Header.Get("Content-Type"); got != "application/json; charset=utf-8" {
