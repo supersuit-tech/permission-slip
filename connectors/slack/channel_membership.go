@@ -56,7 +56,7 @@ type conversationsMembersRequest struct {
 
 type conversationsMembersResponse struct {
 	slackResponse
-	Members []string       `json:"members"`
+	Members []string        `json:"members"`
 	Meta    *paginationMeta `json:"response_metadata,omitempty"`
 }
 
@@ -69,7 +69,6 @@ const maxMembershipPages = 50
 // isUserInChannel checks whether the given Slack user ID is a member of the
 // specified channel. Paginates through the member list up to maxMembershipPages.
 func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.Credentials, channelID, slackUserID string) (bool, error) {
-	membersCreds := credentialsForUserTokenIfDirectOrGroupDM(creds, channelID)
 	cursor := ""
 	for page := 0; page < maxMembershipPages; page++ {
 		body := conversationsMembersRequest{
@@ -79,7 +78,7 @@ func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.C
 		}
 
 		var resp conversationsMembersResponse
-		if err := c.doPost(ctx, "conversations.members", membersCreds, body, &resp); err != nil {
+		if err := c.doPost(ctx, "conversations.members", creds, body, &resp); err != nil {
 			return false, err
 		}
 		if !resp.OK {
@@ -236,9 +235,9 @@ func describeChannelType(channelID string) string {
 
 // usersConversationsRequest is the Slack API request for users.conversations.
 type usersConversationsRequest struct {
-	User  string `json:"user"`
-	Types string `json:"types,omitempty"`
-	Limit int    `json:"limit,omitempty"`
+	User   string `json:"user"`
+	Types  string `json:"types,omitempty"`
+	Limit  int    `json:"limit,omitempty"`
 	Cursor string `json:"cursor,omitempty"`
 }
 
@@ -252,10 +251,8 @@ type usersConversationsResponse struct {
 const maxUserConversationPages = 50
 
 // getUserPrivateConversations returns conversation objects for the given Slack user
-// and types via users.conversations, using the authorizing user's OAuth token when
-// present so 1:1 DMs (where the bot is not a participant) are included.
+// and types via users.conversations.
 func (c *SlackConnector) getUserPrivateConversations(ctx context.Context, creds connectors.Credentials, slackUserID, types string) ([]listChannelEntry, error) {
-	creds = credentialsForChat(creds)
 	var out []listChannelEntry
 	cursor := ""
 	for page := 0; page < maxUserConversationPages; page++ {

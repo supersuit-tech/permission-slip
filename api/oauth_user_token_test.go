@@ -1,7 +1,6 @@
 package api
 
 import (
-	"encoding/json"
 	"testing"
 
 	"golang.org/x/oauth2"
@@ -54,77 +53,36 @@ func TestExtractSlackUserToken(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			// Build an oauth2.Token with extras. The oauth2 library stores
-			// extras in a special way — we simulate this via the raw JSON approach.
-			rawJSON, err := json.Marshal(map[string]any{
-				"access_token": "xoxb-bot-token",
-				"token_type":   "bot",
-				"authed_user":  tt.extra["authed_user"],
-			})
-			if err != nil {
-				t.Fatalf("marshal: %v", err)
-			}
-
-			// Use the oauth2 internal token unmarshaling to get extras populated.
-			// The oauth2.Token.Extra method reads from the raw JSON field.
 			token := &oauth2.Token{AccessToken: "xoxb-bot-token"}
-			// We need to use the internal method — set raw directly.
-			// The simplest way is to construct via Token response parsing.
 			token = token.WithExtra(tt.extra)
 
 			got := extractSlackUserToken(token)
 			if got != tt.wantUser {
 				t.Errorf("extractSlackUserToken() = %q, want %q", got, tt.wantUser)
 			}
-
-			// Verify the raw JSON approach also works (secondary check).
-			_ = rawJSON
 		})
 	}
 }
 
-func TestUserTokenVaultIDFromExtraData(t *testing.T) {
+func TestSlackUserTokenAsPrimary(t *testing.T) {
 	t.Parallel()
 
-	tests := []struct {
-		name      string
-		extraData json.RawMessage
-		want      string
-	}{
-		{
-			name:      "nil extra data",
-			extraData: nil,
-			want:      "",
+	tok := (&oauth2.Token{AccessToken: "xoxb-app"}).WithExtra(map[string]any{
+		"authed_user": map[string]any{
+			"access_token": "xoxp-user",
 		},
-		{
-			name:      "empty extra data",
-			extraData: json.RawMessage(`{}`),
-			want:      "",
-		},
-		{
-			name:      "has user_access_token_vault_id",
-			extraData: json.RawMessage(`{"user_access_token_vault_id":"vault-123","email":"test@example.com"}`),
-			want:      "vault-123",
-		},
-		{
-			name:      "invalid JSON",
-			extraData: json.RawMessage(`{invalid`),
-			want:      "",
-		},
-		{
-			name:      "other keys only",
-			extraData: json.RawMessage(`{"shop_domain":"mystore.myshopify.com"}`),
-			want:      "",
-		},
+	})
+	out := slackUserTokenAsPrimary(tok)
+	if out.AccessToken != "xoxp-user" {
+		t.Errorf("AccessToken = %q, want xoxp-user", out.AccessToken)
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			got := userTokenVaultIDFromExtraData(tt.extraData)
-			if got != tt.want {
-				t.Errorf("userTokenVaultIDFromExtraData() = %q, want %q", got, tt.want)
-			}
-		})
+	if slackUserTokenAsPrimary(nil) != nil {
+		t.Error("nil input should return nil")
+	}
+
+	plain := &oauth2.Token{AccessToken: "only"}
+	if got := slackUserTokenAsPrimary(plain); got != plain {
+		t.Error("without authed_user, should return same token pointer")
 	}
 }

@@ -49,12 +49,10 @@ func (a *sendDMAction) Execute(ctx context.Context, req connectors.ActionRequest
 		return nil, err
 	}
 
-	creds := credentialsForChat(req.Credentials)
-
 	// Step 1: Open (or reuse) a DM channel with the user.
 	openBody := conversationsOpenRequest{Users: params.UserID}
 	var openResp conversationsOpenResponse
-	if err := a.conn.doPost(ctx, "conversations.open", creds, openBody, &openResp); err != nil {
+	if err := a.conn.doPost(ctx, "conversations.open", req.Credentials, openBody, &openResp); err != nil {
 		return nil, err
 	}
 	if !openResp.OK {
@@ -69,7 +67,7 @@ func (a *sendDMAction) Execute(ctx context.Context, req connectors.ActionRequest
 		Text:    params.Message,
 	}
 	var msgResp sendMessageResponse
-	if err := a.conn.doPost(ctx, "chat.postMessage", creds, msgBody, &msgResp); err != nil {
+	if err := a.conn.doPost(ctx, "chat.postMessage", req.Credentials, msgBody, &msgResp); err != nil {
 		return nil, err
 	}
 	if !msgResp.OK {

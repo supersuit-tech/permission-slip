@@ -804,7 +804,7 @@ func TestStoreOAuthTokens_CreateNew(t *testing.T) {
 		TokenType:    "Bearer",
 	}
 
-	_, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token, nil, "", "")
+	_, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token, nil, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}
@@ -843,7 +843,7 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, "", ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -860,7 +860,7 @@ func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID, ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -892,7 +892,7 @@ func TestStoreOAuthTokens_ReauthWithoutRefreshToken_PreservesOld(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, "", ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -914,7 +914,7 @@ func TestStoreOAuthTokens_ReauthWithoutRefreshToken_PreservesOld(t *testing.T) {
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID, ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -965,7 +965,7 @@ func TestStoreOAuthTokens_ReauthWithNewRefreshToken_ReplacesOld(t *testing.T) {
 		Expiry:       time.Now().Add(time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, "", ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, nil, ""); err != nil {
 		t.Fatalf("first storeOAuthTokens: %v", err)
 	}
 
@@ -982,7 +982,7 @@ func TestStoreOAuthTokens_ReauthWithNewRefreshToken_ReplacesOld(t *testing.T) {
 		Expiry:       time.Now().Add(2 * time.Hour),
 		TokenType:    "Bearer",
 	}
-	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token2, nil, conn1.ID, ""); err != nil {
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token2, nil, conn1.ID); err != nil {
 		t.Fatalf("second storeOAuthTokens: %v", err)
 	}
 
@@ -1307,7 +1307,7 @@ func TestStoreOAuthTokens_WithStateExtra(t *testing.T) {
 	}
 
 	stateExtra := map[string]string{"shop_domain": "mystore.myshopify.com"}
-	_, err := storeOAuthTokens(t.Context(), deps, uid, "shopify", []string{"write_orders"}, token, stateExtra, "", "")
+	_, err := storeOAuthTokens(t.Context(), deps, uid, "shopify", []string{"write_orders"}, token, stateExtra, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}
@@ -1564,7 +1564,7 @@ func TestIsURLExtraKey(t *testing.T) {
 		want bool
 	}{
 		{"instance_url", true},
-		{"base_url", false},  // validated in fetchDocuSignUserInfo, not here
+		{"base_url", false}, // validated in fetchDocuSignUserInfo, not here
 		{"shop_domain", false},
 		{"account_id", false},
 	}
@@ -1818,7 +1818,7 @@ func TestStoreOAuthTokens_WithZendeskSubdomain(t *testing.T) {
 	}
 
 	stateExtra := map[string]string{"subdomain": "mycompany"}
-	_, err := storeOAuthTokens(t.Context(), deps, uid, "zendesk", []string{"read", "write"}, token, stateExtra, "", "")
+	_, err := storeOAuthTokens(t.Context(), deps, uid, "zendesk", []string{"read", "write"}, token, stateExtra, "")
 	if err != nil {
 		t.Fatalf("storeOAuthTokens: %v", err)
 	}

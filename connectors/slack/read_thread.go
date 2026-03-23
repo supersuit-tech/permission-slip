@@ -65,9 +65,8 @@ func (a *readThreadAction) Execute(ctx context.Context, req connectors.ActionReq
 		body.Limit = 50
 	}
 
-	repliesCreds := credentialsForUserTokenIfDirectOrGroupDM(req.Credentials, params.Channel)
 	var resp messagesResponse
-	if err := a.conn.doPost(ctx, "conversations.replies", repliesCreds, body, &resp); err != nil {
+	if err := a.conn.doPost(ctx, "conversations.replies", req.Credentials, body, &resp); err != nil {
 		return nil, err
 	}
 

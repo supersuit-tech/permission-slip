@@ -10,7 +10,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-func TestSendMessage_PrefersUserAccessToken(t *testing.T) {
+func TestSendMessage_UsesAccessToken(t *testing.T) {
 	t.Parallel()
 
 	var auth string
@@ -32,8 +32,7 @@ func TestSendMessage_PrefersUserAccessToken(t *testing.T) {
 
 	params, _ := json.Marshal(sendMessageParams{Channel: "#general", Message: "hi"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -49,7 +48,7 @@ func TestSendMessage_PrefersUserAccessToken(t *testing.T) {
 	}
 }
 
-func TestSendDM_PrefersUserAccessTokenOnBothCalls(t *testing.T) {
+func TestSendDM_UsesAccessTokenOnBothCalls(t *testing.T) {
 	t.Parallel()
 
 	var auths []string
@@ -79,8 +78,7 @@ func TestSendDM_PrefersUserAccessTokenOnBothCalls(t *testing.T) {
 
 	params, _ := json.Marshal(sendDMParams{UserID: "U01234567", Message: "hi"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -101,7 +99,7 @@ func TestSendDM_PrefersUserAccessTokenOnBothCalls(t *testing.T) {
 	}
 }
 
-func TestUpdateMessage_PrefersUserAccessToken(t *testing.T) {
+func TestUpdateMessage_UsesAccessToken(t *testing.T) {
 	t.Parallel()
 
 	var auth string
@@ -116,8 +114,7 @@ func TestUpdateMessage_PrefersUserAccessToken(t *testing.T) {
 	action := &updateMessageAction{conn: conn}
 	params, _ := json.Marshal(updateMessageParams{Channel: "C01234567", TS: "1.0", Message: "x"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -133,7 +130,7 @@ func TestUpdateMessage_PrefersUserAccessToken(t *testing.T) {
 	}
 }
 
-func TestDeleteMessage_PrefersUserAccessToken(t *testing.T) {
+func TestDeleteMessage_UsesAccessToken(t *testing.T) {
 	t.Parallel()
 
 	var auth string
@@ -148,8 +145,7 @@ func TestDeleteMessage_PrefersUserAccessToken(t *testing.T) {
 	action := &deleteMessageAction{conn: conn}
 	params, _ := json.Marshal(deleteMessageParams{Channel: "C01234567", TS: "1.0"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -165,7 +161,7 @@ func TestDeleteMessage_PrefersUserAccessToken(t *testing.T) {
 	}
 }
 
-func TestScheduleMessage_PrefersUserAccessToken(t *testing.T) {
+func TestScheduleMessage_UsesAccessToken(t *testing.T) {
 	t.Parallel()
 
 	var auth string
@@ -189,8 +185,7 @@ func TestScheduleMessage_PrefersUserAccessToken(t *testing.T) {
 		PostAt:  "2029-12-31T00:00:00Z",
 	})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -206,7 +201,7 @@ func TestScheduleMessage_PrefersUserAccessToken(t *testing.T) {
 	}
 }
 
-func TestSendMessage_UserTokenMissingScopeReturnsClearAuthError(t *testing.T) {
+func TestSendMessage_MissingScopeReturnsClearAuthError(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -219,8 +214,7 @@ func TestSendMessage_UserTokenMissingScopeReturnsClearAuthError(t *testing.T) {
 	action := &sendMessageAction{conn: conn}
 	params, _ := json.Marshal(sendMessageParams{Channel: "C01234567", Message: "hi"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-stale-user",
+		"access_token": "xoxp-stale-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -235,8 +229,8 @@ func TestSendMessage_UserTokenMissingScopeReturnsClearAuthError(t *testing.T) {
 		t.Fatalf("expected AuthError, got %T", err)
 	}
 	msg := err.Error()
-	if !strings.Contains(msg, "chat:write") || !strings.Contains(msg, "re-authorize") {
-		t.Errorf("expected message to mention chat:write and re-authorize, got: %s", msg)
+	if !strings.Contains(msg, "re-authorize") {
+		t.Errorf("expected message to mention re-authorize, got: %s", msg)
 	}
 }
 
@@ -253,8 +247,7 @@ func TestSendMessage_NotAllowedTokenTypeReturnsAuthError(t *testing.T) {
 	action := &sendMessageAction{conn: conn}
 	params, _ := json.Marshal(sendMessageParams{Channel: "C01234567", Message: "hi"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -270,7 +263,7 @@ func TestSendMessage_NotAllowedTokenTypeReturnsAuthError(t *testing.T) {
 	}
 }
 
-func TestReadChannelMessages_DMUsesUserTokenForMembersAndHistory(t *testing.T) {
+func TestReadChannelMessages_DMUsesAccessTokenForMembersAndHistory(t *testing.T) {
 	t.Parallel()
 
 	var membersAuth, historyAuth string
@@ -305,8 +298,7 @@ func TestReadChannelMessages_DMUsesUserTokenForMembersAndHistory(t *testing.T) {
 	action := &readChannelMessagesAction{conn: conn}
 	params, _ := json.Marshal(readChannelMessagesParams{Channel: "D01234567"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -319,14 +311,14 @@ func TestReadChannelMessages_DMUsesUserTokenForMembersAndHistory(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if membersAuth != "Bearer xoxp-user" {
-		t.Errorf("conversations.members: expected user token, got %q", membersAuth)
+		t.Errorf("conversations.members: expected access token, got %q", membersAuth)
 	}
 	if historyAuth != "Bearer xoxp-user" {
-		t.Errorf("conversations.history: expected user token, got %q", historyAuth)
+		t.Errorf("conversations.history: expected access token, got %q", historyAuth)
 	}
 }
 
-func TestReadChannelMessages_PublicChannelKeepsBotTokenForHistory(t *testing.T) {
+func TestReadChannelMessages_PublicChannelUsesAccessTokenForHistory(t *testing.T) {
 	t.Parallel()
 
 	var historyAuth string
@@ -355,8 +347,7 @@ func TestReadChannelMessages_PublicChannelKeepsBotTokenForHistory(t *testing.T) 
 	action := &readChannelMessagesAction{conn: conn}
 	params, _ := json.Marshal(readChannelMessagesParams{Channel: "C01234567"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -367,12 +358,12 @@ func TestReadChannelMessages_PublicChannelKeepsBotTokenForHistory(t *testing.T) 
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if historyAuth != "Bearer xoxb-bot" {
-		t.Errorf("conversations.history: expected bot token for public C-channel, got %q", historyAuth)
+	if historyAuth != "Bearer xoxp-user" {
+		t.Errorf("conversations.history: expected access token for public C-channel, got %q", historyAuth)
 	}
 }
 
-func TestReadThread_DMUsesUserTokenForReplies(t *testing.T) {
+func TestReadThread_DMUsesAccessTokenForReplies(t *testing.T) {
 	t.Parallel()
 
 	var repliesAuth string
@@ -408,8 +399,7 @@ func TestReadThread_DMUsesUserTokenForReplies(t *testing.T) {
 	action := &readThreadAction{conn: conn}
 	params, _ := json.Marshal(readThreadParams{Channel: "D01234567", ThreadTS: "1.0"})
 	creds := connectors.NewCredentials(map[string]string{
-		"access_token":      "xoxb-bot",
-		"user_access_token": "xoxp-user",
+		"access_token": "xoxp-user",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -422,6 +412,6 @@ func TestReadThread_DMUsesUserTokenForReplies(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if repliesAuth != "Bearer xoxp-user" {
-		t.Errorf("conversations.replies: expected user token, got %q", repliesAuth)
+		t.Errorf("conversations.replies: expected access token, got %q", repliesAuth)
 	}
 }

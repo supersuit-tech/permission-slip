@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -16,14 +17,14 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "slack",
 		Name:        "Slack",
-		Description: "Slack integration for team communication. OAuth connections may include a user token for search, posting as the authorizing user, and reading DMs the bot cannot see.",
+		Description: "Slack integration for team communication via user OAuth (xoxp-). Actions run as the authorizing Slack user.",
 		Status:      "early_preview",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "slack.send_message",
 				Name:        "Send Message",
-				Description: "Send a message to a Slack channel. When the connection has a Slack user OAuth token with chat:write, the message is sent as the authorizing user; otherwise it is sent as the app bot.",
+				Description: "Send a message to a Slack channel as the authorizing user.",
 				RiskLevel:   "low",
 				Preview: &connectors.ActionPreview{
 					Layout: "message",
@@ -69,7 +70,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.list_channels",
 				Name:        "List Channels",
-				Description: "List Slack channels. Uses the bot token for conversations.list and, when a user OAuth token is present, merges in the authorizing user's DMs and private conversations from users.conversations (so 1:1 DMs the bot is not in still appear). Returns all channel types (public, private, group DMs, DMs) by default when a matching profile email is available.",
+				Description: "List Slack channels via conversations.list, merged with the authorizing user's DMs and private conversations from users.conversations when a matching profile email is available. Returns all channel types (public, private, group DMs, DMs) by default when email is set.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -99,7 +100,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.read_channel_messages",
 				Name:        "Read Channel Messages",
-				Description: "Read recent messages from a Slack channel, DM (D…), or group DM (G…). For D and G channels, uses the authorizing user's OAuth token when available so history matches the human participant.",
+				Description: "Read recent messages from a Slack channel, DM (D…), or group DM (G…).",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -161,7 +162,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.schedule_message",
 				Name:        "Schedule Message",
-				Description: "Schedule a message for future delivery to a Slack channel. When a user OAuth token with chat:write is present, schedules as the authorizing user.",
+				Description: "Schedule a message for future delivery to a Slack channel as the authorizing user.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -280,7 +281,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.send_dm",
 				Name:        "Send Direct Message",
-				Description: "Send a direct message to a Slack user. When a user OAuth token with chat:write is present, opens and posts as the authorizing user.",
+				Description: "Send a direct message to a Slack user as the authorizing user.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -301,7 +302,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.update_message",
 				Name:        "Update Message",
-				Description: "Edit an existing message. With a user OAuth token, only messages sent as that user can be updated.",
+				Description: "Edit an existing message you are allowed to change.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -326,7 +327,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.delete_message",
 				Name:        "Delete Message",
-				Description: "Delete a message. With a user OAuth token, only messages that user may delete can be removed.",
+				Description: "Delete a message you are allowed to remove.",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -346,7 +347,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.list_users",
 				Name:        "List Users",
-				Description: "List workspace users visible to the bot",
+				Description: "List workspace users visible to the authorizing user",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -366,7 +367,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "slack.search_messages",
 				Name:        "Search Messages",
-				Description: "Search messages across Slack channels (requires a user token with search:read.* scopes; bot tokens are not supported by Slack for this endpoint)",
+				Description: "Search messages across Slack channels (requires search:read)",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -399,23 +400,22 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Service:       "slack",
 				AuthType:      "oauth2",
 				OAuthProvider: "slack",
-				OAuthScopes:   append(OAuthScopes, OAuthUserScopes...),
+				OAuthScopes:   OAuthScopes,
 			},
-			{Service: "slack_bot", AuthType: "custom", InstructionsURL: "https://api.slack.com/tutorials/tracks/getting-a-token"},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{
 				ID:          "tpl_slack_send_to_channel",
 				ActionType:  "slack.send_message",
 				Name:        "Post to a channel",
-				Description: "Locks the channel and lets the agent choose the message content (as the authorizing user when user OAuth token has chat:write).",
+				Description: "Locks the channel and lets the agent choose the message content as the authorizing user.",
 				Parameters:  json.RawMessage(`{"channel":"#general","message":"*"}`),
 			},
 			{
 				ID:          "tpl_slack_send_any",
 				ActionType:  "slack.send_message",
 				Name:        "Send messages freely",
-				Description: "Agent can send any message to any channel (as the authorizing user when user OAuth token has chat:write).",
+				Description: "Agent can send any message to any channel as the authorizing user.",
 				Parameters:  json.RawMessage(`{"channel":"*","message":"*"}`),
 			},
 			{
@@ -429,28 +429,28 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_slack_list_channels",
 				ActionType:  "slack.list_channels",
 				Name:        "List channels",
-				Description: "Agent can list channels; user OAuth token merges in the authorizing user's DMs when present.",
+				Description: "Agent can list channels, including the authorizing user's DMs when profile email matches Slack.",
 				Parameters:  json.RawMessage(`{"types":"*","limit":"*","cursor":"*"}`),
 			},
 			{
 				ID:          "tpl_slack_read_channel",
 				ActionType:  "slack.read_channel_messages",
 				Name:        "Read channel messages",
-				Description: "Agent can read messages from channels, DMs, or group DMs (user token used for D/G when available).",
+				Description: "Agent can read messages from channels, DMs, or group DMs.",
 				Parameters:  json.RawMessage(`{"channel":"*","limit":"*","oldest":"*","latest":"*","cursor":"*"}`),
 			},
 			{
 				ID:          "tpl_slack_read_thread",
 				ActionType:  "slack.read_thread",
 				Name:        "Read thread replies",
-				Description: "Agent can read thread replies (user token for DM/group-DM threads when available).",
+				Description: "Agent can read thread replies.",
 				Parameters:  json.RawMessage(`{"channel":"*","thread_ts":"*","limit":"*","cursor":"*"}`),
 			},
 			{
 				ID:          "tpl_slack_schedule_message",
 				ActionType:  "slack.schedule_message",
 				Name:        "Schedule messages",
-				Description: "Agent can schedule messages (as the authorizing user when user OAuth token has chat:write).",
+				Description: "Agent can schedule messages as the authorizing user.",
 				Parameters:  json.RawMessage(`{"channel":"*","message":"*","post_at":"*"}`),
 			},
 			{
@@ -485,21 +485,21 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				ID:          "tpl_slack_send_dm",
 				ActionType:  "slack.send_dm",
 				Name:        "Send direct messages",
-				Description: "Agent can send DMs (as the authorizing user when user OAuth token has chat:write).",
+				Description: "Agent can send DMs as the authorizing user.",
 				Parameters:  json.RawMessage(`{"user_id":"*","message":"*"}`),
 			},
 			{
 				ID:          "tpl_slack_update_message",
 				ActionType:  "slack.update_message",
 				Name:        "Update messages",
-				Description: "Agent can edit messages the authorizing user or bot is allowed to change.",
+				Description: "Agent can edit messages the authorizing user is allowed to change.",
 				Parameters:  json.RawMessage(`{"channel":"*","ts":"*","message":"*"}`),
 			},
 			{
 				ID:          "tpl_slack_delete_message",
 				ActionType:  "slack.delete_message",
 				Name:        "Delete messages",
-				Description: "Agent can delete messages the authorizing user or bot is allowed to remove.",
+				Description: "Agent can delete messages the authorizing user is allowed to remove.",
 				Parameters:  json.RawMessage(`{"channel":"*","ts":"*"}`),
 			},
 			{

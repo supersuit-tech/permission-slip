@@ -21,6 +21,11 @@ const eventDeduplicationTTL = 1 * time.Hour
 // RegisterSlackEventRoutes adds the Slack Events API webhook endpoint to the mux.
 // Like the Stripe webhook, this lives outside /api/v1/ to bypass auth middleware.
 // Slack authenticates requests via HMAC-SHA256 signature verification.
+//
+// Note: Slack event subscriptions are configured per Slack app and typically
+// require a bot/app install. User-token-only OAuth does not replace Events API
+// setup; disable event subscriptions in the Slack app if you rely solely on
+// user OAuth without a bot.
 func RegisterSlackEventRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("POST /api/webhooks/slack/events", handleSlackEvent(deps))
 }
