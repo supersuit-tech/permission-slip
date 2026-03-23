@@ -11,6 +11,7 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/db"
 	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip-web/oauth"
 	"github.com/supersuit-tech/permission-slip-web/vault"
 )
 
@@ -68,7 +69,22 @@ func TestListAgentConnectorCalendars_NoCredentialBinding(t *testing.T) {
 	reg.Register(&stubCalendarConnector{id: connID})
 
 	v := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg, SupabaseJWTSecret: testJWTSecret}
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           connID,
+		AuthorizeURL: "https://example.com/oauth/authorize",
+		TokenURL:     "https://example.com/oauth/token",
+		ClientID:     "test",
+		ClientSecret: "test",
+		Source:       oauth.SourceBuiltIn,
+	})
+	deps := &Deps{
+		DB:             tx,
+		Vault:          v,
+		Connectors:     reg,
+		OAuthProviders: oauthReg,
+		SupabaseJWTSecret: testJWTSecret,
+	}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/connectors/%s/calendars", agentID, connID), uid)
@@ -125,7 +141,22 @@ func TestListAgentConnectorCalendars_Success(t *testing.T) {
 	v := vault.NewMockVaultStore()
 	v.SeedSecretForTest(oauthRow.AccessTokenVaultID, []byte(`{"access_token":"tok-test"}`))
 
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg, SupabaseJWTSecret: testJWTSecret}
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           connID,
+		AuthorizeURL: "https://example.com/oauth/authorize",
+		TokenURL:     "https://example.com/oauth/token",
+		ClientID:     "test",
+		ClientSecret: "test",
+		Source:       oauth.SourceBuiltIn,
+	})
+	deps := &Deps{
+		DB:             tx,
+		Vault:          v,
+		Connectors:     reg,
+		OAuthProviders: oauthReg,
+		SupabaseJWTSecret: testJWTSecret,
+	}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/connectors/%s/calendars", agentID, connID), uid)
