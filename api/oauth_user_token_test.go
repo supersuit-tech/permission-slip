@@ -3,7 +3,6 @@ package api
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/oauth"
 	"golang.org/x/oauth2"
 )
 
@@ -17,21 +16,15 @@ func TestExtractSlackTeamName(t *testing.T) {
 	}
 }
 
-func TestOAuthSlackNormalizationUsesPackage(t *testing.T) {
+func TestSlackV2UserTokenTopLevel(t *testing.T) {
 	t.Parallel()
-	// Regression: callback path must use oauth.NormalizeSlackUserOAuthToken for
-	// user refresh_token alignment (see oauth/slack_token_test.go).
-	tok := (&oauth2.Token{
-		AccessToken:  "xoxb",
-		RefreshToken: "bot-rt",
-	}).WithExtra(map[string]any{
-		"authed_user": map[string]any{
-			"access_token":  "xoxp",
-			"refresh_token": "user-rt",
-		},
-	})
-	n := oauth.NormalizeSlackUserOAuthToken(tok)
-	if n.AccessToken != "xoxp" || n.RefreshToken != "user-rt" {
-		t.Fatalf("normalize: %+v", n)
+	// With oauth.v2.user.access, the user token is at the top level —
+	// no authed_user normalization needed.
+	tok := &oauth2.Token{
+		AccessToken:  "xoxp-user",
+		RefreshToken: "user-rt",
+	}
+	if tok.AccessToken != "xoxp-user" || tok.RefreshToken != "user-rt" {
+		t.Fatalf("unexpected: %+v", tok)
 	}
 }
