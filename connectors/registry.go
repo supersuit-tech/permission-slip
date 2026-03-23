@@ -64,3 +64,14 @@ func (r *Registry) GetAction(actionType string) (Action, bool) {
 	action, ok := conn.Actions()[actionType]
 	return action, ok
 }
+
+// Remove deletes a connector from the registry. Returns false if id was not present.
+func (r *Registry) Remove(id string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, ok := r.connectors[id]; !ok {
+		return false
+	}
+	delete(r.connectors, id)
+	return true
+}
