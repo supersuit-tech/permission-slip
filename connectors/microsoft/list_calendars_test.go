@@ -5,8 +5,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
 func TestGraphNextRelativePath(t *testing.T) {
