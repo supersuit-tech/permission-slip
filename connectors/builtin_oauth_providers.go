@@ -22,7 +22,7 @@ func init() {
 		"airtable", "atlassian", "calendly", "datadog", "discord",
 		"docusign", "dropbox", "figma", "github", "google", "hubspot", "kroger",
 		"linear", "linkedin", "meta", "microsoft", "netlify", "notion",
-		"pagerduty", "salesforce", "sendgrid", "shopify", "slack",
+		"pagerduty", "quickbooks", "salesforce", "sendgrid", "shopify", "slack",
 		"square", "stripe", "vercel", "zendesk", "zoom",
 	} {
 		builtInOAuthProviders[id] = true
@@ -47,11 +47,16 @@ func RegisterBuiltInOAuthProvider(id string) {
 
 // BuiltInOAuthProviderIDs returns all registered built-in OAuth provider IDs.
 // Order is not guaranteed. Intended for testing and diagnostics.
+// Connectors turned off via connectors/<id>/disabled are omitted when the
+// provider id matches the connector id (the usual case for built-ins).
 func BuiltInOAuthProviderIDs() []string {
 	builtInOAuthMu.Lock()
 	defer builtInOAuthMu.Unlock()
 	ids := make([]string, 0, len(builtInOAuthProviders))
 	for id := range builtInOAuthProviders {
+		if IsBuiltInConnectorDisabled(id) {
+			continue
+		}
 		ids = append(ids, id)
 	}
 	return ids

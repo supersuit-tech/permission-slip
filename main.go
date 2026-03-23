@@ -302,6 +302,27 @@ func main() {
 	// Load external connectors from CONNECTORS_DIR (or ~/.permission_slip/connectors/).
 	loadExternalConnectors(registry, deps.DB)
 
+	// Built-in connectors with connectors/<id>/disabled are omitted from the registry
+	// above; purge their DB rows so list APIs stay consistent.
+	for _, id := range connectors.DisabledBuiltInConnectorIDs() {
+		registry.Remove(id)
+		if deps.DB == nil {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		err := db.DeleteConnectorByID(ctx, deps.DB, id)
+		cancel()
+		if err != nil {
+			log.Printf("Warning: failed to delete disabled connector %q from database: %v", id, err)
+			continue
+		}
+		if msg := connectors.DisabledBuiltInConnectorReason(id); msg != "" {
+			log.Printf("Connector %q is disabled (%s) — removed from database", id, msg)
+		} else {
+			log.Printf("Connector %q is disabled — removed from database", id)
+		}
+	}
+
 	deps.Connectors = registry
 
 	// Initialize Slack event infrastructure.
@@ -342,6 +363,10 @@ func main() {
 	// so BYOA credentials survive server restarts.
 	if deps.DB != nil && deps.Vault != nil {
 		loadBYOAProviderConfigs(oauthRegistry, deps.DB, deps.Vault)
+	}
+
+	for _, id := range connectors.DisabledBuiltInConnectorIDs() {
+		_ = oauthRegistry.Remove(id)
 	}
 
 	// Start all registered background jobs.
@@ -558,6 +583,10 @@ func loadExternalConnectors(registry *connectors.Registry, d db.DBTX) {
 		// real GitHub connector and receive users' decrypted credentials.
 		if _, exists := registry.Get(ext.ID()); exists {
 			log.Printf("Warning: external connector %q conflicts with an already-registered connector — skipping", ext.ID())
+			continue
+		}
+		if connectors.IsBuiltInConnectorDisabled(ext.ID()) {
+			log.Printf("Warning: external connector %q uses a reserved id (built-in connector disabled in tree) — skipping", ext.ID())
 			continue
 		}
 

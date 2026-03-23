@@ -7,6 +7,9 @@ import (
 )
 
 func init() {
+	if oauth.IsBuiltInOAuthProviderDisabled("quickbooks") {
+		return
+	}
 	oauth.RegisterBuiltIn(func() oauth.Provider {
 		return oauth.Provider{
 			ID:           "quickbooks",
