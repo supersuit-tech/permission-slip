@@ -63,6 +63,13 @@ oauthAuthorize:
       - A signed state token prevents CSRF and session-fixation attacks
       - The provider must have client credentials configured (built-in or BYOA)
 
+      ### Slack (`provider=slack`)
+
+      Slack uses **user-token-only** OAuth: the server sends Slack **user** scopes via
+      the `user_scope` query parameter and does **not** send a bot `scope` parameter.
+      After consent, the stored connection uses the Slack user token (`xoxp-`) as the
+      primary secret. Workspace bot install is not required.
+
     tags:
       - OAuth
 
@@ -73,7 +80,7 @@ oauthAuthorize:
       - name: provider
         in: path
         required: true
-        description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")
+        description: The OAuth provider ID (e.g. "google", "microsoft", "slack", "zoom")
         schema:
           type: string
       - name: scope
@@ -133,6 +140,15 @@ oauthCallback:
       `?oauth_status=success`. On failure, redirects with `?oauth_status=error`.
 
       This endpoint is called by the OAuth provider, not directly by the frontend.
+
+      ### Slack (`provider=slack`)
+
+      The callback requires Slack to return `authed_user.access_token` (user token).
+      If that field is missing (e.g. app still configured for bot-only scopes), the
+      user is redirected with `oauth_status=error` and an actionable message.
+      When Slack token rotation is enabled, user `refresh_token` and expiry may be
+      nested under `authed_user` in the token response; the server normalizes these
+      before persisting.
 
     tags:
       - OAuth

@@ -22,6 +22,13 @@ The credential `auth_type` is `oauth2` with provider `slack`. Users connect via 
 
 At execution time, the connector uses the OAuth `access_token` (Bearer) for all Web API calls.
 
+### Re-authorization after scope changes
+
+If you previously connected with the old bot+user dual-token flow, disconnect and
+connect again (or wait for the connection status `needs_reauth` after deploy). The
+platform stores a single user token per connection; bot-only primary tokens are no
+longer supported.
+
 ## Actions
 
 ### `slack.send_message`
