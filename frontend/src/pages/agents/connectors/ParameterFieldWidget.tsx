@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
 import { inferWidgetFromProperty } from "@/lib/parameterSchema";
+import { RemoteSelectWidget } from "./RemoteSelectWidget";
 
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
@@ -19,6 +20,9 @@ export interface ParameterFieldWidgetProps {
   disabled?: boolean;
   /** Extra className for the input element. */
   className?: string;
+  /** Agent and connector context for `remote-select` widgets. */
+  agentId?: number;
+  connectorId?: string;
   /** Override the placeholder from x-ui (e.g. for constraint mode hints). */
   placeholder?: string;
   /**
@@ -39,6 +43,8 @@ export function ParameterFieldWidget({
   onChange,
   disabled,
   className,
+  agentId,
+  connectorId,
   placeholder: placeholderOverride,
   siblingDatetimeValue,
 }: ParameterFieldWidgetProps) {
@@ -59,8 +65,11 @@ export function ParameterFieldWidget({
         enumValues: property.enum,
         siblingDatetimeValue,
         datetimeRangeRole: ui?.datetime_range_role,
+        agentId,
+        connectorId,
+        propertyUI: ui,
       })}
-      <FieldHints ui={ui} />
+      <FieldHints ui={ui} omitHelpText={widget === "remote-select"} />
     </div>
   );
 }
@@ -75,10 +84,15 @@ interface WidgetRenderProps {
   enumValues?: string[];
   siblingDatetimeValue?: string;
   datetimeRangeRole?: "lower" | "upper";
+  agentId?: number;
+  connectorId?: string;
+  propertyUI?: SchemaPropertyUI;
 }
 
 function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
   switch (widget) {
+    case "remote-select":
+      return <RemoteSelectField {...props} />;
     case "select":
       return <SelectWidget {...props} />;
     case "textarea":
@@ -97,6 +111,49 @@ function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
     default:
       return <TextWidget {...props} />;
   }
+}
+
+function RemoteSelectField({
+  inputId,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  className,
+  agentId,
+  connectorId,
+  propertyUI,
+}: WidgetRenderProps) {
+  if (
+    !propertyUI ||
+    agentId === undefined ||
+    agentId <= 0 ||
+    !connectorId
+  ) {
+    return (
+      <TextWidget
+        inputId={inputId}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder={placeholder}
+        className={className}
+      />
+    );
+  }
+  return (
+    <RemoteSelectWidget
+      inputId={inputId}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      placeholder={placeholder}
+      className={className}
+      agentId={agentId}
+      connectorId={connectorId}
+      ui={propertyUI}
+    />
+  );
 }
 
 function TextWidget({ inputId, value, onChange, disabled, placeholder, className }: WidgetRenderProps) {
@@ -362,14 +419,14 @@ function isConcreteDatetimeString(value: string): boolean {
 }
 
 /** Renders help_text and help_url hints below the input. */
-function FieldHints({ ui }: { ui?: SchemaPropertyUI }) {
+function FieldHints({ ui, omitHelpText }: { ui?: SchemaPropertyUI; omitHelpText?: boolean }) {
   const validHelpUrl =
     ui?.help_url && /^https?:\/\//i.test(ui.help_url) ? ui.help_url : null;
-  if (!ui?.help_text && !validHelpUrl) return null;
+  if ((!ui?.help_text || omitHelpText) && !validHelpUrl) return null;
 
   return (
     <div className="flex flex-wrap items-center gap-x-2">
-      {ui?.help_text && (
+      {ui?.help_text && !omitHelpText && (
         <p className="text-muted-foreground text-sm">{ui.help_text}</p>
       )}
       {validHelpUrl && (

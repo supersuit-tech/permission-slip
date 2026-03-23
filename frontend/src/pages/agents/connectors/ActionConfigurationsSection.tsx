@@ -188,6 +188,7 @@ export function ActionConfigurationsSection({
           }}
           config={editTarget}
           agentId={agentId}
+          connectorId={connectorId}
           actions={actions}
         />
       )}
