@@ -7,6 +7,9 @@ import (
 )
 
 func init() {
+	if oauth.IsBuiltInOAuthProviderDisabled("salesforce") {
+		return
+	}
 	oauth.RegisterBuiltIn(func() oauth.Provider {
 		return oauth.Provider{
 			ID:           "salesforce",
