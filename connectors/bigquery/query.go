@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"sort"
 	"strings"
 	"time"
@@ -32,7 +31,7 @@ type queryParams struct {
 }
 
 func (p *queryParams) validate() error {
-	if err := validateReadOnlyBigQuerySQL(p.SQL); err != nil {
+	if err := sqldb.ValidateReadOnlyWarehouseSQL(p.SQL); err != nil {
 		return err
 	}
 	if p.MaxRows < 0 {
@@ -187,33 +186,7 @@ func buildNamedParameters(params []interface{}) []bq.QueryParameter {
 }
 
 func coerceParamValue(v interface{}) interface{} {
-	switch x := v.(type) {
-	case float64:
-		if !math.IsNaN(x) && !math.IsInf(x, 0) && x == math.Trunc(x) && x >= math.MinInt64 && x <= math.MaxInt64 {
-			return int64(x)
-		}
-		return x
-	case json.Number:
-		if i, err := x.Int64(); err == nil {
-			return i
-		}
-		f, _ := x.Float64()
-		return f
-	case []interface{}:
-		out := make([]interface{}, len(x))
-		for i := range x {
-			out[i] = coerceParamValue(x[i])
-		}
-		return out
-	case map[string]interface{}:
-		out := make(map[string]interface{}, len(x))
-		for k, val := range x {
-			out[k] = coerceParamValue(val)
-		}
-		return out
-	default:
-		return v
-	}
+	return sqldb.CoerceJSONParamValue(v)
 }
 
 func schemaColumnNames(schema bq.Schema) []string {

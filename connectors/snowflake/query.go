@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/snowflakedb/gosnowflake"
@@ -25,12 +24,8 @@ type queryParams struct {
 }
 
 func (p *queryParams) validate() error {
-	if p.SQL == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: sql"}
-	}
-	normalized := strings.TrimSpace(strings.ToUpper(p.SQL))
-	if !strings.HasPrefix(normalized, "SELECT") && !strings.HasPrefix(normalized, "WITH") {
-		return &connectors.ValidationError{Message: "only SELECT queries are allowed (query must start with SELECT or WITH)"}
+	if err := sqldb.ValidateReadOnlyWarehouseSQL(p.SQL); err != nil {
+		return err
 	}
 	if p.MaxRows < 0 {
 		return &connectors.ValidationError{Message: "max_rows must be positive"}
@@ -91,7 +86,8 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 	}
 	defer tx.Rollback() //nolint:errcheck
 
-	rows, err := tx.QueryContext(ctx, params.SQL, params.Params...)
+	args := coerceSnowflakeParams(params.Params)
+	rows, err := tx.QueryContext(ctx, params.SQL, args...)
 	if err != nil {
 		return nil, mapSnowflakeError(err, "executing query")
 	}
@@ -112,6 +108,17 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		"row_count": len(results),
 		"truncated": truncated,
 	})
+}
+
+func coerceSnowflakeParams(params []interface{}) []interface{} {
+	if len(params) == 0 {
+		return nil
+	}
+	out := make([]interface{}, len(params))
+	for i, p := range params {
+		out[i] = sqldb.CoerceJSONParamValue(p)
+	}
+	return out
 }
 
 func snowflakeConfigFromRequest(req connectors.ActionRequest) (*gosnowflake.Config, error) {

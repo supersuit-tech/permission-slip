@@ -1,31 +1,8 @@
 package bigquery
 
 import (
-	"strings"
 	"testing"
-
-	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
-
-func TestValidateReadOnlyBigQuerySQL_withDeleteRejected(t *testing.T) {
-	t.Parallel()
-	sql := "WITH cte AS (SELECT 1 AS id) DELETE FROM `p.d.t` WHERE id IN (SELECT id FROM cte)"
-	err := validateReadOnlyBigQuerySQL(sql)
-	if err == nil || !connectors.IsValidationError(err) {
-		t.Fatalf("expected validation error, got %v", err)
-	}
-	if !strings.Contains(err.Error(), "DELETE") {
-		t.Fatalf("error should mention DELETE: %v", err)
-	}
-}
-
-func TestValidateReadOnlyBigQuerySQL_selectOk(t *testing.T) {
-	t.Parallel()
-	err := validateReadOnlyBigQuerySQL("WITH a AS (SELECT 1) SELECT * FROM a")
-	if err != nil {
-		t.Fatal(err)
-	}
-}
 
 func TestTranslatePlaceholders_skipsStringLiteral(t *testing.T) {
 	t.Parallel()
@@ -52,10 +29,10 @@ func TestTranslatePlaceholders_skipsComment(t *testing.T) {
 	}
 }
 
-func TestRejectMultiStatement(t *testing.T) {
+func TestCoerceParamValue_delegates(t *testing.T) {
 	t.Parallel()
-	err := rejectMultiStatement("SELECT 1; DROP TABLE x")
-	if err == nil || !connectors.IsValidationError(err) {
-		t.Fatalf("expected error, got %v", err)
+	v := coerceParamValue(float64(7))
+	if i, ok := v.(int64); !ok || i != 7 {
+		t.Fatalf("got %T %v", v, v)
 	}
 }
