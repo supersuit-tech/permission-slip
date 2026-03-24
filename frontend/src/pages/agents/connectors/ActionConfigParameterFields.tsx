@@ -9,6 +9,7 @@ import type { ParametersSchema, SchemaProperty, FieldGroup } from "@/lib/paramet
 import {
   getOrderedFieldKeys,
   getFieldLabel,
+  isFieldHidden,
   isFieldVisible,
   inferWidgetFromProperty,
 } from "@/lib/parameterSchema";
@@ -63,6 +64,7 @@ export function ActionConfigParameterFields({
   function renderField(key: string) {
     const prop = properties[key];
     if (!prop) return null;
+    if (isFieldHidden(prop)) return null;
     if (!isFieldVisible(prop, values)) return null;
 
     const isRequired = requiredFields.includes(key);
@@ -126,7 +128,7 @@ export function ActionConfigParameterFields({
           const groupKeys = keysByGroup.get(group.id) ?? [];
           // Filter by visibility so empty groups don't render when all fields are hidden
           const visibleGroupKeys = groupKeys.filter(
-            (k) => properties[k] !== undefined && isFieldVisible(properties[k]!, values),
+            (k) => properties[k] !== undefined && !isFieldHidden(properties[k]!) && isFieldVisible(properties[k]!, values),
           );
           if (visibleGroupKeys.length === 0) return null;
           return (
