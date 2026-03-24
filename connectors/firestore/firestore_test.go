@@ -51,7 +51,7 @@ func TestFirestoreConnector_ValidateCredentials(t *testing.T) {
 		{
 			name: "valid with explicit project_id credential",
 			creds: connectors.NewCredentials(map[string]string{
-				"service_account_json": `{"type":"service_account","client_email":"a@b.com","private_key":"k","project_id":""}`,
+				"service_account_json": `{"type":"service_account","client_email":"a@b.com","private_key":"k"}`,
 				"project_id":           "override-proj",
 			}),
 			wantErr: false,
