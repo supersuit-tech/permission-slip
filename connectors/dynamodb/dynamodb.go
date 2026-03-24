@@ -206,6 +206,18 @@ func (c *DynamoDBConnector) Manifest() *connectors.ConnectorManifest {
 							"minItems": 1,
 							"maxItems": 64,
 							"description": "Table allowlist — request is rejected if table is not listed"
+						},
+						"allowed_write_attributes": {
+							"type": "array",
+							"items": {"type": "string"},
+							"maxItems": 100,
+							"description": "When set, condition expression attribute names must reference only these attributes"
+						},
+						"allowed_read_attributes": {
+							"type": "array",
+							"items": {"type": "string"},
+							"maxItems": 100,
+							"description": "When set, previous_item only returns these attributes"
 						}
 					}
 				}`)),
