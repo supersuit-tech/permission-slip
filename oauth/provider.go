@@ -152,6 +152,7 @@ func (p Provider) MarshalJSON() ([]byte, error) {
 		Scopes       []string       `json:"scopes,omitempty"`
 		ClientID     string         `json:"client_id,omitempty"`
 		ClientSecret string         `json:"client_secret,omitempty"`
+		PKCE         bool           `json:"pkce"`
 		Source       ProviderSource `json:"source"`
 	}
 	safe := safeProvider{
@@ -160,6 +161,7 @@ func (p Provider) MarshalJSON() ([]byte, error) {
 		TokenURL:     p.TokenURL,
 		Scopes:       p.Scopes,
 		ClientID:     p.ClientID,
+		PKCE:         p.PKCE,
 		Source:       p.Source,
 	}
 	if p.ClientSecret != "" {

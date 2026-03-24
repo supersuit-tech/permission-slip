@@ -113,6 +113,8 @@ OAuth provider credentials are configured via environment variables on the serve
 | `DROPBOX_CLIENT_ID` | App key from the [Dropbox App Console](https://www.dropbox.com/developers/apps) |
 | `DROPBOX_CLIENT_SECRET` | App secret from the Dropbox App Console |
 
+The platform uses **PKCE** for Dropbox automatically (verifier is stored in the server-side OAuth state token). `GET /v1/oauth/providers` returns `"pkce": true` for providers that use it.
+
 ### OAuth Infrastructure
 
 | Variable | Description | Default / Notes |

@@ -72,6 +72,7 @@ type oauthProviderResponse struct {
 	Scopes         []string `json:"scopes"`
 	Source         string   `json:"source"`
 	HasCredentials bool     `json:"has_credentials"`
+	PKCE           bool     `json:"pkce"`
 }
 
 type oauthProviderListResponse struct {
@@ -405,6 +406,7 @@ func handleListOAuthProviders(deps *Deps) http.HandlerFunc {
 				Scopes:         p.Scopes,
 				Source:         string(p.Source),
 				HasCredentials: p.HasClientCredentials(),
+				PKCE:           p.PKCE,
 			}
 		}
 		RespondJSON(w, http.StatusOK, oauthProviderListResponse{Providers: data})

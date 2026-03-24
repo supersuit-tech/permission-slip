@@ -157,6 +157,9 @@ func TestListOAuthProviders_ReturnsRegistered(t *testing.T) {
 			if p.Source != "built_in" {
 				t.Errorf("expected built_in source, got %s", p.Source)
 			}
+			if p.PKCE {
+				t.Error("expected google PKCE false in provider list")
+			}
 		}
 		if p.ID == "unconfigured" {
 			if p.HasCredentials {

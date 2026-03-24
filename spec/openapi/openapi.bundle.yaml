@@ -10660,6 +10660,12 @@ components:
           type: boolean
           description: Whether the provider has client credentials configured and is ready to use
           example: true
+        pkce:
+          type: boolean
+          description: |
+            When true, the platform uses PKCE (RFC 7636) for this provider's authorize and token exchange. Clients only need to start the usual browser redirect; the verifier is stored server-side in the OAuth state token.
+          default: false
+          example: false
     OAuthProviderListResponse:
       type: object
       required:
