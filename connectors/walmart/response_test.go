@@ -134,7 +134,7 @@ func TestExtractErrorMessage_Truncation(t *testing.T) {
 	if len(msg) > 520 {
 		t.Errorf("extractErrorMessage should truncate long bodies, got len %d", len(msg))
 	}
-	if !strings.HasSuffix(msg, "... (truncated)") {
+	if !strings.HasSuffix(msg, "...(truncated)") {
 		t.Errorf("expected truncation suffix, got %q", msg[len(msg)-20:])
 	}
 }

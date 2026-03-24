@@ -123,8 +123,21 @@ func (c *SlackConnector) ValidateCredentials(_ context.Context, creds connectors
 // slackResponse is the common envelope for Slack Web API responses.
 // Every endpoint returns {"ok": true/false, ...}.
 type slackResponse struct {
-	OK    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
+	OK     bool   `json:"ok"`
+	Error  string `json:"error,omitempty"`
+	Needed string `json:"needed,omitempty"` // populated on missing_scope errors
+}
+
+// asError converts a failed slackResponse to a typed connector error.
+// Prefer this over mapSlackError when the full response is available,
+// because it can include the missing scope name for missing_scope errors.
+func (r slackResponse) asError() error {
+	if r.Error == "missing_scope" && r.Needed != "" {
+		return &connectors.AuthError{
+			Message: fmt.Sprintf("Slack token is missing the %q OAuth scope — re-authorize the Slack connection to add it", r.Needed),
+		}
+	}
+	return mapSlackError(r.Error)
 }
 
 // validatable is implemented by action param structs to validate their fields.
@@ -264,7 +277,7 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Slack API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Slack API request canceled"}
+			return &connectors.CanceledError{Message: "Slack API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Slack API request failed: %v", err)}
 	}
@@ -326,7 +339,7 @@ func (c *SlackConnector) doGetURL(ctx context.Context, url, token string, dest a
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Slack API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Slack API request canceled"}
+			return &connectors.CanceledError{Message: "Slack API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Slack API request failed: %v", err)}
 	}

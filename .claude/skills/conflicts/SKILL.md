@@ -90,12 +90,6 @@ Conflicts skill session complete.
 - Clean cycles before exit: 10
 ```
 
-Trigger the webhook to notify the user:
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh workflow run trigger-webhook.yml
-```
-
 ## Important Rules
 
 - **Never ask for human input** — decide and resolve conflicts autonomously.

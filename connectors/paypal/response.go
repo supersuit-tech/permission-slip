@@ -25,21 +25,21 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return nil
 	}
 
-	msg := truncate(string(body), maxErrorMessageBytes)
+	msg := connectors.TruncateUTF8(string(body), maxErrorMessageChars)
 	var pe paypalError
-	if json.Unmarshal(body, &pe) == nil {
-		if pe.Message != "" {
-			msg = pe.Message
-			if pe.Name != "" {
-				msg = fmt.Sprintf("%s: %s", pe.Name, pe.Message)
-			}
-			if pe.DebugID != "" {
-				msg = fmt.Sprintf("%s (debug_id: %s)", msg, pe.DebugID)
-			}
-			if len(pe.Details) > 0 && pe.Details[0].Issue != "" {
-				msg = fmt.Sprintf("%s — %s", msg, pe.Details[0].Issue)
-			}
+	if json.Unmarshal(body, &pe) == nil && pe.Message != "" {
+		msg = pe.Message
+		if pe.Name != "" {
+			msg = fmt.Sprintf("%s: %s", pe.Name, pe.Message)
 		}
+		if pe.DebugID != "" {
+			msg = fmt.Sprintf("%s (debug_id: %s)", msg, pe.DebugID)
+		}
+		if len(pe.Details) > 0 && pe.Details[0].Issue != "" {
+			msg = fmt.Sprintf("%s — %s", msg, pe.Details[0].Issue)
+		}
+		// Apply truncation after composing the structured message too.
+		msg = connectors.TruncateUTF8(msg, maxErrorMessageChars)
 	}
 
 	if statusCode == http.StatusTooManyRequests {
@@ -54,19 +54,14 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	switch {
 	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
 		return &connectors.AuthError{Message: fmt.Sprintf("PayPal auth error (%d): %s", statusCode, msg)}
-	case statusCode == http.StatusBadRequest || statusCode == http.StatusUnprocessableEntity:
+	case statusCode == http.StatusBadRequest:
 		if strings.Contains(lowerName, "validation") || strings.Contains(lowerName, "invalid") {
 			return &connectors.ValidationError{Message: fmt.Sprintf("PayPal validation error: %s", msg)}
 		}
-		return &connectors.ValidationError{Message: fmt.Sprintf("PayPal request error: %s", msg)}
+		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("PayPal API error: %s", msg)}
+	case statusCode == http.StatusUnprocessableEntity:
+		return &connectors.ValidationError{Message: fmt.Sprintf("PayPal validation error: %s", msg)}
 	default:
 		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("PayPal API error: %s", msg)}
 	}
-}
-
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
 }

@@ -263,6 +263,7 @@ func TestClassifyConnectorError(t *testing.T) {
 		{"oauth_refresh", &connectors.OAuthRefreshError{Provider: "google"}, "oauth_refresh"},
 		{"validation", &connectors.ValidationError{Message: "bad param"}, "validation"},
 		{"payment", &connectors.PaymentError{Code: connectors.PaymentErrMissing}, "payment"},
+		{"canceled_error", &connectors.CanceledError{Message: "aborted"}, "canceled"},
 		{"deadline_exceeded", context.DeadlineExceeded, "deadline_exceeded"},
 		{"canceled", context.Canceled, "canceled"},
 		{"unknown", errors.New("something weird"), "unknown"},

@@ -51,10 +51,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	}
 
 	const maxErrBody = 512
-	msg := string(body)
-	if len(msg) > maxErrBody {
-		msg = msg[:maxErrBody] + "...(truncated)"
-	}
+	msg := connectors.TruncateUTF8(string(body), maxErrBody)
 
 	if json.Unmarshal(body, &sgErr) == nil && len(sgErr.Errors) > 0 {
 		first := sgErr.Errors[0]

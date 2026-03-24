@@ -347,7 +347,7 @@ func (c *SupabaseConnector) doRequestWithHeaders(ctx context.Context, method, re
 			return "", &connectors.TimeoutError{Message: fmt.Sprintf("Supabase API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return "", &connectors.TimeoutError{Message: "Supabase API request canceled"}
+			return "", &connectors.CanceledError{Message: "Supabase API request canceled"}
 		}
 		return "", &connectors.ExternalError{Message: fmt.Sprintf("Supabase API request failed: %v", err)}
 	}

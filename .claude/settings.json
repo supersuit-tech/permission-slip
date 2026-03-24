@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "CMD=$(jq -r '.tool_input.command'); if echo \"$CMD\" | grep -q 'gh.*pr.*create' && echo \"$CMD\" | grep -qE '(^|\\s)--draft(\\s|$)'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Draft PRs are not allowed per CLAUDE.md. Remove --draft to open as ready for review.\"}}'; fi",
+            "command": "INPUT=$(cat); check_draft() { local cmd=\"$1\"; local stripped=$(echo \"$cmd\" | sed \"s/[\\\"']//g\"); if echo \"$stripped\" | grep -q 'gh.*pr.*create' && echo \"$stripped\" | grep -qE '(^|\\s)--draft(\\s|$)'; then echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"Draft PRs are not allowed per CLAUDE.md. Remove --draft to open as ready for review.\"}}'; return 0; fi; return 1; }; if ! command -v jq >/dev/null 2>&1; then check_draft \"$INPUT\"; exit 0; fi; CMD=$(echo \"$INPUT\" | jq -r '.tool_input.command // empty'); if [ -z \"$CMD\" ]; then exit 0; fi; check_draft \"$CMD\"",
             "statusMessage": "Checking PR draft policy..."
           }
         ]

@@ -158,7 +158,7 @@ func (c *ExpediaConnector) doWithHeaders(ctx context.Context, creds connectors.C
 			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("Expedia Rapid API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return nil, &connectors.TimeoutError{Message: "Expedia Rapid API request canceled"}
+			return nil, &connectors.CanceledError{Message: "Expedia Rapid API request canceled"}
 		}
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("Expedia Rapid API request failed: %v", err)}
 	}

@@ -51,6 +51,15 @@ func TestCheckResponse_TruncateLongMessage(t *testing.T) {
 	}
 }
 
+func TestCheckResponse_UnprocessableEntity(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"error":{"message":"line_items[0].name is required"}}`)
+	err := checkResponse(http.StatusUnprocessableEntity, nil, body)
+	if !connectors.IsValidationError(err) {
+		t.Fatalf("want ValidationError, got %T: %v", err, err)
+	}
+}
+
 func TestCheckResponse_RateLimit(t *testing.T) {
 	t.Parallel()
 	h := http.Header{}

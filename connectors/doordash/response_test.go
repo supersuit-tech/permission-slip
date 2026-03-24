@@ -128,7 +128,7 @@ func TestTruncateBody(t *testing.T) {
 	if len(got) > maxErrorBodyLen+20 {
 		t.Errorf("truncateBody(long) length = %d, want <= %d", len(got), maxErrorBodyLen+20)
 	}
-	if !strings.HasSuffix(got, "... (truncated)") {
+	if !strings.HasSuffix(got, "...(truncated)") {
 		t.Errorf("truncateBody(long) should end with truncation marker")
 	}
 }

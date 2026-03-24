@@ -100,7 +100,7 @@ func (c *AsanaConnector) execRequest(ctx context.Context, creds connectors.Crede
 			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("Asana API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return nil, &connectors.TimeoutError{Message: "Asana API request canceled"}
+			return nil, &connectors.CanceledError{Message: "Asana API request canceled"}
 		}
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("Asana API request failed: %v", err)}
 	}

@@ -1,4 +1,4 @@
-name: Trigger Webhook
+name: Trigger Webhook (disabled)
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +17,7 @@ on:
 
 jobs:
   notify:
+    if: false  # Webhook notifications disabled — no longer in use
     runs-on: ubuntu-latest
     steps:
       - name: Send Webhook
@@ -37,11 +38,11 @@ jobs:
           if [ -n "$MESSAGE_OVERRIDE" ]; then
             MESSAGE="permission-slip: ${MESSAGE_OVERRIDE}"
           elif [ -n "$PR_URL" ] && [ -n "$PR_TITLE" ]; then
-            MESSAGE="permission-slip: ${ACTOR} — ${PR_TITLE} — ${PR_URL}"
+            MESSAGE="permission-slip: ${PR_TITLE} needs your review (from ${ACTOR}) — ${PR_URL}"
           elif [ -n "$PR_URL" ]; then
-            MESSAGE="permission-slip: ${ACTOR} — PR needs attention — ${PR_URL}"
+            MESSAGE="permission-slip: PR needs your review (from ${ACTOR}) — ${PR_URL}"
           else
-            MESSAGE="permission-slip: ${ACTOR} needs your attention"
+            MESSAGE="permission-slip: Your attention needed (triggered by ${ACTOR})"
           fi
 
           PAYLOAD=$(jq -n --arg msg "$MESSAGE" --arg secret "$NOTIFY_WEBHOOK_SECRET" \

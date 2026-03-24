@@ -207,7 +207,7 @@ func (c *TrelloConnector) sendAndDecode(req *http.Request, respBody any) error {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Trello API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Trello API request canceled"}
+			return &connectors.CanceledError{Message: "Trello API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Trello API request failed: %v", err)}
 	}

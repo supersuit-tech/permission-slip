@@ -134,7 +134,7 @@ export function ActionConfigParameterFields({
           if (visibleGroupKeys.length === 0) return null;
           return (
             <CollapsibleFieldGroup key={group.id} group={group}>
-              {groupKeys.map(renderField)}
+              {visibleGroupKeys.map(renderField)}
             </CollapsibleFieldGroup>
           );
         })}

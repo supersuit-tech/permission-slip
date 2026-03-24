@@ -147,7 +147,6 @@ If you reach `MAX_ROUNDS` with CI or audit still failing:
 
 - **Default `MAX_ROUNDS`:** 5
 - **No auto-merge** — this skill only fixes CI/audit; it does not merge PRs
-- **No webhook** — do not run `trigger-webhook.yml` unless the user explicitly asked for notification outside this skill
 - **Minimal diffs** — follow merge-conflict minimization rules in `CLAUDE.md`
 
 ## Example invocations

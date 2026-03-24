@@ -307,7 +307,7 @@ The connector maps X API error responses to typed connector errors:
 | 429 | `RateLimitError` | Rate limit exceeded (includes retry-after) |
 | Other 4xx/5xx | `ExternalError` | X API error with message |
 | Client timeout | `TimeoutError` | Request timed out (30s default) |
-| Context cancel | `TimeoutError` | Request canceled by caller |
+| Context cancel | `CanceledError` | Request canceled by caller (not retryable) |
 
 Rate limit responses use the `x-rate-limit-reset` header to determine retry timing (defaults to 30s if missing).
 

@@ -77,13 +77,8 @@ if [[ "$WEBHOOK_ONLY" == "true" ]]; then
     echo "[post] ERROR: --webhook-only requires --work-dir and a prior successful watch-post run with --skip-webhook (missing ${pending_file})." >&2
     exit 2
   fi
-  echo "[post] Triggering webhook notification only..."
-  if gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null; then
-    rm -f "$pending_file"
-  else
-    echo "[post] WARNING: Failed to trigger webhook (sentinel kept for retry)." >&2
-    exit 1
-  fi
+  echo "[post] Webhook notifications disabled — skipping."
+  rm -f "$pending_file"
   echo "POST_WEBHOOK_ONLY=true"
   exit 0
 fi
@@ -169,9 +164,11 @@ if [[ "$ci_conclusion" != "success" ]]; then
   echo "[post] Fetching CI logs (failed jobs if any)..."
   if [[ "$ci_run_id" != "unknown" ]]; then
     gh_cmd run view "$ci_run_id" --log-failed 2>/dev/null > "$CI_LOGS_FILE" || true
-    gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "$CI_LOGS_FILE" || true
+    if [[ "$ci_conclusion" == "failure" ]]; then
+      gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "$CI_LOGS_FILE" || true
+    fi
   else
-    : > "$CI_LOGS_FILE"
+    echo "[post] CI timed out waiting for completion. The workflow may still be running on GitHub." > "$CI_LOGS_FILE"
   fi
   echo "CI_LOGS_FILE=${CI_LOGS_FILE}"
   echo "AGENT_NEEDED"
@@ -191,9 +188,11 @@ if [[ "$audit_conclusion" != "success" ]]; then
   echo "[post] Fetching audit logs (failed jobs if any)..."
   if [[ "$audit_run_id" != "unknown" ]]; then
     gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "$AUDIT_LOGS_FILE" || true
-    gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "$AUDIT_LOGS_FILE" || true
+    if [[ "$audit_conclusion" == "failure" ]]; then
+      gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "$AUDIT_LOGS_FILE" || true
+    fi
   else
-    : > "$AUDIT_LOGS_FILE"
+    echo "[post] Audit timed out waiting for completion. The workflow may still be running on GitHub." > "$AUDIT_LOGS_FILE"
   fi
   echo "AUDIT_LOGS_FILE=${AUDIT_LOGS_FILE}"
   echo "AGENT_NEEDED"
@@ -225,20 +224,11 @@ fi
 # ---------------------------------------------------------------------------
 # Trigger webhook notification (skipped with --no-notify or --skip-webhook)
 # ---------------------------------------------------------------------------
-if [[ "$NO_NOTIFY" == "true" || "$SKIP_WEBHOOK" == "true" ]]; then
-  echo "[post] Skipping webhook notification (--no-notify or --skip-webhook)."
-else
-  echo "[post] Triggering webhook notification..."
-  gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null || echo "[post] WARNING: Failed to trigger webhook"
-  if [[ -n "$WORK_DIR" && -f "${WORK_DIR}/post-webhook-pending" ]]; then
-    rm -f "${WORK_DIR}/post-webhook-pending"
-  fi
-fi
+# Webhook notifications disabled — trigger-webhook.yml is no longer in use.
+# The flags (--no-notify, --skip-webhook) are kept for backwards compatibility.
+echo "[post] Webhook notifications disabled — skipping."
 
-if [[ -n "$WORK_DIR" && "$SKIP_WEBHOOK" == "true" && "$NO_NOTIFY" == "false" ]]; then
-  touch "${WORK_DIR}/post-webhook-pending"
-  echo "[post] Wrote ${WORK_DIR}/post-webhook-pending (use --webhook-only after final green run to notify)."
-fi
+# post-webhook-pending sentinel no longer needed (webhook disabled)
 
 echo ""
 echo "POST_COMPLETE"

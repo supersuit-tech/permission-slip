@@ -12,12 +12,9 @@ import (
 const maxErrorBodyLen = 512
 
 // truncateBody returns the response body as a string, truncated to
-// maxErrorBodyLen bytes to prevent oversized error messages.
+// maxErrorBodyLen characters to prevent oversized error messages.
 func truncateBody(body []byte) string {
-	if len(body) <= maxErrorBodyLen {
-		return string(body)
-	}
-	return string(body[:maxErrorBodyLen]) + "... (truncated)"
+	return connectors.TruncateUTF8(string(body), maxErrorBodyLen)
 }
 
 // docuSignAPIError represents the standard DocuSign API error response.

@@ -73,7 +73,7 @@ func (a *setTopicAction) Execute(ctx context.Context, req connectors.ActionReque
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	topic := ""

@@ -276,7 +276,7 @@ func wrapHTTPError(err error) error {
 		return &connectors.TimeoutError{Message: fmt.Sprintf("Google API request timed out: %v", err)}
 	}
 	if errors.Is(err, context.Canceled) {
-		return &connectors.TimeoutError{Message: "Google API request canceled"}
+		return &connectors.CanceledError{Message: "Google API request canceled"}
 	}
 	return &connectors.ExternalError{Message: fmt.Sprintf("Google API request failed: %v", err)}
 }

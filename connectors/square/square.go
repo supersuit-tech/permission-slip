@@ -191,7 +191,7 @@ func (c *SquareConnector) do(ctx context.Context, creds connectors.Credentials, 
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Square API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Square API request canceled"}
+			return &connectors.CanceledError{Message: "Square API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Square API request failed: %v", err)}
 	}

@@ -213,4 +213,3 @@ Use the `Skill` tool to invoke the watch skill, passing `--no-notify` as the arg
 - **Include the original prompt in the PR body** (prompt mode) — so reviewers have context on what was requested.
 - **Follow all CLAUDE.md guidelines** — especially around migrations, API types, component architecture, and merge conflict minimization.
 - **Post-task review** — before opening the PR, run all five review passes from CLAUDE.md (self-review, senior engineer lens, maintainability, code quality, documentation).
-- **Do NOT trigger the webhook notification** — the `/yolo` skill is fully autonomous end-to-end. Do not call the `trigger-webhook.yml` workflow at any point during this skill. The `--no-notify` flag on `/watch` handles suppressing the notification from the watch post-session as well.

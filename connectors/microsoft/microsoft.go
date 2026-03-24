@@ -911,7 +911,7 @@ func (c *MicrosoftConnector) executeRequest(req *http.Request) ([]byte, error) {
 			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("Microsoft Graph API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return nil, &connectors.TimeoutError{Message: "Microsoft Graph API request canceled"}
+			return nil, &connectors.CanceledError{Message: "Microsoft Graph API request canceled"}
 		}
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("Microsoft Graph API request failed: %v", err)}
 	}

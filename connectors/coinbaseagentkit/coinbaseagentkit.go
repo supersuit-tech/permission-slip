@@ -183,10 +183,7 @@ func parseSwapNetwork(s string) (openapi.EvmSwapsNetwork, error) {
 }
 
 func mapCDPError(status int, body []byte) error {
-	msg := strings.TrimSpace(string(body))
-	if len(msg) > 4096 {
-		msg = msg[:4096] + "…"
-	}
+	msg := connectors.TruncateUTF8(strings.TrimSpace(string(body)), 4096)
 	if msg == "" {
 		msg = "(empty response body)"
 	}

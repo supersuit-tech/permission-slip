@@ -131,7 +131,7 @@ func (c *XConnector) do(ctx context.Context, creds connectors.Credentials, metho
 			return &connectors.TimeoutError{Message: fmt.Sprintf("X API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "X API request canceled"}
+			return &connectors.CanceledError{Message: "X API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("X API request failed: %v", err)}
 	}

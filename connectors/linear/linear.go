@@ -163,7 +163,7 @@ func (c *LinearConnector) doGraphQL(ctx context.Context, creds connectors.Creden
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Linear API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Linear API request canceled"}
+			return &connectors.CanceledError{Message: "Linear API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Linear API request failed: %v", err)}
 	}

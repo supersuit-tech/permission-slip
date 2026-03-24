@@ -90,11 +90,8 @@ func extractErrorMessage(body []byte) string {
 	// Fallback to raw body, truncated to avoid leaking large payloads
 	// (e.g. HTML error pages) into error messages.
 	const maxFallbackLen = 500
-	if len(body) > maxFallbackLen {
-		return string(body[:maxFallbackLen]) + "... (truncated)"
-	}
 	if len(body) > 0 {
-		return string(body)
+		return connectors.TruncateUTF8(string(body), maxFallbackLen)
 	}
 	return "unknown error"
 }

@@ -16,7 +16,6 @@ This skill uses shell scripts for all mechanical bookkeeping (polling, fetching,
 watch-poll.sh          — Deterministic polling loop (no AI needed)
   ├── Fetches comments from 3 GitHub API endpoints
   ├── Deduplicates by tracking last-seen IDs
-  ├── Filters out bot-authored comments
   ├── Merges from main, detects conflicts
   ├── Parses PR body for unchecked Claude Code checklist items
   ├── Writes work-items.json when there's actionable work
@@ -25,8 +24,7 @@ watch-poll.sh          — Deterministic polling loop (no AI needed)
 watch-post.sh          — Post-session tasks (no AI needed)
   ├── Triggers CI and audit workflows
   ├── Waits for completion
-  ├── Auto-merges if enabled and checks pass
-  └── Triggers webhook notification (unless --skip-webhook)
+  └── Auto-merges if enabled and checks pass
 
 watch-append-wrapup-ci.sh — Appends CI/audit remediation bullets to the wrap-up PR comment
 
@@ -82,7 +80,6 @@ bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "false" ]] &
 The script handles:
 - Fetching comments from all 3 GitHub API endpoints (reviews, review comments, issue comments)
 - Deduplication via last-seen ID tracking per endpoint
-- Filtering out bot-authored comments
 - Merging from main and detecting conflicts
 - Parsing the PR body for unchecked `### Claude Code` checklist items
 - Idle counter tracking (6 consecutive empty cycles = timeout)
@@ -127,7 +124,7 @@ The script communicates via stdout signals and exit codes:
 
 When the script prints **`AGENT_NEEDED`** and exits **0**, it has **not** posted the wrap-up and **has not** emitted `IDLE_TIMEOUT`. The orchestrator **must** run **Step 1 again** with the **same `--work-dir`** (and the **same** `--max-turns` if any) after finishing Step 3 — **unless** the user explicitly asked to stop mid-session.
 
-- **Why:** On an `AGENT_NEEDED` exit, `watch-poll.sh` increments `turns-count` in `WORK_DIR` and exits. The **next** invocation either (a) hits **idle** after empty poll cycles and posts wrap-up + `IDLE_TIMEOUT`, or (b) with **`--max-turns N`**, sees `turns-count >= N` **at the start** of that next run, posts wrap-up, then prints `IDLE_TIMEOUT` **immediately** (no extra agent work). Skipping that second poll is why wrap-up and **`watch-post.sh` never ran.
+- **Why:** On an `AGENT_NEEDED` exit, `watch-poll.sh` increments `turns-count` in `WORK_DIR` and exits. The **next** invocation either (a) hits **idle** after empty poll cycles and posts wrap-up + `IDLE_TIMEOUT`, or (b) with **`--max-turns N`**, sees `turns-count >= N` **at the start** of that next run, posts wrap-up, then prints `IDLE_TIMEOUT` **immediately** (no extra agent work). Skipping that second poll is why wrap-up and **`watch-post.sh`** never ran.
 
 - **`--max-turns 1`:** Expect **two** poll runs in the common case: first run → `AGENT_NEEDED` (do work); second run → `IDLE_TIMEOUT` (wrap-up posted) → **Step 5**.
 
@@ -376,17 +373,12 @@ When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has alrea
 
 **Loop (run until both CI and audit report `success`, or you exhaust retries):**
 
-1. Run post-session. Always pass **`--work-dir "$WORK_DIR"`** (same session directory as `watch-poll.sh`) so CI/audit logs are written under that directory (avoids `/tmp` clashes between concurrent watch sessions) and so the webhook sentinel file is session-scoped. On the **first** iteration of this loop after wrap-up, pass **`--skip-webhook`** so the webhook does not fire until CI is actually green (this creates **`${WORK_DIR}/post-webhook-pending`** on success):
+1. Run post-session. Always pass **`--work-dir "$WORK_DIR"`** (same session directory as `watch-poll.sh`) so CI/audit logs are written under that directory (avoids `/tmp` clashes between concurrent watch sessions):
    ```bash
-   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --skip-webhook 2>&1
+   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") 2>&1
    ```
-   On **subsequent** iterations (after you pushed fixes), omit `--skip-webhook` so each successful pass can notify as usual, **or** keep using `--skip-webhook` until the final successful iteration and then run once with **`--webhook-only`** (see step 2b below).
 
-2. **Exit code 0** — Both workflows concluded `success`. If the webhook was sent this run (no `--skip-webhook`), **`post-webhook-pending`** is removed automatically. If you used **`--skip-webhook`** and `NO_NOTIFY` is false, run once with **`--webhook-only`** — this **requires** `--work-dir` and an existing **`post-webhook-pending`** file (otherwise exit **2**); on success the webhook runs and the sentinel is removed:
-   ```bash
-   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --webhook-only 2>&1
-   ```
-   Read merge result from stdout (`PR merged successfully`, etc.).
+2. **Exit code 0** — Both workflows concluded `success`. Read merge result from stdout (`PR merged successfully`, etc.).
 
 3. **Exit code 101 (CI)** or **102 (audit)** — This is expected while fixing. **Automatically:**
    - Read logs from `CI_LOGS_FILE` or `AUDIT_LOGS_FILE` in the script output.

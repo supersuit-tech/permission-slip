@@ -41,7 +41,7 @@ func (c *SlackConnector) lookupSlackUserByEmail(ctx context.Context, creds conne
 		if resp.Error == "users_not_found" {
 			return "", nil
 		}
-		return "", mapSlackError(resp.Error)
+		return "", resp.asError()
 	}
 
 	return resp.User.ID, nil
@@ -82,7 +82,7 @@ func (c *SlackConnector) isUserInChannel(ctx context.Context, creds connectors.C
 			return false, err
 		}
 		if !resp.OK {
-			return false, mapSlackError(resp.Error)
+			return false, resp.asError()
 		}
 
 		for _, member := range resp.Members {
@@ -207,7 +207,7 @@ func (c *SlackConnector) isChannelPrivate(ctx context.Context, creds connectors.
 		return false, err
 	}
 	if !resp.OK {
-		return false, mapSlackError(resp.Error)
+		return false, resp.asError()
 	}
 
 	return resp.Channel.IsPrivate, nil
@@ -249,7 +249,10 @@ type usersConversationsResponse struct {
 const maxUserConversationPages = 50
 
 // getUserPrivateConversations returns conversation objects for the given Slack user
-// and types via users.conversations.
+// and types via users.conversations. This uses the user token (xoxp-), which only
+// returns conversations the token owner belongs to. A bot token with the `user`
+// parameter would require admin.conversations:read scope — we intentionally
+// use the user token to avoid that requirement.
 func (c *SlackConnector) getUserPrivateConversations(ctx context.Context, creds connectors.Credentials, slackUserID, types string) ([]listChannelEntry, error) {
 	var out []listChannelEntry
 	cursor := ""
@@ -266,7 +269,7 @@ func (c *SlackConnector) getUserPrivateConversations(ctx context.Context, creds 
 			return nil, err
 		}
 		if !resp.OK {
-			return nil, mapSlackError(resp.Error)
+			return nil, resp.asError()
 		}
 
 		out = append(out, resp.Channels...)

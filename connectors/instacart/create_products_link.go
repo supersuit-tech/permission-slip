@@ -38,7 +38,7 @@ func (p *createProductsLinkParams) validate() error {
 		if len(strings.TrimSpace(*p.Title)) == 0 {
 			return &connectors.ValidationError{Message: "title cannot be empty or whitespace-only when provided"}
 		}
-		if len(*p.Title) > maxTitleLen {
+		if connectors.RuneLen(*p.Title) > maxTitleLen {
 			return &connectors.ValidationError{Message: fmt.Sprintf("title exceeds maximum length (%d characters)", maxTitleLen)}
 		}
 	}
@@ -46,7 +46,7 @@ func (p *createProductsLinkParams) validate() error {
 		if strings.TrimSpace(*p.ImageURL) == "" {
 			return &connectors.ValidationError{Message: "image_url cannot be empty or whitespace-only when provided"}
 		}
-		if len(*p.ImageURL) > maxImageURLLen {
+		if connectors.RuneLen(*p.ImageURL) > maxImageURLLen {
 			return &connectors.ValidationError{Message: fmt.Sprintf("image_url exceeds maximum length (%d characters)", maxImageURLLen)}
 		}
 	}
@@ -69,7 +69,7 @@ func (p *createProductsLinkParams) validate() error {
 		return &connectors.ValidationError{Message: fmt.Sprintf("instructions exceeds maximum of %d entries", maxInstructions)}
 	}
 	for i, line := range p.Instructions {
-		if len(line) > maxInstructionLen {
+		if connectors.RuneLen(line) > maxInstructionLen {
 			return &connectors.ValidationError{Message: fmt.Sprintf("instructions[%d] exceeds maximum length", i)}
 		}
 	}
@@ -84,8 +84,8 @@ func (p *createProductsLinkParams) validate() error {
 		if item.Name == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: name is required", i)}
 		}
-		if len(item.Name) > maxLineItemNameBytes {
-			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: name exceeds maximum length (%d bytes)", i, maxLineItemNameBytes)}
+		if connectors.RuneLen(item.Name) > maxLineItemNameChars {
+			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: name exceeds maximum length (%d characters)", i, maxLineItemNameChars)}
 		}
 	}
 
@@ -130,6 +130,10 @@ func (a *createProductsLinkAction) Execute(ctx context.Context, req connectors.A
 	}
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/idp/v1/products/products_link", body, &apiResp); err != nil {
 		return nil, err
+	}
+
+	if strings.TrimSpace(apiResp.ProductsLinkURL) == "" {
+		return nil, &connectors.ExternalError{Message: "Instacart returned an empty products_link_url"}
 	}
 
 	return connectors.JSONResult(apiResp)

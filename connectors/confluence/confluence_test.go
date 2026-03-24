@@ -172,8 +172,8 @@ func TestConfluenceConnector_Do_ContextCanceled(t *testing.T) {
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
-	if !connectors.IsTimeoutError(err) {
-		t.Errorf("expected TimeoutError for canceled context, got %T: %v", err, err)
+	if !connectors.IsCanceledError(err) {
+		t.Errorf("expected CanceledError for canceled context, got %T: %v", err, err)
 	}
 }
 

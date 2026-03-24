@@ -164,7 +164,7 @@ func TestCreateProductsLink_LineItemNameTooLong(t *testing.T) {
 	t.Parallel()
 	conn := New()
 	action := conn.Actions()["instacart.create_products_link"]
-	longName := make([]byte, maxLineItemNameBytes+1)
+	longName := make([]byte, maxLineItemNameChars+1)
 	for i := range longName {
 		longName[i] = 'a'
 	}
@@ -215,6 +215,72 @@ func TestCreateProductsLink_InvalidLinkType(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("want ValidationError, got %T", err)
+	}
+}
+
+func TestCreateProductsLink_ItemsAlias(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var reqBody struct {
+			LineItems []map[string]any `json:"line_items"`
+		}
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		if len(reqBody.LineItems) != 1 || reqBody.LineItems[0]["name"] != "bread" {
+			t.Fatalf("unexpected payload: %#v", reqBody.LineItems)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"products_link_url":"https://example.test/y"}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["instacart.create_products_link"]
+
+	// Simulate the alias+normalize pipeline the API layer runs before Execute.
+	raw := json.RawMessage(`{"items":["bread"]}`)
+	if aliaser, ok := action.(connectors.ParameterAliaser); ok {
+		raw = connectors.NormalizeParameters(aliaser.ParameterAliases(), raw)
+	}
+	if normalizer, ok := action.(connectors.Normalizer); ok {
+		raw = normalizer.Normalize(raw)
+	}
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "instacart.create_products_link",
+		Parameters:  raw,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+}
+
+func TestCreateProductsLink_EmptyProductsLinkURL(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"products_link_url":""}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["instacart.create_products_link"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "instacart.create_products_link",
+		Parameters:  json.RawMessage(`{"line_items":[{"name":"milk"}]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for empty products_link_url")
+	}
+	if !connectors.IsExternalError(err) {
+		t.Errorf("want ExternalError, got %T: %v", err, err)
 	}
 }
 

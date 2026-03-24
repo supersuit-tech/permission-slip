@@ -51,8 +51,5 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 // truncateErrorMessage caps error message length to prevent unexpectedly
 // large Trello responses from bloating error payloads.
 func truncateErrorMessage(msg string) string {
-	if len(msg) <= maxErrorMessageLen {
-		return msg
-	}
-	return msg[:maxErrorMessageLen] + "... (truncated)"
+	return connectors.TruncateUTF8(msg, maxErrorMessageLen)
 }
