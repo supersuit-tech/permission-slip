@@ -1,5 +1,4 @@
-import { Link } from "react-router-dom";
-import { AlertTriangle, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -13,6 +12,7 @@ import type { UsageSummary } from "@/hooks/useBillingPlan";
 import { freePlan, paidPlan, formatLimit } from "@/config/plans";
 import { FREE_PLAN_LIMITS } from "./constants";
 import { buildLimitWarnings } from "./downgradeUtils";
+import { LimitWarningsList } from "./LimitWarningsList";
 
 interface DowngradeConfirmDialogProps {
   open: boolean;
@@ -35,7 +35,6 @@ export function DowngradeConfirmDialog({
   freeLimitsApplyDate,
 }: DowngradeConfirmDialogProps) {
   const warnings = buildLimitWarnings(usage);
-  const hasWarnings = warnings.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={isPending ? undefined : onOpenChange}>
@@ -49,29 +48,7 @@ export function DowngradeConfirmDialog({
         </DialogHeader>
 
         <div className="space-y-4">
-          {hasWarnings && (
-            <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 space-y-2 dark:border-amber-800 dark:bg-amber-950">
-              <div className="flex items-start gap-2">
-                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-600 dark:text-amber-400" aria-hidden="true" />
-                <p className="text-sm font-medium text-amber-900 dark:text-amber-100">
-                  You&apos;re over free plan limits
-                </p>
-              </div>
-              <ul className="ml-6 space-y-1.5">
-                {warnings.map((w) => (
-                  <li key={w.resource} className="text-sm text-amber-800 dark:text-amber-200">
-                    You have {w.current} {w.resource}. Free tier allows {w.limit} after {freeLimitsApplyDate}.{" "}
-                    <Link
-                      to={w.managePath}
-                      className="underline font-medium hover:text-amber-900 dark:hover:text-amber-100"
-                    >
-                      Manage {w.resource}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          <LimitWarningsList warnings={warnings} limitSuffix={`after ${freeLimitsApplyDate}`} />
 
           <div className="rounded-lg border p-4 space-y-1">
             <p className="text-sm font-medium">What changes</p>
