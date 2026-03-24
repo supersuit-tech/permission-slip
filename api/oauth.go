@@ -664,14 +664,17 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Slack user-token-only OAuth: the v2_user token endpoint returns
-		// the user token (xoxp-) at the top level, so no authed_user
-		// extraction is needed. Verify we got a user token (not empty).
-		if providerID == "slack" && token.AccessToken == "" {
-			redirectToFrontend(w, r, deps, providerID, "error",
-				"Slack did not return a user OAuth token. Check your Slack app User Token Scopes configuration, then try again.",
-				state.ReturnTo, "")
-			return
+		// Slack user-token-only OAuth: the standard oauth.v2.access endpoint
+		// nests the user token inside authed_user when only user scopes are
+		// requested. Normalize the token so AccessToken is the user token.
+		if providerID == "slack" {
+			token = oauth.NormalizeSlackUserOAuthToken(token)
+			if token.AccessToken == "" {
+				redirectToFrontend(w, r, deps, providerID, "error",
+					"Slack did not return a user OAuth token. Check your Slack app User Token Scopes configuration, then try again.",
+					state.ReturnTo, "")
+				return
+			}
 		}
 
 		// Store tokens in vault within a transaction. Use scopes from the

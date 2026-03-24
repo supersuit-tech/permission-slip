@@ -42,6 +42,12 @@ func TestListChannelEntryMatchesTypes(t *testing.T) {
 			want:  true,
 		},
 		{
+			name:  "mpim G prefix heuristic excludes private channels",
+			types: "mpim",
+			ch:    listChannelEntry{ID: "G0123", IsPrivate: true},
+			want:  false,
+		},
+		{
 			name:  "mpim C channel",
 			types: "mpim",
 			ch:    listChannelEntry{ID: "C0123", IsPrivate: true},
