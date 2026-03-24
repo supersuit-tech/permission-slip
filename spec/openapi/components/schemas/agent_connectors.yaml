@@ -170,6 +170,47 @@ AgentConnectorCalendarListResponse:
       items:
         $ref: '../schemas/agent_connectors.yaml#/CalendarListItem'
 
+ChannelListItem:
+  type: object
+  required:
+    - id
+    - display_label
+  properties:
+    id:
+      type: string
+      description: Slack channel ID (C…, G…, or D…).
+    name:
+      type: string
+      description: Channel name when available (may be empty for some DMs).
+    user:
+      type: string
+      description: For IM channels, the other participant's user ID when present.
+    is_private:
+      type: boolean
+      description: True for private channels (no # prefix in display_label).
+    is_im:
+      type: boolean
+      description: True for direct messages.
+    is_mpim:
+      type: boolean
+      description: True for group direct messages.
+    num_members:
+      type: integer
+      description: Member count when provided by Slack.
+    display_label:
+      type: string
+      description: Human-readable label for pickers (#public-name, private name, DM label).
+
+AgentConnectorChannelListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/agent_connectors.yaml#/ChannelListItem'
+
 AgentConnectorCredentialResponse:
   type: object
   required:

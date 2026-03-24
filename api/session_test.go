@@ -41,6 +41,21 @@ func authenticatedRequest(t *testing.T, method, path, userID string) *http.Reque
 	return r
 }
 
+// authenticatedRequestWithEmail is like authenticatedRequest but sets the JWT
+// email claim (used by endpoints that pass UserEmail to connectors).
+func authenticatedRequestWithEmail(t *testing.T, method, path, userID, email string) *http.Request {
+	t.Helper()
+	token := makeToken(t, testJWTSecret, jwt.MapClaims{
+		"sub":   userID,
+		"email": email,
+		"aud":   SupabaseAudAuthenticated,
+		"exp":   time.Now().Add(time.Hour).Unix(),
+	})
+	r := httptest.NewRequest(method, path, nil)
+	r.Header.Set("Authorization", "Bearer "+token)
+	return r
+}
+
 // authenticatedJSONRequest creates an authenticated HTTP request with a JSON body.
 // Use this for POST/PUT/PATCH endpoints that accept JSON payloads.
 func authenticatedJSONRequest(t *testing.T, method, path, userID, body string) *http.Request {

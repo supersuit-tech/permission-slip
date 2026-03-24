@@ -129,3 +129,24 @@ type CalendarLister interface {
 	CalendarListCredentialActionType() string
 }
 
+// ChannelListItem is one Slack (or similar) channel row for dashboard pickers.
+type ChannelListItem struct {
+	ID           string `json:"id"`
+	Name         string `json:"name,omitempty"`
+	User         string `json:"user,omitempty"`
+	IsPrivate    bool   `json:"is_private,omitempty"`
+	IsIM         bool   `json:"is_im,omitempty"`
+	IsMPIM       bool   `json:"is_mpim,omitempty"`
+	NumMembers   int    `json:"num_members,omitempty"`
+	DisplayLabel string `json:"display_label"`
+}
+
+// ChannelLister is optionally implemented by connectors that can list channels
+// for UI configuration (session-authenticated proxy endpoints).
+type ChannelLister interface {
+	ListChannels(ctx context.Context, creds Credentials, userEmail string) ([]ChannelListItem, error)
+	// ChannelListCredentialActionType is the connector_actions.action_type used
+	// to look up required credentials for this list call (must exist in the DB).
+	ChannelListCredentialActionType() string
+}
+
