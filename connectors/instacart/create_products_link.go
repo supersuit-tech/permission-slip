@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -13,6 +14,8 @@ const (
 	maxLineItems      = 200
 	maxInstructions   = 50
 	maxInstructionLen = 2000
+	maxTitleLen       = 512
+	maxImageURLLen    = 2048
 )
 
 // createProductsLinkAction implements connectors.Action for instacart.create_products_link.
@@ -31,6 +34,23 @@ type createProductsLinkParams struct {
 }
 
 func (p *createProductsLinkParams) validate() error {
+	if p.Title != nil {
+		if len(strings.TrimSpace(*p.Title)) == 0 {
+			return &connectors.ValidationError{Message: "title cannot be empty or whitespace-only when provided"}
+		}
+		if len(*p.Title) > maxTitleLen {
+			return &connectors.ValidationError{Message: fmt.Sprintf("title exceeds maximum length (%d characters)", maxTitleLen)}
+		}
+	}
+	if p.ImageURL != nil {
+		if strings.TrimSpace(*p.ImageURL) == "" {
+			return &connectors.ValidationError{Message: "image_url cannot be empty or whitespace-only when provided"}
+		}
+		if len(*p.ImageURL) > maxImageURLLen {
+			return &connectors.ValidationError{Message: fmt.Sprintf("image_url exceeds maximum length (%d characters)", maxImageURLLen)}
+		}
+	}
+
 	if len(p.LineItems) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: line_items (non-empty array)"}
 	}

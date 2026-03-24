@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -101,6 +102,43 @@ func TestCreateProductsLink_StringLineItems(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
+	}
+}
+
+func TestCreateProductsLink_EmptyTitleWhitespace(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := conn.Actions()["instacart.create_products_link"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "instacart.create_products_link",
+		Parameters:  json.RawMessage(`{"title":"   ","line_items":[{"name":"x"}]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("want ValidationError, got %T", err)
+	}
+}
+
+func TestCreateProductsLink_TitleTooLong(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := conn.Actions()["instacart.create_products_link"]
+	long := strings.Repeat("t", maxTitleLen+1)
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "instacart.create_products_link",
+		Parameters:  json.RawMessage(`{"title":"` + long + `","line_items":[{"name":"x"}]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("want ValidationError, got %T", err)
 	}
 }
 

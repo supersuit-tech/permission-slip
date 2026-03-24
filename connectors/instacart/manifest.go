@@ -31,10 +31,12 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"title": {
 							"type": "string",
+							"maxLength": 512,
 							"description": "Title shown on the shopping list or recipe page"
 						},
 						"image_url": {
 							"type": "string",
+							"maxLength": 2048,
 							"description": "Image URL for the page (Instacart recommends 500x500 px)"
 						},
 						"link_type": {

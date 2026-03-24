@@ -30,6 +30,16 @@ Partnership approval is typically required before production keys work.
 
 Full LineItem fields (`line_item_measurements`, `upcs`, `filters`, etc.) follow [Instacart’s request schema](https://docs.instacart.com/developer_platform_api/api/products/create_shopping_list_page).
 
+### Limits (enforced before calling Instacart)
+
+| Field | Limit |
+|-------|-------|
+| `line_items` | 1–200 entries |
+| Each `line_items[].name` | ≤ 2048 bytes |
+| `instructions` | ≤ 50 strings, each ≤ 2000 chars |
+| `title` | ≤ 512 chars (non-whitespace when set) |
+| `image_url` | ≤ 2048 chars (non-empty when set) |
+
 ## Error handling
 
 | HTTP status | Connector error |
@@ -39,4 +49,6 @@ Full LineItem fields (`line_item_measurements`, `upcs`, `filters`, etc.) follow 
 | 429 | `RateLimitError` (honors `Retry-After` when present) |
 | Other 4xx/5xx | `ExternalError` |
 
-Response bodies are read with a size cap (2 MiB).
+Response bodies are read with a size cap (2 MiB). Error messages embedded in connector errors are truncated (API messages can be long).
+
+Instacart may return either a single `error.message` object or an `errors[]` array; the connector uses the first message when present.
