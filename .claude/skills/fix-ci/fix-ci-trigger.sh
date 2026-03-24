@@ -56,80 +56,6 @@ latest_completed_for_sha() {
           else "failed:\(.[0].databaseId):\(.[0].conclusion)" end'
 }
 
-ci_fast=$(latest_completed_for_sha "ci.yml" || true)
-audit_fast=$(latest_completed_for_sha "audit.yml" || true)
-
-if [[ -n "$ci_fast" && "${ci_fast%%:*}" == "success" ]]; then
-  ci_fid="${ci_fast#success:}"
-  if [[ -n "$audit_fast" && "${audit_fast%%:*}" == "success" ]]; then
-    audit_fid="${audit_fast#success:}"
-    echo "[fix-ci] CI and audit already green for HEAD ${LOCAL_SHA}; skipping trigger."
-    echo ""
-    echo "FIX_CI_COMPLETE"
-    echo "BRANCH=${BRANCH}"
-    echo "LOCAL_HEAD=${LOCAL_SHA}"
-    echo "CI_RUN_URL=$(gh_cmd run view "$ci_fid" --json url --jq -r '.url')"
-    echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_fid" --json url --jq -r '.url')"
-    exit 0
-  fi
-fi
-
-if [[ -n "$ci_fast" && "${ci_fast%%:*}" == "failed" ]]; then
-  # rest: failed:id:conclusion
-  rest="${ci_fast#failed:}"
-  ci_run_id="${rest%%:*}"
-  ci_conclusion="${rest##*:}"
-  echo "[fix-ci] Latest CI for HEAD ${LOCAL_SHA} already completed with ${ci_conclusion} (run ${ci_run_id})."
-  echo ""
-  echo "CI_FAILED"
-  echo "CI_RUN_ID=${ci_run_id}"
-  echo "CI_CONCLUSION=${ci_conclusion}"
-  gh_cmd run view "$ci_run_id" --log-failed 2>/dev/null > "$CI_LOGS_FILE" || true
-  gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "$CI_LOGS_FILE" || true
-  echo "CI_LOGS_FILE=${CI_LOGS_FILE}"
-  echo "CI_RUN_URL=$(gh_cmd run view "$ci_run_id" --json url --jq -r '.url')"
-  echo "AGENT_NEEDED"
-  exit 101
-fi
-
-if [[ -n "$ci_fast" && "${ci_fast%%:*}" == "success" && -n "$audit_fast" && "${audit_fast%%:*}" == "failed" ]]; then
-  rest="${audit_fast#failed:}"
-  audit_run_id="${rest%%:*}"
-  audit_conclusion="${rest##*:}"
-  echo "[fix-ci] Latest audit for HEAD ${LOCAL_SHA} already completed with ${audit_conclusion} (run ${audit_run_id})."
-  echo ""
-  echo "AUDIT_FAILED"
-  echo "AUDIT_RUN_ID=${audit_run_id}"
-  echo "AUDIT_CONCLUSION=${audit_conclusion}"
-  gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "$AUDIT_LOGS_FILE" || true
-  gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "$AUDIT_LOGS_FILE" || true
-  echo "AUDIT_LOGS_FILE=${AUDIT_LOGS_FILE}"
-  echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_run_id" --json url --jq -r '.url')"
-  echo "AGENT_NEEDED"
-  exit 102
-fi
-
-get_latest_run_id() {
-  local workflow="$1"
-  gh_cmd run list --workflow="$workflow" --branch "$BRANCH" --limit 1 --json databaseId 2>/dev/null \
-    | jq -r '.[0].databaseId // "0"'
-}
-
-ci_prev_run_id=$(get_latest_run_id "ci.yml")
-audit_prev_run_id=$(get_latest_run_id "audit.yml")
-
-echo "[fix-ci] Triggering ci.yml on ${BRANCH}..."
-gh_cmd workflow run ci.yml --ref "$BRANCH" 2>/dev/null || {
-  echo "[fix-ci] ERROR: Failed to trigger ci.yml" >&2
-  exit 1
-}
-
-echo "[fix-ci] Triggering audit.yml on ${BRANCH}..."
-gh_cmd workflow run audit.yml --ref "$BRANCH" 2>/dev/null || {
-  echo "[fix-ci] ERROR: Failed to trigger audit.yml" >&2
-  exit 1
-}
-
 wait_for_workflow() {
   local workflow="$1"
   local prev_run_id="$2"
@@ -159,6 +85,131 @@ wait_for_workflow() {
   echo "timeout:unknown"
 }
 
+ci_fast=$(latest_completed_for_sha "ci.yml" || true)
+audit_fast=$(latest_completed_for_sha "audit.yml" || true)
+
+if [[ -n "$ci_fast" && "${ci_fast%%:*}" == "success" ]]; then
+  ci_fid="${ci_fast#success:}"
+  if [[ -n "$audit_fast" && "${audit_fast%%:*}" == "success" ]]; then
+    audit_fid="${audit_fast#success:}"
+    echo "[fix-ci] CI and audit already green for HEAD ${LOCAL_SHA}; skipping trigger."
+    echo ""
+    echo "FIX_CI_COMPLETE"
+    echo "BRANCH=${BRANCH}"
+    echo "LOCAL_HEAD=${LOCAL_SHA}"
+    echo "CI_RUN_URL=$(gh_cmd run view "$ci_fid" --json url --jq '.url')"
+    echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_fid" --json url --jq '.url')"
+    exit 0
+  fi
+fi
+
+# Fast path: CI already passed but audit hasn't run yet — only trigger audit.yml
+if [[ -n "$ci_fast" && "${ci_fast%%:*}" == "success" && -z "$audit_fast" ]]; then
+  ci_fid="${ci_fast#success:}"
+  echo "[fix-ci] CI already green for HEAD ${LOCAL_SHA}; only audit missing — triggering audit.yml only."
+  echo "CI_RUN_URL=$(gh_cmd run view "$ci_fid" --json url --jq '.url')"
+
+  audit_prev_run_id=$(gh_cmd run list --workflow="audit.yml" --branch "$BRANCH" --limit 1 --json databaseId 2>/dev/null \
+    | jq -r '.[0].databaseId // "0"')
+
+  gh_cmd workflow run audit.yml --ref "$BRANCH" 2>/dev/null || {
+    echo "[fix-ci] ERROR: Failed to trigger audit.yml" >&2
+    exit 1
+  }
+
+  echo "[fix-ci] Waiting for audit..."
+  audit_result=$(wait_for_workflow "audit.yml" "$audit_prev_run_id")
+  audit_conclusion="${audit_result%%:*}"
+  audit_run_id="${audit_result##*:}"
+  echo "[fix-ci] Audit result: ${audit_conclusion} (run ${audit_run_id})"
+
+  if [[ "$audit_conclusion" == "success" ]]; then
+    echo ""
+    echo "FIX_CI_COMPLETE"
+    echo "BRANCH=${BRANCH}"
+    echo "LOCAL_HEAD=${LOCAL_SHA}"
+    echo "CI_RUN_URL=$(gh_cmd run view "$ci_fid" --json url --jq '.url')"
+    echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_run_id" --json url --jq '.url')"
+    exit 0
+  fi
+
+  echo ""
+  echo "AUDIT_FAILED"
+  echo "AUDIT_RUN_ID=${audit_run_id}"
+  echo "AUDIT_CONCLUSION=${audit_conclusion}"
+  echo "[fix-ci] Fetching audit logs..."
+  if [[ "$audit_run_id" != "unknown" ]]; then
+    gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "$AUDIT_LOGS_FILE" || true
+    if [[ "$audit_conclusion" == "failure" ]]; then
+      gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "$AUDIT_LOGS_FILE" || true
+    fi
+  else
+    echo "[fix-ci] Audit timed out waiting for completion. The workflow may still be running on GitHub." > "$AUDIT_LOGS_FILE"
+  fi
+  echo "AUDIT_LOGS_FILE=${AUDIT_LOGS_FILE}"
+  if [[ -n "$audit_run_id" && "$audit_run_id" != "unknown" ]]; then
+    echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_run_id" --json url --jq '.url')"
+  fi
+  echo "AGENT_NEEDED"
+  exit 102
+fi
+
+if [[ -n "$ci_fast" && "${ci_fast%%:*}" == "failed" ]]; then
+  # rest: failed:id:conclusion
+  rest="${ci_fast#failed:}"
+  ci_run_id="${rest%%:*}"
+  ci_conclusion="${rest##*:}"
+  echo "[fix-ci] Latest CI for HEAD ${LOCAL_SHA} already completed with ${ci_conclusion} (run ${ci_run_id})."
+  echo ""
+  echo "CI_FAILED"
+  echo "CI_RUN_ID=${ci_run_id}"
+  echo "CI_CONCLUSION=${ci_conclusion}"
+  gh_cmd run view "$ci_run_id" --log-failed 2>/dev/null > "$CI_LOGS_FILE" || true
+  gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "$CI_LOGS_FILE" || true
+  echo "CI_LOGS_FILE=${CI_LOGS_FILE}"
+  echo "CI_RUN_URL=$(gh_cmd run view "$ci_run_id" --json url --jq '.url')"
+  echo "AGENT_NEEDED"
+  exit 101
+fi
+
+if [[ -n "$ci_fast" && "${ci_fast%%:*}" == "success" && -n "$audit_fast" && "${audit_fast%%:*}" == "failed" ]]; then
+  rest="${audit_fast#failed:}"
+  audit_run_id="${rest%%:*}"
+  audit_conclusion="${rest##*:}"
+  echo "[fix-ci] Latest audit for HEAD ${LOCAL_SHA} already completed with ${audit_conclusion} (run ${audit_run_id})."
+  echo ""
+  echo "AUDIT_FAILED"
+  echo "AUDIT_RUN_ID=${audit_run_id}"
+  echo "AUDIT_CONCLUSION=${audit_conclusion}"
+  gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "$AUDIT_LOGS_FILE" || true
+  gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "$AUDIT_LOGS_FILE" || true
+  echo "AUDIT_LOGS_FILE=${AUDIT_LOGS_FILE}"
+  echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_run_id" --json url --jq '.url')"
+  echo "AGENT_NEEDED"
+  exit 102
+fi
+
+get_latest_run_id() {
+  local workflow="$1"
+  gh_cmd run list --workflow="$workflow" --branch "$BRANCH" --limit 1 --json databaseId 2>/dev/null \
+    | jq -r '.[0].databaseId // "0"'
+}
+
+ci_prev_run_id=$(get_latest_run_id "ci.yml")
+audit_prev_run_id=$(get_latest_run_id "audit.yml")
+
+echo "[fix-ci] Triggering ci.yml on ${BRANCH}..."
+gh_cmd workflow run ci.yml --ref "$BRANCH" 2>/dev/null || {
+  echo "[fix-ci] ERROR: Failed to trigger ci.yml" >&2
+  exit 1
+}
+
+echo "[fix-ci] Triggering audit.yml on ${BRANCH}..."
+gh_cmd workflow run audit.yml --ref "$BRANCH" 2>/dev/null || {
+  echo "[fix-ci] ERROR: Failed to trigger audit.yml" >&2
+  exit 1
+}
+
 echo "[fix-ci] Waiting for CI..."
 ci_result=$(wait_for_workflow "ci.yml" "$ci_prev_run_id")
 ci_conclusion="${ci_result%%:*}"
@@ -173,13 +224,15 @@ if [[ "$ci_conclusion" != "success" ]]; then
   echo "[fix-ci] Fetching CI logs..."
   if [[ "$ci_run_id" != "unknown" ]]; then
     gh_cmd run view "$ci_run_id" --log-failed 2>/dev/null > "$CI_LOGS_FILE" || true
-    gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "$CI_LOGS_FILE" || true
+    if [[ "$ci_conclusion" == "failure" ]]; then
+      gh_cmd run view "$ci_run_id" --log 2>/dev/null >> "$CI_LOGS_FILE" || true
+    fi
   else
-    : > "$CI_LOGS_FILE"
+    echo "[fix-ci] CI timed out waiting for completion. The workflow may still be running on GitHub." > "$CI_LOGS_FILE"
   fi
   echo "CI_LOGS_FILE=${CI_LOGS_FILE}"
   if [[ -n "$ci_run_id" && "$ci_run_id" != "unknown" ]]; then
-    echo "CI_RUN_URL=$(gh_cmd run view "$ci_run_id" --json url --jq -r '.url')"
+    echo "CI_RUN_URL=$(gh_cmd run view "$ci_run_id" --json url --jq '.url')"
   fi
   echo "AGENT_NEEDED"
   exit 101
@@ -199,13 +252,15 @@ if [[ "$audit_conclusion" != "success" ]]; then
   echo "[fix-ci] Fetching audit logs..."
   if [[ "$audit_run_id" != "unknown" ]]; then
     gh_cmd run view "$audit_run_id" --log-failed 2>/dev/null > "$AUDIT_LOGS_FILE" || true
-    gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "$AUDIT_LOGS_FILE" || true
+    if [[ "$audit_conclusion" == "failure" ]]; then
+      gh_cmd run view "$audit_run_id" --log 2>/dev/null >> "$AUDIT_LOGS_FILE" || true
+    fi
   else
-    : > "$AUDIT_LOGS_FILE"
+    echo "[fix-ci] Audit timed out waiting for completion. The workflow may still be running on GitHub." > "$AUDIT_LOGS_FILE"
   fi
   echo "AUDIT_LOGS_FILE=${AUDIT_LOGS_FILE}"
   if [[ -n "$audit_run_id" && "$audit_run_id" != "unknown" ]]; then
-    echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_run_id" --json url --jq -r '.url')"
+    echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_run_id" --json url --jq '.url')"
   fi
   echo "AGENT_NEEDED"
   exit 102
@@ -216,8 +271,8 @@ echo "FIX_CI_COMPLETE"
 echo "BRANCH=${BRANCH}"
 echo "LOCAL_HEAD=$(git rev-parse HEAD)"
 if [[ -n "$ci_run_id" && "$ci_run_id" != "unknown" ]]; then
-  echo "CI_RUN_URL=$(gh_cmd run view "$ci_run_id" --json url --jq -r '.url')"
+  echo "CI_RUN_URL=$(gh_cmd run view "$ci_run_id" --json url --jq '.url')"
 fi
 if [[ -n "$audit_run_id" && "$audit_run_id" != "unknown" ]]; then
-  echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_run_id" --json url --jq -r '.url')"
+  echo "AUDIT_RUN_URL=$(gh_cmd run view "$audit_run_id" --json url --jq '.url')"
 fi

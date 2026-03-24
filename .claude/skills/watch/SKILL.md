@@ -16,7 +16,6 @@ This skill uses shell scripts for all mechanical bookkeeping (polling, fetching,
 watch-poll.sh          — Deterministic polling loop (no AI needed)
   ├── Fetches comments from 3 GitHub API endpoints
   ├── Deduplicates by tracking last-seen IDs
-  ├── Filters out bot-authored comments
   ├── Merges from main, detects conflicts
   ├── Parses PR body for unchecked Claude Code checklist items
   ├── Writes work-items.json when there's actionable work
@@ -82,7 +81,6 @@ bash "${SKILL_DIR}/watch-poll.sh" "${PR_URL}" $([[ "$AUTO_MERGE" == "false" ]] &
 The script handles:
 - Fetching comments from all 3 GitHub API endpoints (reviews, review comments, issue comments)
 - Deduplication via last-seen ID tracking per endpoint
-- Filtering out bot-authored comments
 - Merging from main and detecting conflicts
 - Parsing the PR body for unchecked `### Claude Code` checklist items
 - Idle counter tracking (6 consecutive empty cycles = timeout)
@@ -127,7 +125,7 @@ The script communicates via stdout signals and exit codes:
 
 When the script prints **`AGENT_NEEDED`** and exits **0**, it has **not** posted the wrap-up and **has not** emitted `IDLE_TIMEOUT`. The orchestrator **must** run **Step 1 again** with the **same `--work-dir`** (and the **same** `--max-turns` if any) after finishing Step 3 — **unless** the user explicitly asked to stop mid-session.
 
-- **Why:** On an `AGENT_NEEDED` exit, `watch-poll.sh` increments `turns-count` in `WORK_DIR` and exits. The **next** invocation either (a) hits **idle** after empty poll cycles and posts wrap-up + `IDLE_TIMEOUT`, or (b) with **`--max-turns N`**, sees `turns-count >= N` **at the start** of that next run, posts wrap-up, then prints `IDLE_TIMEOUT` **immediately** (no extra agent work). Skipping that second poll is why wrap-up and **`watch-post.sh` never ran.
+- **Why:** On an `AGENT_NEEDED` exit, `watch-poll.sh` increments `turns-count` in `WORK_DIR` and exits. The **next** invocation either (a) hits **idle** after empty poll cycles and posts wrap-up + `IDLE_TIMEOUT`, or (b) with **`--max-turns N`**, sees `turns-count >= N` **at the start** of that next run, posts wrap-up, then prints `IDLE_TIMEOUT` **immediately** (no extra agent work). Skipping that second poll is why wrap-up and **`watch-post.sh`** never ran.
 
 - **`--max-turns 1`:** Expect **two** poll runs in the common case: first run → `AGENT_NEEDED` (do work); second run → `IDLE_TIMEOUT` (wrap-up posted) → **Step 5**.
 
