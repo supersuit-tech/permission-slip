@@ -1,6 +1,6 @@
 import { ExpoConfig, ConfigContext } from "expo/config";
 
-export default ({ config }: ConfigContext): ExpoConfig => ({
+export default (_config: ConfigContext): ExpoConfig => ({
   name: "Permission Slip",
   slug: "permission-slip",
   version: "1.0.0",
@@ -66,7 +66,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     favicon: "./assets/favicon.png",
   },
   updates: {
-    url: "https://u.expo.dev/${EXPO_PROJECT_ID}",
+    url: `https://u.expo.dev/${process.env.EXPO_PROJECT_ID}`,
     enabled: true,
     fallbackToCacheTimeout: 0,
   },
