@@ -26,6 +26,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/instacart"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/intercom"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/jira"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/kroger"
