@@ -9,8 +9,8 @@
 - **Link PRs to issues.** When a PR addresses a GitHub issue, include `Closes #<issue>` in the PR body so the issue is automatically closed when the PR merges. Don't wait to be asked.
 - **Never open draft PRs.** Always open PRs as ready for review.
 - When suggesting a PR body or GitHub issue that includes a checklist, **split the checklist into two sections** based on who should handle each item:
-  - `### Developer` — items that a developer can address (e.g., add tests, fix lint, update docs, add error handling, run checks). The `/watch` command will pick these up and check them off.
-  - `### Manual Testing` — items that require manual verification, design review, or hands-on testing that a developer can't perform.
+  - `### Developer` — items that can be automated or handled by `/watch` (e.g., add tests, fix lint, update docs, add error handling, run checks).
+  - `### Manual Testing` — items that require manual verification, design review, or hands-on testing that can't be automated.
 - Always include the pull request URL at the end of every message where a PR already exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
@@ -216,6 +216,7 @@ The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API typ
 - When creating issues, default to using checklists (`- [ ]`) instead of bullet points for work items that can be completed independently. This makes it easy to track progress directly in the issue.
 - When you encounter an issue with a checklist that is out of date (items completed but not checked off, missing items, irrelevant items), update the checklist to reflect the current state.
 - **Never assume issue scope.** If you can't access an issue (e.g., a link doesn't work or returns an error), try fetching it with the `gh` CLI (`GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh issue view <number>`). If you still can't access it, ask the user for the issue details — do not guess or infer what the issue is about.
+- **Organize multi-task issues into phases.** When an issue has multiple tasks, group them into sequential phases where each phase depends on the previous one completing. Within each phase, mark which tasks can run in parallel vs. which must be sequential. Use checklists within each phase for trackability.
 
 ## Go Toolchain Setup
 
