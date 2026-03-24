@@ -11,6 +11,9 @@ export const WILDCARD_ACTION_TYPE = "*";
 const selectClassName =
   "border-input bg-background flex h-9 w-full rounded-md border px-3 py-1 text-sm";
 
+const segmentBase =
+  "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
+
 interface NameFieldProps {
   id: string;
   value: string;
@@ -79,12 +82,12 @@ export function StatusSelect({
   const activeRef = useRef<HTMLButtonElement>(null);
   const disabledRef = useRef<HTMLButtonElement>(null);
 
-  const segmentBase =
-    "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
   const labelId = `${id}-label`;
 
+  // WAI-ARIA radio group: arrow keys cycle circularly between options.
   function handleActiveKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
-    if (e.key === "ArrowRight" || e.key === "ArrowDown") {
+    if (e.key === "ArrowRight" || e.key === "ArrowDown" ||
+        e.key === "ArrowLeft" || e.key === "ArrowUp") {
       e.preventDefault();
       onChange("disabled");
       queueMicrotask(() => disabledRef.current?.focus());
@@ -92,7 +95,8 @@ export function StatusSelect({
   }
 
   function handleDisabledKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
-    if (e.key === "ArrowLeft" || e.key === "ArrowUp") {
+    if (e.key === "ArrowLeft" || e.key === "ArrowUp" ||
+        e.key === "ArrowRight" || e.key === "ArrowDown") {
       e.preventDefault();
       onChange("active");
       queueMicrotask(() => activeRef.current?.focus());
