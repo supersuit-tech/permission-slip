@@ -489,6 +489,38 @@ func TestExecuteConnectorAction_OAuthPath_NilTokenExpirySkipsRefresh(t *testing.
 	}
 }
 
+// TestExecuteConnectorAction_OAuthPath_NilExpiryNilOAuthRegistrySucceeds verifies
+// that tokens with no expiry work even when deps.OAuthProviders is nil.
+// This is the regression test for the OAuthProviders nil-check relocation.
+func TestExecuteConnectorAction_OAuthPath_NilExpiryNilOAuthRegistrySucceeds(t *testing.T) {
+	t.Parallel()
+
+	var capturedCreds connectors.Credentials
+	f := setupOAuthExecutionTest(t, oauthExecOpts{
+		OnExec:          func(creds connectors.Credentials) { capturedCreds = creds },
+		Connection:      &testhelper.OAuthConnectionOpts{Status: "active"},
+		NoOAuthRegistry: true,
+	})
+
+	// Store a token with no expiry — refresh should never be attempted.
+	accessVaultID, _ := f.Vault.CreateSecret(t.Context(), f.TX, "access", []byte("no-expiry-token"))
+	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
+	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, nil)
+
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	if err != nil {
+		t.Fatalf("unexpected error with nil OAuthProviders and nil expiry: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	tok, _ := capturedCreds.Get("access_token")
+	if tok != "no-expiry-token" {
+		t.Errorf("expected access_token %q, got %q", "no-expiry-token", tok)
+	}
+}
+
 // TestExecuteConnectorAction_OAuthPath_RefreshesExpiredToken is the hardest
 // integration test: it wires up a real mock OAuth token server, stores an expired
 // access token with a valid refresh token, and verifies the full refresh pipeline:
