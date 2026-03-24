@@ -192,4 +192,22 @@ func TestValidateCredentials(t *testing.T) {
 	})); err != nil {
 		t.Errorf("valid: %v", err)
 	}
+	// Whitespace around environment should be trimmed (treated as sandbox).
+	if err := p.ValidateCredentials(context.Background(), connectors.NewCredentials(map[string]string{
+		"access_token": "x",
+		"environment":  "  sandbox  ",
+	})); err != nil {
+		t.Errorf("trimmed sandbox env: %v", err)
+	}
+}
+
+func TestAPIBaseURLForCreds_SandboxTrimmed(t *testing.T) {
+	t.Parallel()
+	c := connectors.NewCredentials(map[string]string{
+		"access_token": "x",
+		"environment":  "\tsandbox\n",
+	})
+	if apiBaseURLForCreds(c) != sandboxAPIBaseURL {
+		t.Errorf("got %q, want sandbox", apiBaseURLForCreds(c))
+	}
 }
