@@ -293,7 +293,7 @@ func TestCreateAndVerifyOAuthState_WithPKCEVerifier(t *testing.T) {
 	}
 }
 
-func TestVerifyOAuthState_LegacyPlaintextPKCEClaim(t *testing.T) {
+func TestVerifyOAuthState_PlaintextPKCEClaimIgnored(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 	verifier := "legacy-plaintext-verifier-43charsxxxxxxxxxxxxxxxxxxxxx"
@@ -315,8 +315,8 @@ func TestVerifyOAuthState_LegacyPlaintextPKCEClaim(t *testing.T) {
 	if err != nil {
 		t.Fatalf("verifyOAuthState: %v", err)
 	}
-	if verified.PKCEVerifier != verifier {
-		t.Errorf("legacy PKCE: got %q, want %q", verified.PKCEVerifier, verifier)
+	if verified.PKCEVerifier != "" {
+		t.Errorf("plaintext pkce_verifier claim should be ignored, got %q", verified.PKCEVerifier)
 	}
 }
 
@@ -2030,5 +2030,113 @@ func TestStoreOAuthTokens_WithZendeskSubdomain(t *testing.T) {
 	}
 	if extra["subdomain"] != "mycompany" {
 		t.Errorf("expected subdomain=mycompany, got %q", extra["subdomain"])
+	}
+}
+
+// ── PKCE callback tests ──────────────────────────────────────────────────────
+
+func TestOAuthCallback_PKCEVerifierPropagated(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	// Fake token endpoint that captures the code_verifier form param.
+	var capturedVerifier string
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		capturedVerifier = r.FormValue("code_verifier")
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"access_token":"tok","token_type":"Bearer","expires_in":3600,"refresh_token":"ref"}`))
+	}))
+	defer tokenSrv.Close()
+
+	reg := oauth.NewRegistry()
+	_ = reg.Register(oauth.Provider{
+		ID:           "dropbox",
+		AuthorizeURL: "https://www.dropbox.com/oauth2/authorize",
+		TokenURL:     tokenSrv.URL,
+		Scopes:       []string{"files.content.read"},
+		PKCE:         true,
+		ClientID:     "test-dropbox-client-id",
+		ClientSecret: "test-dropbox-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	v := vault.NewMockVaultStore()
+	deps := &Deps{
+		DB:               tx,
+		Vault:            v,
+		OAuthProviders:   reg,
+		OAuthStateSecret: testOAuthStateSecret,
+		BaseURL:          "http://localhost:3000",
+	}
+
+	// Create a state token with a PKCE verifier embedded.
+	verifier := oauth2.GenerateVerifier()
+	state, err := createOAuthState(deps, uid, "dropbox", []string{"files.content.read"}, "", "", "", verifier)
+	if err != nil {
+		t.Fatalf("create state: %v", err)
+	}
+
+	router := NewRouter(deps)
+	r := httptest.NewRequest(http.MethodGet,
+		"/oauth/dropbox/callback?code=test-code&state="+url.QueryEscape(state), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	// The callback should have forwarded the verifier to the token endpoint.
+	if capturedVerifier == "" {
+		t.Fatal("expected code_verifier to be sent to token endpoint, got empty")
+	}
+	if capturedVerifier != verifier {
+		t.Errorf("code_verifier mismatch: got %q, want %q", capturedVerifier, verifier)
+	}
+}
+
+func TestOAuthCallback_PKCEVerifierMissing(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	reg := oauth.NewRegistry()
+	_ = reg.Register(oauth.Provider{
+		ID:           "dropbox",
+		AuthorizeURL: "https://www.dropbox.com/oauth2/authorize",
+		TokenURL:     "https://api.dropboxapi.com/oauth2/token",
+		Scopes:       []string{"files.content.read"},
+		PKCE:         true,
+		ClientID:     "test-dropbox-client-id",
+		ClientSecret: "test-dropbox-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	deps := &Deps{
+		DB:               tx,
+		Vault:            vault.NewMockVaultStore(),
+		OAuthProviders:   reg,
+		OAuthStateSecret: testOAuthStateSecret,
+		BaseURL:          "http://localhost:3000",
+	}
+
+	// Create state WITHOUT a PKCE verifier (simulates a corrupt/tampered state).
+	state, err := createOAuthState(deps, uid, "dropbox", []string{"files.content.read"}, "", "", "", "")
+	if err != nil {
+		t.Fatalf("create state: %v", err)
+	}
+
+	router := NewRouter(deps)
+	r := httptest.NewRequest(http.MethodGet,
+		"/oauth/dropbox/callback?code=test-code&state="+url.QueryEscape(state), nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+	location := w.Header().Get("Location")
+	if !strings.Contains(location, "oauth_status=error") {
+		t.Errorf("expected error status in redirect, got: %s", location)
+	}
+	if !strings.Contains(location, "PKCE+verifier+missing") && !strings.Contains(location, "PKCE%20verifier%20missing") {
+		t.Errorf("expected PKCE verifier missing message in redirect, got: %s", location)
 	}
 }

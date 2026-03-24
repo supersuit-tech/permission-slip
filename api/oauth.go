@@ -258,9 +258,6 @@ func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 			return nil, fmt.Errorf("invalid state token pkce: %w", err)
 		}
 		pkceVerifier = v
-	} else if legacy, ok := claims["pkce_verifier"].(string); ok && legacy != "" {
-		// In-flight tokens from before pkce_sealed (plaintext in JWT payload).
-		pkceVerifier = legacy
 	}
 	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop, ReturnTo: returnTo, ReplaceID: replaceID, PKCEVerifier: pkceVerifier}, nil
 }
@@ -623,6 +620,16 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		provider, ok := deps.OAuthProviders.Get(providerID)
 		if !ok {
 			redirectToFrontend(w, r, deps, providerID, "error", "Provider not found", state.ReturnTo, "")
+			return
+		}
+
+		// PKCE-required providers must have a verifier in the state token.
+		// If the verifier is missing, the token exchange will fail with an
+		// opaque provider error — surface a clear message instead.
+		if provider.PKCE && state.PKCEVerifier == "" {
+			log.Printf("[%s] OAuthCallback: PKCE verifier missing for provider %s", TraceID(r.Context()), providerID)
+			CaptureError(r.Context(), fmt.Errorf("OAuthCallback: PKCE verifier missing for PKCE-required provider %s", providerID))
+			redirectToFrontend(w, r, deps, providerID, "error", "PKCE verifier missing from state token", state.ReturnTo, "")
 			return
 		}
 
