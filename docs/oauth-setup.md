@@ -1,6 +1,6 @@
 # OAuth Setup Guide
 
-Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Slack, Square, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
+Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, Google, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Slack, Square, PayPal, Stripe, and X (Twitter) services. This guide covers how to configure OAuth for both hosted and self-hosted deployments.
 
 ## Overview
 
@@ -99,6 +99,13 @@ OAuth provider credentials are configured via environment variables on the serve
 | `STRIPE_CLIENT_ID` | OAuth client ID from Stripe Connect settings (starts with `ca_`) |
 | `STRIPE_CLIENT_SECRET` | Stripe secret key used as the client secret for the OAuth token exchange |
 
+### PayPal OAuth
+
+| Variable | Description |
+|---|---|
+| `PAYPAL_CLIENT_ID` | Client ID from [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/) (REST app with Log in with PayPal) |
+| `PAYPAL_CLIENT_SECRET` | Secret from the same app |
+
 ### DocuSign OAuth
 
 | Variable | Description |
@@ -112,6 +119,8 @@ OAuth provider credentials are configured via environment variables on the serve
 |---|---|
 | `DROPBOX_CLIENT_ID` | App key from the [Dropbox App Console](https://www.dropbox.com/developers/apps) |
 | `DROPBOX_CLIENT_SECRET` | App secret from the Dropbox App Console |
+
+The platform uses **PKCE** for Dropbox automatically: the server sends an S256 code challenge to Dropbox and keeps the code verifier only in the **signed OAuth state JWT** (the verifier is **sealed** in the JWT payload so it is not plaintext in browser history or logs). `GET /v1/oauth/providers` returns `"pkce": true` for providers that use PKCE.
 
 ### OAuth Infrastructure
 
@@ -638,6 +647,46 @@ When a user connects their Stripe account:
 
 The Stripe connector also supports manual API key entry as a fallback for users who prefer not to use OAuth.
 
+## PayPal OAuth Setup
+
+The PayPal connector uses [Log in with PayPal](https://developer.paypal.com/docs/log-in-with-paypal/) (OpenID Connect) so users authorize access without pasting API credentials. After connect, the platform stores the access token (and refresh token when issued) like other OAuth providers.
+
+### 1. Create or configure a REST app
+
+1. Open the [PayPal Developer Dashboard](https://developer.paypal.com/dashboard/)
+2. Under **Apps & Credentials**, select your app (or create one)
+3. Enable **Log in with PayPal** and the REST API features you need (e.g. Payouts, Invoicing) — some products require account approval for live
+
+### 2. Configure Return URL
+
+Add the platform callback URL under the app’s return / redirect URLs:
+
+```
+https://your-domain.com/api/v1/oauth/paypal/callback
+```
+
+For local development, add the same path on `http://localhost:PORT` if your dev server exposes it.
+
+### 3. Configure environment
+
+```bash
+PAYPAL_CLIENT_ID=your-client-id
+PAYPAL_CLIENT_SECRET=your-secret
+```
+
+### 4. Scopes and token endpoint
+
+The connector requests REST-oriented scopes (payments, payouts, invoicing, refunds) plus `openid`, defined in `connectors/paypal` as `OAuthScopes` so the manifest and built-in provider stay aligned.
+
+The built-in provider uses PayPal’s **live** OpenID endpoints (`www.paypal.com/signin/authorize` and `api.paypal.com/v1/oauth2/token`). REST API calls default to **live** `api-m.paypal.com` unless the user adds credential key `environment` = `sandbox`, which routes requests to `api-m.sandbox.paypal.com`.
+
+> **Sandbox OAuth:** If you need authorization against PayPal’s sandbox identity endpoints only, register a separate sandbox app and consider a follow-up change (e.g. env-driven token/authorize URLs or a `paypal_sandbox` provider). The `.env.example` file summarizes this split.
+
+### 5. REST vs OAuth environment
+
+- **OAuth:** Handled by the platform using the PayPal app you configured (live endpoints in the default built-in provider).
+- **REST base URL:** Controlled per connection via optional credential `environment`: `sandbox` for `api-m.sandbox.paypal.com`, otherwise live `api-m.paypal.com`.
+
 ## DocuSign OAuth Setup
 
 DocuSign OAuth uses the authorization code grant flow, which is the standard approach for user-facing integrations. After connecting, the platform automatically fetches the user's default account ID and API base URL from DocuSign's userinfo endpoint so the connector can make API calls without manual configuration.
@@ -809,6 +858,7 @@ Ensure the redirect URI in your OAuth app matches exactly:
 - PagerDuty: `https://your-domain.com/api/v1/oauth/pagerduty/callback`
 - Slack: `https://your-domain.com/api/v1/oauth/slack/callback`
 - Square: `https://your-domain.com/api/v1/oauth/square/callback`
+- PayPal: `https://your-domain.com/api/v1/oauth/paypal/callback`
 - Stripe: `https://your-domain.com/api/v1/oauth/stripe/callback`
 - X: `https://your-domain.com/api/v1/oauth/x/callback`
 

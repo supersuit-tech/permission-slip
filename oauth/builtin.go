@@ -98,6 +98,7 @@ func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 			TokenURL:        mp.TokenURL,
 			Scopes:          mp.Scopes,
 			AuthorizeParams: mp.AuthorizeParams,
+			PKCE:            mp.PKCE,
 			Source:          SourceManifest,
 		}); err != nil {
 			return fmt.Errorf("registering manifest OAuth provider %q: %w", mp.ID, err)
@@ -114,4 +115,5 @@ type ManifestProvider struct {
 	TokenURL        string
 	Scopes          []string
 	AuthorizeParams map[string]string
+	PKCE            bool
 }

@@ -51,7 +51,7 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 - 🔐 **Cryptographic agent identity** — Ed25519 key pairs for tamper-proof request signing
 - 🙈 **Zero credential exposure** — agents never see your API keys or passwords
 - 📋 **Full audit trail** — every request, approval, and execution logged
-- 🔌 **OAuth 2.0 connections** — Google, Microsoft, and custom providers; tokens encrypted at rest with automatic refresh
+- 🔌 **OAuth 2.0 connections** — Google, Microsoft, Dropbox, and custom providers; PKCE where required; tokens encrypted at rest with automatic refresh
 - 🏠 **Self-hostable** — your data, your infrastructure
 - 📦 **Single binary deployment** — Go server with embedded React frontend
 
