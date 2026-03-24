@@ -6,6 +6,7 @@ import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
 import { inferWidgetFromProperty } from "@/lib/parameterSchema";
 import { CalendarRemoteSelectWidget } from "./CalendarRemoteSelectWidget";
+import { SlackChannelRemoteSelectWidget } from "./SlackChannelRemoteSelectWidget";
 
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
@@ -138,6 +139,22 @@ function RemoteSelectField({
         disabled={disabled}
         placeholder={placeholder}
         className={className}
+      />
+    );
+  }
+  const path = propertyUI.remote_select_options_path ?? "";
+  if (path.includes("/channels")) {
+    return (
+      <SlackChannelRemoteSelectWidget
+        inputId={inputId}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder={placeholder}
+        className={className}
+        agentId={agentId}
+        connectorId={connectorId}
+        ui={propertyUI}
       />
     );
   }

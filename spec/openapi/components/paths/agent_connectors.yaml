@@ -407,3 +407,54 @@ agentConnectorCalendars:
 
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+agentConnectorChannels:
+  get:
+    operationId: listAgentConnectorChannels
+    summary: List channels for agent connector
+    description: |
+      Returns Slack channels visible to the OAuth credential assigned to this agent–connector pair.
+      Used by the dashboard to populate channel pickers for Slack actions.
+
+      Requires session authentication (Supabase JWT). The agent must belong to the current user.
+      Private channels and DMs require the user's profile email to match their Slack account (same rules as `slack.list_channels`).
+
+    tags:
+      - Agents
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+
+    responses:
+      '200':
+        description: Channels listed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorChannelListResponse'
+
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent, connector, or channel listing not supported
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

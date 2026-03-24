@@ -166,4 +166,25 @@ describe("SchemaParameterDetails", () => {
 
     expect(screen.getByText("\u2014")).toBeInTheDocument();
   });
+
+  it("shows resolved Slack channel name with raw ID for slack.send_message", () => {
+    const slackSchema: ParametersSchema = {
+      type: "object",
+      required: ["channel", "message"],
+      properties: {
+        channel: { type: "string", description: "Channel" },
+        message: { type: "string", description: "Message" },
+      },
+    };
+    render(
+      <SchemaParameterDetails
+        parameters={{ channel: "C0123", message: "hi" }}
+        schema={slackSchema}
+        actionType="slack.send_message"
+        resourceDetails={{ channel_name: "#general" }}
+      />,
+    );
+
+    expect(screen.getByText("#general (C0123)")).toBeInTheDocument();
+  });
 });
