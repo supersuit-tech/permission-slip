@@ -209,7 +209,7 @@ func (c *AirtableConnector) doRequest(ctx context.Context, method, url string, c
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Airtable API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Airtable API request canceled"}
+			return &connectors.CanceledError{Message: "Airtable API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Airtable API request failed: %v", err)}
 	}
@@ -270,10 +270,7 @@ type airtableErrorDetail struct {
 func mapAirtableError(statusCode int, body []byte) error {
 	var errResp airtableErrorResponse
 	if err := json.Unmarshal(body, &errResp); err != nil || errResp.Error == nil {
-		snippet := string(body)
-		if len(snippet) > 500 {
-			snippet = snippet[:500] + "...(truncated)"
-		}
+		snippet := connectors.TruncateUTF8(string(body), 500)
 		return &connectors.ExternalError{
 			StatusCode: statusCode,
 			Message:    fmt.Sprintf("Airtable API error (HTTP %d): %s", statusCode, snippet),

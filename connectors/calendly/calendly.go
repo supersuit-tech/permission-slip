@@ -163,7 +163,7 @@ func (c *CalendlyConnector) doJSON(ctx context.Context, creds connectors.Credent
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Calendly API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Calendly API request canceled"}
+			return &connectors.CanceledError{Message: "Calendly API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Calendly API request failed: %v", err)}
 	}

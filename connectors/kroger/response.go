@@ -27,10 +27,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	// Truncate raw body to prevent leaking large or sensitive payloads in
 	// error messages (the body could be up to maxResponseBytes).
 	const maxErrBody = 512
-	msg := string(body)
-	if len(msg) > maxErrBody {
-		msg = msg[:maxErrBody] + "...(truncated)"
-	}
+	msg := connectors.TruncateUTF8(string(body), maxErrBody)
 
 	// Try to extract a structured Kroger API error message.
 	var kErr krogerErrorResponse

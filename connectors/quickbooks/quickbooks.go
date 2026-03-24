@@ -145,7 +145,7 @@ func (c *QuickBooksConnector) doJSON(ctx context.Context, creds connectors.Crede
 			return &connectors.TimeoutError{Message: fmt.Sprintf("QuickBooks API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "QuickBooks API request canceled"}
+			return &connectors.CanceledError{Message: "QuickBooks API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("QuickBooks API request failed: %v", err)}
 	}

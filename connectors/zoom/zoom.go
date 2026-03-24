@@ -118,7 +118,7 @@ func (c *ZoomConnector) doJSON(ctx context.Context, creds connectors.Credentials
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Zoom API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Zoom API request canceled"}
+			return &connectors.CanceledError{Message: "Zoom API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Zoom API request failed: %v", err)}
 	}

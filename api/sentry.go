@@ -107,6 +107,8 @@ func classifyConnectorError(err error) string {
 		return "auth"
 	case connectors.IsTimeoutError(err):
 		return "timeout"
+	case connectors.IsCanceledError(err):
+		return "canceled"
 	case errors.Is(err, context.DeadlineExceeded):
 		return "deadline_exceeded"
 	case errors.Is(err, context.Canceled):

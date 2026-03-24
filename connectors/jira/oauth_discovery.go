@@ -120,8 +120,11 @@ func (c *JiraConnector) fetchCloudID(ctx context.Context, accessToken string) (s
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
+		if connectors.IsTimeout(err) {
 			return "", &connectors.TimeoutError{Message: fmt.Sprintf("accessible-resources request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return "", &connectors.CanceledError{Message: "accessible-resources request canceled"}
 		}
 		return "", &connectors.ExternalError{Message: fmt.Sprintf("accessible-resources request failed: %v", err)}
 	}

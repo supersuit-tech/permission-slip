@@ -253,7 +253,7 @@ func wrapHTTPError(err error) error {
 		return &connectors.TimeoutError{Message: fmt.Sprintf("LinkedIn API request timed out: %v", err)}
 	}
 	if errors.Is(err, context.Canceled) {
-		return &connectors.TimeoutError{Message: "LinkedIn API request canceled"}
+		return &connectors.CanceledError{Message: "LinkedIn API request canceled"}
 	}
 	return &connectors.ExternalError{Message: fmt.Sprintf("LinkedIn API request failed: %v", err)}
 }

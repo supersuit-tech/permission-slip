@@ -130,7 +130,7 @@ func (c *MondayConnector) query(ctx context.Context, creds connectors.Credential
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Monday.com API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Monday.com API request canceled"}
+			return &connectors.CanceledError{Message: "Monday.com API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Monday.com API request failed: %v", err)}
 	}

@@ -24,20 +24,14 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 	}
 
 	const maxErrBody = 512
-	msg := string(body)
-	if len(msg) > maxErrBody {
-		msg = msg[:maxErrBody] + "...(truncated)"
-	}
+	msg := connectors.TruncateUTF8(string(body), maxErrBody)
 	if json.Unmarshal(body, &plaidErr) == nil && plaidErr.ErrorMessage != "" {
 		// Put the human-readable message first, then include the error code
 		// for debugging — matches the Stripe connector pattern. Re-apply the
 		// length cap so a very large error_message doesn't produce oversized
 		// error strings.
 		formatted := fmt.Sprintf("%s (code: %s, type: %s)", plaidErr.ErrorMessage, plaidErr.ErrorCode, plaidErr.ErrorType)
-		if len(formatted) > maxErrBody {
-			formatted = formatted[:maxErrBody] + "...(truncated)"
-		}
-		msg = formatted
+		msg = connectors.TruncateUTF8(formatted, maxErrBody)
 	}
 
 	switch {

@@ -139,7 +139,7 @@ func (c *SendGridConnector) doRequest(ctx context.Context, creds connectors.Cred
 			return nil, nil, &connectors.TimeoutError{Message: fmt.Sprintf("SendGrid API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return nil, nil, &connectors.TimeoutError{Message: "SendGrid API request canceled"}
+			return nil, nil, &connectors.CanceledError{Message: "SendGrid API request canceled"}
 		}
 		return nil, nil, &connectors.ExternalError{Message: fmt.Sprintf("SendGrid API request failed: %v", err)}
 	}

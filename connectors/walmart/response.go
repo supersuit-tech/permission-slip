@@ -76,11 +76,8 @@ func extractErrorMessage(body []byte) string {
 	}
 
 	s := string(body)
-	if len(s) > 500 {
-		s = s[:500] + "... (truncated)"
-	}
 	if len(s) > 0 {
-		return s
+		return connectors.TruncateUTF8(s, 500)
 	}
 	return "unknown error"
 }

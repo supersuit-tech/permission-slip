@@ -87,7 +87,7 @@ func (c *DocuSignConnector) doJSON(ctx context.Context, method, path string, cre
 			return &connectors.TimeoutError{Message: fmt.Sprintf("DocuSign API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "DocuSign API request canceled"}
+			return &connectors.CanceledError{Message: "DocuSign API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("DocuSign API request failed: %v", err)}
 	}
@@ -166,7 +166,7 @@ func (c *DocuSignConnector) doRaw(ctx context.Context, method, path string, cred
 			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("DocuSign API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return nil, &connectors.TimeoutError{Message: "DocuSign API request canceled"}
+			return nil, &connectors.CanceledError{Message: "DocuSign API request canceled"}
 		}
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("DocuSign API request failed: %v", err)}
 	}

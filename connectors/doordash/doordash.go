@@ -197,7 +197,7 @@ func (c *DoorDashConnector) do(ctx context.Context, creds connectors.Credentials
 			return &connectors.TimeoutError{Message: fmt.Sprintf("DoorDash API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "DoorDash API request canceled"}
+			return &connectors.CanceledError{Message: "DoorDash API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("DoorDash API request failed: %v", err)}
 	}

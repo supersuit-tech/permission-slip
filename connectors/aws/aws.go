@@ -400,8 +400,11 @@ func (c *AWSConnector) do(ctx context.Context, creds connectors.Credentials, met
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
+		if connectors.IsTimeout(err) {
 			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("AWS API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return nil, &connectors.CanceledError{Message: "AWS API request canceled"}
 		}
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("AWS API request failed: %v", err)}
 	}

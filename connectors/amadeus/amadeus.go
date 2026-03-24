@@ -162,7 +162,7 @@ func (c *AmadeusConnector) fetchToken(ctx context.Context, creds connectors.Cred
 			return "", &connectors.TimeoutError{Message: fmt.Sprintf("Amadeus token request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return "", &connectors.TimeoutError{Message: "Amadeus token request canceled"}
+			return "", &connectors.CanceledError{Message: "Amadeus token request canceled"}
 		}
 		return "", &connectors.ExternalError{Message: fmt.Sprintf("Amadeus token request failed: %v", err)}
 	}
@@ -297,7 +297,7 @@ func (c *AmadeusConnector) doOnce(ctx context.Context, creds connectors.Credenti
 			return 0, &connectors.TimeoutError{Message: fmt.Sprintf("Amadeus API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return 0, &connectors.TimeoutError{Message: "Amadeus API request canceled"}
+			return 0, &connectors.CanceledError{Message: "Amadeus API request canceled"}
 		}
 		return 0, &connectors.ExternalError{Message: fmt.Sprintf("Amadeus API request failed: %v", err)}
 	}

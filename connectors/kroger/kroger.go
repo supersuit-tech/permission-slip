@@ -107,7 +107,7 @@ func (c *KrogerConnector) do(ctx context.Context, creds connectors.Credentials, 
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Kroger API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Kroger API request canceled"}
+			return &connectors.CanceledError{Message: "Kroger API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Kroger API request failed: %v", err)}
 	}

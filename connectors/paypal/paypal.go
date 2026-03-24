@@ -34,7 +34,7 @@ const (
 	defaultRetryAfter = 30 * time.Second
 
 	maxResponseBytes     = 4 << 20 // 4 MiB
-	maxErrorMessageBytes = 512
+	maxErrorMessageChars = 512
 	maxJSONBodyBytes     = 256 << 10 // 256 KiB cap for caller-supplied JSON bodies
 )
 
@@ -198,7 +198,7 @@ func (c *PayPalConnector) doJSON(ctx context.Context, creds connectors.Credentia
 			return &connectors.TimeoutError{Message: fmt.Sprintf("PayPal API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "PayPal API request canceled"}
+			return &connectors.CanceledError{Message: "PayPal API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("PayPal API request failed: %v", err)}
 	}

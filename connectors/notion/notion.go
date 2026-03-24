@@ -387,7 +387,7 @@ func (c *NotionConnector) do(ctx context.Context, httpMethod, path string, creds
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Notion API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Notion API request canceled"}
+			return &connectors.CanceledError{Message: "Notion API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Notion API request failed: %v", err)}
 	}

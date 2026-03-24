@@ -321,7 +321,7 @@ func (c *MakeConnector) doRequest(ctx context.Context, method, path string, cred
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Make API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Make API request canceled"}
+			return &connectors.CanceledError{Message: "Make API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Make API request failed: %v", err)}
 	}
@@ -367,11 +367,7 @@ func (c *MakeConnector) doRequest(ctx context.Context, method, path string, cred
 // payloads through error strings.
 const maxErrorBodyLen = 512
 
-// truncateBody returns the first maxErrorBodyLen bytes of body as a string,
-// appending "..." if truncated.
+// truncateBody returns the body truncated to maxErrorBodyLen runes.
 func truncateBody(body []byte) string {
-	if len(body) <= maxErrorBodyLen {
-		return string(body)
-	}
-	return string(body[:maxErrorBodyLen]) + "..."
+	return connectors.TruncateUTF8(string(body), maxErrorBodyLen)
 }

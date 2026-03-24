@@ -21,10 +21,7 @@ type postgrestErrorResponse struct {
 func mapSupabaseError(statusCode int, body []byte) error {
 	var errResp postgrestErrorResponse
 	if err := json.Unmarshal(body, &errResp); err != nil {
-		snippet := string(body)
-		if len(snippet) > 500 {
-			snippet = snippet[:500] + "...(truncated)"
-		}
+		snippet := connectors.TruncateUTF8(string(body), 500)
 		return &connectors.ExternalError{
 			StatusCode: statusCode,
 			Message:    fmt.Sprintf("Supabase PostgREST error (HTTP %d): %s", statusCode, snippet),

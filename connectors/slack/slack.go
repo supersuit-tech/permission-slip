@@ -277,7 +277,7 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Slack API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Slack API request canceled"}
+			return &connectors.CanceledError{Message: "Slack API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Slack API request failed: %v", err)}
 	}
@@ -339,7 +339,7 @@ func (c *SlackConnector) doGetURL(ctx context.Context, url, token string, dest a
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Slack API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Slack API request canceled"}
+			return &connectors.CanceledError{Message: "Slack API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Slack API request failed: %v", err)}
 	}

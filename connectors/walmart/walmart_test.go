@@ -175,8 +175,8 @@ func TestDo_ContextCanceled(t *testing.T) {
 	if err == nil {
 		t.Fatal("do() expected error with canceled context, got nil")
 	}
-	if !connectors.IsTimeoutError(err) {
-		t.Errorf("expected TimeoutError, got %T: %v", err, err)
+	if !connectors.IsCanceledError(err) {
+		t.Errorf("expected CanceledError, got %T: %v", err, err)
 	}
 }
 

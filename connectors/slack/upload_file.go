@@ -199,8 +199,8 @@ func (a *uploadFileAction) uploadContent(ctx context.Context, uploadURL, filenam
 		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("file upload timed out: %v", err)}
 		}
-		if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("file upload canceled: %v", err)}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.CanceledError{Message: fmt.Sprintf("file upload canceled: %v", err)}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("file upload failed: %v", err)}
 	}

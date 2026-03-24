@@ -26,37 +26,21 @@ type instacartMultiError struct {
 
 const maxAPIErrorMessageRunes = 512
 
-func truncateForErrorMessage(s string) string {
-	s = strings.TrimSpace(s)
-	if s == "" {
-		return s
-	}
-	runes := []rune(s)
-	if len(runes) <= maxAPIErrorMessageRunes {
-		return s
-	}
-	return string(runes[:maxAPIErrorMessageRunes]) + "...(truncated)"
-}
-
 // checkResponse maps non-success HTTP responses to typed connector errors.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
 		return nil
 	}
 
-	const maxErrBody = 512
-	msg := string(body)
-	if len(msg) > maxErrBody {
-		msg = msg[:maxErrBody] + "...(truncated)"
-	}
+	msg := connectors.TruncateUTF8(string(body), maxAPIErrorMessageRunes)
 
 	var single instacartSingleError
 	if json.Unmarshal(body, &single) == nil && single.Error.Message != "" {
-		msg = truncateForErrorMessage(single.Error.Message)
+		msg = connectors.TruncateUTF8(strings.TrimSpace(single.Error.Message), maxAPIErrorMessageRunes)
 	} else {
 		var multi instacartMultiError
 		if json.Unmarshal(body, &multi) == nil && len(multi.Errors) > 0 && multi.Errors[0].Message != "" {
-			msg = truncateForErrorMessage(multi.Errors[0].Message)
+			msg = connectors.TruncateUTF8(strings.TrimSpace(multi.Errors[0].Message), maxAPIErrorMessageRunes)
 		}
 	}
 
@@ -71,6 +55,8 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return &connectors.AuthError{Message: fmt.Sprintf("Instacart API auth error: %s", msg)}
 	case statusCode == http.StatusForbidden:
 		return &connectors.AuthError{Message: fmt.Sprintf("Instacart API permission error: %s", msg)}
+	case statusCode == http.StatusUnprocessableEntity:
+		return &connectors.ValidationError{Message: fmt.Sprintf("Instacart API validation error: %s", msg)}
 	default:
 		return &connectors.ExternalError{StatusCode: statusCode, Message: fmt.Sprintf("Instacart API error: %s", msg)}
 	}

@@ -31,10 +31,7 @@ func truncateBody(body []byte) string {
 	if len(body) == 0 {
 		return "(empty response)"
 	}
-	if len(body) <= maxErrorBodyPreview {
-		return string(body)
-	}
-	return string(body[:maxErrorBodyPreview]) + "... (truncated)"
+	return connectors.TruncateUTF8(string(body), maxErrorBodyPreview)
 }
 
 // checkResponse inspects the HTTP status code and response body, returning
