@@ -916,6 +916,52 @@ func TestDowngrade_EndQuotaGraceNow_PastEntitlementsReturnsAlreadyDowngraded(t *
 	}
 }
 
+func TestDowngrade_EndQuotaGraceNow_DoubleCallReturns409(t *testing.T) {
+	// Simulates the TOCTOU edge case: two concurrent "end grace now" requests
+	// where the first succeeds and the second sees the grace already cleared.
+	// The true race (ClearSubscriptionQuotaGrace returns nil mid-handler) is
+	// covered at the DB layer by TestClearSubscriptionQuotaGrace_ReturnsNilWhenNoActiveGrace.
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
+
+	future := time.Now().Add(48 * time.Hour)
+	testhelper.MustExec(t, tx,
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = now() WHERE user_id = $1`,
+		uid, db.PlanPayAsYouGo, future)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	router := NewRouter(deps)
+
+	// First request succeeds — clears quota grace.
+	r1 := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, r1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("first request: expected 200, got %d: %s", w1.Code, w1.Body.String())
+	}
+
+	// Second request: quota grace is now cleared, so IsInQuotaGrace() is false
+	// and the handler returns 409 (already on free plan).
+	r2 := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, r2)
+
+	if w2.Code != http.StatusConflict {
+		t.Fatalf("second request: expected 409, got %d: %s", w2.Code, w2.Body.String())
+	}
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w2.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("parse error: %v", err)
+	}
+	if errResp.Error.Code != ErrAlreadyDowngraded {
+		t.Errorf("expected error code %s, got %s", ErrAlreadyDowngraded, errResp.Error.Code)
+	}
+}
+
 func TestDowngrade_NoSubscription(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

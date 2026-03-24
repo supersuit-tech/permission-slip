@@ -158,9 +158,8 @@ type billingUsageSummary struct {
 
 // newBillingSubscription builds subscription status fields from a DB subscription.
 func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
-	inQuotaGrace := sub.QuotaPlanID != nil && sub.QuotaEntitlementsUntil != nil && time.Now().Before(*sub.QuotaEntitlementsUntil)
 	var quotaUntil *time.Time
-	if inQuotaGrace {
+	if sub.IsInQuotaGrace() {
 		quotaUntil = sub.QuotaEntitlementsUntil
 	}
 	return billingSubscription{
@@ -170,7 +169,7 @@ func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
 		HasPaymentMethod:       false,
 		CanUpgrade:             sub.PlanID == db.PlanFree || sub.PlanID == db.PlanFreePro,
 		CanDowngrade:           sub.PlanID == db.PlanPayAsYouGo,
-		CanEndQuotaGraceNow:    sub.PlanID == db.PlanFree && inQuotaGrace,
+		CanEndQuotaGraceNow:    sub.PlanID == db.PlanFree && sub.IsInQuotaGrace(),
 		GracePeriodEndsAt:      sub.GracePeriodEndsAt(),
 		QuotaEntitlementsUntil: quotaUntil,
 	}
@@ -585,65 +584,12 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		inActiveQuotaGrace := sub.QuotaPlanID != nil && sub.QuotaEntitlementsUntil != nil &&
-			time.Now().Before(*sub.QuotaEntitlementsUntil)
-
 		if sub.PlanID == db.PlanFree {
-			if !inActiveQuotaGrace {
+			if !sub.IsInQuotaGrace() {
 				RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadyDowngraded, "Already on the free plan"))
 				return
 			}
-			// User cancelled pay-as-you-go but still has paid quotas until period end — allow ending that early.
-			freePlan := db.GetPlan(db.PlanFree)
-			if freePlan == nil {
-				log.Printf("[%s] Downgrade (end grace): free plan not found in config", TraceID(r.Context()))
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Free plan not configured"))
-				return
-			}
-			warnings, warnErr := buildDowngradeLimitWarnings(r.Context(), deps, profile.ID, freePlan)
-			if warnErr != nil {
-				log.Printf("[%s] Downgrade (end grace): limit warnings: %v", TraceID(r.Context()), warnErr)
-				CaptureError(r.Context(), warnErr)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify plan limits"))
-				return
-			}
-			tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
-			if err != nil {
-				log.Printf("[%s] Downgrade (end grace): begin tx: %v", TraceID(r.Context()), err)
-				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update plan"))
-				return
-			}
-			if owned {
-				defer db.RollbackTx(r.Context(), tx)
-			}
-			updated, err := db.ClearSubscriptionQuotaGrace(r.Context(), tx, profile.ID)
-			if err != nil {
-				log.Printf("[%s] Downgrade (end grace): clear quota grace: %v", TraceID(r.Context()), err)
-				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update plan"))
-				return
-			}
-			if updated == nil {
-				RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Paid-plan entitlements have already ended"))
-				return
-			}
-			if owned {
-				if err := db.CommitTx(r.Context(), tx); err != nil {
-					log.Printf("[%s] Downgrade (end grace): commit: %v", TraceID(r.Context()), err)
-					CaptureError(r.Context(), err)
-					RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update plan"))
-					return
-				}
-			}
-			RespondJSON(w, http.StatusOK, downgradeResponse{
-				Status:                 string(updated.Status),
-				PlanID:                 updated.PlanID,
-				DowngradedAt:           updated.DowngradedAt,
-				GracePeriodEndsAt:      gracePeriodEndIfActive(updated.DowngradedAt),
-				QuotaEntitlementsUntil: nil,
-				Warnings:               warnings,
-			})
+			handleEndQuotaGraceNow(w, r, deps, profile.ID)
 			return
 		}
 		if sub.PlanID == db.PlanFreePro {
@@ -759,6 +705,67 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			Warnings:               warnings,
 		})
 	}
+}
+
+// handleEndQuotaGraceNow ends paid-plan quota entitlements immediately for a
+// user already on the free plan. Called when the user clicks "Downgrade now"
+// during the post-cancellation quota grace window.
+func handleEndQuotaGraceNow(w http.ResponseWriter, r *http.Request, deps *Deps, userID string) {
+	freePlan := db.GetPlan(db.PlanFree)
+	if freePlan == nil {
+		log.Printf("[%s] Downgrade (end grace): free plan not found in config", TraceID(r.Context()))
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Free plan not configured"))
+		return
+	}
+
+	warnings, warnErr := buildDowngradeLimitWarnings(r.Context(), deps, userID, freePlan)
+	if warnErr != nil {
+		log.Printf("[%s] Downgrade (end grace): limit warnings: %v", TraceID(r.Context()), warnErr)
+		CaptureError(r.Context(), warnErr)
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify plan limits"))
+		return
+	}
+
+	tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+	if err != nil {
+		log.Printf("[%s] Downgrade (end grace): begin tx: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update plan"))
+		return
+	}
+	if owned {
+		defer db.RollbackTx(r.Context(), tx)
+	}
+
+	updated, err := db.ClearSubscriptionQuotaGrace(r.Context(), tx, userID)
+	if err != nil {
+		log.Printf("[%s] Downgrade (end grace): clear quota grace: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update plan"))
+		return
+	}
+	if updated == nil {
+		RespondError(w, r, http.StatusConflict, Conflict(ErrPlanChangeNotAllowed, "Paid-plan entitlements have already ended"))
+		return
+	}
+
+	if owned {
+		if err := db.CommitTx(r.Context(), tx); err != nil {
+			log.Printf("[%s] Downgrade (end grace): commit: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update plan"))
+			return
+		}
+	}
+
+	RespondJSON(w, http.StatusOK, downgradeResponse{
+		Status:                 string(updated.Status),
+		PlanID:                 updated.PlanID,
+		DowngradedAt:           updated.DowngradedAt,
+		GracePeriodEndsAt:      gracePeriodEndIfActive(updated.DowngradedAt),
+		QuotaEntitlementsUntil: nil,
+		Warnings:               warnings,
+	})
 }
 
 // buildDowngradeLimitWarnings returns non-blocking warnings when the user

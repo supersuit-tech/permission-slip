@@ -193,17 +193,15 @@ function DowngradeSection({ usage, subscription }: DowngradeSectionProps) {
         usage={usage}
         freeLimitsApplyDate={formatDate(subscription.current_period_end)}
       />
-      {subscription.quota_entitlements_until && (
-        <EndQuotaGraceConfirmDialog
-          open={showEndGraceConfirm}
-          onOpenChange={setShowEndGraceConfirm}
-          onConfirm={handleDowngrade}
-          isPending={isDowngrading}
-          error={downgradeError}
-          usage={usage}
-          paidEntitlementsEndDate={formatDate(subscription.quota_entitlements_until)}
-        />
-      )}
+      <EndQuotaGraceConfirmDialog
+        open={showEndGraceConfirm}
+        onOpenChange={setShowEndGraceConfirm}
+        onConfirm={handleDowngrade}
+        isPending={isDowngrading}
+        error={downgradeError}
+        usage={usage}
+        paidEntitlementsEndDate={subscription.quota_entitlements_until ? formatDate(subscription.quota_entitlements_until) : "your grace period end"}
+      />
     </>
   );
 }
