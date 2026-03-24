@@ -1,6 +1,7 @@
 package firestore
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -116,6 +117,30 @@ func TestFirestoreConnector_ValidateCredentials(t *testing.T) {
 				t.Errorf("got %T, want validation error", err)
 			}
 		})
+	}
+}
+
+func TestFirestoreConnector_ManifestTemplate_QueryPostsLimitIsInteger(t *testing.T) {
+	t.Parallel()
+	m := New().Manifest()
+	var tpl *connectors.ManifestTemplate
+	for i := range m.Templates {
+		if m.Templates[i].ID == "tpl_firestore_query_posts" {
+			tpl = &m.Templates[i]
+			break
+		}
+	}
+	if tpl == nil {
+		t.Fatal("missing tpl_firestore_query_posts")
+	}
+	var params struct {
+		Limit int `json:"limit"`
+	}
+	if err := json.Unmarshal(tpl.Parameters, &params); err != nil {
+		t.Fatalf("template parameters must unmarshal: %v", err)
+	}
+	if params.Limit != defaultQueryLimit {
+		t.Fatalf("template limit = %d, want default %d", params.Limit, defaultQueryLimit)
 	}
 }
 

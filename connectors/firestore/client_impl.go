@@ -9,7 +9,9 @@ import (
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -70,6 +72,9 @@ func (r *realRunner) close() error {
 func (r *realRunner) getDocument(ctx context.Context, path string) (map[string]interface{}, error) {
 	snap, err := r.client.Doc(path).Get(ctx)
 	if err != nil {
+		if st, ok := status.FromError(err); ok && st.Code() == codes.NotFound {
+			return nil, nil
+		}
 		return nil, mapFirestoreError(err)
 	}
 	if !snap.Exists() {

@@ -4,6 +4,9 @@ import (
 	"encoding/json"
 	"testing"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
@@ -39,6 +42,36 @@ func TestGet_FoundAndFiltered(t *testing.T) {
 	}
 	if data["name"] != "Alice" {
 		t.Fatalf("name missing: %#v", data)
+	}
+}
+
+func TestGet_NotFoundGRPCReturnsFoundFalse(t *testing.T) {
+	t.Parallel()
+	mock := newMockRunner()
+	mock.getErr = status.Error(codes.NotFound, "no document")
+	conn := newForTest(mock)
+	action := conn.Actions()["firestore.get"]
+
+	res, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType: "firestore.get",
+		Parameters: json.RawMessage(`{
+			"path":"users/missing",
+			"allowed_paths":["users/missing"]
+		}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("NotFound should be success with found:false, got err %v", err)
+	}
+	var payload map[string]interface{}
+	if err := json.Unmarshal(res.Data, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload["found"].(bool) {
+		t.Fatal("expected found false")
+	}
+	if payload["data"] != nil {
+		t.Fatalf("expected data null, got %#v", payload["data"])
 	}
 }
 
