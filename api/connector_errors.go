@@ -125,6 +125,7 @@ func handleConnectorError(w http.ResponseWriter, r *http.Request, err error, cc 
 			msg = ce.Message
 		}
 		log.Printf("[%s] connector request canceled: %v", traceID, err)
+		CaptureConnectorError(r.Context(), err, cc)
 		// Canceled requests are NOT retryable — the caller intentionally canceled.
 		RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, msg, false))
 		return true

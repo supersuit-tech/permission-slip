@@ -75,7 +75,7 @@ func formatErrorMessage(body []byte) string {
 	if len(parts) == 0 {
 		return truncateBody(body)
 	}
-	return strings.Join(parts, "; ")
+	return connectors.TruncateUTF8(strings.Join(parts, "; "), maxErrorBodyLen)
 }
 
 func truncateBody(body []byte) string {

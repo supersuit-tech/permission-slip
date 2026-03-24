@@ -34,7 +34,7 @@ const (
 	defaultRetryAfter = 30 * time.Second
 
 	maxResponseBytes     = 4 << 20 // 4 MiB
-	maxErrorMessageBytes = 512
+	maxErrorMessageChars = 512
 	maxJSONBodyBytes     = 256 << 10 // 256 KiB cap for caller-supplied JSON bodies
 )
 

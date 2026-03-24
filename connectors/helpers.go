@@ -53,11 +53,14 @@ func JSONResult(v any) (*ActionResult, error) {
 // UTF-8 sequences. Use this for schema-facing validation where maxLength
 // counts Unicode code points, not bytes.
 func TruncateUTF8(s string, maxChars int) string {
-	if utf8.RuneCountInString(s) <= maxChars {
-		return s
+	count := 0
+	for i := range s {
+		if count == maxChars {
+			return s[:i] + "...(truncated)"
+		}
+		count++
 	}
-	runes := []rune(s)
-	return string(runes[:maxChars]) + "...(truncated)"
+	return s
 }
 
 // RuneLen returns the number of Unicode code points in s. Use this instead of

@@ -25,7 +25,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 		return nil
 	}
 
-	msg := connectors.TruncateUTF8(string(body), maxErrorMessageBytes)
+	msg := connectors.TruncateUTF8(string(body), maxErrorMessageChars)
 	var pe paypalError
 	if json.Unmarshal(body, &pe) == nil && pe.Message != "" {
 		msg = pe.Message
@@ -39,7 +39,7 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 			msg = fmt.Sprintf("%s — %s", msg, pe.Details[0].Issue)
 		}
 		// Apply truncation after composing the structured message too.
-		msg = connectors.TruncateUTF8(msg, maxErrorMessageBytes)
+		msg = connectors.TruncateUTF8(msg, maxErrorMessageChars)
 	}
 
 	if statusCode == http.StatusTooManyRequests {
