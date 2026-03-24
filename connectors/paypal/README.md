@@ -33,6 +33,8 @@ Tokens are stored encrypted and decrypted only at execution time.
 
 POST requests that create resources send a `PayPal-Request-Id` header derived from the action type and parameters (stable across retries).
 
+The HTTP client does **not** follow redirects, so a stray `3xx` from the API cannot cause the OAuth `Bearer` token to be forwarded to another host.
+
 ## Templates
 
 The manifest includes starter templates (minimal order, Venmo payout shape, read-only lookups) so admins can enable common flows without writing JSON from scratch.

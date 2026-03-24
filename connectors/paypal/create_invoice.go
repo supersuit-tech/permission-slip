@@ -3,7 +3,6 @@ package paypal
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -19,8 +18,8 @@ type createInvoiceParams struct {
 
 func (a *createInvoiceAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createInvoiceParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	if err := parseParams(req, &params); err != nil {
+		return nil, err
 	}
 	body, err := readJSONBody(params.Invoice, "invoice")
 	if err != nil {

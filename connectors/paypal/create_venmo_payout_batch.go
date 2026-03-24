@@ -3,7 +3,6 @@ package paypal
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -22,8 +21,8 @@ type createVenmoPayoutBatchParams struct {
 // recipient_type PHONE or USER_HANDLE and recipient_wallet VENMO in each item.
 func (a *createVenmoPayoutBatchAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params createVenmoPayoutBatchParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	if err := parseParams(req, &params); err != nil {
+		return nil, err
 	}
 	body, err := readJSONBody(params.PayoutBatch, "payout_batch")
 	if err != nil {

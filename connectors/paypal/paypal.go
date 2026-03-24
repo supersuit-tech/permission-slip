@@ -59,7 +59,14 @@ type PayPalConnector struct {
 // New creates a PayPalConnector with sensible defaults.
 func New() *PayPalConnector {
 	return &PayPalConnector{
-		client: &http.Client{Timeout: defaultTimeout},
+		client: &http.Client{
+			Timeout: defaultTimeout,
+			// Do not follow redirects — avoids leaking the Bearer token to an
+			// unexpected host if upstream ever returns a 3xx (misconfig or attack).
+			CheckRedirect: func(*http.Request, []*http.Request) error {
+				return http.ErrUseLastResponse
+			},
+		},
 	}
 }
 
@@ -94,7 +101,8 @@ func (c *PayPalConnector) ValidateCredentials(_ context.Context, creds connector
 	if !ok || strings.TrimSpace(tok) == "" {
 		return &connectors.ValidationError{Message: "missing required credential: access_token (connect via OAuth)"}
 	}
-	if env, ok := creds.Get(credKeyEnvironment); ok && env != "" {
+	if env, ok := creds.Get(credKeyEnvironment); ok && strings.TrimSpace(env) != "" {
+		env = strings.TrimSpace(env)
 		if env != "live" && env != "sandbox" {
 			return &connectors.ValidationError{Message: "environment must be \"live\" or \"sandbox\" when set"}
 		}
@@ -103,7 +111,7 @@ func (c *PayPalConnector) ValidateCredentials(_ context.Context, creds connector
 }
 
 func apiBaseURLForCreds(creds connectors.Credentials) string {
-	if env, ok := creds.Get(credKeyEnvironment); ok && env == "sandbox" {
+	if env, ok := creds.Get(credKeyEnvironment); ok && strings.TrimSpace(env) == "sandbox" {
 		return sandboxAPIBaseURL
 	}
 	return liveAPIBaseURL

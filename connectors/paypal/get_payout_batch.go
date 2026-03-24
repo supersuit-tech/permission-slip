@@ -3,7 +3,6 @@ package paypal
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -19,8 +18,8 @@ type getPayoutBatchParams struct {
 
 func (a *getPayoutBatchAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params getPayoutBatchParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	if err := parseParams(req, &params); err != nil {
+		return nil, err
 	}
 	seg, err := pathSegment("payout_batch_id", params.PayoutBatchID)
 	if err != nil {

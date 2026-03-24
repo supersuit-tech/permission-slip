@@ -142,6 +142,39 @@ func TestGetOrderAction_HTTPServer(t *testing.T) {
 	}
 }
 
+func TestHTTPClient_DoesNotFollowRedirects(t *testing.T) {
+	t.Parallel()
+	var handlerCalls int
+	var ts *httptest.Server
+	ts = httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		handlerCalls++
+		if r.URL.Path == "/v2/checkout/orders" && r.Method == http.MethodPost {
+			http.Redirect(w, r, ts.URL+"/trap", http.StatusFound)
+			return
+		}
+		// If the client followed the redirect, it would POST here with the Bearer token.
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"trapped":true}`))
+	}))
+	t.Cleanup(ts.Close)
+	srv := ts
+
+	c := newForTest(New().client, srv.URL)
+	act := &createOrderAction{conn: c}
+	raw, _ := json.Marshal(map[string]any{"order": map[string]any{"intent": "CAPTURE"}})
+	_, err := act.Execute(context.Background(), connectors.ActionRequest{
+		ActionType:  "paypal.create_order",
+		Parameters:  raw,
+		Credentials: connectors.NewCredentials(map[string]string{"access_token": "secret-token"}),
+	})
+	if err == nil {
+		t.Fatal("expected error on redirect response")
+	}
+	if handlerCalls != 1 {
+		t.Fatalf("handler called %d times, want 1 (redirect must not be followed)", handlerCalls)
+	}
+}
+
 func TestValidateCredentials(t *testing.T) {
 	t.Parallel()
 	p := New()
