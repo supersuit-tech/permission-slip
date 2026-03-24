@@ -56,6 +56,14 @@ func TestValidateReadOnlyWarehouseSQL_backtickCTEName(t *testing.T) {
 	}
 }
 
+func TestValidateReadOnlyWarehouseSQL_backtickCTENameNoWhitespace(t *testing.T) {
+	t.Parallel()
+	// Backtick identifier directly adjacent to keywords (no whitespace) must still be accepted.
+	if err := ValidateReadOnlyWarehouseSQL("WITH`my-cte`AS(SELECT 1) SELECT * FROM t"); err != nil {
+		t.Fatalf("backtick CTE name without whitespace should be accepted: %v", err)
+	}
+}
+
 func TestValidateReadOnlyWarehouseSQL_tripleQuotedString(t *testing.T) {
 	t.Parallel()
 	// Triple-quoted string containing DELETE should not trigger keyword rejection

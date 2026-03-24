@@ -39,7 +39,8 @@ func findBarePlaceholders(sql string) []int {
 					i += 3
 					break
 				}
-				i++
+				_, w := utf8.DecodeRuneInString(sql[i:])
+				i += w
 			}
 		case c == '\'':
 			i++

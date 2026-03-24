@@ -148,16 +148,17 @@ func scrubSQLMasking(sql string) string {
 				i += w
 			}
 		case c == '`':
-			// Preserve backtick-quoted identifiers as underscores so they
-			// remain valid identifier tokens for CTE name parsing.
-			b.WriteByte('_')
+			// Emit a space for the opening backtick so the identifier does not
+			// merge with any preceding keyword, then replace interior bytes
+			// with underscores so the result is a valid identifier token.
+			b.WriteByte(' ')
 			i++
 			for i < len(sql) && sql[i] != '`' {
 				b.WriteByte('_')
 				i++
 			}
 			if i < len(sql) {
-				b.WriteByte('_')
+				b.WriteByte(' ') // closing backtick → space (boundary)
 				i++
 			}
 		default:
