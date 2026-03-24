@@ -125,6 +125,9 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 	if err != nil {
 		return nil, err
 	}
+	if docs == nil {
+		docs = []map[string]interface{}{}
+	}
 	allowed := buildFieldSet(params.AllowedReadFields)
 	if allowed != nil {
 		for i := range docs {

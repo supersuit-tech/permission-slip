@@ -103,7 +103,7 @@ func (m *mockRunner) queryCollection(ctx context.Context, collectionPath string,
 		return nil, m.queryErr
 	}
 	if len(m.queryDocs) == 0 {
-		return nil, nil
+		return []map[string]interface{}{}, nil
 	}
 	batch := m.queryDocs[0]
 	m.queryDocs = m.queryDocs[1:]
