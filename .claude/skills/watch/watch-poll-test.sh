@@ -248,9 +248,8 @@ test_pending_queue_reprocessing() {
   echo "1" > "$work_dir/turns-count"
   echo "999" > "$work_dir/pr-number.txt"
 
-  # Pending items from previous run (action_log_length was 0 when saved)
+  # Pending items from previous run (comment-ID tracking, no metadata)
   echo '[
-    {"type": "pending_metadata", "action_log_length": 0},
     {"type": "review_comment", "id": 100, "author": "reviewer", "body": "Fix A"},
     {"type": "review_comment", "id": 200, "author": "reviewer", "body": "Fix B"}
   ]' > "$work_dir/pending-items.json"
@@ -285,12 +284,11 @@ test_pending_queue_cleared_on_processing() {
   echo "1" > "$work_dir/turns-count"
   echo "999" > "$work_dir/pr-number.txt"
 
-  # Agent DID process: action log has entries now (was 0 at pending save time)
-  echo '[{"type": "implemented", "author": "reviewer", "request": "Fix A", "commit": "abc123"}]' > "$work_dir/action-log.json"
+  # Agent DID process: action log has entry with matching comment_id
+  echo '[{"type": "implemented", "author": "reviewer", "request": "Fix A", "commit": "abc123", "comment_id": 100}]' > "$work_dir/action-log.json"
 
-  # Pending items from previous run (action_log_length was 0)
+  # Pending items from previous run (comment-ID tracking, no metadata)
   echo '[
-    {"type": "pending_metadata", "action_log_length": 0},
     {"type": "review_comment", "id": 100, "author": "reviewer", "body": "Fix A"}
   ]' > "$work_dir/pending-items.json"
 
@@ -378,19 +376,16 @@ test_post_idle_drain() {
   local graphql_response='{"data":{"repository":{"pullRequest":{"merged":true,"reviewThreads":{"nodes":[{"id":"THREAD1","isResolved":false,"comments":{"nodes":[{"databaseId":500,"body":"Unresolved comment","author":{"login":"greptile"}}]}}]}}}}}'
   echo "$graphql_response" > "$test_dir/graphql-response.json"
 
-  # Run with MAX_IDLE_CYCLES=1 to trigger drain quickly
-  # We need to override the constant in the script for testing
+  # Run with MAX_IDLE_CYCLES=1 and POLL_INTERVAL=0 via env var overrides
   local output
   output=$(
     PATH="$test_dir/mock-bin:$PATH" \
     MOCK_DIR="$test_dir" \
     GH_HOST="github.com" \
     GH_REPO="supersuit-tech/permission-slip" \
-    bash -c '
-      # Patch MAX_IDLE_CYCLES to 1 for fast test
-      sed "s/MAX_IDLE_CYCLES=6/MAX_IDLE_CYCLES=1/" "'"$POLL_SCRIPT"'" > /tmp/poll-patched.sh
-      bash /tmp/poll-patched.sh "https://github.com/supersuit-tech/permission-slip/pull/999" --work-dir "'"$work_dir"'"
-    ' 2>&1
+    MAX_IDLE_CYCLES_OVERRIDE=1 \
+    POLL_INTERVAL_OVERRIDE=0 \
+    bash "$POLL_SCRIPT" "https://github.com/supersuit-tech/permission-slip/pull/999" --work-dir "$work_dir" 2>&1
   )
 
   assert_contains "$output" "unresolved review threads" "Detects unresolved threads during drain"
@@ -419,9 +414,8 @@ test_idle_counter_suppressed_by_pending() {
   echo "1" > "$work_dir/turns-count"
   echo "999" > "$work_dir/pr-number.txt"
 
-  # Pending items exist but action log didn't grow
+  # Pending items exist but agent didn't process them (no matching comment_id in action log)
   echo '[
-    {"type": "pending_metadata", "action_log_length": 0},
     {"type": "review_comment", "id": 100, "author": "reviewer", "body": "Fix A"}
   ]' > "$work_dir/pending-items.json"
 
