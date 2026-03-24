@@ -2,7 +2,6 @@ package slack
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -81,6 +80,8 @@ type listChannelSummary struct {
 	Name       string `json:"name,omitempty"`
 	User       string `json:"user,omitempty"`
 	IsPrivate  bool   `json:"is_private"`
+	IsIM       bool   `json:"is_im,omitempty"`
+	IsMPIM     bool   `json:"is_mpim,omitempty"`
 	Topic      string `json:"topic,omitempty"`
 	Purpose    string `json:"purpose,omitempty"`
 	NumMembers int    `json:"num_members"`
@@ -95,133 +96,11 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	excludeArchived := true
-	if params.ExcludeArchived != nil {
-		excludeArchived = *params.ExcludeArchived
-	}
-
-	types := params.Types
-	explicitTypes := types != ""
-	if types == "" {
-		types = "public_channel,private_channel,mpim,im"
-	}
-
-	// When listing private channels, group DMs, or DMs, resolve the user's
-	// Slack identity and pre-fetch their channel memberships so we can filter
-	// results efficiently. Uses users.conversations (one paginated call) instead
-	// of per-channel isUserInChannel to avoid N+1 API calls.
-	//
-	// If the caller didn't explicitly request private types (using the default)
-	// and has no email set, gracefully fall back to public_channel only instead
-	// of returning an error. This preserves backward compatibility for callers
-	// that previously relied on the old public_channel-only default.
-	var userChannelIDs map[string]bool
-	var userPrivateMerge []listChannelEntry
-	if channelTypesIncludePrivate(types) {
-		if req.UserEmail == "" {
-			if explicitTypes {
-				return nil, &connectors.ValidationError{
-					Message: "listing private channels, group DMs, or DMs requires your Permission Slip profile to have an email address matching your Slack account",
-				}
-			}
-			// Graceful fallback: caller used the default, so fall back to
-			// public channels only rather than breaking existing integrations.
-			types = "public_channel"
-		} else {
-			slackUserID, err := a.conn.lookupSlackUserByEmail(ctx, req.Credentials, req.UserEmail)
-			if err != nil {
-				return nil, fmt.Errorf("unable to verify Slack identity: %w", err)
-			}
-			if slackUserID == "" {
-				return nil, &connectors.ValidationError{
-					Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account", req.UserEmail),
-				}
-			}
-			// Only fetch memberships for private channel types — public channels
-			// are never filtered, so including them wastes API quota.
-			privateTypes := filterPrivateTypes(types)
-			userPrivateChs, err := a.conn.getUserPrivateConversations(ctx, req.Credentials, slackUserID, privateTypes)
-			if err != nil {
-				return nil, fmt.Errorf("fetching user channel memberships: %w", err)
-			}
-			userPrivateMerge = userPrivateChs
-			userChannelIDs = make(map[string]bool, len(userPrivateChs))
-			for _, ch := range userPrivateChs {
-				userChannelIDs[ch.ID] = true
-			}
-		}
-	}
-
-	body := listChannelsRequest{
-		Types:           types,
-		Limit:           params.Limit,
-		Cursor:          params.Cursor,
-		ExcludeArchived: excludeArchived,
-	}
-	if body.Limit == 0 {
-		body.Limit = 100
-	}
-
-	var resp listChannelsResponse
-	if err := a.conn.doPost(ctx, "conversations.list", req.Credentials, body, &resp); err != nil {
+	result, err := a.conn.listChannelsMerged(ctx, req.Credentials, req.UserEmail, params)
+	if err != nil {
 		return nil, err
 	}
-
-	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
-	}
-
-	seen := make(map[string]bool)
-	result := listChannelsResult{
-		Channels: make([]listChannelSummary, 0, len(resp.Channels)+len(userPrivateMerge)),
-	}
-	for _, ch := range resp.Channels {
-		// For private channel types, filter to only channels the user is a member of.
-		// Uses the pre-fetched userChannelIDs set for O(1) lookups instead of per-channel API calls.
-		if userChannelIDs != nil && (ch.IsPrivate || strings.HasPrefix(ch.ID, "D") || strings.HasPrefix(ch.ID, "G")) {
-			if !userChannelIDs[ch.ID] {
-				continue
-			}
-		}
-		seen[ch.ID] = true
-		result.Channels = append(result.Channels, listChannelSummary{
-			ID:         ch.ID,
-			Name:       ch.Name,
-			User:       ch.User,
-			IsPrivate:  ch.IsPrivate,
-			Topic:      ch.Topic.Value,
-			Purpose:    ch.Purpose.Value,
-			NumMembers: ch.NumMembers,
-		})
-	}
-	// Add human-only DMs / MPIMs / private channels from users.conversations that
-	// conversations.list (bot token) did not return.
-	for _, ch := range userPrivateMerge {
-		if excludeArchived && ch.IsArchived {
-			continue
-		}
-		if !listChannelEntryMatchesTypes(types, ch) {
-			continue
-		}
-		if seen[ch.ID] {
-			continue
-		}
-		seen[ch.ID] = true
-		result.Channels = append(result.Channels, listChannelSummary{
-			ID:         ch.ID,
-			Name:       ch.Name,
-			User:       ch.User,
-			IsPrivate:  ch.IsPrivate,
-			Topic:      ch.Topic.Value,
-			Purpose:    ch.Purpose.Value,
-			NumMembers: ch.NumMembers,
-		})
-	}
-	if resp.Meta != nil {
-		result.NextCursor = resp.Meta.NextCursor
-	}
-
-	return connectors.JSONResult(result)
+	return connectors.JSONResult(*result)
 }
 
 // listChannelEntryMatchesTypes returns whether ch should be included for the

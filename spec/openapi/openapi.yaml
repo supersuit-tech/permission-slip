@@ -159,6 +159,9 @@ paths:
   /v1/agents/{agent_id}/connectors/{connector_id}/calendars:
     $ref: './components/paths/agent_connectors.yaml#/agentConnectorCalendars'
 
+  /v1/agents/{agent_id}/connectors/{connector_id}/channels:
+    $ref: './components/paths/agent_connectors.yaml#/agentConnectorChannels'
+
   /v1/registration-invites:
     $ref: './components/paths/registration_invites.yaml#/createRegistrationInvite'
 

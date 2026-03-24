@@ -255,6 +255,8 @@ function ApprovalSupplementalContent({
             <SchemaParameterDetails
               parameters={parameters}
               schema={schema}
+              actionType={actionType}
+              resourceDetails={resourceDetails}
             />
           </div>
         </div>
@@ -361,6 +363,8 @@ function ApprovalContent({
             <SchemaParameterDetails
               parameters={parameters}
               schema={schema}
+              actionType={actionType}
+              resourceDetails={resourceDetails}
             />
           </div>
         </div>

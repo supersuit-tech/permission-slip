@@ -368,6 +368,10 @@ export function ReviewApprovalDialog({
                     <SchemaParameterDetails
                       parameters={params}
                       schema={schema}
+                      actionType={approval.action.type}
+                      resourceDetails={
+                        approval.resource_details as Record<string, unknown> | undefined
+                      }
                     />
                   </div>
                 )}
