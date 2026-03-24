@@ -29,6 +29,43 @@ func TestTranslatePlaceholders_skipsComment(t *testing.T) {
 	}
 }
 
+func TestTranslatePlaceholders_tripleQuotedSingle(t *testing.T) {
+	t.Parallel()
+	sql := "SELECT * FROM t WHERE x = '''Did you mean ?'''"
+	out, err := translatePlaceholders(sql, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != sql {
+		t.Fatalf("got %q want unchanged", out)
+	}
+}
+
+func TestTranslatePlaceholders_tripleQuotedDouble(t *testing.T) {
+	t.Parallel()
+	sql := `SELECT * FROM t WHERE x = """Did you mean ?"""`
+	out, err := translatePlaceholders(sql, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out != sql {
+		t.Fatalf("got %q want unchanged", out)
+	}
+}
+
+func TestTranslatePlaceholders_tripleQuotedWithBarePlaceholder(t *testing.T) {
+	t.Parallel()
+	sql := `SELECT * FROM t WHERE x = """hello?""" AND y = ?`
+	out, err := translatePlaceholders(sql, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `SELECT * FROM t WHERE x = """hello?""" AND y = @p0`
+	if out != want {
+		t.Fatalf("got %q want %q", out, want)
+	}
+}
+
 func TestCoerceParamValue_delegates(t *testing.T) {
 	t.Parallel()
 	v := coerceParamValue(float64(7))

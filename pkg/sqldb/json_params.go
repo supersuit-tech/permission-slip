@@ -10,7 +10,8 @@ import (
 func CoerceJSONParamValue(v interface{}) interface{} {
 	switch x := v.(type) {
 	case float64:
-		if !math.IsNaN(x) && !math.IsInf(x, 0) && x == math.Trunc(x) && x >= math.MinInt64 && x <= math.MaxInt64 {
+		if !math.IsNaN(x) && !math.IsInf(x, 0) && x == math.Trunc(x) &&
+			x >= float64(math.MinInt64) && x < float64(math.MaxInt64)+1 {
 			return int64(x)
 		}
 		return x

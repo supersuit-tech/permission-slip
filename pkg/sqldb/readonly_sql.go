@@ -63,8 +63,8 @@ func scrubSQLMasking(sql string) string {
 			b.WriteByte(' ')
 			b.WriteByte(' ')
 			i += 2
-			for i+1 < len(sql) {
-				if sql[i] == '*' && sql[i+1] == '/' {
+			for i < len(sql) {
+				if i+1 < len(sql) && sql[i] == '*' && sql[i+1] == '/' {
 					b.WriteByte(' ')
 					b.WriteByte(' ')
 					i += 2
@@ -72,6 +72,26 @@ func scrubSQLMasking(sql string) string {
 				}
 				b.WriteByte(' ')
 				i++
+			}
+		case (c == '\'' || c == '"') && i+2 < len(sql) && sql[i+1] == c && sql[i+2] == c:
+			// Triple-quoted string (BigQuery """...""" or '''...''')
+			b.WriteByte(' ')
+			b.WriteByte(' ')
+			b.WriteByte(' ')
+			i += 3
+			for i < len(sql) {
+				if i+2 < len(sql) && sql[i] == c && sql[i+1] == c && sql[i+2] == c {
+					b.WriteByte(' ')
+					b.WriteByte(' ')
+					b.WriteByte(' ')
+					i += 3
+					break
+				}
+				_, w := utf8.DecodeRuneInString(sql[i:])
+				for k := 0; k < w; k++ {
+					b.WriteByte(' ')
+				}
+				i += w
 			}
 		case c == '\'':
 			b.WriteByte(' ')
@@ -128,14 +148,16 @@ func scrubSQLMasking(sql string) string {
 				i += w
 			}
 		case c == '`':
-			b.WriteByte(' ')
+			// Preserve backtick-quoted identifiers as underscores so they
+			// remain valid identifier tokens for CTE name parsing.
+			b.WriteByte('_')
 			i++
 			for i < len(sql) && sql[i] != '`' {
-				b.WriteByte(' ')
+				b.WriteByte('_')
 				i++
 			}
 			if i < len(sql) {
-				b.WriteByte(' ')
+				b.WriteByte('_')
 				i++
 			}
 		default:
