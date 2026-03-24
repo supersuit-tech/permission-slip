@@ -300,6 +300,25 @@ func TestProvider_MarshalJSON_NoSecretOmitted(t *testing.T) {
 	}
 }
 
+func TestProvider_MarshalJSON_IncludesPKCE(t *testing.T) {
+	p := Provider{
+		ID:     "dropbox",
+		PKCE:   true,
+		Source: SourceBuiltIn,
+	}
+	data, err := json.Marshal(p)
+	if err != nil {
+		t.Fatalf("MarshalJSON failed: %v", err)
+	}
+	var m map[string]json.RawMessage
+	if err := json.Unmarshal(data, &m); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if string(m["pkce"]) != "true" {
+		t.Errorf("expected pkce true in JSON, got %s", string(m["pkce"]))
+	}
+}
+
 func TestTokenSet_StringRedactsTokens(t *testing.T) {
 	ts := TokenSet{
 		AccessToken:  "secret-access-token",

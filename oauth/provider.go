@@ -65,6 +65,11 @@ type Provider struct {
 	// because auto-detect never sees a 401 and never retries.
 	AuthStyle oauth2.AuthStyle
 
+	// PKCE when true enables RFC 7636 proof key for code exchange: the server
+	// generates a verifier, sends an S256 challenge on authorize, and passes
+	// the verifier on token exchange. Required by some providers (e.g. Dropbox).
+	PKCE bool
+
 	// Source indicates where the provider configuration originated.
 	Source ProviderSource
 }
@@ -147,6 +152,7 @@ func (p Provider) MarshalJSON() ([]byte, error) {
 		Scopes       []string       `json:"scopes,omitempty"`
 		ClientID     string         `json:"client_id,omitempty"`
 		ClientSecret string         `json:"client_secret,omitempty"`
+		PKCE         bool           `json:"pkce"`
 		Source       ProviderSource `json:"source"`
 	}
 	safe := safeProvider{
@@ -155,6 +161,7 @@ func (p Provider) MarshalJSON() ([]byte, error) {
 		TokenURL:     p.TokenURL,
 		Scopes:       p.Scopes,
 		ClientID:     p.ClientID,
+		PKCE:         p.PKCE,
 		Source:       p.Source,
 	}
 	if p.ClientSecret != "" {

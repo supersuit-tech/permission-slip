@@ -25,6 +25,16 @@ OAuthProvider:
       type: boolean
       description: Whether the provider has client credentials configured and is ready to use
       example: true
+    pkce:
+      type: boolean
+      description: >
+        When true, the platform uses PKCE (RFC 7636) for this provider's authorize
+        and token exchange. The browser still follows the normal redirect to
+        `GET /v1/oauth/{provider}/authorize`; the code verifier is generated and
+        recovered server-side inside the signed OAuth state JWT (sealed so the JWT
+        payload does not contain the verifier in plaintext).
+      default: false
+      example: true
 
 OAuthProviderListResponse:
   type: object

@@ -292,6 +292,7 @@ Or copy the component source manually into `src/components/ui/` from the [shadcn
 
 The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API types. The typed client uses `openapi-fetch`, and types are generated via `openapi-typescript`.
 
+- **`frontend/src/api/schema.d.ts` and `mobile/src/api/schema.d.ts` are gitignored** — they are produced locally when you run `make generate` (or `npm run generate:api` per package). PRs that change the spec should include the updated YAML and bundled `openapi.bundle.yaml`; reviewers run `make generate` to refresh their working copies.
 - **Never hand-write API types or request functions.** Generate from the spec with `make generate`. If a type doesn't exist in the generated output, the spec needs updating — not a manual type.
 - Import all request/response types from the generated client (`api/schema.d.ts`).
 - New API calls must use the `openapi-fetch` client in `api/client.ts` — never raw `fetch` for our API.
