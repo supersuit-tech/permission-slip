@@ -49,3 +49,10 @@ func TestDocumentPath_InvalidEvenSegments(t *testing.T) {
 		t.Fatal("expected error for single-segment path")
 	}
 }
+
+func TestAllowedPaths_CollectionPrefixForDocuments(t *testing.T) {
+	t.Parallel()
+	if err := validateAllowedPaths("users/alice", []string{"users"}, "document"); err != nil {
+		t.Fatal(err)
+	}
+}

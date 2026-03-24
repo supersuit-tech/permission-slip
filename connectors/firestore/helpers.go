@@ -17,8 +17,8 @@ func (c *FirestoreConnector) withTimeout(ctx context.Context) (context.Context, 
 
 const maxPathSegments = 32
 
-// validateDocumentPath checks a Firestore document path: odd number of segments, each non-empty,
-// no "..", reasonable length. Paths must not start with "projects/" (use project_id credential instead).
+// validateDocumentPath checks a Firestore document path: even number of segments (collection/id pairs),
+// each non-empty, no "..", reasonable length. Paths must not start with "projects/" (use project_id credential instead).
 func validateDocumentPath(path string) error {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -115,13 +115,7 @@ func validateAllowedPaths(path string, allowed []string, kind string) error {
 			return &connectors.ValidationError{Message: fmt.Sprintf("duplicate entry in allowed_paths: %q", p)}
 		}
 		seen[p] = struct{}{}
-		var err error
-		if kind == "document" {
-			err = validateDocumentPath(p)
-		} else {
-			err = validateCollectionPath(p)
-		}
-		if err != nil {
+		if err := validateAllowlistEntry(p, kind); err != nil {
 			return err
 		}
 	}
@@ -131,8 +125,9 @@ func validateAllowedPaths(path string, allowed []string, kind string) error {
 	return nil
 }
 
-// pathAllowed returns true if path equals a prefix entry in allowed or equals / is under an allowed path
-// (allowed path is a prefix followed by '/' or exact match).
+// pathAllowed returns true if path exactly matches an allowlist entry or is under a permitted prefix.
+// For document actions: each entry is a document path or a collection path (documents under that collection are allowed).
+// For query actions: each entry is a collection path or a parent document path (subcollections under that doc are allowed).
 func pathAllowed(path string, allowed []string, kind string) bool {
 	path = strings.TrimSpace(path)
 	for _, prefix := range allowed {
@@ -140,11 +135,67 @@ func pathAllowed(path string, allowed []string, kind string) bool {
 		if path == prefix {
 			return true
 		}
-		if strings.HasPrefix(path, prefix+"/") {
+		if !strings.HasPrefix(path, prefix+"/") {
+			continue
+		}
+		if kind == "document" {
+			if isDocumentPathString(prefix) || isCollectionPathString(prefix) {
+				return true
+			}
+			continue
+		}
+		if isCollectionPathString(prefix) || isDocumentPathString(prefix) {
 			return true
 		}
 	}
 	return false
+}
+
+func validateAllowlistEntry(p string, kind string) error {
+	doc := isDocumentPathString(p)
+	col := isCollectionPathString(p)
+	if kind == "document" {
+		if doc || col {
+			return nil
+		}
+		return &connectors.ValidationError{Message: fmt.Sprintf("allowed_paths entry %q must be a document path or a collection path (prefix)", p)}
+	}
+	if doc || col {
+		return nil
+	}
+	return &connectors.ValidationError{Message: fmt.Sprintf("allowed_paths entry %q must be a collection path or a parent document path (prefix)", p)}
+}
+
+func isDocumentPathString(path string) bool {
+	segs := splitFirestorePath(strings.TrimSpace(path))
+	if len(segs) == 0 || len(segs)%2 != 0 {
+		return false
+	}
+	if strings.HasPrefix(path, "projects/") {
+		return false
+	}
+	for _, s := range segs {
+		if validatePathSegment(s) != nil {
+			return false
+		}
+	}
+	return true
+}
+
+func isCollectionPathString(path string) bool {
+	segs := splitFirestorePath(strings.TrimSpace(path))
+	if len(segs) == 0 || len(segs)%2 == 0 {
+		return false
+	}
+	if strings.HasPrefix(path, "projects/") {
+		return false
+	}
+	for _, s := range segs {
+		if validatePathSegment(s) != nil {
+			return false
+		}
+	}
+	return true
 }
 
 func validateFieldAllowlist(names []string) error {

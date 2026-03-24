@@ -8,12 +8,15 @@ import (
 	"cloud.google.com/go/firestore"
 	"google.golang.org/api/iterator"
 	"google.golang.org/api/option"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
 type realRunner struct {
 	client *firestore.Client
+	conn   *grpc.ClientConn // set when dialing the Firestore emulator (closed in Close)
 }
 
 func newRealRunner(ctx context.Context, projectID string, opts []option.ClientOption) (*realRunner, error) {
@@ -24,8 +27,44 @@ func newRealRunner(ctx context.Context, projectID string, opts []option.ClientOp
 	return &realRunner{client: client}, nil
 }
 
+// newRealRunnerEmulator matches cloud.google.com/go/firestore.NewClient emulator behavior
+// (insecure gRPC + Bearer owner) without mutating process environment variables.
+func newRealRunnerEmulator(ctx context.Context, projectID, addr string) (*realRunner, error) {
+	conn, err := grpc.NewClient(addr,
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithPerRPCCredentials(firestoreEmulatorCreds{}),
+	)
+	if err != nil {
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("dialing Firestore emulator: %v", err)}
+	}
+	client, err := firestore.NewClient(ctx, projectID, option.WithGRPCConn(conn))
+	if err != nil {
+		_ = conn.Close()
+		return nil, mapFirestoreError(err)
+	}
+	return &realRunner{client: client, conn: conn}, nil
+}
+
+// firestoreEmulatorCreds mirrors cloud.google.com/go/firestore emulatorCreds (unexported upstream).
+type firestoreEmulatorCreds struct{}
+
+func (firestoreEmulatorCreds) GetRequestMetadata(context.Context, ...string) (map[string]string, error) {
+	return map[string]string{"authorization": "Bearer owner"}, nil
+}
+
+func (firestoreEmulatorCreds) RequireTransportSecurity() bool { return false }
+
 func (r *realRunner) close() error {
-	return r.client.Close()
+	var err error
+	if r.client != nil {
+		err = r.client.Close()
+	}
+	if r.conn != nil {
+		if cerr := r.conn.Close(); cerr != nil && err == nil {
+			err = cerr
+		}
+	}
+	return err
 }
 
 func (r *realRunner) getDocument(ctx context.Context, path string) (map[string]interface{}, error) {

@@ -81,6 +81,15 @@ func TestFirestoreConnector_ValidateCredentials(t *testing.T) {
 			}),
 			wantErr: true,
 		},
+		{
+			name: "bad emulator host even when project_id credential overrides JSON",
+			creds: connectors.NewCredentials(map[string]string{
+				"service_account_json": validServiceAccountJSON(),
+				"project_id":           "override-proj",
+				"emulator_host":        "http://bad",
+			}),
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

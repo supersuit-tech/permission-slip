@@ -13,7 +13,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"os"
 	"strings"
 	"time"
@@ -101,7 +100,7 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 							"items": {"type": "string"},
 							"minItems": 1,
 							"maxItems": 64,
-							"description": "Path allowlist — exact paths or prefixes (path must equal or start with an entry + /)"
+							"description": "Path allowlist — each entry is a full document path OR a collection path (odd segments) that prefixes allowed documents; request path must equal an entry or start with entry + /"
 						},
 						"allowed_read_fields": {
 							"type": "array",
@@ -139,7 +138,8 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "array",
 							"items": {"type": "string"},
 							"minItems": 1,
-							"maxItems": 64
+							"maxItems": 64,
+							"description": "Document path allowlist — full document paths or collection paths (odd segments) as prefixes"
 						},
 						"allowed_write_fields": {
 							"type": "array",
@@ -170,7 +170,8 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "array",
 							"items": {"type": "string"},
 							"minItems": 1,
-							"maxItems": 64
+							"maxItems": 64,
+							"description": "Document path allowlist — full document paths or collection paths (odd segments) as prefixes"
 						},
 						"allowed_write_fields": {
 							"type": "array",
@@ -199,7 +200,8 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "array",
 							"items": {"type": "string"},
 							"minItems": 1,
-							"maxItems": 64
+							"maxItems": 64,
+							"description": "Document path allowlist — full document paths or collection paths (odd segments) as prefixes"
 						}
 					}
 				}`)),
@@ -260,7 +262,7 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 							"items": {"type": "string"},
 							"minItems": 1,
 							"maxItems": 64,
-							"description": "Collection path allowlist"
+							"description": "Collection path allowlist — full collection paths or parent document paths (even segments) as prefixes"
 						},
 						"allowed_read_fields": {
 							"type": "array",
@@ -338,14 +340,16 @@ func (c *FirestoreConnector) ValidateCredentials(_ context.Context, creds connec
 	if sa.ClientEmail == "" || sa.PrivateKey == "" {
 		return &connectors.ValidationError{Message: "service_account_json must include client_email and private_key"}
 	}
+	if host, ok := creds.Get("emulator_host"); ok && strings.TrimSpace(host) != "" {
+		if err := validateEmulatorHost(host); err != nil {
+			return err
+		}
+	}
 	if pid, ok := creds.Get("project_id"); ok && strings.TrimSpace(pid) != "" {
 		return nil
 	}
 	if sa.ProjectID == "" {
 		return &connectors.ValidationError{Message: "missing project_id: set credential project_id or include project_id in the service account JSON"}
-	}
-	if host, ok := creds.Get("emulator_host"); ok && strings.TrimSpace(host) != "" {
-		return validateEmulatorHost(host)
 	}
 	return nil
 }
@@ -365,10 +369,8 @@ func resolveProjectID(creds connectors.Credentials, credJSON []byte) (string, er
 }
 
 func (c *FirestoreConnector) buildRunner(ctx context.Context, projectID string, credJSON []byte, emulatorHost string) (fsRunner, error) {
-	var opts []option.ClientOption
-	opts = append(opts, option.WithCredentialsJSON(credJSON))
-	if c.timeout > 0 {
-		opts = append(opts, option.WithHTTPClient(&http.Client{Timeout: c.timeout}))
+	if _, err := google.CredentialsFromJSON(ctx, credJSON, "https://www.googleapis.com/auth/datastore"); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid service account credentials: %v", err)}
 	}
 	emulatorHost = strings.TrimSpace(emulatorHost)
 	if emulatorHost == "" {
@@ -378,11 +380,10 @@ func (c *FirestoreConnector) buildRunner(ctx context.Context, projectID string, 
 		if err := validateEmulatorHost(emulatorHost); err != nil {
 			return nil, err
 		}
-		_ = os.Setenv("FIRESTORE_EMULATOR_HOST", emulatorHost)
+		// Per-client gRPC dial — never use os.Setenv(FIRESTORE_EMULATOR_HOST) (process-wide, multi-tenant unsafe).
+		return newRealRunnerEmulator(ctx, projectID, emulatorHost)
 	}
-	if _, err := google.CredentialsFromJSON(ctx, credJSON, "https://www.googleapis.com/auth/datastore"); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid service account credentials: %v", err)}
-	}
+	opts := []option.ClientOption{option.WithCredentialsJSON(credJSON)}
 	return newRealRunner(ctx, projectID, opts)
 }
 
