@@ -13,7 +13,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"os"
 	"strings"
 	"time"
 
@@ -301,7 +300,7 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "firestore.query",
 				Name:        "Query posts subcollection",
 				Description: "Agent may list posts under a user with a limit.",
-				Parameters:  json.RawMessage(`{"collection_path":"users/USER_ID/posts","allowed_paths":["users/USER_ID/posts"],"limit":"*","order_by":[{"field":"createdAt","direction":"desc"}]}`),
+				Parameters:  json.RawMessage(`{"collection_path":"users/USER_ID/posts","allowed_paths":["users/USER_ID/posts"],"limit":50,"order_by":[{"field":"createdAt","direction":"desc"}]}`),
 			},
 		},
 	}
@@ -374,9 +373,6 @@ func (c *FirestoreConnector) buildRunner(ctx context.Context, projectID string, 
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid service account credentials: %v", err)}
 	}
 	emulatorHost = strings.TrimSpace(emulatorHost)
-	if emulatorHost == "" {
-		emulatorHost = strings.TrimSpace(os.Getenv("FIRESTORE_EMULATOR_HOST"))
-	}
 	if emulatorHost != "" {
 		if err := validateEmulatorHost(emulatorHost); err != nil {
 			return nil, err
