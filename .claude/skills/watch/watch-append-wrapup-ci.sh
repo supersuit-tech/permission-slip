@@ -98,6 +98,12 @@ fi
 posted=false
 if [[ -z "$COMMENT_ID" ]]; then
   echo "[append-wrapup-ci] No wrap-up comment id; posting remediation as a new PR comment."
+  # When posting as a standalone comment, always include the H2 heading for context
+  if [[ "$stored" -gt 0 ]]; then
+    block="## 🔧 CI / audit remediation
+
+${block}"
+  fi
   if gh_api "/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" -f body="$block" > /dev/null 2>&1; then
     posted=true
   fi
