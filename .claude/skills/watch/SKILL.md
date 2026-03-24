@@ -24,8 +24,7 @@ watch-poll.sh          — Deterministic polling loop (no AI needed)
 watch-post.sh          — Post-session tasks (no AI needed)
   ├── Triggers CI and audit workflows
   ├── Waits for completion
-  ├── Auto-merges if enabled and checks pass
-  └── Triggers webhook notification (unless --skip-webhook)
+  └── Auto-merges if enabled and checks pass
 
 watch-append-wrapup-ci.sh — Appends CI/audit remediation bullets to the wrap-up PR comment
 
@@ -374,17 +373,12 @@ When the polling script exits with `IDLE_TIMEOUT`, the wrap-up comment has alrea
 
 **Loop (run until both CI and audit report `success`, or you exhaust retries):**
 
-1. Run post-session. Always pass **`--work-dir "$WORK_DIR"`** (same session directory as `watch-poll.sh`) so CI/audit logs are written under that directory (avoids `/tmp` clashes between concurrent watch sessions) and so the webhook sentinel file is session-scoped. On the **first** iteration of this loop after wrap-up, pass **`--skip-webhook`** so the webhook does not fire until CI is actually green (this creates **`${WORK_DIR}/post-webhook-pending`** on success):
+1. Run post-session. Always pass **`--work-dir "$WORK_DIR"`** (same session directory as `watch-poll.sh`) so CI/audit logs are written under that directory (avoids `/tmp` clashes between concurrent watch sessions):
    ```bash
-   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --skip-webhook 2>&1
+   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$AUTO_MERGE" == "false" ]] && echo "--no-automerge") 2>&1
    ```
-   On **subsequent** iterations (after you pushed fixes), omit `--skip-webhook` so each successful pass can notify as usual, **or** keep using `--skip-webhook` until the final successful iteration and then run once with **`--webhook-only`** (see step 2b below).
 
-2. **Exit code 0** — Both workflows concluded `success`. If the webhook was sent this run (no `--skip-webhook`), **`post-webhook-pending`** is removed automatically. If you used **`--skip-webhook`** and `NO_NOTIFY` is false, run once with **`--webhook-only`** — this **requires** `--work-dir` and an existing **`post-webhook-pending`** file (otherwise exit **2**); on success the webhook runs and the sentinel is removed:
-   ```bash
-   bash "${SKILL_DIR}/watch-post.sh" "${PR_URL}" --work-dir "$WORK_DIR" $([[ "$NO_NOTIFY" == "true" ]] && echo "--no-notify") --webhook-only 2>&1
-   ```
-   Read merge result from stdout (`PR merged successfully`, etc.).
+2. **Exit code 0** — Both workflows concluded `success`. Read merge result from stdout (`PR merged successfully`, etc.).
 
 3. **Exit code 101 (CI)** or **102 (audit)** — This is expected while fixing. **Automatically:**
    - Read logs from `CI_LOGS_FILE` or `AUDIT_LOGS_FILE` in the script output.
