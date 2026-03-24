@@ -23,10 +23,12 @@ BEGIN
         WHERE connector_id = NEW.connector_id
           AND (auth_type = 'oauth2') <> new_is_oauth
           -- Exclude the row being updated (if this is an UPDATE).
+          -- Use OLD.auth_type so the exclusion matches the pre-update row.
           AND NOT (
               connector_id = NEW.connector_id
               AND service = NEW.service
-              AND auth_type = NEW.auth_type
+              AND auth_type = CASE WHEN TG_OP = 'UPDATE' THEN OLD.auth_type
+                                   ELSE NEW.auth_type END
           )
     ) INTO has_conflict;
 

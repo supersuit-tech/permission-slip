@@ -17,9 +17,9 @@ BEGIN
         DELETE FROM vault.secrets
         WHERE id NOT IN (
             SELECT vault_secret_id FROM credentials
-            UNION ALL
+            UNION
             SELECT access_token_vault_id FROM oauth_connections
-            UNION ALL
+            UNION
             SELECT refresh_token_vault_id FROM oauth_connections
                 WHERE refresh_token_vault_id IS NOT NULL
         );

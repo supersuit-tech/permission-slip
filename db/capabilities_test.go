@@ -688,3 +688,25 @@ func TestConnectorRequiredCredentials_MixedAuthTypeRejected(t *testing.T) {
 		t.Fatal("expected error when inserting mixed auth types for the same connector, got nil")
 	}
 }
+
+func TestConnectorRequiredCredentials_MixedAuthTypeRejectedOnUpdate(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	// Create a connector with two non-oauth2 CRC rows (different services).
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_a", "api_key")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_b", "basic")
+
+	// Updating one row's auth_type to oauth2 should be rejected because the
+	// other row is still non-oauth2, creating a mixed-auth situation.
+	_, err := tx.Exec(t.Context(),
+		`UPDATE connector_required_credentials
+		 SET auth_type = 'oauth2', oauth_provider = 'google', oauth_scopes = '{}'
+		 WHERE connector_id = $1 AND service = 'svc_a' AND auth_type = 'api_key'`,
+		connID)
+	if err == nil {
+		t.Fatal("expected error when updating auth_type to create mixed auth types, got nil")
+	}
+}
