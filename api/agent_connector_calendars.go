@@ -87,6 +87,8 @@ func handleListAgentConnectorCalendars(deps *Deps) http.HandlerFunc {
 			if handleConnectorError(w, r, err, connErrCtx) {
 				return
 			}
+			log.Printf("[%s] ListAgentConnectorCalendars validate creds: %v", TraceID(r.Context()), err)
+			CaptureConnectorError(r.Context(), err, connErrCtx)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Credential validation failed"))
 			return
 		}

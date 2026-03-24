@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -72,14 +71,10 @@ func (a *searchTicketsAction) Execute(ctx context.Context, req connectors.Action
 		if err != nil {
 			return err
 		}
-		v := strconv.FormatInt(sec, 10)
-		if err != nil {
-			return err
-		}
 		predicates = append(predicates, map[string]any{
 			"field":    field,
 			"operator": op,
-			"value":    v,
+			"value":    sec,
 		})
 		return nil
 	}

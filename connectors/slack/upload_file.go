@@ -108,7 +108,7 @@ func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 	if !getURLResp.OK {
-		return nil, mapSlackError(getURLResp.Error)
+		return nil, getURLResp.asError()
 	}
 
 	// Step 2: Upload file content to the upload URL (multipart/form-data, no auth).
@@ -141,7 +141,7 @@ func (a *uploadFileAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 	if !completeResp.OK {
-		return nil, mapSlackError(completeResp.Error)
+		return nil, completeResp.asError()
 	}
 
 	return connectors.JSONResult(map[string]string{

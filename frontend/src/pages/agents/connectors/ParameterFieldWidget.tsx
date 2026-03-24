@@ -143,7 +143,7 @@ function RemoteSelectField({
     );
   }
   const path = propertyUI.remote_select_options_path ?? "";
-  if (path.includes("/channels")) {
+  if (connectorId === "slack" && path.endsWith("/channels")) {
     return (
       <SlackChannelRemoteSelectWidget
         inputId={inputId}

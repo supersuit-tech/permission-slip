@@ -87,7 +87,7 @@ func (a *listUsersAction) Execute(ctx context.Context, req connectors.ActionRequ
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	result := listUsersResult{
