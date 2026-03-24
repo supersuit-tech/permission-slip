@@ -13,6 +13,7 @@ import {
   isFieldVisible,
   inferWidgetFromProperty,
 } from "@/lib/parameterSchema";
+import { isConcreteDatetimeString } from "@/lib/datetime";
 
 interface ActionConfigParameterFieldsProps {
   parametersSchema: ParametersSchema | null;
@@ -324,14 +325,6 @@ function isDatetimeLikeProperty(prop: SchemaProperty): boolean {
     );
   }
   return false;
-}
-
-/** True when the value is a single concrete instant (not a wildcard pattern). */
-function isConcreteDatetimeString(value: string): boolean {
-  if (!value || value.includes("*")) return false;
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return true;
-  const t = new Date(value).getTime();
-  return !Number.isNaN(t);
 }
 
 function shouldUseTextDatetimeConstraint(value: string): boolean {

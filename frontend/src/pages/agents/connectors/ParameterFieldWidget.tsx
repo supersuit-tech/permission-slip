@@ -5,6 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import { ExternalLink, Plus, X } from "lucide-react";
 import type { SchemaProperty, SchemaPropertyUI, WidgetType } from "@/lib/parameterSchema";
 import { inferWidgetFromProperty } from "@/lib/parameterSchema";
+import { isConcreteDatetimeString } from "@/lib/datetime";
 import { CalendarRemoteSelectWidget } from "./CalendarRemoteSelectWidget";
 import { SlackChannelRemoteSelectWidget } from "./SlackChannelRemoteSelectWidget";
 
@@ -427,13 +428,6 @@ function toDatetimeLocalValue(value: string): string {
   return `${year}-${month}-${day}T${hrs}:${mins}`;
 }
 
-/** True when the value is a single concrete instant (not a wildcard pattern). */
-function isConcreteDatetimeString(value: string): boolean {
-  if (!value || value.includes("*")) return false;
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value)) return true;
-  const t = new Date(value).getTime();
-  return !Number.isNaN(t);
-}
 
 /** Renders help_text and help_url hints below the input. */
 function FieldHints({ ui, omitHelpText }: { ui?: SchemaPropertyUI; omitHelpText?: boolean }) {
