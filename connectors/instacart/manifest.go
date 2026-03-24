@@ -20,10 +20,11 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
-				ActionType:  "instacart.create_products_link",
-				Name:        "Create Products Link",
-				Description: "Create an Instacart-hosted landing page from product line items and return a shareable products_link_url. Requires an approved Instacart Developer Platform API key.",
-				RiskLevel:   "low",
+				ActionType:      "instacart.create_products_link",
+				Name:            "Create Products Link",
+				Description:     "Create an Instacart-hosted landing page from product line items and return a shareable products_link_url. Requires an approved Instacart Developer Platform API key.",
+				RiskLevel:       "low",
+				DisplayTemplate: "Create Instacart link — {{line_items:count}} items",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["line_items"],
@@ -99,7 +100,7 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 									}
 								}
 							},
-							"description": "Items to include; each needs at least name. Use line_item_measurements for quantities per Instacart docs."
+							"description": "Items to include. Each element is a LineItem object with at least name, or use line_item_measurements for quantities (see Instacart docs). You may use the parameter name items instead of line_items. For convenience, each element may be a plain string (same as {\"name\": \"...\"})."
 						},
 						"landing_page_configuration": {
 							"type": "object",
@@ -125,6 +126,13 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create shoppable shopping list link",
 				Description: "Turn a list of product names into an Instacart landing page URL.",
 				Parameters:  json.RawMessage(`{"title":"*","line_items":[{"name":"*"}]}`),
+			},
+			{
+				ID:          "tpl_instacart_recipe_link",
+				ActionType:  "instacart.create_products_link",
+				Name:        "Create shoppable recipe link",
+				Description: "Recipe-style Instacart page with ingredient line items (link_type recipe).",
+				Parameters:  json.RawMessage(`{"title":"*","link_type":"recipe","line_items":[{"name":"*"}]}`),
 			},
 		},
 	}

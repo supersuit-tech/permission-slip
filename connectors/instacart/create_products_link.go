@@ -77,6 +77,7 @@ func (a *createProductsLinkAction) Execute(ctx context.Context, req connectors.A
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
+	params.LineItems = expandStringLineItemsInPlace(params.LineItems)
 	if err := params.validate(); err != nil {
 		return nil, err
 	}

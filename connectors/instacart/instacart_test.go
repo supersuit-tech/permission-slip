@@ -121,4 +121,15 @@ func TestInstacartConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 	var _ connectors.Connector = (*InstacartConnector)(nil)
 	var _ connectors.ManifestProvider = (*InstacartConnector)(nil)
+
+	a := New().Actions()["instacart.create_products_link"]
+	if _, ok := a.(connectors.ParameterAliaser); !ok {
+		t.Error("create_products_link should implement ParameterAliaser")
+	}
+	if _, ok := a.(connectors.Normalizer); !ok {
+		t.Error("create_products_link should implement Normalizer")
+	}
+	if _, ok := a.(connectors.RequestValidator); !ok {
+		t.Error("create_products_link should implement RequestValidator")
+	}
 }

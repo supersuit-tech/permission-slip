@@ -73,10 +73,10 @@ func (c *InstacartConnector) Actions() map[string]connectors.Action {
 func (c *InstacartConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "missing required credential: api_key"}
+		return &connectors.ValidationError{Message: "missing required credential: api_key (Instacart Developer Platform API key from https://www.instacart.com/developer)"}
 	}
 	if len(key) < 8 {
-		return &connectors.ValidationError{Message: "api_key is too short"}
+		return &connectors.ValidationError{Message: "api_key looks invalid (too short); use the full key from the Instacart developer portal"}
 	}
 	if raw, ok := creds.Get(credKeyBaseURL); ok && raw != "" {
 		if err := validateBaseURL(raw); err != nil {
@@ -93,7 +93,7 @@ func validateBaseURL(raw string) error {
 	}
 	host := strings.ToLower(u.Hostname())
 	if _, ok := allowedBaseHosts[host]; !ok {
-		return &connectors.ValidationError{Message: "base_url host must be connect.instacart.com or connect.dev.instacart.tools"}
+		return &connectors.ValidationError{Message: "base_url must be https://connect.instacart.com (production) or https://connect.dev.instacart.tools (sandbox)"}
 	}
 	return nil
 }
@@ -112,7 +112,7 @@ func (c *InstacartConnector) resolveBaseURL(creds connectors.Credentials) (strin
 func (c *InstacartConnector) do(ctx context.Context, creds connectors.Credentials, method, path string, reqBody, dest any) error {
 	key, ok := creds.Get(credKeyAPIKey)
 	if !ok || key == "" {
-		return &connectors.ValidationError{Message: "api_key credential is missing or empty"}
+		return &connectors.ValidationError{Message: "api_key credential is missing or empty (add your Instacart Developer Platform API key)"}
 	}
 
 	base, err := c.resolveBaseURL(creds)

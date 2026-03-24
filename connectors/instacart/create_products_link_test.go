@@ -69,6 +69,41 @@ func TestCreateProductsLink_Success(t *testing.T) {
 	}
 }
 
+func TestCreateProductsLink_StringLineItems(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		body, _ := io.ReadAll(r.Body)
+		var reqBody struct {
+			LineItems []map[string]any `json:"line_items"`
+		}
+		if err := json.Unmarshal(body, &reqBody); err != nil {
+			t.Fatalf("unmarshal: %v", err)
+		}
+		if len(reqBody.LineItems) != 2 {
+			t.Fatalf("line_items len = %d", len(reqBody.LineItems))
+		}
+		if reqBody.LineItems[0]["name"] != "milk" || reqBody.LineItems[1]["name"] != "eggs" {
+			t.Fatalf("unexpected payload: %#v", reqBody.LineItems)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"products_link_url":"https://example.test/x"}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := conn.Actions()["instacart.create_products_link"]
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "instacart.create_products_link",
+		Parameters:  json.RawMessage(`{"line_items":["milk","eggs"]}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+}
+
 func TestCreateProductsLink_MissingLineItems(t *testing.T) {
 	t.Parallel()
 	conn := New()
