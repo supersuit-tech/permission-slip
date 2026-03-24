@@ -101,6 +101,72 @@ func TestJSONResult_MarshalError(t *testing.T) {
 	}
 }
 
+func TestTruncateUTF8_Short(t *testing.T) {
+	t.Parallel()
+	got := TruncateUTF8("hello", 10)
+	if got != "hello" {
+		t.Errorf("TruncateUTF8(short) = %q, want %q", got, "hello")
+	}
+}
+
+func TestTruncateUTF8_ExactLength(t *testing.T) {
+	t.Parallel()
+	got := TruncateUTF8("hello", 5)
+	if got != "hello" {
+		t.Errorf("TruncateUTF8(exact) = %q, want %q", got, "hello")
+	}
+}
+
+func TestTruncateUTF8_Truncated(t *testing.T) {
+	t.Parallel()
+	got := TruncateUTF8("hello world", 5)
+	want := "hello...(truncated)"
+	if got != want {
+		t.Errorf("TruncateUTF8(long) = %q, want %q", got, want)
+	}
+}
+
+func TestTruncateUTF8_MultibyteSafe(t *testing.T) {
+	t.Parallel()
+	// "日本語テスト" = 6 runes, each 3 bytes = 18 bytes
+	input := "日本語テスト"
+	got := TruncateUTF8(input, 3)
+	want := "日本語...(truncated)"
+	if got != want {
+		t.Errorf("TruncateUTF8(multibyte) = %q, want %q", got, want)
+	}
+}
+
+func TestTruncateUTF8_Emoji(t *testing.T) {
+	t.Parallel()
+	input := "😀😁😂🤣😃"
+	got := TruncateUTF8(input, 2)
+	want := "😀😁...(truncated)"
+	if got != want {
+		t.Errorf("TruncateUTF8(emoji) = %q, want %q", got, want)
+	}
+}
+
+func TestRuneLen(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		input string
+		want  int
+	}{
+		{"hello", 5},
+		{"日本語", 3},
+		{"😀😁", 2},
+		{"", 0},
+		{"abc日本", 5},
+	}
+	for _, tt := range tests {
+		got := RuneLen(tt.input)
+		if got != tt.want {
+			t.Errorf("RuneLen(%q) = %d, want %d", tt.input, got, tt.want)
+		}
+	}
+}
+
 func TestTrimIndent(t *testing.T) {
 	t.Parallel()
 
