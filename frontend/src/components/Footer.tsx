@@ -22,7 +22,7 @@ export function Footer({ className }: FooterProps) {
         <Link to="/policy/privacy" className={linkClass}>Privacy Policy</Link>
         <Link to="/policy/terms" className={linkClass}>Terms of Service</Link>
         <Link to="/policy/cookies" className={linkClass}>Cookie Policy</Link>
-        <a href="mailto:support@supersuit.tech" className={linkClass}>Support</a>
+        <Link to="/support" className={linkClass}>Support</Link>
         <button type="button" onClick={resetConsent} className={linkClass}>Manage Cookies</button>
       </div>
     </footer>

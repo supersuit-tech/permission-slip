@@ -11,6 +11,7 @@ import { AppLayout } from "./components/AppLayout";
 import { PrivacyPolicyPage } from "./pages/policy/PrivacyPolicyPage";
 import { TermsOfServicePage } from "./pages/policy/TermsOfServicePage";
 import { CookiePolicyPage } from "./pages/policy/CookiePolicyPage";
+import { SupportPage } from "./pages/support/SupportPage";
 import { useProfile } from "./hooks/useProfile";
 import { appRoutes } from "./routes";
 
@@ -61,13 +62,14 @@ function App() {
     }
   }, [authStatus, user]);
 
-  // Policy pages are public — render without auth.
-  if (pathname.startsWith("/policy/")) {
+  // Policy and support pages are public — render without auth.
+  if (pathname.startsWith("/policy/") || pathname === "/support") {
     return (
       <SentryRoutes>
         <Route path="/policy/privacy" element={<PrivacyPolicyPage />} />
         <Route path="/policy/terms" element={<TermsOfServicePage />} />
         <Route path="/policy/cookies" element={<CookiePolicyPage />} />
+        <Route path="/support" element={<SupportPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </SentryRoutes>
     );

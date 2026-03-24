@@ -71,11 +71,9 @@ export function UserMenu() {
             </DropdownMenuItem>
           </DropdownMenuGroup>
           <DropdownMenuSeparator />
-          <DropdownMenuItem asChild>
-            <a href="mailto:support@supersuit.tech">
-              <LifeBuoy />
-              <span>Support</span>
-            </a>
+          <DropdownMenuItem onSelect={() => navigate("/support")}>
+            <LifeBuoy />
+            <span>Support</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuCheckboxItem
