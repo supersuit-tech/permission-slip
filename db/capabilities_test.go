@@ -605,3 +605,86 @@ func TestGetAgentCapabilities_StandingApprovalOnlyForCorrectAgent(t *testing.T) 
 		t.Errorf("expected 0 standing approvals for agent2, got %d", len(caps.StandingApprovals))
 	}
 }
+
+func TestGetAgentCapabilities_CredentialsReady_MultiCRCAllSatisfiedViaConnectorID(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	// Connector with two required credential rows (different services, same auth type).
+	// A single bound credential whose service = connector ID should satisfy both,
+	// because the query matches on (cr.service = crc.service OR cr.service = c.id).
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_alpha", "api_key")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_beta", "api_key")
+
+	// Credential with service = connector ID (covers all CRC rows via the OR fallback).
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredential(t, tx, credID, uid, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	testhelper.InsertAgentConnectorCredential(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, connID, credID)
+
+	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("GetAgentCapabilities: %v", err)
+	}
+	if len(caps.Connectors) != 1 {
+		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
+	}
+	if !caps.Connectors[0].CredentialsReady {
+		t.Error("expected credentials_ready=true when a single credential (service=connector_id) satisfies multiple CRC rows")
+	}
+}
+
+func TestGetAgentCapabilities_CredentialsReady_MultiCRCPartiallyUnsatisfied(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	// Connector with two required credential rows for different services.
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_alpha", "api_key")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_beta", "api_key")
+
+	// Credential that matches only svc_alpha (not using connector ID fallback).
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredential(t, tx, credID, uid, "svc_alpha")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	testhelper.InsertAgentConnectorCredential(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, connID, credID)
+
+	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("GetAgentCapabilities: %v", err)
+	}
+	if len(caps.Connectors) != 1 {
+		t.Fatalf("expected 1 connector, got %d", len(caps.Connectors))
+	}
+	if caps.Connectors[0].CredentialsReady {
+		t.Error("expected credentials_ready=false when bound credential only matches one of two CRC rows")
+	}
+}
+
+func TestConnectorRequiredCredentials_MixedAuthTypeRejected(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	// Create a connector with a non-oauth2 CRC row.
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc_a", "api_key")
+
+	// Attempting to insert an oauth2 CRC row for the same connector should fail.
+	_, err := tx.Exec(t.Context(),
+		`INSERT INTO connector_required_credentials (connector_id, service, auth_type, oauth_provider, oauth_scopes)
+		 VALUES ($1, 'svc_b', 'oauth2', 'google', '{}')`,
+		connID)
+	if err == nil {
+		t.Fatal("expected error when inserting mixed auth types for the same connector, got nil")
+	}
+}
