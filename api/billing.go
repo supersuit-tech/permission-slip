@@ -158,9 +158,8 @@ type billingUsageSummary struct {
 
 // newBillingSubscription builds subscription status fields from a DB subscription.
 func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
-	inQuotaGrace := sub.QuotaPlanID != nil && sub.QuotaEntitlementsUntil != nil && time.Now().Before(*sub.QuotaEntitlementsUntil)
 	var quotaUntil *time.Time
-	if inQuotaGrace {
+	if sub.IsInQuotaGrace() {
 		quotaUntil = sub.QuotaEntitlementsUntil
 	}
 	return billingSubscription{
@@ -170,7 +169,7 @@ func newBillingSubscription(sub *db.SubscriptionWithPlan) billingSubscription {
 		HasPaymentMethod:       false,
 		CanUpgrade:             sub.PlanID == db.PlanFree || sub.PlanID == db.PlanFreePro,
 		CanDowngrade:           sub.PlanID == db.PlanPayAsYouGo,
-		CanEndQuotaGraceNow:    sub.PlanID == db.PlanFree && inQuotaGrace,
+		CanEndQuotaGraceNow:    sub.PlanID == db.PlanFree && sub.IsInQuotaGrace(),
 		GracePeriodEndsAt:      sub.GracePeriodEndsAt(),
 		QuotaEntitlementsUntil: quotaUntil,
 	}
@@ -585,11 +584,8 @@ func handleDowngrade(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		inActiveQuotaGrace := sub.QuotaPlanID != nil && sub.QuotaEntitlementsUntil != nil &&
-			time.Now().Before(*sub.QuotaEntitlementsUntil)
-
 		if sub.PlanID == db.PlanFree {
-			if !inActiveQuotaGrace {
+			if !sub.IsInQuotaGrace() {
 				RespondError(w, r, http.StatusConflict, Conflict(ErrAlreadyDowngraded, "Already on the free plan"))
 				return
 			}
