@@ -188,6 +188,28 @@ func TestBuiltInProviders(t *testing.T) {
 			t.Errorf("expected 6 scopes, got %d: %v", len(a.Scopes), a.Scopes)
 		}
 	})
+
+	t.Run("dropbox", func(t *testing.T) {
+		d, ok := byID["dropbox"]
+		if !ok {
+			t.Fatal("dropbox provider not found")
+		}
+		if d.AuthorizeURL != "https://www.dropbox.com/oauth2/authorize" {
+			t.Errorf("AuthorizeURL = %q", d.AuthorizeURL)
+		}
+		if d.TokenURL != "https://api.dropboxapi.com/oauth2/token" {
+			t.Errorf("TokenURL = %q", d.TokenURL)
+		}
+		if d.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", d.Source, oauth.SourceBuiltIn)
+		}
+		if !d.PKCE {
+			t.Error("expected PKCE enabled for Dropbox")
+		}
+		if d.AuthorizeParams["token_access_type"] != "offline" {
+			t.Errorf("token_access_type = %q, want offline", d.AuthorizeParams["token_access_type"])
+		}
+	})
 }
 
 func TestNewRegistryWithBuiltIns(t *testing.T) {
@@ -203,6 +225,9 @@ func TestNewRegistryWithBuiltIns(t *testing.T) {
 	}
 	if _, ok := r.Get("discord"); !ok {
 		t.Error("discord not found in registry")
+	}
+	if _, ok := r.Get("dropbox"); !ok {
+		t.Error("dropbox not found in registry")
 	}
 	if _, ok := r.Get("figma"); !ok {
 		t.Error("figma not found in registry")

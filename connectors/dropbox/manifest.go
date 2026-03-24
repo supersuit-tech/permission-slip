@@ -192,6 +192,7 @@ func (c *DropboxConnector) Manifest() *connectors.ConnectorManifest {
 				AuthorizeParams: map[string]string{
 					"token_access_type": "offline",
 				},
+				PKCE: true,
 			},
 		},
 		Templates: []connectors.ManifestTemplate{

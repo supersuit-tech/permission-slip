@@ -19,6 +19,7 @@ func init() {
 			AuthorizeParams: map[string]string{
 				"token_access_type": "offline",
 			},
+			PKCE:         true,
 			ClientID:     os.Getenv("DROPBOX_CLIENT_ID"),
 			ClientSecret: os.Getenv("DROPBOX_CLIENT_SECRET"),
 			Source:       oauth.SourceBuiltIn,

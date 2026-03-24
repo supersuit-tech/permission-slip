@@ -655,6 +655,7 @@ func registerManifestOAuthProviders(oauthReg *poauth.Registry, connReg *connecto
 				TokenURL:        p.TokenURL,
 				Scopes:          p.Scopes,
 				AuthorizeParams: p.AuthorizeParams,
+				PKCE:            p.PKCE,
 			}
 		}
 		if err := poauth.RegisterFromManifest(oauthReg, providers); err != nil {

@@ -234,6 +234,32 @@ func TestParseManifest_OAuthProviders(t *testing.T) {
 	}
 }
 
+func TestParseManifest_OAuthProviders_PKCE(t *testing.T) {
+	input := `{
+		"id": "example",
+		"name": "Example",
+		"actions": [{"action_type": "example.do", "name": "Do"}],
+		"required_credentials": [
+			{"service": "example", "auth_type": "oauth2", "oauth_provider": "example"}
+		],
+		"oauth_providers": [
+			{
+				"id": "example",
+				"authorize_url": "https://auth.example.com/authorize",
+				"token_url": "https://auth.example.com/token",
+				"pkce": true
+			}
+		]
+	}`
+	m, err := ParseManifest([]byte(input))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(m.OAuthProviders) != 1 || !m.OAuthProviders[0].PKCE {
+		t.Fatalf("expected pkce true, got %+v", m.OAuthProviders)
+	}
+}
+
 func TestParseManifest_OAuthProviderCrossReference(t *testing.T) {
 	// Built-in providers (google, microsoft) should be accepted without declaration.
 	t.Run("built-in provider accepted", func(t *testing.T) {
@@ -520,7 +546,10 @@ func TestManifestValidation_ReservedAuthorizeParams(t *testing.T) {
 		}
 	})
 
-	for _, reserved := range []string{"redirect_uri", "state", "client_id", "client_secret", "response_type", "code", "grant_type"} {
+	for _, reserved := range []string{
+		"redirect_uri", "state", "client_id", "client_secret", "response_type", "code", "grant_type",
+		"code_challenge", "code_challenge_method", "code_verifier",
+	} {
 		t.Run("rejects_"+reserved, func(t *testing.T) {
 			input := fmt.Sprintf(base, fmt.Sprintf(`"%s": "evil-value"`, reserved))
 			_, err := ParseManifest([]byte(input))
