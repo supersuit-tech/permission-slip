@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	// maxLineItemNameBytes caps each line item's name field so a single
+	// maxLineItemNameChars caps each line item's name field so a single
 	// oversized string cannot dominate request bodies or logs.
-	maxLineItemNameBytes = 2048
+	// Measured in Unicode code points to match JSON Schema maxLength.
+	maxLineItemNameChars = 2048
 )
 
 // parseAndValidateProductsLinkParams unmarshals JSON, expands string

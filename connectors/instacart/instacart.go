@@ -149,7 +149,7 @@ func (c *InstacartConnector) do(ctx context.Context, creds connectors.Credential
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Instacart API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Instacart API request canceled"}
+			return &connectors.CanceledError{Message: "Instacart API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Instacart API request failed: %v", err)}
 	}
