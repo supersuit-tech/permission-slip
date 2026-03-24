@@ -2,6 +2,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 import { friendlyTypeLabel } from "@/lib/parameterSchema";
 import { formatParameterValue, humanizeKey } from "@/lib/formatValues";
+import { slackResolvedDisplayValue } from "@/lib/slackParameterDisplay";
 
 export type { ParametersSchema } from "@/lib/parameterSchema";
 export { parseParametersSchema } from "@/lib/parameterSchema";
@@ -11,6 +12,10 @@ interface SchemaParameterDetailsProps {
   parameters: Record<string, unknown>;
   /** JSON Schema describing the parameters (from connector action). */
   schema: ParametersSchema | null;
+  /** e.g. "slack.send_message" — used with resourceDetails for Slack ID resolution. */
+  actionType?: string;
+  /** Resolved names from the backend (channel_name, user_name, …). */
+  resourceDetails?: Record<string, unknown> | null;
 }
 
 /**
@@ -28,9 +33,17 @@ interface SchemaParameterDetailsProps {
 export function SchemaParameterDetails({
   parameters,
   schema,
+  actionType,
+  resourceDetails,
 }: SchemaParameterDetailsProps) {
   if (!schema?.properties) {
-    return <FallbackDetails parameters={parameters} />;
+    return (
+      <FallbackDetails
+        parameters={parameters}
+        actionType={actionType}
+        resourceDetails={resourceDetails}
+      />
+    );
   }
 
   const properties = schema.properties;
@@ -67,6 +80,8 @@ export function SchemaParameterDetails({
             defaultValue={prop.default}
             isRequired={isRequired}
             isProvided={key in parameters}
+            actionType={actionType}
+            resourceDetails={resourceDetails}
           />
         );
       })}
@@ -77,6 +92,8 @@ export function SchemaParameterDetails({
           label={humanizeKey(key)}
           value={parameters[key]}
           isProvided
+          actionType={actionType}
+          resourceDetails={resourceDetails}
         />
       ))}
     </div>
@@ -92,6 +109,8 @@ function ParameterRow({
   defaultValue,
   isRequired,
   isProvided,
+  actionType,
+  resourceDetails,
 }: {
   name: string;
   label: string;
@@ -101,8 +120,14 @@ function ParameterRow({
   defaultValue?: unknown;
   isRequired?: boolean;
   isProvided: boolean;
+  actionType?: string;
+  resourceDetails?: Record<string, unknown> | null;
 }) {
-  const displayValue = formatParameterValue(value);
+  const resolved =
+    actionType != null
+      ? slackResolvedDisplayValue(actionType, name, value, resourceDetails)
+      : null;
+  const displayValue = resolved ?? formatParameterValue(value);
   const isDefault =
     defaultValue !== undefined && String(value) === String(defaultValue);
   const isMultiline = typeof value === "string" && value.includes("\n");
@@ -163,13 +188,21 @@ function ParameterRow({
 
 function FallbackDetails({
   parameters,
+  actionType,
+  resourceDetails,
 }: {
   parameters: Record<string, unknown>;
+  actionType?: string;
+  resourceDetails?: Record<string, unknown> | null;
 }) {
   return (
     <dl className="divide-border divide-y">
       {Object.entries(parameters).map(([key, value]) => {
-        const displayValue = formatParameterValue(value);
+        const resolved =
+          actionType != null
+            ? slackResolvedDisplayValue(actionType, key, value, resourceDetails)
+            : null;
+        const displayValue = resolved ?? formatParameterValue(value);
         const isMultiline = typeof value === "string" && value.includes("\n");
         return (
           <div key={key} className="space-y-1.5 py-3 first:pt-0 last:pb-0">

@@ -1,11 +1,17 @@
 import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { renderWithProviders } from "../../../../test-helpers";
 import { ParameterFieldWidget } from "../ParameterFieldWidget";
 import type { SchemaProperty } from "@/lib/parameterSchema";
 
 vi.mock("../../../../lib/supabaseClient");
+
+const mockUseSlackChannels = vi.fn();
+
+vi.mock("@/hooks/useAgentConnectorChannels", () => ({
+  useAgentConnectorChannels: () => mockUseSlackChannels(),
+}));
 
 function renderWidget(
   property: SchemaProperty,
@@ -456,6 +462,57 @@ describe("ParameterFieldWidget", () => {
       expect(screen.getByRole("textbox")).toBeDisabled();
       expect(screen.getByRole("button", { name: /remove item/i })).toBeDisabled();
       expect(screen.getByRole("button", { name: /add item/i })).toBeDisabled();
+    });
+  });
+
+  describe("remote-select Slack channels", () => {
+    const slackRemoteProp: SchemaProperty = {
+      type: "string",
+      "x-ui": {
+        widget: "remote-select",
+        remote_select_options_path:
+          "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+        remote_select_id_key: "id",
+        remote_select_label_key: "display_label",
+      },
+    };
+
+    beforeEach(() => {
+      mockUseSlackChannels.mockReturnValue({
+        channels: [
+          {
+            id: "C1",
+            display_label: "#general",
+            is_private: false,
+            num_members: 3,
+          },
+        ],
+        isLoading: false,
+        isFetching: false,
+        error: null,
+        hasCredential: true,
+        isCredentialBindingPending: false,
+        refetch: vi.fn(),
+      });
+    });
+
+    it("uses Slack channel widget when remote path includes /channels", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      renderWithProviders(
+        <ParameterFieldWidget
+          paramKey="channel"
+          property={slackRemoteProp}
+          value=""
+          onChange={onChange}
+          agentId={1}
+          connectorId="slack"
+        />,
+      );
+
+      const select = screen.getByTestId("slack-remote-select-param-channel");
+      await user.selectOptions(select, "C1");
+      expect(onChange).toHaveBeenCalledWith("C1");
     });
   });
 
