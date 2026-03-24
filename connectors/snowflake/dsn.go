@@ -1,66 +1,51 @@
 package snowflake
 
 import (
-	"crypto/rsa"
-	"crypto/x509"
-	"encoding/base64"
-	"encoding/pem"
-	"fmt"
 	"strings"
 
+	"github.com/snowflakedb/gosnowflake"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-// composeDSN merges vault credentials into a Snowflake DSN for gosnowflake.
-// When private_key_pem is set, JWT auth (SNOWFLAKE_JWT) is appended unless the
-// connection string already sets authenticator=.
-func composeDSN(connectionString, privateKeyPEM string) (string, error) {
+// buildSnowflakeConfig parses the vault DSN and optional PEM private key into a
+// gosnowflake.Config. When private_key_pem is set, JWT auth is used with
+// PrivateKey on the struct (not embedded in a DSN string) to avoid key material
+// in logged connection URLs.
+func buildSnowflakeConfig(connectionString, privateKeyPEM string) (*gosnowflake.Config, error) {
 	dsn := strings.TrimSpace(connectionString)
 	if dsn == "" {
-		return "", &connectors.ValidationError{Message: "missing credential: connection_string"}
+		return nil, &connectors.ValidationError{Message: "missing credential: connection_string"}
 	}
 	pkPEM := strings.TrimSpace(privateKeyPEM)
-	if pkPEM == "" {
-		return dsn, nil
+
+	parseDSN := dsn
+	if pkPEM != "" {
+		lower := strings.ToLower(dsn)
+		if strings.Contains(lower, "authenticator=") {
+			return nil, &connectors.ValidationError{Message: "do not set authenticator= in connection_string when using private_key_pem; use JWT-only DSN (user@account/...) and private_key_pem"}
+		}
+		// ParseDSN validates password before we can switch to JWT; include JWT in the DSN
+		// so password is not required, then attach the key from vault (not in the string).
+		sep := "?"
+		if strings.Contains(dsn, "?") {
+			sep = "&"
+		}
+		parseDSN = dsn + sep + "authenticator=SNOWFLAKE_JWT"
 	}
 
-	lower := strings.ToLower(dsn)
-	if strings.Contains(lower, "authenticator=") {
-		return dsn, nil
+	cfg, err := gosnowflake.ParseDSN(parseDSN)
+	if err != nil {
+		return nil, &connectors.ValidationError{Message: err.Error()}
+	}
+	if pkPEM == "" {
+		return cfg, nil
 	}
 
 	pk, err := parseRSAPrivateKeyPEM(pkPEM)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	der, err := x509.MarshalPKCS8PrivateKey(pk)
-	if err != nil {
-		return "", &connectors.ValidationError{Message: fmt.Sprintf("encoding private key: %v", err)}
-	}
-	enc := base64.URLEncoding.EncodeToString(der)
-	sep := "?"
-	if strings.Contains(dsn, "?") {
-		sep = "&"
-	}
-	return dsn + sep + "authenticator=SNOWFLAKE_JWT&privateKey=" + enc, nil
-}
-
-func parseRSAPrivateKeyPEM(pemStr string) (*rsa.PrivateKey, error) {
-	block, _ := pem.Decode([]byte(pemStr))
-	if block == nil {
-		return nil, &connectors.ValidationError{Message: "private_key_pem is not valid PEM"}
-	}
-	key, err := x509.ParsePKCS8PrivateKey(block.Bytes)
-	if err != nil {
-		key2, err2 := x509.ParsePKCS1PrivateKey(block.Bytes)
-		if err2 != nil {
-			return nil, &connectors.ValidationError{Message: fmt.Sprintf("parse private key: %v", err)}
-		}
-		return key2, nil
-	}
-	rk, ok := key.(*rsa.PrivateKey)
-	if !ok {
-		return nil, &connectors.ValidationError{Message: "private key must be RSA"}
-	}
-	return rk, nil
+	cfg.Authenticator = gosnowflake.AuthTypeJwt
+	cfg.PrivateKey = pk
+	return cfg, nil
 }

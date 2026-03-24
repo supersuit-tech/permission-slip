@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/snowflakedb/gosnowflake"
+	"github.com/snowflakedb/gosnowflake"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
 )
@@ -50,7 +50,7 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		return nil, err
 	}
 
-	connStr, err := getDSN(req)
+	cfg, err := snowflakeConfigFromRequest(req)
 	if err != nil {
 		return nil, err
 	}
@@ -64,10 +64,8 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 	ctx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
-	db, err := sql.Open("snowflake", connStr)
-	if err != nil {
-		return nil, mapSnowflakeError(err, "opening connection")
-	}
+	connector := gosnowflake.NewConnector(gosnowflake.SnowflakeDriver{}, *cfg)
+	db := sql.OpenDB(connector)
 	defer db.Close()
 	db.SetMaxOpenConns(1)
 	db.SetMaxIdleConns(1)
@@ -116,11 +114,11 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 	})
 }
 
-func getDSN(req connectors.ActionRequest) (string, error) {
+func snowflakeConfigFromRequest(req connectors.ActionRequest) (*gosnowflake.Config, error) {
 	connStr, ok := req.Credentials.Get("connection_string")
 	if !ok {
 		connStr = ""
 	}
 	pkPEM, _ := req.Credentials.Get("private_key_pem")
-	return composeDSN(connStr, pkPEM)
+	return buildSnowflakeConfig(connStr, pkPEM)
 }

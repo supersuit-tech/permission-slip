@@ -43,7 +43,7 @@ func (c *Connector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "bigquery",
 		Name:        "BigQuery",
-		Description: "Run read-only Standard SQL against Google BigQuery with ? placeholders, row caps, job timeouts, and optional max_bytes_billed. Requires a service account JSON key in vault.",
+		Description: "Run read-only Standard SQL against Google BigQuery with ? placeholders (outside strings/comments), row caps, job timeouts, and optional max_bytes_billed. Rejects WITH … DML and other mutating statements. Use a least-privilege service account (e.g. bigquery.jobs.create + dataViewer) in production.",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{

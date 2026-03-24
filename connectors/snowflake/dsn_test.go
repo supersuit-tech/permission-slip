@@ -5,53 +5,42 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
-	"strings"
 	"testing"
 
+	"github.com/snowflakedb/gosnowflake"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-func TestComposeDSN_passwordOnly(t *testing.T) {
+func TestBuildSnowflakeConfig_passwordOnly(t *testing.T) {
 	t.Parallel()
 	dsn := "user:pass@org-account/db/schema?warehouse=wh"
-	out, err := composeDSN(dsn, "")
+	cfg, err := buildSnowflakeConfig(dsn, "")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if out != dsn {
-		t.Fatalf("got %q want %q", out, dsn)
+	if cfg.User != "user" || cfg.Password != "pass" {
+		t.Fatalf("unexpected cfg: %+v", cfg)
 	}
 }
 
-func TestComposeDSN_respectsExistingAuthenticator(t *testing.T) {
+func TestBuildSnowflakeConfig_rejectsAuthenticatorWithPEM(t *testing.T) {
 	t.Parallel()
 	dsn := "u@a/db?authenticator=oauth"
-	out, err := composeDSN(dsn, "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if out != dsn {
-		t.Fatalf("should not modify DSN when authenticator set: got %q", out)
+	_, err := buildSnowflakeConfig(dsn, "-----BEGIN PRIVATE KEY-----\nabc\n-----END PRIVATE KEY-----")
+	if err == nil || !connectors.IsValidationError(err) {
+		t.Fatalf("expected validation error, got %v", err)
 	}
 }
 
-func TestComposeDSN_missingConnectionString(t *testing.T) {
+func TestBuildSnowflakeConfig_missingConnectionString(t *testing.T) {
 	t.Parallel()
-	_, err := composeDSN("", "")
+	_, err := buildSnowflakeConfig("", "")
 	if err == nil || !connectors.IsValidationError(err) {
 		t.Fatalf("expected ValidationError, got %v", err)
 	}
 }
 
-func TestParseRSAPrivateKeyPEM_invalid(t *testing.T) {
-	t.Parallel()
-	_, err := parseRSAPrivateKeyPEM("not pem")
-	if err == nil || !connectors.IsValidationError(err) {
-		t.Fatalf("expected ValidationError, got %v", err)
-	}
-}
-
-func TestComposeDSN_appendsJWTParams(t *testing.T) {
+func TestBuildSnowflakeConfig_JWTUsesPrivateKeyField(t *testing.T) {
 	t.Parallel()
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	if err != nil {
@@ -64,14 +53,14 @@ func TestComposeDSN_appendsJWTParams(t *testing.T) {
 	pemStr := string(pem.EncodeToMemory(&pem.Block{Type: "PRIVATE KEY", Bytes: der}))
 
 	base := "svcuser@myorg-myacct/db/schema?warehouse=COMPUTE_WH"
-	out, err := composeDSN(base, pemStr)
+	cfg, err := buildSnowflakeConfig(base, pemStr)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(out, "authenticator=SNOWFLAKE_JWT") {
-		t.Fatalf("missing JWT authenticator in %q", out)
+	if cfg.Authenticator != gosnowflake.AuthTypeJwt {
+		t.Fatalf("authenticator = %v, want JWT", cfg.Authenticator)
 	}
-	if !strings.Contains(out, "privateKey=") {
-		t.Fatalf("missing privateKey in %q", out)
+	if cfg.PrivateKey == nil {
+		t.Fatal("PrivateKey not set")
 	}
 }

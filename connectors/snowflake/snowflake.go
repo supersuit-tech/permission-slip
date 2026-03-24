@@ -39,7 +39,7 @@ func (c *SnowflakeConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "snowflake",
 		Name:        "Snowflake",
-		Description: "Run read-only SQL queries against Snowflake with parameterized placeholders (?), row caps, and statement timeouts. Supports password or RSA key-pair (private_key_pem) authentication.",
+		Description: "Run read-only SQL queries against Snowflake with parameterized placeholders (?), row caps, and statement timeouts. Password auth uses connection_string only; key-pair auth uses private_key_pem with the RSA key on the driver config (not embedded in the DSN).",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
@@ -117,7 +117,7 @@ func (c *SnowflakeConnector) ValidateCredentials(_ context.Context, creds connec
 			return err
 		}
 	}
-	_, err := composeDSN(connStr, pkPEM)
+	_, err := buildSnowflakeConfig(connStr, pkPEM)
 	return err
 }
 

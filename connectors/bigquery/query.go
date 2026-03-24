@@ -32,12 +32,8 @@ type queryParams struct {
 }
 
 func (p *queryParams) validate() error {
-	if strings.TrimSpace(p.SQL) == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: sql"}
-	}
-	normalized := strings.TrimSpace(strings.ToUpper(p.SQL))
-	if !strings.HasPrefix(normalized, "SELECT") && !strings.HasPrefix(normalized, "WITH") {
-		return &connectors.ValidationError{Message: "only SELECT queries are allowed (query must start with SELECT or WITH)"}
+	if err := validateReadOnlyBigQuerySQL(p.SQL); err != nil {
+		return err
 	}
 	if p.MaxRows < 0 {
 		return &connectors.ValidationError{Message: "max_rows must be positive"}
@@ -136,35 +132,6 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		"row_count": len(results),
 		"truncated": truncated,
 	})
-}
-
-// translatePlaceholders maps each ? to @p0, @p1, ... for BigQuery standard SQL.
-// If the query contains no ? placeholders, the SQL is returned unchanged (callers may use @name directly).
-func translatePlaceholders(sql string, paramCount int) (string, error) {
-	n := strings.Count(sql, "?")
-	if n == 0 {
-		if paramCount > 0 {
-			return "", &connectors.ValidationError{Message: "sql must use ? placeholders when params is non-empty"}
-		}
-		return sql, nil
-	}
-	if n != paramCount {
-		return "", &connectors.ValidationError{Message: fmt.Sprintf("sql has %d ? placeholders but params has %d values", n, paramCount)}
-	}
-	var b strings.Builder
-	idx := 0
-	for {
-		pos := strings.Index(sql, "?")
-		if pos < 0 {
-			b.WriteString(sql)
-			break
-		}
-		b.WriteString(sql[:pos])
-		fmt.Fprintf(&b, "@p%d", idx)
-		idx++
-		sql = sql[pos+1:]
-	}
-	return b.String(), nil
 }
 
 func serviceAccountAndProject(req connectors.ActionRequest) ([]byte, string, error) {
