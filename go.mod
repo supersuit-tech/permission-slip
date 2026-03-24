@@ -1,6 +1,6 @@
 module github.com/supersuit-tech/permission-slip-web
 
-go 1.24.0
+go 1.25.8
 
 require (
 	cloud.google.com/go/firestore v1.18.0

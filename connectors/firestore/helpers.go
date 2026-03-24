@@ -45,7 +45,7 @@ func validateDocumentPath(path string) error {
 	return nil
 }
 
-// validateCollectionPath checks a collection path: even number of segments (collection under a document, ...).
+// validateCollectionPath checks a collection path: odd number of segments (top-level collection or subcollection under a document).
 func validateCollectionPath(path string) error {
 	path = strings.TrimSpace(path)
 	if path == "" {

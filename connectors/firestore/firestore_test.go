@@ -74,6 +74,21 @@ func TestFirestoreConnector_ValidateCredentials(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "missing type in service account JSON",
+			creds: connectors.NewCredentials(map[string]string{
+				"service_account_json": `{"client_email":"a@b.com","private_key":"k","project_id":"p"}`,
+			}),
+			wantErr: true,
+		},
+		{
+			name: "emulator host without port",
+			creds: connectors.NewCredentials(map[string]string{
+				"service_account_json": validServiceAccountJSON(),
+				"emulator_host":        "localhost",
+			}),
+			wantErr: true,
+		},
+		{
 			name: "bad emulator host",
 			creds: connectors.NewCredentials(map[string]string{
 				"service_account_json": validServiceAccountJSON(),

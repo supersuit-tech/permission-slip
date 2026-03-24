@@ -153,7 +153,7 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "firestore.update",
 				Name:            "Update document",
-				Description:     "Update specific top-level fields (patch)",
+				Description:     "Update fields via Firestore field paths (map keys are paths; dots denote nesting, e.g. address.city)",
 				RiskLevel:       "medium",
 				DisplayTemplate: "Update {{path}}",
 				Preview: &connectors.ActionPreview{
@@ -165,7 +165,7 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 					"required": ["path", "data", "allowed_paths"],
 					"properties": {
 						"path": {"type": "string"},
-						"data": {"type": "object", "description": "Top-level fields to update"},
+						"data": {"type": "object", "description": "Field paths to values — each JSON object key is a Firestore field path (dot segments target nested fields, same as Firestore Update)"},
 						"allowed_paths": {
 							"type": "array",
 							"items": {"type": "string"},
@@ -176,7 +176,8 @@ func (c *FirestoreConnector) Manifest() *connectors.ConnectorManifest {
 						"allowed_write_fields": {
 							"type": "array",
 							"items": {"type": "string"},
-							"maxItems": 100
+							"maxItems": 100,
+							"description": "When set, data keys must be listed here; values are Firestore field paths (e.g. address.city updates nested city)"
 						}
 					}
 				}`)),
@@ -334,7 +335,7 @@ func (c *FirestoreConnector) ValidateCredentials(_ context.Context, creds connec
 	if err := json.Unmarshal([]byte(raw), &sa); err != nil {
 		return &connectors.ValidationError{Message: fmt.Sprintf("service_account_json is not valid JSON: %v", err)}
 	}
-	if sa.Type != "" && sa.Type != "service_account" {
+	if sa.Type != "service_account" {
 		return &connectors.ValidationError{Message: "service_account_json must be a GCP service account key (type service_account)"}
 	}
 	if sa.ClientEmail == "" || sa.PrivateKey == "" {
@@ -395,6 +396,9 @@ func validateEmulatorHost(host string) error {
 	// host:port, no scheme
 	if strings.Contains(host, "://") {
 		return &connectors.ValidationError{Message: "emulator_host must be host:port without a scheme (e.g. 127.0.0.1:8080)"}
+	}
+	if !strings.Contains(host, ":") {
+		return &connectors.ValidationError{Message: "emulator_host must include a port (e.g. 127.0.0.1:8080)"}
 	}
 	return nil
 }
