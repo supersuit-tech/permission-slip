@@ -33,9 +33,6 @@ func TestGetConfig_BillingDisabled(t *testing.T) {
 	if resp.BillingEnabled {
 		t.Error("expected billing_enabled=false when BillingEnabled is false")
 	}
-	if !resp.BYOAEnabled {
-		t.Error("expected byoa_enabled=true when BillingEnabled is false (self-hosted)")
-	}
 }
 
 func TestGetConfig_BillingEnabled(t *testing.T) {
@@ -61,9 +58,6 @@ func TestGetConfig_BillingEnabled(t *testing.T) {
 	}
 	if !resp.BillingEnabled {
 		t.Error("expected billing_enabled=true when BillingEnabled is true")
-	}
-	if resp.BYOAEnabled {
-		t.Error("expected byoa_enabled=false when BillingEnabled is true (hosted)")
 	}
 }
 

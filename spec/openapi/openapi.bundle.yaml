@@ -5612,13 +5612,12 @@ paths:
       summary: List OAuth Providers
       description: |
         Returns all registered OAuth providers and their configuration status.
-        This lets the frontend discover which providers are available, which are
-        ready to use (have credentials configured), and which need BYOA setup.
+        This lets the frontend discover which providers are available and which are
+        ready to use (have credentials configured).
 
-        Providers come from three sources:
+        Providers come from two sources:
         - **built_in**: Platform-provided providers (e.g. Google, Microsoft)
         - **manifest**: Declared in a connector manifest (e.g. Salesforce)
-        - **byoa**: User-configured (Bring Your Own App)
       tags:
         - OAuth
       security:
@@ -5667,7 +5666,7 @@ paths:
 
         - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
         - A signed state token prevents CSRF and session-fixation attacks
-        - The provider must have client credentials configured (built-in or BYOA)
+        - The provider must have client credentials configured (via environment variables)
 
         ### Slack (`provider=slack`)
 
@@ -5882,210 +5881,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: OAuth connection not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /v1/oauth/provider-configs:
-    get:
-      operationId: listOAuthProviderConfigs
-      summary: List BYOA Provider Configs
-      description: |
-        Returns all BYOA (Bring Your Own App) OAuth provider configurations for
-        the authenticated user. Each config indicates that the user has registered
-        their own OAuth client credentials for that provider.
-
-        Client secrets are never included in the response — only the provider ID
-        and timestamps are returned.
-
-        ## Related Endpoints
-
-        - `GET /v1/oauth/providers` — lists all available providers (built-in + manifest + BYOA)
-        - `POST /v1/oauth/provider-configs` — register new BYOA credentials
-        - `PUT /v1/oauth/provider-configs/{provider}` — rotate existing credentials
-        - `DELETE /v1/oauth/provider-configs/{provider}` — remove BYOA credentials
-      tags:
-        - OAuth
-      security:
-        - SupabaseSession: []
-      responses:
-        '200':
-          description: BYOA provider configs listed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OAuthProviderConfigListResponse'
-              example:
-                configs:
-                  - provider: salesforce
-                    created_at: '2026-03-05T12:00:00Z'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-    post:
-      operationId: createOAuthProviderConfig
-      summary: Register BYOA OAuth Credentials
-      description: |
-        Registers user-provided OAuth client credentials for a provider. The
-        provider must already be declared by a built-in config or connector
-        manifest — this endpoint only supplies the client ID and secret.
-
-        Client credentials are encrypted in Supabase Vault (AES-256-GCM) and
-        never stored in plaintext. The vault secret IDs are stored in the
-        `oauth_provider_configs` database table.
-
-        After registration, the provider's OAuth flows will use these credentials
-        immediately. Only one config per provider per user is allowed — delete the
-        existing config before creating a new one.
-
-        ## Credential Lifecycle
-
-        1. **Register**: `POST /v1/oauth/provider-configs` (this endpoint)
-        2. **Rotate**: `PUT /v1/oauth/provider-configs/{provider}`
-        3. **Remove**: `DELETE /v1/oauth/provider-configs/{provider}`
-      tags:
-        - OAuth
-      security:
-        - SupabaseSession: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateOAuthProviderConfigRequest'
-      responses:
-        '201':
-          description: BYOA provider config created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OAuthProviderConfig'
-              example:
-                provider: salesforce
-                created_at: '2026-03-05T12:00:00Z'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: OAuth provider not found (not declared by any built-in or connector manifest)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: BYOA config already exists for this provider
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /v1/oauth/provider-configs/{provider}:
-    put:
-      operationId: updateOAuthProviderConfig
-      summary: Update BYOA Provider Config
-      description: |
-        Replaces the client credentials for an existing BYOA provider config.
-        This supports credential rotation without requiring delete + create.
-
-        The old vault secrets are deleted and replaced with new ones atomically.
-      tags:
-        - OAuth
-      security:
-        - SupabaseSession: []
-      parameters:
-        - name: provider
-          in: path
-          required: true
-          description: The OAuth provider ID to update
-          schema:
-            type: string
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateOAuthProviderConfigRequest'
-      responses:
-        '200':
-          description: BYOA provider config updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OAuthProviderConfig'
-              example:
-                provider: salesforce
-                created_at: '2026-03-05T12:00:00Z'
-                updated_at: '2026-03-05T14:00:00Z'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: BYOA provider config not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-    delete:
-      operationId: deleteOAuthProviderConfig
-      summary: Delete BYOA Provider Config
-      description: |
-        Removes the user's BYOA OAuth client credentials for a provider. The
-        encrypted vault secrets are deleted along with the database row.
-
-        After deletion, the provider reverts to its built-in or manifest
-        configuration (if any). If no built-in credentials exist, the provider
-        will require new BYOA credentials before OAuth flows can be initiated.
-      tags:
-        - OAuth
-      security:
-        - SupabaseSession: []
-      parameters:
-        - name: provider
-          in: path
-          required: true
-          description: The OAuth provider ID to delete the config for
-          schema:
-            type: string
-      responses:
-        '200':
-          description: BYOA provider config deleted successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OAuthProviderConfigDeleteResponse'
-              example:
-                provider: salesforce
-                deleted_at: '2026-03-05T15:00:00Z'
-        '400':
-          $ref: '#/components/responses/BadRequest'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: BYOA provider config not found
           content:
             application/json:
               schema:
@@ -10819,7 +10614,6 @@ components:
           enum:
             - built_in
             - manifest
-            - byoa
           description: Where the provider configuration originated
           example: built_in
         has_credentials:
@@ -10909,121 +10703,6 @@ components:
           type: string
           format: date-time
           description: When the OAuth provider was disconnected
-          example: '2026-03-05T15:00:00Z'
-    CreateOAuthProviderConfigRequest:
-      type: object
-      description: |
-        Request body for registering BYOA (Bring Your Own App) OAuth credentials.
-        The provider must already be declared by a built-in config or connector
-        manifest — this endpoint only supplies the client ID and secret.
-        Credentials are encrypted at rest in Supabase Vault (AES-256-GCM).
-        Only one config per provider per user is allowed.
-      required:
-        - provider
-        - client_id
-        - client_secret
-      properties:
-        provider:
-          type: string
-          description: |
-            The OAuth provider ID to configure. Must match a provider already
-            declared by a built-in config or connector manifest (e.g. "salesforce",
-            "google"). Use GET /v1/oauth/providers to discover available providers.
-          example: salesforce
-          maxLength: 128
-        client_id:
-          type: string
-          description: |
-            The OAuth application's client ID, obtained from the provider's
-            developer console (e.g. Google Cloud Console, Salesforce Connected App).
-          example: my-client-id
-          maxLength: 2048
-        client_secret:
-          type: string
-          description: |
-            The OAuth application's client secret. This value is encrypted in
-            Supabase Vault and never returned in API responses.
-          example: my-client-secret
-          maxLength: 2048
-    UpdateOAuthProviderConfigRequest:
-      type: object
-      description: |
-        Request body for rotating BYOA OAuth credentials. Both client_id and
-        client_secret must be provided — partial updates are not supported.
-        The old vault secrets are deleted and replaced atomically within a
-        database transaction.
-      required:
-        - client_id
-        - client_secret
-      properties:
-        client_id:
-          type: string
-          description: The new OAuth application's client ID
-          example: my-new-client-id
-          maxLength: 2048
-        client_secret:
-          type: string
-          description: |
-            The new OAuth application's client secret. Encrypted in Supabase
-            Vault and never returned in API responses.
-          example: my-new-client-secret
-          maxLength: 2048
-    OAuthProviderConfig:
-      type: object
-      description: |
-        A BYOA provider config indicating the user has registered their own
-        OAuth client credentials for this provider. Client secrets are never
-        included — only the provider ID and timestamps are returned.
-      required:
-        - provider
-        - created_at
-        - updated_at
-      properties:
-        provider:
-          type: string
-          description: The OAuth provider ID (e.g. "salesforce", "google")
-          example: salesforce
-        created_at:
-          type: string
-          format: date-time
-          description: When the BYOA credentials were first registered
-          example: '2026-03-05T12:00:00Z'
-        updated_at:
-          type: string
-          format: date-time
-          description: When the BYOA credentials were last rotated (equals created_at if never updated)
-          example: '2026-03-05T14:00:00Z'
-    OAuthProviderConfigListResponse:
-      type: object
-      required:
-        - configs
-      properties:
-        configs:
-          type: array
-          items:
-            $ref: '#/components/schemas/OAuthProviderConfig'
-          description: |
-            List of BYOA provider configs for the authenticated user. Each entry
-            indicates the user has registered custom OAuth credentials for that
-            provider. Empty array if no BYOA configs exist.
-    OAuthProviderConfigDeleteResponse:
-      type: object
-      description: |
-        Confirmation that the BYOA provider config and its encrypted vault
-        secrets have been deleted. After deletion, the provider reverts to
-        its built-in or manifest configuration (if any).
-      required:
-        - provider
-        - deleted_at
-      properties:
-        provider:
-          type: string
-          description: The OAuth provider whose BYOA credentials were deleted
-          example: salesforce
-        deleted_at:
-          type: string
-          format: date-time
-          description: When the BYOA credentials were deleted
           example: '2026-03-05T15:00:00Z'
     AgentPaymentMethodResponse:
       type: object
@@ -11217,7 +10896,6 @@ components:
         - google_oauth_configured
         - microsoft_oauth_configured
         - sms_enabled
-        - byoa_enabled
       properties:
         billing_enabled:
           type: boolean
@@ -11231,17 +10909,17 @@ components:
           type: boolean
           description: |
             Whether Google OAuth client credentials are configured on the server.
-            When `true`, the built-in Google connector can initiate OAuth flows
-            without BYOA setup. When `false`, users must provide their own Google
-            OAuth app credentials via the BYOA configuration UI.
+            When `true`, the built-in Google connector can initiate OAuth flows.
+            When `false`, the Google connector will not be usable until credentials
+            are set via environment variables.
           example: true
         microsoft_oauth_configured:
           type: boolean
           description: |
             Whether Microsoft OAuth client credentials are configured on the server.
-            When `true`, the built-in Microsoft connector can initiate OAuth flows
-            without BYOA setup. When `false`, users must provide their own Microsoft
-            OAuth app credentials via the BYOA configuration UI.
+            When `true`, the built-in Microsoft connector can initiate OAuth flows.
+            When `false`, the Microsoft connector will not be usable until credentials
+            are set via environment variables.
           example: true
         sms_enabled:
           type: boolean
@@ -11254,15 +10932,6 @@ components:
             this set automatically; the hosted platform (app.permissionslip.dev)
             sets `SMS_NOTIFICATIONS_HIDDEN=true` to hide SMS from users.
           example: false
-        byoa_enabled:
-          type: boolean
-          description: |
-            Whether BYOA (Bring Your Own App) OAuth credential management is
-            available. BYOA is enabled on self-hosted deployments (where users
-            may need to supply their own OAuth client credentials) and disabled
-            on the hosted platform (app.permissionslip.dev) where all providers
-            ship with platform-level credentials.
-          example: true
     Action:
       type: object
       required:

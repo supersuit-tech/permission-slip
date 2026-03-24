@@ -88,7 +88,7 @@ func NewRegistryWithBuiltIns() *Registry {
 // RegisterFromManifest registers providers declared in a connector manifest's
 // oauth_providers section. These are external providers that the platform
 // doesn't have built-in support for. They are registered without client
-// credentials — users must supply those via BYOA.
+// credentials — operators must supply those via environment variables.
 // Returns an error if any provider fails validation.
 func RegisterFromManifest(r *Registry, providers []ManifestProvider) error {
 	for _, mp := range providers {

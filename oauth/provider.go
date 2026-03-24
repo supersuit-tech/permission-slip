@@ -1,13 +1,11 @@
 // Package oauth implements the OAuth 2.0 provider registry for Permission Slip.
 // It manages provider configurations (endpoints, scopes, client credentials)
-// and provides a thread-safe registry that merges built-in providers,
-// connector-manifest-declared providers, and user BYOA configurations.
+// and provides a thread-safe registry that merges built-in providers and
+// connector-manifest-declared providers.
 //
-// Provider sources have a defined priority: BYOA > Manifest > BuiltIn.
+// Provider sources have a defined priority: Manifest > BuiltIn.
 // When multiple sources register a provider with the same ID, the higher-priority
-// source wins. BYOA registrations are special: they merge client credentials
-// into the existing provider config (preserving endpoints and scopes from the
-// lower-priority source) rather than replacing the entire Provider value.
+// source wins.
 //
 // Security: Provider and TokenSet implement fmt.Stringer, fmt.GoStringer, and
 // json.Marshaler to redact secrets (ClientSecret, AccessToken, RefreshToken).
@@ -30,8 +28,7 @@ import (
 
 // Provider holds the configuration for an OAuth 2.0 provider. Built-in
 // providers (Google, Microsoft) ship with endpoints and default scopes
-// pre-filled; connector-declared providers are populated from manifests;
-// BYOA providers get client credentials from user configuration.
+// pre-filled; connector-declared providers are populated from manifests.
 type Provider struct {
 	// ID is a unique identifier for the provider (e.g. "google", "microsoft",
 	// "salesforce"). Must be lowercase alphanumeric with hyphens/underscores.
@@ -47,13 +44,12 @@ type Provider struct {
 	// Connector manifests may request additional scopes beyond these defaults.
 	Scopes []string
 
-	// ClientID is the OAuth application's client ID. For built-in providers
-	// this comes from server config (env vars). For BYOA it comes from user
-	// configuration stored in the database.
+	// ClientID is the OAuth application's client ID, sourced from server
+	// config (environment variables).
 	ClientID string
 
-	// ClientSecret is the OAuth application's client secret. Same sourcing
-	// rules as ClientID.
+	// ClientSecret is the OAuth application's client secret, sourced from
+	// server config (environment variables).
 	ClientSecret string
 
 	// AuthorizeParams are extra query parameters appended to the authorization
@@ -82,9 +78,6 @@ const (
 
 	// SourceManifest indicates a provider declared in a connector manifest.
 	SourceManifest ProviderSource = "manifest"
-
-	// SourceBYOA indicates a provider configured by the user (Bring Your Own App).
-	SourceBYOA ProviderSource = "byoa"
 )
 
 // TokenSet holds the tokens returned by an OAuth 2.0 token exchange or refresh.
@@ -122,8 +115,7 @@ func (ts TokenSet) IsExpired() bool {
 
 // HasClientCredentials reports whether the provider has both a client ID and
 // client secret configured. Providers without credentials can be registered
-// (from manifests) but cannot initiate OAuth flows until BYOA credentials are
-// supplied.
+// (from manifests) but cannot initiate OAuth flows.
 func (p Provider) HasClientCredentials() bool {
 	return p.ClientID != "" && p.ClientSecret != ""
 }
@@ -190,9 +182,8 @@ func (ts TokenSet) MarshalJSON() ([]byte, error) {
 }
 
 // Registry is a thread-safe registry of OAuth providers. It is populated at
-// startup from built-in configs, connector manifests, and user BYOA settings.
-// The registry is read-heavy and write-rare (writes happen at startup and when
-// BYOA configs change).
+// startup from built-in configs and connector manifests. The registry is
+// read-heavy and write-rare (writes happen at startup).
 type Registry struct {
 	mu        sync.RWMutex
 	providers map[string]Provider
@@ -210,13 +201,7 @@ var ProviderIDPattern = regexp.MustCompile(`^[a-z][a-z0-9_-]{0,62}$`)
 
 // Register adds or replaces a provider in the registry. If a provider with the
 // same ID already exists, it is replaced only if the new source has equal or
-// higher priority: BYOA > Manifest > BuiltIn.
-//
-// When a BYOA provider overrides an existing provider, the client credentials
-// from the BYOA registration are merged into the existing provider's endpoint
-// and scope configuration. This means BYOA users only need to supply their
-// client ID and secret — they don't need to re-specify authorize/token URLs
-// or default scopes that were already set by the built-in or manifest source.
+// higher priority: Manifest > BuiltIn.
 //
 // Returns an error if the provider ID is empty or invalid.
 func (r *Registry) Register(p Provider) error {
@@ -236,35 +221,6 @@ func (r *Registry) Register(p Provider) error {
 
 	existing, exists := r.providers[p.ID]
 	if exists && sourcePriority(existing.Source) > sourcePriority(p.Source) {
-		return nil
-	}
-
-	// When BYOA overrides an existing provider, merge client credentials into
-	// the existing config so users don't need to re-specify endpoints/scopes.
-	if exists && p.Source == SourceBYOA {
-		merged := existing
-		merged.ClientID = p.ClientID
-		merged.ClientSecret = p.ClientSecret
-		merged.Source = SourceBYOA
-		// Allow BYOA to override endpoints/scopes only if explicitly provided.
-		if p.AuthorizeURL != "" {
-			merged.AuthorizeURL = p.AuthorizeURL
-		}
-		if p.TokenURL != "" {
-			merged.TokenURL = p.TokenURL
-		}
-		if len(p.Scopes) > 0 {
-			merged.Scopes = p.Scopes // Already deep-copied above.
-		} else {
-			// Deep-copy the existing scopes so the merged provider owns its data.
-			merged.Scopes = copyStrings(existing.Scopes)
-		}
-		if len(p.AuthorizeParams) > 0 {
-			merged.AuthorizeParams = p.AuthorizeParams // Already deep-copied above.
-		} else {
-			merged.AuthorizeParams = copyStringMap(existing.AuthorizeParams)
-		}
-		r.providers[p.ID] = merged
 		return nil
 	}
 
@@ -366,8 +322,6 @@ func sourcePriority(s ProviderSource) int {
 		return 1
 	case SourceManifest:
 		return 2
-	case SourceBYOA:
-		return 3
 	default:
 		return 0
 	}

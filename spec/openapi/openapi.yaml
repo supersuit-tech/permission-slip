@@ -311,12 +311,6 @@ paths:
   /v1/oauth/connections/{connection_id}:
     $ref: './components/paths/oauth.yaml#/oauthDisconnect'
 
-  /v1/oauth/provider-configs:
-    $ref: './components/paths/oauth.yaml#/oauthProviderConfigs'
-
-  /v1/oauth/provider-configs/{provider}:
-    $ref: './components/paths/oauth.yaml#/oauthProviderConfigByProvider'
-
   /v1/agents/{agent_id}/payment-method:
     $ref: './components/paths/agent_payment_methods.yaml#/agentPaymentMethod'
 
@@ -605,17 +599,6 @@ components:
       $ref: './components/schemas/oauth.yaml#/OAuthConnectionListResponse'
     OAuthDisconnectResponse:
       $ref: './components/schemas/oauth.yaml#/OAuthDisconnectResponse'
-    CreateOAuthProviderConfigRequest:
-      $ref: './components/schemas/oauth.yaml#/CreateOAuthProviderConfigRequest'
-    UpdateOAuthProviderConfigRequest:
-      $ref: './components/schemas/oauth.yaml#/UpdateOAuthProviderConfigRequest'
-    OAuthProviderConfig:
-      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfig'
-    OAuthProviderConfigListResponse:
-      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfigListResponse'
-    OAuthProviderConfigDeleteResponse:
-      $ref: './components/schemas/oauth.yaml#/OAuthProviderConfigDeleteResponse'
-
     # Agent Payment Methods
     AgentPaymentMethodResponse:
       $ref: './components/schemas/agent_payment_methods.yaml#/AgentPaymentMethodResponse'

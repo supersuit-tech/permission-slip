@@ -135,17 +135,6 @@ func TestRegistry_RegisterValidation(t *testing.T) {
 }
 
 func TestRegistry_SourcePriority(t *testing.T) {
-	t.Run("manifest does not override BYOA", func(t *testing.T) {
-		r := NewRegistry()
-		mustRegister(t, r, Provider{ID: "p", ClientID: "byoa-id", Source: SourceBYOA})
-		mustRegister(t, r, Provider{ID: "p", ClientID: "manifest-id", Source: SourceManifest})
-
-		got, _ := r.Get("p")
-		if got.ClientID != "byoa-id" {
-			t.Errorf("ClientID = %q, want %q (BYOA should win)", got.ClientID, "byoa-id")
-		}
-	})
-
 	t.Run("built-in does not override manifest", func(t *testing.T) {
 		r := NewRegistry()
 		mustRegister(t, r, Provider{ID: "p", AuthorizeURL: "https://manifest.com/auth", Source: SourceManifest})
@@ -168,18 +157,6 @@ func TestRegistry_SourcePriority(t *testing.T) {
 		}
 	})
 
-	t.Run("BYOA overrides everything", func(t *testing.T) {
-		r := NewRegistry()
-		mustRegister(t, r, Provider{ID: "p", Source: SourceBuiltIn})
-		mustRegister(t, r, Provider{ID: "p", Source: SourceManifest})
-		mustRegister(t, r, Provider{ID: "p", ClientID: "user-app", Source: SourceBYOA})
-
-		got, _ := r.Get("p")
-		if got.ClientID != "user-app" {
-			t.Errorf("ClientID = %q, want %q", got.ClientID, "user-app")
-		}
-	})
-
 	t.Run("same source replaces", func(t *testing.T) {
 		r := NewRegistry()
 		mustRegister(t, r, Provider{ID: "p", ClientID: "first", Source: SourceBuiltIn})
@@ -188,76 +165,6 @@ func TestRegistry_SourcePriority(t *testing.T) {
 		got, _ := r.Get("p")
 		if got.ClientID != "second" {
 			t.Errorf("ClientID = %q, want %q (same source should replace)", got.ClientID, "second")
-		}
-	})
-}
-
-func TestRegistry_BYOAMerge(t *testing.T) {
-	t.Run("BYOA merges credentials into existing provider", func(t *testing.T) {
-		r := NewRegistry()
-		mustRegister(t, r, Provider{
-			ID:           "google",
-			AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
-			TokenURL:     "https://oauth2.googleapis.com/token",
-			Scopes:       []string{"openid", "email"},
-			Source:       SourceBuiltIn,
-		})
-
-		// BYOA registration with only client credentials — no endpoints or scopes.
-		mustRegister(t, r, Provider{
-			ID:           "google",
-			ClientID:     "my-app-id",
-			ClientSecret: "my-app-secret",
-			Source:       SourceBYOA,
-		})
-
-		got, _ := r.Get("google")
-		if got.ClientID != "my-app-id" {
-			t.Errorf("ClientID = %q, want %q", got.ClientID, "my-app-id")
-		}
-		if got.ClientSecret != "my-app-secret" {
-			t.Errorf("ClientSecret = %q, want %q", got.ClientSecret, "my-app-secret")
-		}
-		// Endpoints and scopes should be preserved from the built-in.
-		if got.AuthorizeURL != "https://accounts.google.com/o/oauth2/v2/auth" {
-			t.Errorf("AuthorizeURL not preserved: %q", got.AuthorizeURL)
-		}
-		if got.TokenURL != "https://oauth2.googleapis.com/token" {
-			t.Errorf("TokenURL not preserved: %q", got.TokenURL)
-		}
-		if len(got.Scopes) != 2 {
-			t.Errorf("Scopes not preserved: %v", got.Scopes)
-		}
-		if got.Source != SourceBYOA {
-			t.Errorf("Source = %q, want %q", got.Source, SourceBYOA)
-		}
-	})
-
-	t.Run("BYOA can override endpoints when explicitly provided", func(t *testing.T) {
-		r := NewRegistry()
-		mustRegister(t, r, Provider{
-			ID:           "custom",
-			AuthorizeURL: "https://original.com/auth",
-			TokenURL:     "https://original.com/token",
-			Scopes:       []string{"read"},
-			Source:       SourceManifest,
-		})
-
-		mustRegister(t, r, Provider{
-			ID:           "custom",
-			AuthorizeURL: "https://custom.com/auth",
-			TokenURL:     "https://custom.com/token",
-			ClientID:     "my-id",
-			ClientSecret: "my-secret",
-			Source:       SourceBYOA,
-		})
-
-		got, _ := r.Get("custom")
-		if got.AuthorizeURL != "https://custom.com/auth" {
-			t.Errorf("AuthorizeURL = %q, want overridden URL", got.AuthorizeURL)
-		}
-		if got.TokenURL != "https://custom.com/token" {
-			t.Errorf("TokenURL = %q, want overridden URL", got.TokenURL)
 		}
 	})
 }

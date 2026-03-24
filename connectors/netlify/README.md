@@ -16,7 +16,7 @@ The Netlify connector supports two authentication methods. OAuth is recommended 
 |---------|-----------|----------|
 | `netlify` | `oauth2` | `netlify` |
 
-OAuth tokens are automatically refreshed. Users connect via the OAuth flow in the connector settings. Requires `NETLIFY_CLIENT_ID` and `NETLIFY_CLIENT_SECRET` environment variables (or BYOA configuration).
+OAuth tokens are automatically refreshed. Users connect via the OAuth flow in the connector settings. Requires `NETLIFY_CLIENT_ID` and `NETLIFY_CLIENT_SECRET` environment variables.
 
 Netlify does not use granular OAuth scopes — tokens receive full account access.
 
