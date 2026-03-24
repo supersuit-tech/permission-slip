@@ -189,7 +189,7 @@ func (c *PayPalConnector) doJSON(ctx context.Context, creds connectors.Credentia
 			return &connectors.TimeoutError{Message: fmt.Sprintf("PayPal API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "PayPal API request canceled"}
+			return &connectors.CanceledError{Message: "PayPal API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("PayPal API request failed: %v", err)}
 	}
