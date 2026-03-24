@@ -126,6 +126,8 @@ Creates a marketing email campaign and optionally sends it immediately. When `se
 
 Fetches marketing and sales analytics reports with configurable time period granularity. Optional date range filtering via `start` and `end` parameters.
 
+`start` and `end` accept YYYY-MM-DD, RFC 3339, Unix seconds, or epoch milliseconds; values are normalized to UTC calendar dates (`YYYY-MM-DD`) before calling the HubSpot API.
+
 **HubSpot API:** `GET /analytics/v2/reports/{object_type}/{time_period}`
 **Required scopes:** `analytics.read`
 

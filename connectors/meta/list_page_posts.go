@@ -18,8 +18,8 @@ type listPagePostsAction struct {
 type listPagePostsParams struct {
 	PageID string `json:"page_id"`
 	Limit  int    `json:"limit,omitempty"`
-	Since  int64  `json:"since,omitempty"`
-	Until  int64  `json:"until,omitempty"`
+	Since  string `json:"since,omitempty"`
+	Until  string `json:"until,omitempty"`
 }
 
 func (p *listPagePostsParams) validate() error {
@@ -80,11 +80,19 @@ func (a *listPagePostsAction) Execute(ctx context.Context, req connectors.Action
 	reqURL := fmt.Sprintf("%s/%s/posts?fields=id,message,created_time,shares,likes.summary(true),comments.summary(true)&limit=%d",
 		a.conn.baseURL, params.PageID, limit)
 
-	if params.Since > 0 {
-		reqURL += "&since=" + strconv.FormatInt(params.Since, 10)
+	sinceUnix, err := connectors.ParseUnixTimestampOrRFC3339(params.Since)
+	if err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid since: %v", err)}
 	}
-	if params.Until > 0 {
-		reqURL += "&until=" + strconv.FormatInt(params.Until, 10)
+	untilUnix, err := connectors.ParseUnixTimestampOrRFC3339(params.Until)
+	if err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid until: %v", err)}
+	}
+	if sinceUnix > 0 {
+		reqURL += "&since=" + strconv.FormatInt(sinceUnix, 10)
+	}
+	if untilUnix > 0 {
+		reqURL += "&until=" + strconv.FormatInt(untilUnix, 10)
 	}
 
 	var resp listPagePostsResponse

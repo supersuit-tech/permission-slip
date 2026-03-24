@@ -199,8 +199,8 @@ Lists recent posts on a Facebook Page with engagement metrics (likes, comments, 
 |------|------|----------|---------|-------------|
 | `page_id` | string | Yes | — | Facebook Page ID |
 | `limit` | integer | No | `10` | Maximum number of posts to return (1-100) |
-| `since` | integer | No | — | Unix timestamp — only return posts after this time |
-| `until` | integer | No | — | Unix timestamp — only return posts before this time |
+| `since` | string | No | — | Unix seconds, epoch milliseconds, or RFC 3339 — only return posts after this time |
+| `until` | string | No | — | Same formats as `since` — only return posts before this time |
 
 **Response:**
 

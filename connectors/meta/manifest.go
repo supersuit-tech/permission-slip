@@ -162,12 +162,24 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Maximum number of posts to return (1-100, default 10)"
 						},
 						"since": {
-							"type": "integer",
-							"description": "Unix timestamp — only return posts after this time"
+							"type": "string",
+							"format": "date-time",
+							"description": "Only return posts after this time. Unix seconds, epoch milliseconds, or RFC 3339 (e.g. 2024-03-01T00:00:00Z).",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "until",
+								"datetime_range_role": "lower"
+							}
 						},
 						"until": {
-							"type": "integer",
-							"description": "Unix timestamp — only return posts before this time"
+							"type": "string",
+							"format": "date-time",
+							"description": "Only return posts before this time. Unix seconds, epoch milliseconds, or RFC 3339.",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "since",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),
@@ -218,12 +230,24 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Time period for the metric (default: day)"
 						},
 						"since": {
-							"type": "integer",
-							"description": "Unix timestamp — only return data after this time"
+							"type": "string",
+							"format": "date-time",
+							"description": "Only return data after this time. Unix seconds, epoch milliseconds, or RFC 3339.",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "until",
+								"datetime_range_role": "lower"
+							}
 						},
 						"until": {
-							"type": "integer",
-							"description": "Unix timestamp — only return data before this time"
+							"type": "string",
+							"format": "date-time",
+							"description": "Only return data before this time. Unix seconds, epoch milliseconds, or RFC 3339.",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "since",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),
