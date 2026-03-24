@@ -354,9 +354,6 @@ func resolveOAuthCredentialsFromConnection(ctx context.Context, deps *Deps, conn
 	if deps.Vault == nil {
 		return zero, fmt.Errorf("credential vault is not configured but connector requires OAuth credentials")
 	}
-	if deps.OAuthProviders == nil {
-		return zero, fmt.Errorf("OAuth provider registry is not configured")
-	}
 
 	return credentialsFromOAuthConnection(ctx, deps, conn)
 }
@@ -380,6 +377,9 @@ func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OA
 
 	// Refresh the token if expired or within pre-emptive buffer.
 	if conn.TokenExpiry != nil && time.Now().After(conn.TokenExpiry.Add(-oauth.TokenExpiryBuffer)) {
+		if deps.OAuthProviders == nil {
+			return zero, fmt.Errorf("OAuth provider registry is not configured")
+		}
 		if err := refreshOAuthConnection(ctx, deps, conn, conn.Provider); err != nil {
 			return zero, err
 		}

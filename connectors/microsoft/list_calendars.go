@@ -63,12 +63,15 @@ func graphNextRelativePath(baseURL, nextLink string) string {
 	}
 	base := strings.TrimSuffix(baseURL, "/")
 	full := strings.TrimSuffix(u.String(), "/")
-	if !strings.HasPrefix(full, base) {
+	if !strings.HasPrefix(full, base+"/") && !strings.HasPrefix(full, base+"?") {
 		return ""
 	}
-	rel := strings.TrimPrefix(full[len(base):], "/")
-	if rel == "" {
+	rel := full[len(base):]
+	if rel == "" || rel == "/" {
 		return ""
+	}
+	if rel[0] == '/' || rel[0] == '?' {
+		return rel
 	}
 	return "/" + rel
 }

@@ -10,10 +10,25 @@ import (
 func TestGraphNextRelativePath(t *testing.T) {
 	t.Parallel()
 	base := "https://graph.microsoft.com/v1.0"
-	next := "https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=abc"
-	got := graphNextRelativePath(base, next)
-	if got != "/me/calendars?$skiptoken=abc" {
-		t.Errorf("got %q", got)
+
+	tests := []struct {
+		name string
+		next string
+		want string
+	}{
+		{"valid path", "https://graph.microsoft.com/v1.0/me/calendars?$skiptoken=abc", "/me/calendars?$skiptoken=abc"},
+		{"empty next", "", ""},
+		{"different host", "https://evil.com/v1.0/me/calendars", ""},
+		{"prefix collision without path boundary", "https://graph.microsoft.com/v1.0.evil.com/steal", ""},
+		{"query string after base", "https://graph.microsoft.com/v1.0?unexpected=true", "?unexpected=true"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := graphNextRelativePath(base, tt.next)
+			if got != tt.want {
+				t.Errorf("graphNextRelativePath(%q, %q) = %q, want %q", base, tt.next, got, tt.want)
+			}
+		})
 	}
 }
 
