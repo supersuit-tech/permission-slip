@@ -48,6 +48,17 @@ func (e *TimeoutError) Error() string {
 	return fmt.Sprintf("external service timeout: %s", e.Message)
 }
 
+// CanceledError indicates the request was intentionally canceled (context.Canceled).
+// Distinct from TimeoutError — canceled requests should NOT be retried.
+// Maps to HTTP 499 (Client Closed Request) or 502.
+type CanceledError struct {
+	Message string // human-readable description
+}
+
+func (e *CanceledError) Error() string {
+	return fmt.Sprintf("request canceled: %s", e.Message)
+}
+
 // ValidationError indicates a parameter or credential validation failure.
 // Maps to HTTP 400 Bad Request.
 type ValidationError struct {
@@ -79,6 +90,12 @@ func IsRateLimitError(err error) bool {
 // IsTimeoutError reports whether err is or wraps a *TimeoutError.
 func IsTimeoutError(err error) bool {
 	var target *TimeoutError
+	return errors.As(err, &target)
+}
+
+// IsCanceledError reports whether err is or wraps a *CanceledError.
+func IsCanceledError(err error) bool {
+	var target *CanceledError
 	return errors.As(err, &target)
 }
 

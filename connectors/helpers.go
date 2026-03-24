@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // IsTimeout reports whether err represents a timeout — either a context
@@ -45,6 +46,25 @@ func JSONResult(v any) (*ActionResult, error) {
 		return nil, fmt.Errorf("marshaling result: %w", err)
 	}
 	return &ActionResult{Data: data}, nil
+}
+
+// TruncateUTF8 truncates s to at most maxChars Unicode code points (runes),
+// appending a suffix if the string was shortened. It never splits multibyte
+// UTF-8 sequences. Use this for schema-facing validation where maxLength
+// counts Unicode code points, not bytes.
+func TruncateUTF8(s string, maxChars int) string {
+	if utf8.RuneCountInString(s) <= maxChars {
+		return s
+	}
+	runes := []rune(s)
+	return string(runes[:maxChars]) + "...(truncated)"
+}
+
+// RuneLen returns the number of Unicode code points in s. Use this instead of
+// len() when validating against JSON Schema maxLength, which counts characters
+// not bytes.
+func RuneLen(s string) int {
+	return utf8.RuneCountInString(s)
 }
 
 // TrimIndent removes common leading tab indentation from a multi-line string
