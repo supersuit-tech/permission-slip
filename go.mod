@@ -4,6 +4,7 @@ go 1.25.8
 
 require (
 	cloud.google.com/go/bigquery v1.74.0
+	cloud.google.com/go/firestore v1.21.0
 	github.com/DATA-DOG/go-sqlmock v1.5.2
 	github.com/SherClockHolmes/webpush-go v1.4.0
 	github.com/aws/aws-sdk-go-v2 v1.41.4
@@ -29,6 +30,7 @@ require (
 	golang.org/x/oauth2 v0.35.0
 	golang.org/x/text v0.33.0
 	google.golang.org/api v0.265.0
+	google.golang.org/grpc v1.78.0
 )
 
 require (
@@ -37,6 +39,7 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.5.3 // indirect
+	cloud.google.com/go/longrunning v0.8.0 // indirect
 	filippo.io/edwards25519 v1.1.0 // indirect
 	github.com/99designs/go-keychain v0.0.0-20191008050251-8e49817e8af4 // indirect
 	github.com/99designs/keyring v1.2.2 // indirect
@@ -138,6 +141,5 @@ require (
 	google.golang.org/genproto v0.0.0-20260128011058-8636f8732409 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260203192932-546029d2fa20 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260203192932-546029d2fa20 // indirect
-	google.golang.org/grpc v1.78.0 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
 )

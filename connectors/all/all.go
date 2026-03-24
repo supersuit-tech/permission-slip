@@ -26,6 +26,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/dynamodb"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/figma"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/firestore"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/github"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/google"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/hubspot"
