@@ -142,16 +142,22 @@ var validAuthTypes = map[string]bool{
 // manifest override security-critical values (redirect_uri, state, client_id)
 // that the platform manages.
 var ReservedAuthorizeParams = map[string]bool{
-	"redirect_uri":            true,
-	"state":                   true,
-	"client_id":               true,
-	"client_secret":           true,
-	"response_type":           true,
-	"code":                    true,
-	"grant_type":              true,
-	"code_challenge":          true,
-	"code_challenge_method":   true,
-	"code_verifier":           true,
+	"redirect_uri":          true,
+	"state":                 true,
+	"client_id":             true,
+	"client_secret":         true,
+	"response_type":         true,
+	"code":                  true,
+	"grant_type":            true,
+	"code_challenge":        true,
+	"code_challenge_method": true,
+}
+
+// ReservedTokenParams lists OAuth 2.0 parameters that belong to the token
+// exchange request and must not be set by connectors. code_verifier is a
+// token exchange parameter (RFC 7636 §4.5), not an authorization parameter.
+var ReservedTokenParams = map[string]bool{
+	"code_verifier": true,
 }
 
 // validateURL parses a URL and checks scheme and host. allowedSchemes specifies
