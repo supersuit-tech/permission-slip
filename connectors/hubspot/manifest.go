@@ -361,11 +361,23 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start": {
 							"type": "string",
-							"description": "Start date/time (ISO 8601 or epoch milliseconds)"
+							"format": "date-time",
+							"description": "Start of range (YYYY-MM-DD, RFC 3339, Unix seconds, or epoch milliseconds — normalized to UTC date for the API)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "end",
+								"datetime_range_role": "lower"
+							}
 						},
 						"end": {
 							"type": "string",
-							"description": "End date/time (ISO 8601 or epoch milliseconds)"
+							"format": "date-time",
+							"description": "End of range (YYYY-MM-DD, RFC 3339, Unix seconds, or epoch milliseconds — normalized to UTC date for the API)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "start",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),

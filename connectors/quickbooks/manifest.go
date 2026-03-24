@@ -34,7 +34,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"due_date": {
 							"type": "string",
-							"description": "Invoice due date in YYYY-MM-DD format (e.g. \"2025-12-31\")"
+							"format": "date",
+							"description": "Invoice due date in YYYY-MM-DD format (e.g. \"2025-12-31\")",
+							"x-ui": {"widget": "date"}
 						},
 						"line_items": {
 							"type": "array",
@@ -148,7 +150,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"txn_date": {
 							"type": "string",
-							"description": "Transaction date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Transaction date in YYYY-MM-DD format",
+							"x-ui": {"widget": "date"}
 						}
 					}
 				}`)),
@@ -164,11 +168,23 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"start_date": {
 							"type": "string",
-							"description": "Report start date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Report start date in YYYY-MM-DD format",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "end_date",
+								"datetime_range_role": "lower"
+							}
 						},
 						"end_date": {
 							"type": "string",
-							"description": "Report end date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Report end date in YYYY-MM-DD format",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "start_date",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),
@@ -184,11 +200,23 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"start_date": {
 							"type": "string",
-							"description": "Report start date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Report start date in YYYY-MM-DD format",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "end_date",
+								"datetime_range_role": "lower"
+							}
 						},
 						"end_date": {
 							"type": "string",
-							"description": "Report end date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Report end date in YYYY-MM-DD format",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "start_date",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),
@@ -214,7 +242,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"txn_date": {
 							"type": "string",
-							"description": "Transaction date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Transaction date in YYYY-MM-DD format",
+							"x-ui": {"widget": "date"}
 						},
 						"description": {
 							"type": "string",
@@ -354,11 +384,15 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"due_date": {
 							"type": "string",
-							"description": "Payment due date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Payment due date in YYYY-MM-DD format",
+							"x-ui": {"widget": "date"}
 						},
 						"txn_date": {
 							"type": "string",
-							"description": "Bill date in YYYY-MM-DD format (defaults to today)"
+							"format": "date",
+							"description": "Bill date in YYYY-MM-DD format (defaults to today)",
+							"x-ui": {"widget": "date"}
 						}
 					}
 				}`)),
@@ -378,11 +412,23 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_date": {
 							"type": "string",
-							"description": "Filter invoices on or after this date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Filter invoices on or after this date (YYYY-MM-DD)",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "end_date",
+								"datetime_range_role": "lower"
+							}
 						},
 						"end_date": {
 							"type": "string",
-							"description": "Filter invoices on or before this date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Filter invoices on or before this date (YYYY-MM-DD)",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "start_date",
+								"datetime_range_role": "upper"
+							}
 						},
 						"max_results": {
 							"type": "integer",
