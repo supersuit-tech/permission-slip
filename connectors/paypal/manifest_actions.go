@@ -72,7 +72,7 @@ func paypalActions() []connectors.ManifestAction {
 				"properties": {
 					"order": {
 						"type": "object",
-						"description": "Order create payload (intent, purchase_units, optional payment_source.paypal for wallet checkout, application_context with https return_url/cancel_url). Docs: https://developer.paypal.com/docs/api/orders/v2/",
+						"description": "Order create payload (intent, purchase_units, optional payment_source.paypal.experience_context with https return_url/cancel_url). Docs: https://developer.paypal.com/docs/api/orders/v2/",
 						"additionalProperties": true
 					}
 				}
