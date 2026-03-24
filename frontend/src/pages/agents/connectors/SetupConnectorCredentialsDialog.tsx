@@ -420,7 +420,12 @@ function StaticOnlyContent({
           onClick={() => onConnect(cred)}
         >
           <KeyRound className="size-4" />
-          Add {cred.auth_type === "basic" ? "credentials" : "API key"}
+          Add{" "}
+          {cred.auth_type === "basic"
+            ? "credentials"
+            : cred.service === "coinbase_agentkit"
+              ? "CDP credentials"
+              : "API key"}
         </Button>
       ))}
     </div>

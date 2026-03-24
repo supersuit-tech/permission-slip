@@ -38,6 +38,7 @@ export function providerLabel(id: string): string {
 }
 
 const SERVICE_LABELS: Record<string, string> = {
+  coinbase_agentkit: "Coinbase AgentKit (CDP)",
   github_pat: "GitHub Personal Access Token",
   "netlify-api-key": "Netlify API Key",
   "vercel-api-key": "Vercel API Key",
