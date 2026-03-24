@@ -15,6 +15,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/asana"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/aws"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/calendly"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/coinbaseagentkit"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/confluence"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/datadog"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/discord"
