@@ -140,9 +140,10 @@ func TestGetRequiredCredentialsByActionType_MultipleAuthMethods(t *testing.T) {
 
 	testhelper.InsertConnector(t, tx, "trello")
 	testhelper.InsertConnectorAction(t, tx, "trello", "trello.create_card", "Create Card")
-	// Insert both OAuth and API key credentials for the same connector.
-	testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, "trello", "trello_oauth", "trello", []string{"read:me:trello"})
-	testhelper.InsertConnectorRequiredCredential(t, tx, "trello", "trello", "api_key")
+	// Insert two non-oauth2 credentials for the same connector (different services).
+	// Mixed oauth2/non-oauth2 types are now prevented at the schema level.
+	testhelper.InsertConnectorRequiredCredential(t, tx, "trello", "trello_api", "api_key")
+	testhelper.InsertConnectorRequiredCredential(t, tx, "trello", "trello_token", "basic")
 
 	creds, err := db.GetRequiredCredentialsByActionType(context.Background(), tx, "trello.create_card")
 	if err != nil {
@@ -151,18 +152,18 @@ func TestGetRequiredCredentialsByActionType_MultipleAuthMethods(t *testing.T) {
 	if len(creds) != 2 {
 		t.Fatalf("expected 2 credentials, got %d", len(creds))
 	}
-	// OAuth should be first (ordering guarantee).
-	if creds[0].AuthType != "oauth2" {
-		t.Errorf("expected first credential to be oauth2, got %q", creds[0].AuthType)
+	// Both are non-oauth2, ordered by service name.
+	if creds[0].AuthType != "api_key" {
+		t.Errorf("expected first credential to be api_key, got %q", creds[0].AuthType)
 	}
-	if creds[0].Service != "trello_oauth" {
-		t.Errorf("expected first credential service 'trello_oauth', got %q", creds[0].Service)
+	if creds[0].Service != "trello_api" {
+		t.Errorf("expected first credential service 'trello_api', got %q", creds[0].Service)
 	}
-	if creds[1].AuthType != "api_key" {
-		t.Errorf("expected second credential to be api_key, got %q", creds[1].AuthType)
+	if creds[1].AuthType != "basic" {
+		t.Errorf("expected second credential to be basic, got %q", creds[1].AuthType)
 	}
-	if creds[1].Service != "trello" {
-		t.Errorf("expected second credential service 'trello', got %q", creds[1].Service)
+	if creds[1].Service != "trello_token" {
+		t.Errorf("expected second credential service 'trello_token', got %q", creds[1].Service)
 	}
 }
 
