@@ -361,9 +361,8 @@ func main() {
 		}
 	}
 
-	for _, id := range connectors.DisabledBuiltInConnectorIDs() {
-		_ = oauthRegistry.Remove(id)
-	}
+	// Disabled connectors' OAuth providers never register (their init()
+	// guards return early), so the oauth registry is already clean.
 
 	// Start all registered background jobs.
 	for _, job := range backgroundJobs {
