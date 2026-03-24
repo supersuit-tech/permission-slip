@@ -265,7 +265,8 @@ describe("ParameterFieldWidget", () => {
       renderWidget(datetimeProp, "2026-03-16T17:00:00Z");
 
       const input = document.getElementById("param-test_field") as HTMLInputElement;
-      // Should be formatted as YYYY-MM-DDTHH:mm in local time
+      // Should be formatted as YYYY-MM-DDTHH:mm in local time (date may
+      // differ from the UTC date depending on the runner's timezone)
       expect(input.value).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
     });
 
@@ -308,7 +309,9 @@ describe("ParameterFieldWidget", () => {
       });
 
       const input = document.getElementById("param-test_field") as HTMLInputElement;
-      expect(input.min).toMatch(/^2026-03-16T\d{2}:\d{2}$/);
+      // The local date may differ from 2026-03-16 depending on the runner's
+      // timezone, so only assert the datetime-local format.
+      expect(input.min).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/);
     });
 
     it("sets max from sibling when datetime_range_role is lower", () => {

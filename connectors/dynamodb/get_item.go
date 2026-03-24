@@ -45,7 +45,7 @@ func (p *getItemParams) validate() error {
 			return err
 		}
 	}
-	allowed := allowedReadSet(p.AllowedReadAttributes)
+	allowed := buildAllowedSet(p.AllowedReadAttributes)
 	return validateProjectionSubset(p.Projection, allowed)
 }
 
@@ -97,7 +97,7 @@ func (a *getItemAction) Execute(ctx context.Context, req connectors.ActionReques
 	}
 
 	item := out.Item
-	if allowed := allowedReadSet(params.AllowedReadAttributes); allowed != nil {
+	if allowed := buildAllowedSet(params.AllowedReadAttributes); allowed != nil {
 		item = filterItemAttrs(item, allowed)
 	}
 

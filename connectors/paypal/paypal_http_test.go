@@ -89,6 +89,13 @@ func TestCreateOrderAction_HTTPServer(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer tok" {
 			t.Errorf("auth %q", r.Header.Get("Authorization"))
 		}
+		rid := r.Header.Get("PayPal-Request-Id")
+		if rid == "" {
+			t.Error("missing PayPal-Request-Id header")
+		}
+		if len(rid) > maxRequestIDLen {
+			t.Errorf("PayPal-Request-Id length = %d, want <= %d", len(rid), maxRequestIDLen)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"ORD-1","status":"CREATED"}`))
 	}))
@@ -198,6 +205,29 @@ func TestValidateCredentials(t *testing.T) {
 		"environment":  "  sandbox  ",
 	})); err != nil {
 		t.Errorf("trimmed sandbox env: %v", err)
+	}
+}
+
+func TestDeriveRequestID_FitsPayPalLimit(t *testing.T) {
+	t.Parallel()
+	// Use a realistic action type and large params to ensure SHA256 output is truncated.
+	params := json.RawMessage(`{"order":{"intent":"CAPTURE","purchase_units":[{"amount":{"currency_code":"USD","value":"99.99"}}]}}`)
+	id := deriveRequestID("paypal.create_order", params)
+	if len(id) > maxRequestIDLen {
+		t.Errorf("deriveRequestID length = %d, want <= %d; value = %q", len(id), maxRequestIDLen, id)
+	}
+	if len(id) == 0 {
+		t.Error("deriveRequestID returned empty string")
+	}
+	// Same inputs must produce same output (deterministic).
+	id2 := deriveRequestID("paypal.create_order", params)
+	if id != id2 {
+		t.Errorf("deriveRequestID not deterministic: %q != %q", id, id2)
+	}
+	// Different inputs must produce different output.
+	id3 := deriveRequestID("paypal.capture_order", params)
+	if id == id3 {
+		t.Error("different action types produced same request ID")
 	}
 }
 

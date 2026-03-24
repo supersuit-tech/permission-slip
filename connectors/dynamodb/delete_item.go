@@ -25,6 +25,8 @@ type deleteItemParams struct {
 	ExpressionAttributeNames  map[string]string      `json:"expression_attribute_names"`
 	ExpressionAttributeValues map[string]interface{} `json:"expression_attribute_values"`
 	AllowedTables             []string               `json:"allowed_tables"`
+	AllowedWriteAttributes    []string               `json:"allowed_write_attributes"`
+	AllowedReadAttributes     []string               `json:"allowed_read_attributes"`
 }
 
 func (p *deleteItemParams) validate() error {
@@ -37,7 +39,23 @@ func (p *deleteItemParams) validate() error {
 	if len(p.Key) == 0 {
 		return &connectors.ValidationError{Message: "missing required parameter: key"}
 	}
-	return validateAllowedTables(p.Table, p.AllowedTables)
+	if err := validateAllowedTables(p.Table, p.AllowedTables); err != nil {
+		return err
+	}
+	if len(p.AllowedWriteAttributes) > 0 {
+		if err := validateAttrAllowlist(p.AllowedWriteAttributes); err != nil {
+			return err
+		}
+	}
+	if len(p.AllowedReadAttributes) > 0 {
+		if err := validateAttrAllowlist(p.AllowedReadAttributes); err != nil {
+			return err
+		}
+	}
+	if err := validateExprAttrNames(p.ExpressionAttributeNames, buildAllowedSet(p.AllowedWriteAttributes)); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (a *deleteItemAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
@@ -90,8 +108,12 @@ func (a *deleteItemAction) Execute(ctx context.Context, req connectors.ActionReq
 		resp["previous_item"] = nil
 		return connectors.JSONResult(resp)
 	}
+	attrs := out.Attributes
+	if allowed := buildAllowedSet(params.AllowedReadAttributes); allowed != nil {
+		attrs = filterItemAttrs(attrs, allowed)
+	}
 	var prev map[string]interface{}
-	if err := attributevalue.UnmarshalMap(out.Attributes, &prev); err != nil {
+	if err := attributevalue.UnmarshalMap(attrs, &prev); err != nil {
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("unmarshaling deleted item: %v", err)}
 	}
 	resp["previous_item"] = prev

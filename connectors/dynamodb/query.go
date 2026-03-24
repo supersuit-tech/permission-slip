@@ -61,7 +61,7 @@ func (p *queryParams) validate() error {
 			return err
 		}
 	}
-	if err := validateProjectionSubset(p.Projection, allowedReadSet(p.AllowedReadAttributes)); err != nil {
+	if err := validateProjectionSubset(p.Projection, buildAllowedSet(p.AllowedReadAttributes)); err != nil {
 		return err
 	}
 
@@ -84,6 +84,9 @@ func (p *queryParams) validate() error {
 		case "eq", "lt", "lte", "gt", "gte", "begins_with":
 			if len(p.SortKeyValue) == 0 {
 				return &connectors.ValidationError{Message: "sort_key_value is required for this sort_key_condition"}
+			}
+			if len(p.SortKeyBetween) > 0 {
+				return &connectors.ValidationError{Message: "sort_key_between must not be provided when sort_key_condition is not \"between\""}
 			}
 		default:
 			return &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_condition: %q", p.SortKeyCondition)}
@@ -134,93 +137,11 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 
 	if params.SortKeyName != "" {
 		exprNames["#sk"] = params.SortKeyName
-		switch strings.ToLower(params.SortKeyCondition) {
-		case "eq":
-			var skVal interface{}
-			if err := json.Unmarshal(params.SortKeyValue, &skVal); err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			skAv, err := attributevalue.Marshal(skVal)
-			if err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			exprVals[":sk"] = skAv
-			keyCond += " AND #sk = :sk"
-		case "lt":
-			var skVal interface{}
-			if err := json.Unmarshal(params.SortKeyValue, &skVal); err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			skAv, err := attributevalue.Marshal(skVal)
-			if err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			exprVals[":sk"] = skAv
-			keyCond += " AND #sk < :sk"
-		case "lte":
-			var skVal interface{}
-			if err := json.Unmarshal(params.SortKeyValue, &skVal); err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			skAv, err := attributevalue.Marshal(skVal)
-			if err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			exprVals[":sk"] = skAv
-			keyCond += " AND #sk <= :sk"
-		case "gt":
-			var skVal interface{}
-			if err := json.Unmarshal(params.SortKeyValue, &skVal); err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			skAv, err := attributevalue.Marshal(skVal)
-			if err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			exprVals[":sk"] = skAv
-			keyCond += " AND #sk > :sk"
-		case "gte":
-			var skVal interface{}
-			if err := json.Unmarshal(params.SortKeyValue, &skVal); err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			skAv, err := attributevalue.Marshal(skVal)
-			if err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			exprVals[":sk"] = skAv
-			keyCond += " AND #sk >= :sk"
-		case "begins_with":
-			var skVal interface{}
-			if err := json.Unmarshal(params.SortKeyValue, &skVal); err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			skAv, err := attributevalue.Marshal(skVal)
-			if err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_value: %v", err)}
-			}
-			exprVals[":sk"] = skAv
-			keyCond += " AND begins_with(#sk, :sk)"
-		case "between":
-			var lo, hi interface{}
-			if err := json.Unmarshal(params.SortKeyBetween[0], &lo); err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_between[0]: %v", err)}
-			}
-			if err := json.Unmarshal(params.SortKeyBetween[1], &hi); err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_between[1]: %v", err)}
-			}
-			loAv, err := attributevalue.Marshal(lo)
-			if err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_between[0]: %v", err)}
-			}
-			hiAv, err := attributevalue.Marshal(hi)
-			if err != nil {
-				return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid sort_key_between[1]: %v", err)}
-			}
-			exprVals[":sklo"] = loAv
-			exprVals[":skhi"] = hiAv
-			keyCond += " AND #sk BETWEEN :sklo AND :skhi"
+		sortExpr, err := buildSortKeyCondition(params.SortKeyCondition, params.SortKeyValue, params.SortKeyBetween, exprVals)
+		if err != nil {
+			return nil, err
 		}
+		keyCond += sortExpr
 	}
 
 	limit := int32(defaultQueryLimit)
@@ -278,7 +199,7 @@ func (a *queryAction) Execute(ctx context.Context, req connectors.ActionRequest)
 		return nil, mapDynamoError(err)
 	}
 
-	allowed := allowedReadSet(params.AllowedReadAttributes)
+	allowed := buildAllowedSet(params.AllowedReadAttributes)
 	items := make([]map[string]interface{}, 0, len(out.Items))
 	for _, it := range out.Items {
 		if allowed != nil {
