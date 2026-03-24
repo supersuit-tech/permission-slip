@@ -377,7 +377,7 @@ func validateZendeskSubdomain(raw string) (string, error) {
 
 // handleListOAuthProviders returns all registered OAuth providers with their
 // configuration status. This lets the frontend discover which providers are
-// available, which are ready to use, and which need BYOA setup.
+// available and which are ready to use.
 func handleListOAuthProviders(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		if deps.OAuthProviders == nil {
@@ -426,7 +426,7 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		}
 		if !provider.HasClientCredentials() {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrOAuthProviderUnconfigured,
-				"OAuth provider is not configured. Supply client credentials via BYOA settings."))
+				"OAuth provider is not configured. Set client credentials via environment variables."))
 			return
 		}
 

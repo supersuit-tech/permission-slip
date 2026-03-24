@@ -4,10 +4,7 @@ Permission Slip uses OAuth 2.0 to connect with Atlassian (Jira), Datadog, Dropbo
 
 ## Overview
 
-Permission Slip supports two modes for OAuth provider credentials:
-
-1. **Platform-level (pre-configured)**: The server has Google/Microsoft client credentials set via environment variables. Users can connect their accounts immediately.
-2. **BYOA (Bring Your Own App)**: Users provide their own OAuth client credentials through the Settings UI. Required for self-hosted deployments or custom providers.
+OAuth provider credentials are configured via environment variables on the server. Set the appropriate client ID and secret for each provider you want to enable. Users can then connect their accounts through the Settings UI.
 
 ## Environment Variables
 
@@ -727,7 +724,7 @@ Dropbox uses two API hosts. The connector handles this automatically:
 
 ## X (Twitter) OAuth Setup
 
-The X connector declares its own OAuth provider in its manifest, so no platform-level environment variables are needed. Users configure X OAuth through the BYOA flow.
+The X connector declares its own OAuth provider in its manifest. Set the `X_CLIENT_ID` and `X_CLIENT_SECRET` environment variables to enable X OAuth.
 
 ### 1. Create an X Developer App
 
@@ -756,22 +753,6 @@ The X connector requires these scopes:
 2. On the connector's configuration page, enter your **Client ID** and **Client Secret** from the X Developer Portal
 3. Connect your X account via the credential configuration section
 
-## BYOA (Bring Your Own App) Setup
-
-Some connectors use OAuth providers that don't have platform-level credentials — for example, Salesforce, X/Twitter, or any external connector that declares its own OAuth provider in a manifest. These connectors require you to create your own OAuth app in the provider's developer console and supply the client credentials.
-
-**Self-hosted deployments** do NOT need BYOA for providers like Google or Microsoft. Set those credentials via environment variables (`GOOGLE_CLIENT_ID`, `MICROSOFT_CLIENT_ID`, etc.) instead — see the sections above.
-
-### When is BYOA required?
-
-When you open a connector's credential management dialog and the OAuth section shows an "OAuth app setup required" banner, that provider needs BYOA. The banner walks you through the setup:
-
-1. **Create an OAuth app** in the provider's developer console (linked from the banner)
-2. **Enter your Client ID and Client Secret** in the configuration form
-3. **Connect your account** — the Connect button becomes available after credentials are saved
-
-Credentials are encrypted in the vault and never stored in plaintext.
-
 ## External Connector OAuth
 
 External connectors can declare their own OAuth providers in `connector.json`:
@@ -798,7 +779,7 @@ External connectors can declare their own OAuth providers in `connector.json`:
 }
 ```
 
-The platform reads `oauth_providers` from the manifest and registers them in the provider registry. Users then supply their own OAuth app credentials via the BYOA setup banner that appears in the connector's credential management dialog.
+The platform reads `oauth_providers` from the manifest and registers them in the provider registry. Operators must set the corresponding environment variables (e.g., `SALESFORCE_CLIENT_ID` and `SALESFORCE_CLIENT_SECRET`) to supply client credentials.
 
 For more details on creating external connectors, see [Creating Connectors](creating-connectors.md).
 
@@ -806,9 +787,7 @@ For more details on creating external connectors, see [Creating Connectors](crea
 
 ### "Provider not configured" error
 
-The OAuth provider doesn't have client credentials. Either:
-- Set the platform-level environment variables (`GOOGLE_CLIENT_ID`, etc.)
-- Configure BYOA credentials via the connector configuration page on an agent
+The OAuth provider doesn't have client credentials. Set the appropriate environment variables (e.g., `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET`) and restart the server.
 
 ### "Needs Re-auth" status
 

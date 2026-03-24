@@ -46,8 +46,9 @@ info:
     ### Standing Approval (pre-authorized)
 
     1. **User creates standing approval**: Via web UI — specifies agent, action type, constraints, duration, and optional execution cap
-    2. **Agent executes**: Calls `POST /v1/actions/execute` with agent signature (no token) — Permission Slip matches the standing approval and executes immediately
-    3. **Fallthrough**: If no standing approval matches, falls through to the one-off flow above
+    2. **Agent requests**: Calls `POST /v1/approvals/request` — Permission Slip checks for a matching standing approval
+    3. **Auto-approve**: If a standing approval matches, the action is executed immediately and the result is returned inline with `status: "approved"`
+    4. **Fallthrough**: If no standing approval matches, creates a pending approval for human review (one-off flow above)
 
     ## Architecture
 
@@ -1633,6 +1634,45 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/agents/{agent_id}/connectors/{connector_id}/calendars:
+    get:
+      operationId: listAgentConnectorCalendars
+      summary: List calendars for agent connector
+      description: |
+        Returns calendars visible to the OAuth credential assigned to this agent–connector pair.
+        Used by the dashboard to populate calendar pickers for Google and Microsoft calendar actions.
+
+        Requires session authentication (Supabase JWT). The agent must belong to the current user.
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      responses:
+        '200':
+          description: Calendars listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorCalendarListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent, connector, or calendar listing not supported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/registration-invites:
     post:
       operationId: createRegistrationInvite
@@ -1950,6 +1990,7 @@ paths:
               - pending
               - expired
               - charged
+              - updated
           example: approved
         - name: connector_id
           in: query
@@ -2056,14 +2097,27 @@ paths:
       operationId: requestApproval
       summary: Request Approval for Action
       description: |
-        Request approval for a specific one-off action. The designated approver must review 
-        and approve the action before the agent can execute it.
+        Request approval for an action. If a matching standing approval exists, the action
+        is auto-approved and executed immediately — the result is returned inline with
+        `status: "approved"`. Otherwise, creates a pending approval for human review.
 
-        ## Approval Request Flow
+        ## Auto-Approval (Standing Approval Match)
+
+        Before creating a pending approval, Permission Slip checks for an active standing
+        approval that matches the agent, action type, and parameters. If found:
+
+        1. **Parameters validated**: Against standing approval constraints
+        2. **Action executed**: Immediately via the connector using stored credentials
+        3. **Result returned**: Response has `status: "approved"` with `result`, `standing_approval_id`, and `executions_remaining`
+        4. **No polling needed**: The agent has the result immediately
+
+        ## One-off Approval (No Standing Approval Match)
+
+        If no standing approval matches, the request follows the standard flow:
 
         1. **Agent requests**: Sends action details, parameters, and context
         2. **Permission Slip validates**: Verifies agent is registered, signature is valid
-        3. **Permission Slip responds**: Returns approval URL with unique approval_id
+        3. **Permission Slip responds**: Returns approval URL with unique approval_id and `status: "pending"`
         4. **Notification sent**: Permission Slip notifies approver (push notification)
         5. **Approver reviews**: Visits URL, sees full action details, approves/denies
         6. **Direct execution**: If approved, Permission Slip immediately executes the action via the connector
@@ -2174,29 +2228,32 @@ paths:
                       estimated_downtime: 2 minutes
       responses:
         '200':
-          description: Approval request created successfully
+          description: |
+            Approval request processed. Check `status` to determine the outcome:
+            - `approved` — auto-approved via standing approval, result inline
+            - `pending` — awaiting human review
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ApprovalRequestResponse'
               examples:
-                basic:
-                  summary: Basic approval response
+                pending:
+                  summary: Pending — awaiting human approval
                   value:
                     approval_id: appr_xyz789
                     approval_url: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
                     status: pending
                     expires_at: '2026-02-11T13:25:00Z'
-                with_alternative_urls:
-                  summary: Response with cross-platform URLs
+                    created_at: '2026-02-11T13:20:00Z'
+                auto_approved:
+                  summary: Auto-approved via standing approval
                   value:
-                    approval_id: appr_xyz789
-                    approval_url: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
-                    alternative_urls:
-                      deeplink: permissionslip://permission-slip/approve/appr_xyz789
-                      web: https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789
-                    status: pending
-                    expires_at: '2026-02-11T13:25:00Z'
+                    status: approved
+                    result:
+                      message_id: msg_abc123
+                      delivery_status: queued
+                    standing_approval_id: sa_abc123
+                    executions_remaining: 47
         '400':
           description: Invalid request or unsupported action type
           content:
@@ -3435,272 +3492,6 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /v1/actions/execute:
-    post:
-      operationId: executeAction
-      summary: Execute Action
-      description: |
-        Execute an action via Permission Slip using a standing approval. The agent provides
-        action details and Permission Slip matches an active standing approval to authorize
-        execution.
-
-        ## Standing Approval Flow
-
-        1. **Agent submits action**: Provides action type, parameters, and request_id (no token)
-        2. **Permission Slip matches**: Finds an active standing approval for this agent + action type + constraints
-        3. **Permission Slip validates**: Verifies parameters fall within standing approval constraints
-        4. **Permission Slip executes**: Calls the external service API using stored credentials
-        5. **Result returned**: Returns `StandingApprovalExecuteResponse` with `standing_approval_id` and `executions_remaining`
-
-        ## One-off Approvals
-
-        One-off approval actions are executed automatically when the user approves. Agents
-        should poll `GET /v1/approvals/{approval_id}/status` for results instead of calling
-        this endpoint. If no standing approval matches, Permission Slip returns `404 Not Found`
-        with a hint to use `POST /v1/approvals/request` for one-off approval.
-
-        ## Standing Approval Validation
-
-        Permission Slip verifies:
-        - **Agent signature**: Valid Ed25519/ECDSA signature
-        - **Standing approval match**: Active standing approval for this agent + action type
-        - **Constraint compliance**: Parameters fall within standing approval constraints
-        - **Expiration**: Standing approval has not expired (or has no expiration)
-        - **Execution count**: Max executions not exceeded (if set)
-
-        ## Credential Lookup
-
-        Permission Slip determines which external service to call based on the action type
-        (via connector configuration) and retrieves the user's stored credentials from the
-        encrypted vault. The agent never sees these credentials.
-
-        ## Idempotency
-
-        Executions support idempotency via the `request_id` field. If the same `request_id`
-        is submitted again for the same standing approval, Permission Slip returns
-        `409 Conflict` with error code `duplicate_request_id`.
-
-        ## Error Handling
-
-        If the external service returns an error, Permission Slip returns a `502 Bad Gateway`
-        with details about the upstream failure. The execution count is still incremented to
-        prevent unbounded retry loops; the agent should use a new `request_id` for each
-        retry attempt.
-
-        ## Security
-
-        - Request MUST include valid `X-Permission-Slip-Signature` header
-        - Constraints are enforced on every execution
-        - Agent never sees user credentials
-      tags:
-        - Actions
-      security:
-        - PermissionSlipSignature: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/ExecuteActionRequest'
-            examples:
-              email_read_standing:
-                summary: 'Standing approval: Read emails'
-                value:
-                  request_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
-                  action:
-                    type: email.read
-                    version: '1'
-                    parameters:
-                      sender: '*@github.com'
-                      max_results: 10
-              email_send_standing:
-                summary: 'Standing approval: Send email'
-                value:
-                  request_id: a925fbe0-db83-4969-9dc5-27f40385f12c
-                  action:
-                    type: email.send
-                    version: '1'
-                    parameters:
-                      from: alice@example.com
-                      to:
-                        - bob@example.com
-                      subject: Meeting tomorrow
-                      body: Let's meet at 3pm.
-      responses:
-        '200':
-          description: Action executed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ExecuteActionResponse'
-              examples:
-                email_read_standing:
-                  summary: 'Standing approval: Emails read successfully'
-                  value:
-                    result:
-                      emails:
-                        - id: msg_001
-                          subject: PR merged
-                          sender: noreply@github.com
-                    standing_approval_id: sa_abc123
-                    executions_remaining: null
-                email_sent_standing:
-                  summary: 'Standing approval: Email sent successfully'
-                  value:
-                    result:
-                      message_id: msg_abc123
-                      delivery_status: queued
-                    standing_approval_id: sa_def456
-                    executions_remaining: 47
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: invalid_request
-                  message: 'Missing required field: action'
-                  retryable: false
-                  details:
-                    field: action
-                  trace_id: trace_xyz789
-        '401':
-          description: Invalid signature or OAuth authorization required
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                invalid_signature:
-                  summary: Agent signature verification failed
-                  value:
-                    error:
-                      code: invalid_signature
-                      message: Signature verification failed
-                      retryable: false
-                      trace_id: trace_xyz789
-                oauth_refresh_failed:
-                  summary: OAuth token expired or revoked — user must re-authorize
-                  value:
-                    error:
-                      code: oauth_refresh_failed
-                      message: OAuth authorization required — user must re-connect the provider in Settings
-                      retryable: false
-                      details:
-                        provider: google
-                        action_required: reauthorize
-                      trace_id: trace_xyz789
-        '403':
-          description: Standing approval exhausted or constraint violation
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                standing_approval_exhausted:
-                  summary: Standing approval execution count exceeded
-                  value:
-                    error:
-                      code: standing_approval_exhausted
-                      message: Standing approval max execution count has been reached
-                      retryable: false
-                      details:
-                        standing_approval_id: sa_abc123
-                        max_executions: 100
-                        execution_count: 100
-                      trace_id: trace_xyz789
-                constraint_violation:
-                  summary: Parameters violate standing approval constraints
-                  value:
-                    error:
-                      code: constraint_violation
-                      message: Request parameters violate standing approval constraints
-                      retryable: false
-                      details:
-                        standing_approval_id: sa_abc123
-                        violated_constraint: sender
-                        expected: '*@github.com'
-                        actual: '*@competitor.com'
-                      trace_id: trace_xyz789
-        '404':
-          description: Credentials not found or no matching standing approval
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                credentials_not_found:
-                  summary: Credentials not found for the required service
-                  value:
-                    error:
-                      code: credentials_not_found
-                      message: No stored credentials found for the required service
-                      retryable: false
-                      details:
-                        required_service: gmail
-                      trace_id: trace_xyz789
-                no_matching_standing_approval:
-                  summary: No active standing approval matches this request
-                  value:
-                    error:
-                      code: no_matching_standing_approval
-                      message: No active standing approval matches this agent, action type, and parameters
-                      retryable: false
-                      details:
-                        action_type: email.read
-                        hint: Use POST /v1/approvals/request for one-off approval
-                      trace_id: trace_xyz789
-        '409':
-          description: Duplicate request_id
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: duplicate_request_id
-                  message: A request with this request_id has already been executed
-                  retryable: false
-                  trace_id: trace_xyz789
-        '410':
-          description: Standing approval has expired
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: standing_approval_expired
-                  message: Standing approval has expired
-                  retryable: false
-                  details:
-                    standing_approval_id: sa_abc123
-                    expired_at: '2026-02-14T00:00:00Z'
-                  trace_id: trace_xyz789
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '502':
-          description: External service error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: upstream_error
-                  message: External service returned an error
-                  retryable: false
-                  details:
-                    service: gmail
-                    upstream_status: 503
-                    upstream_message: Service temporarily unavailable
-                  trace_id: trace_xyz789
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
   /v1/credentials:
     post:
       operationId: storeCredential
@@ -3997,6 +3788,7 @@ paths:
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
                     revoked_at: null
+                    source_action_configuration_id: null
                   - standing_approval_id: sa_def456
                     agent_id: 42
                     user_id: alice
@@ -4012,6 +3804,7 @@ paths:
                     expires_at: '2026-05-15T00:00:00Z'
                     created_at: '2026-02-14T10:35:00Z'
                     revoked_at: null
+                    source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
                 has_more: true
                 next_cursor: 2026-02-14T10:30:00.000000000Z,sa_abc123
         '400':
@@ -4125,6 +3918,7 @@ paths:
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
                     revoked_at: null
+                    source_action_configuration_id: null
                 has_more: false
         '400':
           description: Invalid query parameters
@@ -4166,6 +3960,10 @@ paths:
         Create a new standing approval for an agent. The agent must belong to
         the authenticated user. The standing approval becomes active immediately
         (or at `starts_at` if specified).
+
+        **Constraints are required.** The `constraints` object must be non-empty and
+        contain at least one non-wildcard (`"*"`) value. This prevents "blank check"
+        standing approvals that auto-approve any parameters.
       tags:
         - Standing Approvals
       security:
@@ -4182,6 +3980,7 @@ paths:
               action_version: '1'
               constraints:
                 recipient_pattern: '*@mycompany.com'
+              source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
               max_executions: 100
               expires_at: '2026-03-14T00:00:00Z'
       responses:
@@ -4192,17 +3991,35 @@ paths:
               schema:
                 $ref: '#/components/schemas/StandingApproval'
         '400':
-          description: Invalid request (validation errors, duration exceeds 90 days, etc.)
+          description: |
+            Invalid request. Common causes:
+            - Missing or empty `constraints` (`invalid_constraints`)
+            - All constraint values are wildcards (`invalid_constraints`)
+            - Duration exceeds 90 days (`invalid_request`)
+            - Invalid field values (`invalid_request`)
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: invalid_request
-                  message: Duration exceeds maximum of 90 days
-                  retryable: false
-                  trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+              examples:
+                invalid_constraints:
+                  summary: Constraints are required
+                  value:
+                    error:
+                      code: invalid_constraints
+                      message: constraints are required for standing approvals
+                      retryable: false
+                      details:
+                        hint: 'Provide a JSON object with at least one non-wildcard constraint, e.g. {"repo": "my-org/my-repo", "title": "*"}'
+                      trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+                duration_exceeded:
+                  summary: Duration exceeds maximum
+                  value:
+                    error:
+                      code: invalid_request
+                      message: Duration exceeds maximum of 90 days
+                      retryable: false
+                      trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -4305,6 +4122,86 @@ paths:
                   details:
                     status: expired
                   trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/standing-approvals/{standing_approval_id}/update:
+    post:
+      operationId: updateStandingApproval
+      summary: Update Standing Approval
+      description: |
+        Update the constraints, max_executions, and expires_at of an active standing approval.
+        The standing approval must belong to the authenticated user and be in `active` status.
+        Agent and action type cannot be changed — only constraints and limits.
+
+        **Duration policy**: The total lifespan from the approval's original `starts_at` may not exceed
+        the maximum allowed window (90 days). Expiry headroom shrinks as the approval ages — this is
+        not a rolling window from the time of the update call.
+
+        **Execution count**: `max_executions` cannot be set below the approval's current
+        `execution_count`. The update is rejected atomically at the database level to prevent
+        a race condition where concurrent executions could otherwise create a zombie approval.
+
+        Emits a `standing_approval.updated` audit event on success.
+      tags:
+        - Standing Approvals
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/StandingApprovalId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateStandingApprovalRequest'
+            example:
+              constraints:
+                recipient_pattern: '*@mycompany.com'
+              max_executions: 200
+              expires_at: '2026-04-14T00:00:00Z'
+      responses:
+        '200':
+          description: Standing approval updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingApproval'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Standing approval not found or not owned by user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: approval_not_found
+                  message: Standing approval not found
+                  retryable: false
+                  trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+        '409':
+          description: Standing approval already revoked
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: Standing approval no longer active (expired or exhausted)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -5186,7 +5083,12 @@ paths:
         Cancels the Stripe subscription and sets a 7-day grace period during
         which the user retains the longer audit retention window to export data.
 
-        If the user is already on the free plan, returns 409 Conflict.
+        If the user is already on the free plan with no active paid-quota grace window
+        (`quota_entitlements_until` in the past or unset), returns 409 Conflict.
+
+        If the user is already on the free plan but still has paid-plan quotas until
+        the end of the cancelled billing period, this call clears that grace immediately
+        so free-tier limits apply right away (same limit warnings as a normal downgrade).
 
         Only available when `billing_enabled` is `true`.
       operationId: downgradePlan
@@ -5209,7 +5111,9 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '409':
-          description: Already on the free plan
+          description: |
+            Conflict — already fully on the free plan, or entitlements already ended when
+            attempting to end quota grace early.
           content:
             application/json:
               schema:
@@ -5380,6 +5284,9 @@ paths:
         needed to render the billing section of the settings page in a single request.
 
         Only available when `billing_enabled` is `true` in the server config.
+
+        Plan IDs include `free_pro` for complimentary Pro (unlimited usage, no
+        Stripe per-request billing) granted via coupon.
       operationId: getBillingPlan
       tags:
         - Billing
@@ -5469,6 +5376,109 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '403':
           description: Checkout session does not belong to this account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '502':
+          description: Stripe API error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/redeem-coupon:
+    post:
+      summary: Redeem complimentary Pro coupon
+      description: |
+        Applies a one-time coupon that upgrades the authenticated user from the
+        free plan to complimentary Pro (`free_pro`) when the coupon matches
+        `HMAC-SHA256(COUPON_SECRET, trimmed username)` as lowercase hex (64 chars).
+
+        **Requirements:** `billing_enabled` is `true` and the server has a
+        non-empty `COUPON_SECRET` environment variable. If the secret is unset,
+        this route is not registered.
+
+        Returns `403` with `invalid_coupon` for a wrong code. Returns `409`
+        `already_subscribed` if the user is already on pay-as-you-go. Idempotent
+        for users already on `free_pro` (`already_redeemed`).
+      operationId: redeemComplimentaryProCoupon
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RedeemCouponRequest'
+      responses:
+        '200':
+          description: Coupon applied or already active
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RedeemCouponResponse'
+        '400':
+          description: Missing coupon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Invalid coupon
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: No subscription found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Not on free plan or already on paid Stripe plan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/billing/portal:
+    post:
+      summary: Create billing portal session
+      description: |
+        Creates a Stripe Billing Portal session for the authenticated user.
+        Returns a URL to redirect the user to Stripe's hosted portal where they
+        can manage their subscription, update payment methods, and view invoices.
+
+        Requires the user to have a Stripe customer ID (i.e., has previously
+        been on a paid plan or initiated checkout).
+
+        Only available when `billing_enabled` is `true` and Stripe is configured.
+      operationId: createBillingPortal
+      tags:
+        - Billing
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Portal session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PortalResponse'
+              example:
+                url: https://billing.stripe.com/p/session/test_...
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No billing account found (user has no Stripe customer ID)
           content:
             application/json:
               schema:
@@ -5602,13 +5612,12 @@ paths:
       summary: List OAuth Providers
       description: |
         Returns all registered OAuth providers and their configuration status.
-        This lets the frontend discover which providers are available, which are
-        ready to use (have credentials configured), and which need BYOA setup.
+        This lets the frontend discover which providers are available and which are
+        ready to use (have credentials configured).
 
-        Providers come from three sources:
+        Providers come from two sources:
         - **built_in**: Platform-provided providers (e.g. Google, Microsoft)
         - **manifest**: Declared in a connector manifest (e.g. Salesforce)
-        - **byoa**: User-configured (Bring Your Own App)
       tags:
         - OAuth
       security:
@@ -5657,7 +5666,14 @@ paths:
 
         - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
         - A signed state token prevents CSRF and session-fixation attacks
-        - The provider must have client credentials configured (built-in or BYOA)
+        - The provider must have client credentials configured (via environment variables)
+
+        ### Slack (`provider=slack`)
+
+        Slack uses **user-token-only** OAuth: the server sends Slack **user** scopes via
+        the `user_scope` query parameter and does **not** send a bot `scope` parameter.
+        After consent, the stored connection uses the Slack user token (`xoxp-`) as the
+        primary secret. Workspace bot install is not required.
       tags:
         - OAuth
       security:
@@ -5666,7 +5682,7 @@ paths:
         - name: provider
           in: path
           required: true
-          description: The OAuth provider ID (e.g. "google", "microsoft", "zoom")
+          description: The OAuth provider ID (e.g. "google", "microsoft", "slack", "zoom")
           schema:
             type: string
         - name: scope
@@ -5714,6 +5730,15 @@ paths:
         `?oauth_status=success`. On failure, redirects with `?oauth_status=error`.
 
         This endpoint is called by the OAuth provider, not directly by the frontend.
+
+        ### Slack (`provider=slack`)
+
+        The callback requires Slack to return `authed_user.access_token` (user token).
+        If that field is missing (e.g. app still configured for bot-only scopes), the
+        user is redirected with `oauth_status=error` and an actionable message.
+        When Slack token rotation is enabled, user `refresh_token` and expiry may be
+        nested under `authed_user` in the token response; the server normalizes these
+        before persisting.
       tags:
         - OAuth
       security:
@@ -5866,210 +5891,84 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /v1/oauth/provider-configs:
+  /v1/agents/{agent_id}/payment-method:
     get:
-      operationId: listOAuthProviderConfigs
-      summary: List BYOA Provider Configs
+      operationId: getAgentPaymentMethod
+      summary: Get agent payment method
       description: |
-        Returns all BYOA (Bring Your Own App) OAuth provider configurations for
-        the authenticated user. Each config indicates that the user has registered
-        their own OAuth client credentials for that provider.
-
-        Client secrets are never included in the response — only the provider ID
-        and timestamps are returned.
-
-        ## Related Endpoints
-
-        - `GET /v1/oauth/providers` — lists all available providers (built-in + manifest + BYOA)
-        - `POST /v1/oauth/provider-configs` — register new BYOA credentials
-        - `PUT /v1/oauth/provider-configs/{provider}` — rotate existing credentials
-        - `DELETE /v1/oauth/provider-configs/{provider}` — remove BYOA credentials
+        Returns the payment method assigned to this agent, or null if none is assigned.
       tags:
-        - OAuth
+        - Agents
       security:
         - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
       responses:
         '200':
-          description: BYOA provider configs listed successfully
+          description: Payment method assignment retrieved
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OAuthProviderConfigListResponse'
-              example:
-                configs:
-                  - provider: salesforce
-                    created_at: '2026-03-05T12:00:00Z'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-    post:
-      operationId: createOAuthProviderConfig
-      summary: Register BYOA OAuth Credentials
-      description: |
-        Registers user-provided OAuth client credentials for a provider. The
-        provider must already be declared by a built-in config or connector
-        manifest — this endpoint only supplies the client ID and secret.
-
-        Client credentials are encrypted in Supabase Vault (AES-256-GCM) and
-        never stored in plaintext. The vault secret IDs are stored in the
-        `oauth_provider_configs` database table.
-
-        After registration, the provider's OAuth flows will use these credentials
-        immediately. Only one config per provider per user is allowed — delete the
-        existing config before creating a new one.
-
-        ## Credential Lifecycle
-
-        1. **Register**: `POST /v1/oauth/provider-configs` (this endpoint)
-        2. **Rotate**: `PUT /v1/oauth/provider-configs/{provider}`
-        3. **Remove**: `DELETE /v1/oauth/provider-configs/{provider}`
-      tags:
-        - OAuth
-      security:
-        - SupabaseSession: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateOAuthProviderConfigRequest'
-      responses:
-        '201':
-          description: BYOA provider config created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/OAuthProviderConfig'
-              example:
-                provider: salesforce
-                created_at: '2026-03-05T12:00:00Z'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                $ref: '#/components/schemas/AgentPaymentMethodResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
-          description: OAuth provider not found (not declared by any built-in or connector manifest)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          description: BYOA config already exists for this provider
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
-  /v1/oauth/provider-configs/{provider}:
+          $ref: '#/components/responses/NotFound'
     put:
-      operationId: updateOAuthProviderConfig
-      summary: Update BYOA Provider Config
+      operationId: assignAgentPaymentMethod
+      summary: Assign payment method to agent
       description: |
-        Replaces the client credentials for an existing BYOA provider config.
-        This supports credential rotation without requiring delete + create.
-
-        The old vault secrets are deleted and replaced with new ones atomically.
+        Assigns a payment method to this agent. If the agent already has a payment
+        method assigned, it is replaced. The payment method must belong to the
+        authenticated user.
       tags:
-        - OAuth
+        - Agents
       security:
         - SupabaseSession: []
       parameters:
-        - name: provider
-          in: path
-          required: true
-          description: The OAuth provider ID to update
-          schema:
-            type: string
+        - $ref: '#/components/parameters/AgentId'
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateOAuthProviderConfigRequest'
+              $ref: '#/components/schemas/AssignAgentPaymentMethodRequest'
       responses:
         '200':
-          description: BYOA provider config updated successfully
+          description: Payment method assigned
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OAuthProviderConfig'
-              example:
-                provider: salesforce
-                created_at: '2026-03-05T12:00:00Z'
-                updated_at: '2026-03-05T14:00:00Z'
+                $ref: '#/components/schemas/AgentPaymentMethodResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
-          description: BYOA provider config not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          $ref: '#/components/responses/NotFound'
     delete:
-      operationId: deleteOAuthProviderConfig
-      summary: Delete BYOA Provider Config
+      operationId: removeAgentPaymentMethod
+      summary: Remove payment method from agent
       description: |
-        Removes the user's BYOA OAuth client credentials for a provider. The
-        encrypted vault secrets are deleted along with the database row.
-
-        After deletion, the provider reverts to its built-in or manifest
-        configuration (if any). If no built-in credentials exist, the provider
-        will require new BYOA credentials before OAuth flows can be initiated.
+        Removes the payment method assignment from this agent. Does not delete
+        the payment method itself.
       tags:
-        - OAuth
+        - Agents
       security:
         - SupabaseSession: []
       parameters:
-        - name: provider
-          in: path
-          required: true
-          description: The OAuth provider ID to delete the config for
-          schema:
-            type: string
+        - $ref: '#/components/parameters/AgentId'
       responses:
         '200':
-          description: BYOA provider config deleted successfully
+          description: Payment method assignment removed
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/OAuthProviderConfigDeleteResponse'
-              example:
-                provider: salesforce
-                deleted_at: '2026-03-05T15:00:00Z'
-        '400':
-          $ref: '#/components/responses/BadRequest'
+                $ref: '#/components/schemas/RemoveAgentPaymentMethodResponse'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
-          description: BYOA provider config not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-        '503':
-          $ref: '#/components/responses/ServiceUnavailable'
+          $ref: '#/components/responses/NotFound'
   /v1/payment-methods:
     get:
       tags:
@@ -6264,6 +6163,7 @@ paths:
                 $ref: '#/components/schemas/ConfigResponse'
               example:
                 billing_enabled: false
+                sms_enabled: false
         '401':
           $ref: '#/components/responses/Unauthorized'
   /v1/config/vapid-key:
@@ -6637,6 +6537,21 @@ components:
           $ref: '#/components/schemas/Action'
         context:
           $ref: '#/components/schemas/ActionContext'
+        payment_method_id:
+          type: string
+          description: |
+            Optional payment method ID for actions that require payment (e.g., `requires_payment_method: true`
+            in the connector action definition). When a standing approval auto-approves the request, this
+            value is forwarded to the connector for payment processing.
+          example: pm_abc123
+        amount_cents:
+          type: integer
+          minimum: 0
+          description: |
+            Optional transaction amount in cents for payment-required actions. Required when
+            `payment_method_id` is provided. Validated against per-transaction and monthly spending
+            limits configured on the payment method.
+          example: 9900
       example:
         agent_id: 42
         request_id: a925fbe0-db83-4969-9dc5-27f40385f12c
@@ -6659,22 +6574,25 @@ components:
     ApprovalRequestResponse:
       type: object
       description: |
-        Response after submitting an approval request. The agent should use the `approval_id`
-        to poll for status and execution results via `GET /v1/approvals/{approval_id}/status`,
-        or listen for real-time updates via `GET /v1/approvals/events` (SSE).
+        Response after submitting an approval request. Two possible outcomes:
+
+        **Auto-approved** (`status: "approved"`): A matching standing approval was found.
+        The action was executed immediately. The response includes `result`,
+        `standing_approval_id`, and optionally `executions_remaining`. No `approval_id`
+        or `approval_url` is returned.
+
+        **Pending** (`status: "pending"`): No standing approval matched. A pending approval
+        was created. The agent should poll `GET /v1/approvals/{approval_id}/status` for the
+        result, or listen via `GET /v1/approvals/events` (SSE).
       required:
-        - approval_id
-        - approval_url
         - status
-        - expires_at
       properties:
         approval_id:
           type: string
           pattern: ^appr_[a-zA-Z0-9]{6,64}$
           maxLength: 70
           description: |
-            Unique approval identifier assigned by Permission Slip. Used to reference this approval
-            in subsequent operations (cancel, poll status via `GET /v1/approvals/{approval_id}/status`).
+            Unique approval identifier. Present only when `status` is `pending`.
           example: appr_xyz789
         approval_url:
           type: string
@@ -6682,11 +6600,7 @@ components:
           maxLength: 4096
           pattern: ^https://
           description: |
-            Primary approval URL (universal link) that the approver must visit to review and
-            approve/deny the action. This is the canonical URL that clients MUST support.
-
-            The URL contains context about the approval request and allows the approver to see
-            full action details before making a decision.
+            Approval URL for the approver to review. Present only when `status` is `pending`.
           example: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
         alternative_urls:
           $ref: '#/components/schemas/AlternativeUrls'
@@ -6694,26 +6608,42 @@ components:
           type: string
           enum:
             - pending
+            - approved
           description: |
-            Approval status. Always `pending` when first created. Status changes to `approved`
-            or `denied` after approver makes a decision.
+            `pending` — approval created, awaiting human review.
+            `approved` — auto-approved via standing approval, result is inline.
           example: pending
         expires_at:
           type: string
           format: date-time
           description: |
-            ISO 8601 timestamp (RFC 3339 format, UTC) when approval expires. After this time,
-            the approval becomes invalid and cannot be approved.
-
-            Typically set to 5 minutes from creation, but may vary based on configuration
-            or action risk level.
+            When the pending approval expires. Present only when `status` is `pending`.
           example: '2026-02-11T13:25:00Z'
+        created_at:
+          type: string
+          format: date-time
+          description: |
+            When the approval was created. Present only when `status` is `pending`.
+          example: '2026-02-11T13:20:00Z'
+        result:
+          description: |
+            Execution result from the connector. Present only when `status` is `approved`
+            (auto-approved via standing approval).
+        standing_approval_id:
+          type: string
+          description: |
+            ID of the standing approval that matched. Present only when `status` is `approved`.
+          example: sa_abc123
+        executions_remaining:
+          type: integer
+          description: |
+            Number of executions remaining on the standing approval.
+            Present only when `status` is `approved` and the standing approval has a
+            finite `max_executions`. Absent when unlimited.
+          example: 47
       example:
         approval_id: appr_xyz789
         approval_url: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
-        alternative_urls:
-          deeplink: permissionslip://permission-slip/approve/appr_xyz789
-          web: https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789
         status: pending
         expires_at: '2026-02-11T13:25:00Z'
     CancelApprovalRequest:
@@ -6784,7 +6714,8 @@ components:
             - approved
             - denied
             - cancelled
-          description: Current approval status
+            - expired
+          description: Current approval status. Pending approvals past their expiration time are returned as "expired".
           example: pending
         expires_at:
           type: string
@@ -6811,6 +6742,19 @@ components:
           format: date-time
           description: When the approval request was created
           example: '2026-02-11T13:20:00Z'
+        resource_details:
+          type: object
+          nullable: true
+          description: |
+            Human-readable metadata for resources referenced by opaque IDs in the
+            action parameters. Populated at request time via the connector's
+            ResourceDetailResolver. Null when the connector doesn't support
+            resource resolution or the lookup failed.
+          additionalProperties: true
+          example:
+            title: Q1 Planning Meeting
+            start_time: '2026-03-15T14:00:00Z'
+            end_time: '2026-03-15T15:00:00Z'
         execution_status:
           allOf:
             - $ref: '#/components/schemas/ExecutionStatus'
@@ -6923,7 +6867,8 @@ components:
             - approved
             - denied
             - cancelled
-          description: Current status of the approval request.
+            - expired
+          description: Current status of the approval request. Pending approvals past their expiration time are returned as "expired".
           example: approved
         approved_at:
           type: string
@@ -7320,24 +7265,6 @@ components:
       example:
         id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         deleted_at: '2026-02-25T15:00:00Z'
-    ExecuteActionRequest:
-      allOf:
-        - $ref: '#/components/schemas/StandingApprovalExecuteRequest'
-        - description: |
-            Execute an action via Permission Slip using a standing approval.
-
-            The agent provides a `request_id`, `action` object, and optionally a `configuration_id`.
-            Permission Slip matches an active standing approval for the agent + action type + constraints
-            and executes the action using the user's stored credentials.
-
-            One-off approvals are executed directly when the user approves — agents receive results
-            via `GET /v1/approvals/{approval_id}/status` instead of calling this endpoint.
-    ExecuteActionResponse:
-      allOf:
-        - $ref: '#/components/schemas/StandingApprovalExecuteResponse'
-        - description: |
-            Response from executing an action via a standing approval. Returns the action result,
-            the standing approval that authorized execution, and the remaining execution count.
     StoreCredentialRequest:
       type: object
       required:
@@ -7540,6 +7467,7 @@ components:
       required:
         - id
         - name
+        - status
         - actions
         - required_credentials
       properties:
@@ -7562,6 +7490,19 @@ components:
           description: |
             Brief description of what this connector does.
           example: GitHub integration for repository management
+        status:
+          type: string
+          enum:
+            - tested
+            - early_preview
+            - untested
+          description: |
+            Readiness status of this connector. Indicates how thoroughly the connector
+            has been tested and whether it's ready for production use.
+            - "tested": Fully tested and production-ready.
+            - "early_preview": Functional but still being validated — expect rough edges.
+            - "untested": Connector code exists but has not been verified against the live service.
+          example: tested
         logo_svg:
           type: string
           description: |
@@ -7600,6 +7541,7 @@ components:
         id: github
         name: GitHub
         description: GitHub integration for repository management
+        status: tested
         actions:
           - github.create_issue
           - github.close_issue
@@ -7617,6 +7559,7 @@ components:
       required:
         - id
         - name
+        - status
         - actions
         - required_credentials
       properties:
@@ -7639,6 +7582,15 @@ components:
           description: |
             Brief description of what this connector does.
           example: GitHub integration for repository management
+        status:
+          type: string
+          enum:
+            - tested
+            - early_preview
+            - untested
+          description: |
+            Readiness status of this connector.
+          example: tested
         logo_svg:
           type: string
           description: |
@@ -7768,12 +7720,56 @@ components:
             The payment method is resolved to a Stripe token at execution time — raw card
             details are never exposed to the agent.
           example: false
+        display_template:
+          type: string
+          maxLength: 500
+          description: |
+            Template string for rendering a human-readable summary of action parameters.
+            Uses `{{param}}` for raw value insertion, `{{param:datetime}}` for date formatting,
+            and `{{param:count}}` for array length. Falls back to generic rendering when absent.
+          example: Send email to {{to}} — {{subject}}
+        preview:
+          type: object
+          description: |
+            Structured preview layout config for rich rendering in the approval UI.
+            Defines a layout type and maps layout-specific field roles to action parameter names.
+            When present, the frontend renders a visually rich preview card instead of plain text.
+          properties:
+            layout:
+              type: string
+              enum:
+                - event
+                - message
+                - record
+              description: |
+                Layout template type. Determines which visual layout the frontend uses.
+                - "event": Calendar-style card with date block, title, time range, duration
+                - "message": Communication card with recipient, subject, body preview
+                - "record": Entity card with title, subtitle, and key metadata fields
+            fields:
+              type: object
+              additionalProperties:
+                type: string
+              description: |
+                Maps layout-specific field roles to action parameter names. For example,
+                an "event" layout expects "title", "start", and "end" fields mapped to
+                the corresponding parameter names from the action's schema.
+          required:
+            - layout
+            - fields
+          example:
+            layout: event
+            fields:
+              title: summary
+              start: start_time
+              end: end_time
       example:
         action_type: github.create_issue
         name: Create Issue
         description: Create a new issue in a repository
         risk_level: low
         requires_payment_method: false
+        display_template: Create issue {{title}} in {{owner}}/{{repo}}
         parameters_schema:
           type: object
           required:
@@ -7839,11 +7835,12 @@ components:
         - agent_id
         - user_id
         - action_type
+        - constraints
         - status
         - execution_count
         - starts_at
-        - expires_at
         - created_at
+        - source_action_configuration_id
       properties:
         standing_approval_id:
           type: string
@@ -7936,11 +7933,12 @@ components:
         expires_at:
           type: string
           format: date-time
+          nullable: true
           description: |
             ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval expires.
-            Required when creating a standing approval. Maximum duration is 90 days from
-            `starts_at`.
-          example: '2026-02-21T00:00:00Z'
+            `null` means the standing approval never expires and remains active until
+            explicitly revoked.
+          example: null
         created_at:
           type: string
           format: date-time
@@ -7954,6 +7952,18 @@ components:
           description: |
             ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval was revoked.
             `null` if not revoked.
+          example: null
+        source_action_configuration_id:
+          type: string
+          maxLength: 128
+          nullable: true
+          description: |
+            The action configuration this standing approval was derived from, if any.
+            Nullable — `null` when the standing approval was created with a custom
+            action type rather than from an existing configuration. The referenced
+            configuration may have been deleted since creation.
+            Expected format: `ac_` prefix followed by 32 hex characters, but the
+            backend does not enforce the pattern.
           example: null
       example:
         standing_approval_id: sa_abc123
@@ -7971,6 +7981,7 @@ components:
         expires_at: '2026-02-21T00:00:00Z'
         created_at: '2026-02-14T10:30:00Z'
         revoked_at: null
+        source_action_configuration_id: null
     StandingApprovalExecuteRequest:
       type: object
       required:
@@ -8118,6 +8129,7 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
+            source_action_configuration_id: null
         has_more: false
     UserStandingApprovalListResponse:
       type: object
@@ -8159,13 +8171,14 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
+            source_action_configuration_id: null
         has_more: false
     CreateStandingApprovalRequest:
       type: object
       required:
         - agent_id
         - action_type
-        - expires_at
+        - constraints
       properties:
         agent_id:
           type: integer
@@ -8187,10 +8200,27 @@ components:
         constraints:
           type: object
           additionalProperties: true
-          description: Constraint boundaries for this standing approval.
+          description: |
+            Constraint boundaries for this standing approval. Required and must
+            contain at least one non-wildcard parameter constraint. A standing
+            approval without parameter constraints is a blank check — the backend
+            rejects empty constraints or constraints where every value is a
+            wildcard (`"*"`).
           example:
             recipient_pattern: '*@mycompany.com'
             max_recipients: 5
+        source_action_configuration_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: |
+            Optional reference to the action configuration this standing approval
+            was derived from. When provided, the backend records it for traceability.
+            No foreign-key enforcement — the configuration may be deleted later.
+            Expected format: `ac_` prefix followed by 32 hex characters (e.g.,
+            `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
+            enforce the pattern — only non-empty and max 128 characters.
+          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         max_executions:
           type: integer
           minimum: 1
@@ -8205,16 +8235,20 @@ components:
         expires_at:
           type: string
           format: date-time
-          description: When this standing approval expires. Required. Maximum 90 days from starts_at.
-          example: '2026-03-14T00:00:00Z'
+          nullable: true
+          description: |
+            When this standing approval expires. Omit or set to null for no expiry
+            (the approval remains active until revoked).
+          example: null
       example:
         agent_id: 42
         action_type: email.send
         action_version: '1'
         constraints:
           recipient_pattern: '*@mycompany.com'
+        source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         max_executions: 100
-        expires_at: '2026-03-14T00:00:00Z'
+        expires_at: null
     RevokeStandingApprovalResponse:
       type: object
       required:
@@ -8234,6 +8268,38 @@ components:
           type: string
           format: date-time
           example: '2026-02-21T10:30:00Z'
+    UpdateStandingApprovalRequest:
+      type: object
+      required:
+        - constraints
+      properties:
+        constraints:
+          type: object
+          additionalProperties: true
+          description: |
+            Updated constraint boundaries. Must be non-empty with at least one non-wildcard value.
+          example:
+            recipient_pattern: '*@mycompany.com'
+        max_executions:
+          type: integer
+          minimum: 1
+          nullable: true
+          description: Updated maximum number of executions. Null means unlimited.
+          example: 200
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            Updated expiration time. Must be in the future. Null means the approval remains active until revoked.
+            Omitting the field preserves the current expiration
+            (the approval remains active until revoked).
+          example: '2026-04-14T00:00:00Z'
+      example:
+        constraints:
+          recipient_pattern: '*@mycompany.com'
+        max_executions: 200
+        expires_at: null
     UserExecuteStandingApprovalRequest:
       type: object
       properties:
@@ -8295,6 +8361,7 @@ components:
             - approval.cancelled
             - action.executed
             - standing_approval.executed
+            - standing_approval.updated
             - agent.registered
             - agent.deactivated
             - payment_method.charged
@@ -8324,7 +8391,8 @@ components:
             approvals, contains `type`, `version`, and `parameters`. For standing
             approval executions, contains `type`, `version`, `parameters` (the
             actual parameters used in the execution), and `constraints` (the
-            boundary rules from the standing approval). For payment_method.charged
+            boundary rules from the standing approval). For standing_approval.updated,
+            contains `type` (action type) only. For payment_method.charged
             events, contains `type`, `payment_method_id`, `brand`, `last4`,
             `amount_cents`, `currency`, and optionally `description` (a human-readable
             summary of the charge). Never includes raw card details.
@@ -8341,6 +8409,7 @@ components:
             - pending
             - expired
             - charged
+            - updated
           description: The outcome of the event.
           example: approved
         source_id:
@@ -8433,6 +8502,7 @@ components:
             - approval.cancelled
             - action.executed
             - standing_approval.executed
+            - standing_approval.updated
             - agent.registered
             - agent.deactivated
             - payment_method.charged
@@ -8473,6 +8543,7 @@ components:
             - pending
             - expired
             - charged
+            - updated
           description: The outcome of the event.
           example: approved
         source_id:
@@ -8826,10 +8897,12 @@ components:
         credentials_ready:
           type: boolean
           description: |
-            Whether the user has stored the required credentials for this connector.
+            Whether required credentials for this connector are assigned to this
+            agent+connector pair (via `agent_connector_credentials`). Unassigned
+            global credentials alone do not make this `true`.
 
-            - `true`: Credentials are stored — actions can be executed.
-            - `false`: Credentials are missing — action execution will fail with
+            - `true`: A credential or OAuth connection is bound — actions can be executed.
+            - `false`: No valid binding — action execution will fail with
               `404 credentials_not_found`. The agent should direct the user to
               `credentials_setup_url` to connect their account.
 
@@ -9749,10 +9822,11 @@ components:
         - has_payment_method
         - can_upgrade
         - plan_limits
+        - effective_limits
       properties:
         plan_id:
           type: string
-          description: The plan ID (e.g., "free", "pay_as_you_go")
+          description: The plan ID (e.g., "free", "pay_as_you_go", "free_pro")
           example: free
         plan_name:
           type: string
@@ -9784,6 +9858,11 @@ components:
           example: true
         plan_limits:
           $ref: '#/components/schemas/PlanLimits'
+        effective_limits:
+          $ref: '#/components/schemas/PlanLimits'
+          description: |
+            Resource and request limits currently enforced (may match a paid plan during
+            quota grace after downgrade while `plan_id` is already `free`).
         usage:
           $ref: '#/components/schemas/UsageInfo'
     UsageInfo:
@@ -9965,6 +10044,7 @@ components:
         - has_payment_method
         - can_upgrade
         - can_downgrade
+        - can_end_quota_grace_now
       properties:
         status:
           type: string
@@ -10000,15 +10080,30 @@ components:
           type: boolean
           description: Whether the user can downgrade (true when on a paid plan). Use this to show/hide the downgrade button.
           example: false
+        can_end_quota_grace_now:
+          type: boolean
+          description: |
+            True when the user is already on the free plan but still has paid-plan quotas
+            until `quota_entitlements_until` (post–pay-as-you-go cancellation). The client may
+            offer "Downgrade now" to apply free-tier limits immediately via `POST /billing/downgrade`.
+          example: false
         grace_period_ends_at:
           type: string
           format: date-time
           nullable: true
           description: |
-            When the downgrade grace period expires, or null if no grace period is active.
-            During the grace period (7 days after downgrade), the user retains the longer
-            audit retention window (90 days) to export their data. After this timestamp,
-            retention drops to the free plan's window (7 days).
+            When the 7-day audit retention grace period expires after downgrade, or null
+            if not active. During this window the user keeps the longer paid-plan audit
+            retention (e.g. 90 days) to export data; afterward retention matches the
+            free plan. This is separate from quota entitlements (`quota_entitlements_until`).
+        quota_entitlements_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When paid-plan quotas stop applying after a downgrade to free, or null if not
+            in quota grace. Until this instant, API enforcement uses the snapshotted paid
+            plan limits even though `plan_id` is `free`.
     UsageSummary:
       type: object
       required:
@@ -10042,15 +10137,33 @@ components:
         prompts, and gate features like SMS notifications.
       required:
         - plan
+        - effective_limits
         - subscription
         - usage
+        - pricing
+        - coupon_redemption_enabled
       properties:
         plan:
           $ref: '#/components/schemas/Plan'
+        effective_limits:
+          $ref: '#/components/schemas/PlanLimits'
+          description: |
+            Limits currently enforced for quotas and resource caps. During quota grace
+            after downgrade, this reflects the previous paid plan while `plan` reflects
+            the billing plan (`free`).
         subscription:
           $ref: '#/components/schemas/Subscription'
         usage:
           $ref: '#/components/schemas/UsageSummary'
+        pricing:
+          $ref: '#/components/schemas/BillingPricing'
+        coupon_redemption_enabled:
+          type: boolean
+          description: |
+            True when the server has `COUPON_SECRET` set so `POST /v1/billing/redeem-coupon`
+            is available. The frontend may show a coupon entry form when true and the user
+            is on the free plan.
+          example: false
     UsageDetail:
       type: object
       description: |
@@ -10501,7 +10614,6 @@ components:
           enum:
             - built_in
             - manifest
-            - byoa
           description: Where the provider configuration originated
           example: built_in
         has_credentials:
@@ -10565,8 +10677,8 @@ components:
         display_name:
           type: string
           description: |
-            A human-readable identifier for this connection, typically the authenticated user's email address. Omitted when no identifying information is available.
-          example: user@example.com
+            A human-readable identifier for this connection — the provider username (e.g. GitHub login) when available, otherwise the authenticated user's email address. Omitted when no identifying information is available.
+          example: octocat
     OAuthConnectionListResponse:
       type: object
       required:
@@ -10592,121 +10704,41 @@ components:
           format: date-time
           description: When the OAuth provider was disconnected
           example: '2026-03-05T15:00:00Z'
-    CreateOAuthProviderConfigRequest:
+    AgentPaymentMethodResponse:
       type: object
-      description: |
-        Request body for registering BYOA (Bring Your Own App) OAuth credentials.
-        The provider must already be declared by a built-in config or connector
-        manifest — this endpoint only supplies the client ID and secret.
-        Credentials are encrypted at rest in Supabase Vault (AES-256-GCM).
-        Only one config per provider per user is allowed.
       required:
-        - provider
-        - client_id
-        - client_secret
+        - agent_id
+        - payment_method_id
       properties:
-        provider:
+        agent_id:
+          type: integer
+          format: int64
+        payment_method_id:
           type: string
-          description: |
-            The OAuth provider ID to configure. Must match a provider already
-            declared by a built-in config or connector manifest (e.g. "salesforce",
-            "google"). Use GET /v1/oauth/providers to discover available providers.
-          example: salesforce
-          maxLength: 128
-        client_id:
-          type: string
-          description: |
-            The OAuth application's client ID, obtained from the provider's
-            developer console (e.g. Google Cloud Console, Salesforce Connected App).
-          example: my-client-id
-          maxLength: 2048
-        client_secret:
-          type: string
-          description: |
-            The OAuth application's client secret. This value is encrypted in
-            Supabase Vault and never returned in API responses.
-          example: my-client-secret
-          maxLength: 2048
-    UpdateOAuthProviderConfigRequest:
-      type: object
-      description: |
-        Request body for rotating BYOA OAuth credentials. Both client_id and
-        client_secret must be provided — partial updates are not supported.
-        The old vault secrets are deleted and replaced atomically within a
-        database transaction.
-      required:
-        - client_id
-        - client_secret
-      properties:
-        client_id:
-          type: string
-          description: The new OAuth application's client ID
-          example: my-new-client-id
-          maxLength: 2048
-        client_secret:
-          type: string
-          description: |
-            The new OAuth application's client secret. Encrypted in Supabase
-            Vault and never returned in API responses.
-          example: my-new-client-secret
-          maxLength: 2048
-    OAuthProviderConfig:
-      type: object
-      description: |
-        A BYOA provider config indicating the user has registered their own
-        OAuth client credentials for this provider. Client secrets are never
-        included — only the provider ID and timestamps are returned.
-      required:
-        - provider
-        - created_at
-        - updated_at
-      properties:
-        provider:
-          type: string
-          description: The OAuth provider ID (e.g. "salesforce", "google")
-          example: salesforce
+          format: uuid
+          nullable: true
+          description: The assigned payment method ID, or null if none is assigned
         created_at:
           type: string
           format: date-time
-          description: When the BYOA credentials were first registered
-          example: '2026-03-05T12:00:00Z'
-        updated_at:
-          type: string
-          format: date-time
-          description: When the BYOA credentials were last rotated (equals created_at if never updated)
-          example: '2026-03-05T14:00:00Z'
-    OAuthProviderConfigListResponse:
+    AssignAgentPaymentMethodRequest:
       type: object
       required:
-        - configs
+        - payment_method_id
       properties:
-        configs:
-          type: array
-          items:
-            $ref: '#/components/schemas/OAuthProviderConfig'
-          description: |
-            List of BYOA provider configs for the authenticated user. Each entry
-            indicates the user has registered custom OAuth credentials for that
-            provider. Empty array if no BYOA configs exist.
-    OAuthProviderConfigDeleteResponse:
+        payment_method_id:
+          type: string
+          format: uuid
+          description: The payment method to assign to this agent
+    RemoveAgentPaymentMethodResponse:
       type: object
-      description: |
-        Confirmation that the BYOA provider config and its encrypted vault
-        secrets have been deleted. After deletion, the provider reverts to
-        its built-in or manifest configuration (if any).
       required:
-        - provider
-        - deleted_at
+        - status
       properties:
-        provider:
+        status:
           type: string
-          description: The OAuth provider whose BYOA credentials were deleted
-          example: salesforce
-        deleted_at:
-          type: string
-          format: date-time
-          description: When the BYOA credentials were deleted
-          example: '2026-03-05T15:00:00Z'
+          enum:
+            - removed
     PaymentMethod:
       type: object
       description: |
@@ -10832,6 +10864,9 @@ components:
           description: |
             Monthly spend limit in cents (rolling 30-day window). Must be >= per_transaction_limit
             if both are set. Set to a value to create/update the limit.
+        clear_label:
+          type: boolean
+          description: Set to true to remove the card nickname/label
         clear_per_transaction_limit:
           type: boolean
           description: Set to true to remove the per-transaction limit entirely
@@ -10842,10 +10877,15 @@ components:
       type: object
       required:
         - deleted
+        - affected_agents
       properties:
         deleted:
           type: boolean
           description: Always true on successful deletion
+        affected_agents:
+          type: integer
+          minimum: 0
+          description: Number of agents that had this payment method assigned (bindings are cascade-deleted)
     ConfigResponse:
       type: object
       description: |
@@ -10855,6 +10895,7 @@ components:
         - billing_enabled
         - google_oauth_configured
         - microsoft_oauth_configured
+        - sms_enabled
       properties:
         billing_enabled:
           type: boolean
@@ -10868,18 +10909,29 @@ components:
           type: boolean
           description: |
             Whether Google OAuth client credentials are configured on the server.
-            When `true`, the built-in Google connector can initiate OAuth flows
-            without BYOA setup. When `false`, users must provide their own Google
-            OAuth app credentials via the BYOA configuration UI.
+            When `true`, the built-in Google connector can initiate OAuth flows.
+            When `false`, the Google connector will not be usable until credentials
+            are set via environment variables.
           example: true
         microsoft_oauth_configured:
           type: boolean
           description: |
             Whether Microsoft OAuth client credentials are configured on the server.
-            When `true`, the built-in Microsoft connector can initiate OAuth flows
-            without BYOA setup. When `false`, users must provide their own Microsoft
-            OAuth app credentials via the BYOA configuration UI.
+            When `true`, the built-in Microsoft connector can initiate OAuth flows.
+            When `false`, the Microsoft connector will not be usable until credentials
+            are set via environment variables.
           example: true
+        sms_enabled:
+          type: boolean
+          description: |
+            Whether SMS notifications are configured and available on this server.
+            When `true`, users can enable SMS notifications in their preferences.
+            SMS is enabled when the server has a working AWS SNS sender configured
+            (`AWS_REGION` is set) and the `SMS_NOTIFICATIONS_HIDDEN` env var is not
+            set to `"true"`. Self-hosted deployments that configure SNS will have
+            this set automatically; the hosted platform (app.permissionslip.dev)
+            sets `SMS_NOTIFICATIONS_HIDDEN=true` to hide SMS from users.
+          example: false
     Action:
       type: object
       required:
@@ -11116,6 +11168,8 @@ components:
             - approval_already_resolved
             - duplicate_credential
             - already_subscribed
+            - invalid_coupon
+            - plan_change_not_allowed
             - registration_expired
             - verification_locked
             - approval_expired
@@ -11268,6 +11322,35 @@ components:
           type: string
           description: OAuth connection ID to assign.
           example: oc_def456
+    CalendarListItem:
+      type: object
+      required:
+        - id
+      properties:
+        id:
+          type: string
+          description: Provider calendar identifier (Google calendar ID or Microsoft Graph calendar id).
+        summary:
+          type: string
+          description: Human-readable name (Google Calendar `summary`).
+        name:
+          type: string
+          description: Human-readable name (Microsoft Graph `name`).
+        primary:
+          type: boolean
+          description: True when this is the user's primary Google calendar.
+        isDefaultCalendar:
+          type: boolean
+          description: True when this is the default Microsoft Graph calendar.
+    AgentConnectorCalendarListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/CalendarListItem'
     RetentionMeta:
       type: object
       description: |
@@ -11345,6 +11428,25 @@ components:
           type: integer
           description: Number of days audit logs are retained
           example: 7
+    DowngradeLimitWarning:
+      type: object
+      required:
+        - resource
+        - current
+        - max_allowed
+      properties:
+        resource:
+          type: string
+          description: Resource type over the free-tier cap (e.g. agents, credentials)
+          example: agents
+        current:
+          type: integer
+          description: Current count for that resource
+          example: 5
+        max_allowed:
+          type: integer
+          description: Maximum allowed on the free plan (applies after quota grace ends)
+          example: 3
     DowngradeResponse:
       type: object
       required:
@@ -11373,9 +11475,22 @@ components:
           type: string
           format: date-time
           description: |
-            When the 7-day grace period expires. Until this time, the user retains
-            the 90-day audit retention window from their paid plan. Show this to the
-            user so they know how long they have to export their data.
+            When the 7-day audit retention grace period expires. Until this time, the user
+            retains the longer paid-plan audit retention window to export data.
+        quota_entitlements_until:
+          type: string
+          format: date-time
+          nullable: true
+          description: |
+            When paid-plan resource and request quotas stop applying. Until then, limits
+            match the previous paid plan even though the billing plan is now free.
+        warnings:
+          type: array
+          items:
+            $ref: '#/components/schemas/DowngradeLimitWarning'
+          description: |
+            Non-blocking notices when the user exceeds free-tier caps; those limits apply
+            after `quota_entitlements_until`.
     InvoiceListResponse:
       type: object
       required:
@@ -11390,6 +11505,70 @@ components:
           type: boolean
           description: Whether there are more invoices beyond this page. If true, pass the last invoice's `id` as `starting_after` to fetch the next page.
           example: false
+    BillingPricing:
+      type: object
+      description: |
+        Per-request pricing information sourced from Stripe. Included for all
+        plans so the upgrade flow can show Stripe-sourced pricing to free users.
+        The frontend should use these values instead of deriving pricing from
+        plans.json, so Stripe remains the single source of truth.
+      required:
+        - free_request_allowance
+        - price_per_request_display
+      properties:
+        free_request_allowance:
+          type: integer
+          description: Number of requests included free each billing period before per-request charges apply.
+          example: 1000
+        price_per_request_display:
+          type: string
+          description: Human-readable per-request price string (e.g. "$0.005"), sourced from the Stripe price object.
+          example: $0.005
+    RedeemCouponRequest:
+      type: object
+      required:
+        - coupon
+      properties:
+        coupon:
+          type: string
+          description: |
+            Lowercase hex HMAC-SHA256(`COUPON_SECRET`, trimmed username) for the
+            authenticated user's profile username. One-time grant from free to
+            complimentary Pro when valid.
+          minLength: 64
+          maxLength: 64
+          pattern: ^[0-9a-f]{64}$
+          example: a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456
+    RedeemCouponResponse:
+      type: object
+      required:
+        - plan_id
+        - status
+      properties:
+        plan_id:
+          type: string
+          description: Plan after redemption (typically "free_pro")
+          example: free_pro
+        status:
+          type: string
+          description: |
+            `redeemed` when the plan was upgraded, `already_redeemed` when the
+            account was already on complimentary Pro.
+          enum:
+            - redeemed
+            - already_redeemed
+          example: redeemed
+    PortalResponse:
+      type: object
+      required:
+        - url
+      properties:
+        url:
+          type: string
+          format: uri
+          pattern: ^https://
+          description: Stripe Billing Portal URL — redirect the user here to manage their subscription. Always HTTPS.
+          example: https://billing.stripe.com/p/session/test_...
   parameters:
     ActionConfigId:
       name: config_id

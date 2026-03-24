@@ -14,7 +14,7 @@ Kroger is the largest US supermarket chain by revenue, operating ~2,800 stores a
 |-----|----------|-------------|
 | `access_token` | Yes | OAuth 2.0 access token obtained through the platform's OAuth flow. |
 
-The credential `auth_type` in the database is `oauth2`. The connector references the `kroger` OAuth provider, which is registered as a built-in provider. Users connect with a single click; self-hosted deployments can override credentials via BYOA.
+The credential `auth_type` in the database is `oauth2`. The connector references the `kroger` OAuth provider, which is registered as a built-in provider. Users connect with a single click; self-hosted deployments configure credentials via environment variables.
 
 ### OAuth Configuration
 

@@ -10,7 +10,6 @@ type configResponse struct {
 	GoogleOAuthConfigured    bool `json:"google_oauth_configured"`
 	MicrosoftOAuthConfigured bool `json:"microsoft_oauth_configured"`
 	SMSEnabled               bool `json:"sms_enabled"`
-	BYOAEnabled              bool `json:"byoa_enabled"`
 }
 
 func init() {
@@ -41,7 +40,6 @@ func handleGetConfig(deps *Deps) http.HandlerFunc {
 			GoogleOAuthConfigured:    googleConfigured,
 			MicrosoftOAuthConfigured: microsoftConfigured,
 			SMSEnabled:               deps.SMSEnabled,
-			BYOAEnabled:              !deps.BillingEnabled,
 		})
 	}
 }

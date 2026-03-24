@@ -195,24 +195,6 @@ A background job proactively refreshes tokens within 15 minutes of expiry (`toke
 
 **Indexes:** `idx_oauth_connections_user` on `(user_id)`, `idx_oauth_connections_status` on `(user_id, status)`
 
-### `oauth_provider_configs`
-
-Stores user-provided ("bring your own app") OAuth client credentials. Users register their own OAuth app's client ID and secret for a provider, rather than using a platform-managed app.
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | text | PK, max 255 chars |
-| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE |
-| `provider` | text | NOT NULL, max 255 chars |
-| `client_id_vault_id` | uuid | NOT NULL |
-| `client_secret_vault_id` | uuid | NOT NULL |
-| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
-| `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
-
-**Constraints:** UNIQUE on `(user_id, provider)` — one config per provider per user.
-
-**Indexes:** `idx_oauth_provider_configs_user` on `(user_id)`
-
 ### `agent_connectors`
 
 Join table controlling which connectors are enabled for each agent. Users enable connectors per-agent through the dashboard — an agent can only submit actions from connectors in this table.
@@ -404,7 +386,6 @@ auth.users
         ├── approvals (approver_id → profiles, CASCADE)
         ├── credentials (user_id → profiles, CASCADE)
         ├── oauth_connections (user_id → profiles, CASCADE)
-        ├── oauth_provider_configs (user_id → profiles, CASCADE)
         ├── standing_approvals (user_id → profiles, CASCADE)
         └── audit_events (user_id → profiles, RESTRICT)
 

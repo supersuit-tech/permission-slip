@@ -33,11 +33,9 @@ import {
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
-import { useConfig } from "@/hooks/useConfig";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 import { DisconnectOAuthDialog } from "./DisconnectOAuthDialog";
-import { BYOASetupBanner } from "./BYOASetupBanner";
 
 export interface ManageCredentialsDialogProps {
   open: boolean;
@@ -213,8 +211,6 @@ function OAuthCredentialRow({
   providers: { id: string; has_credentials: boolean }[];
 }) {
   const { session } = useAuth();
-  const { config } = useConfig();
-  const byoaEnabled = config?.byoa_enabled ?? false;
   const [shopDialogState, setShopDialogState] = useState<{
     replaceId?: string;
   } | null>(null);
@@ -381,9 +377,6 @@ function OAuthCredentialRow({
           </div>
         )}
 
-        {byoaEnabled && !hasAnyConnection && provider != null && !provider.has_credentials && (
-          <BYOASetupBanner providerId={providerId} />
-        )}
       </div>
 
       {SHOP_REQUIRED_PROVIDERS.has(providerId) && shopDialogState && (

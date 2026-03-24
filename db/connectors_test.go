@@ -34,12 +34,6 @@ func TestConnectorsSchema(t *testing.T) {
 			"status", "created_at", "updated_at",
 		})
 	})
-	t.Run("oauth_provider_configs", func(t *testing.T) {
-		testhelper.RequireColumns(t, tx, "oauth_provider_configs", []string{
-			"id", "user_id", "provider", "client_id_vault_id",
-			"client_secret_vault_id", "created_at", "updated_at",
-		})
-	})
 }
 
 func TestConnectorCascadeDelete(t *testing.T) {

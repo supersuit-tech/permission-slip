@@ -48,7 +48,7 @@ graph TB
         SA["Standing Approval Engine<br/><i>Pre-authorized grants,<br/>constraint matching,<br/>execution counting</i>"]
         NS["Notification Service<br/><i>Push notifications,<br/>webhooks</i>"]
         CV["Credential Vault<br/><i>Encrypted at rest,<br/>OAuth tokens, API keys</i>"]
-        OR["OAuth Provider Registry<br/><i>Built-in + manifest providers,<br/>BYOA client credentials</i>"]
+        OR["OAuth Provider Registry<br/><i>Built-in + manifest providers</i>"]
         CE["Connector Engine"]
 
         subgraph Connectors
