@@ -80,7 +80,7 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 				DisplayTemplate: "Create Instacart link — {{line_items:count}} items",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"anyOf": [
+					"oneOf": [
 						{"required": ["line_items"]},
 						{"required": ["items"]}
 					],
