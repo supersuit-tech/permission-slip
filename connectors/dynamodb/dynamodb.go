@@ -15,8 +15,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 
@@ -77,10 +80,15 @@ func (c *DynamoDBConnector) Manifest() *connectors.ConnectorManifest {
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
-				ActionType:  "dynamodb.get_item",
-				Name:        "Get Item",
-				Description: "Read a single item by primary key with optional projection",
-				RiskLevel:   "low",
+				ActionType:      "dynamodb.get_item",
+				Name:            "Get Item",
+				Description:     "Read a single item by primary key with optional projection",
+				RiskLevel:       "low",
+				DisplayTemplate: "Get item from {{table}} ({{region}})",
+				Preview: &connectors.ActionPreview{
+					Layout: "record",
+					Fields: map[string]string{"title": "table", "subtitle": "region"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["region", "table", "key", "allowed_tables"],
@@ -122,10 +130,15 @@ func (c *DynamoDBConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "dynamodb.put_item",
-				Name:        "Put Item",
-				Description: "Create or replace an item with JSON attributes",
-				RiskLevel:   "medium",
+				ActionType:      "dynamodb.put_item",
+				Name:            "Put Item",
+				Description:     "Create or replace an item with JSON attributes",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Put item into {{table}} ({{region}})",
+				Preview: &connectors.ActionPreview{
+					Layout: "record",
+					Fields: map[string]string{"title": "table", "subtitle": "region"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["region", "table", "item", "allowed_tables"],
@@ -165,10 +178,15 @@ func (c *DynamoDBConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "dynamodb.delete_item",
-				Name:        "Delete Item",
-				Description: "Delete an item by primary key",
-				RiskLevel:   "high",
+				ActionType:      "dynamodb.delete_item",
+				Name:            "Delete Item",
+				Description:     "Delete an item by primary key",
+				RiskLevel:       "high",
+				DisplayTemplate: "Delete item from {{table}} ({{region}})",
+				Preview: &connectors.ActionPreview{
+					Layout: "record",
+					Fields: map[string]string{"title": "table", "subtitle": "region"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["region", "table", "key", "allowed_tables"],
@@ -193,10 +211,15 @@ func (c *DynamoDBConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "dynamodb.query",
-				Name:        "Query",
-				Description: "Query items by partition key with optional sort key conditions",
-				RiskLevel:   "low",
+				ActionType:      "dynamodb.query",
+				Name:            "Query",
+				Description:     "Query items by partition key with optional sort key conditions",
+				RiskLevel:       "low",
+				DisplayTemplate: "Query {{table}} by {{partition_key_name}} ({{region}})",
+				Preview: &connectors.ActionPreview{
+					Layout: "record",
+					Fields: map[string]string{"title": "table", "subtitle": "partition_key_name"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["region", "table", "partition_key_name", "partition_key_value", "allowed_tables"],
@@ -260,7 +283,7 @@ func (c *DynamoDBConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				Service:         "dynamodb",
 				AuthType:        "custom",
-				InstructionsURL: "https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Introduction.html",
+				InstructionsURL: "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
 			},
 		},
 		Templates: []connectors.ManifestTemplate{
@@ -300,6 +323,7 @@ func (c *DynamoDBConnector) Actions() map[string]connectors.Action {
 }
 
 // ValidateCredentials ensures static AWS keys are present (same as aws connector).
+// Optional: endpoint_url (e.g. http://localhost:4566 for LocalStack), session_token (STS).
 func (c *DynamoDBConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	accessKey, ok := creds.Get("access_key_id")
 	if !ok || accessKey == "" {
@@ -309,7 +333,24 @@ func (c *DynamoDBConnector) ValidateCredentials(_ context.Context, creds connect
 	if !ok || secretKey == "" {
 		return &connectors.ValidationError{Message: "missing required credential: secret_access_key"}
 	}
+	if ep, ok := creds.Get("endpoint_url"); ok && strings.TrimSpace(ep) != "" {
+		if _, err := parseDynamoEndpoint(ep); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func parseDynamoEndpoint(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	u, err := url.Parse(raw)
+	if err != nil || u.Scheme == "" || u.Host == "" {
+		return "", &connectors.ValidationError{Message: "endpoint_url must be a full URL with host (e.g. https://dynamodb.us-east-1.amazonaws.com or http://localhost:4566)"}
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return "", &connectors.ValidationError{Message: "endpoint_url scheme must be http or https"}
+	}
+	return strings.TrimRight(raw, "/"), nil
 }
 
 func (c *DynamoDBConnector) buildClient(ctx context.Context, region string, creds connectors.Credentials) (dynamoAPI, error) {
@@ -325,9 +366,21 @@ func (c *DynamoDBConnector) buildClient(ctx context.Context, region string, cred
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("loading AWS config: %v", err)}
 	}
 
+	var baseEndpoint *string
+	if ep, ok := creds.Get("endpoint_url"); ok && strings.TrimSpace(ep) != "" {
+		trimmed, perr := parseDynamoEndpoint(ep)
+		if perr != nil {
+			return nil, perr
+		}
+		baseEndpoint = aws.String(trimmed)
+	}
+
 	return dynamodb.NewFromConfig(cfg, func(o *dynamodb.Options) {
 		if c.timeout > 0 {
 			o.HTTPClient = &http.Client{Timeout: c.timeout}
+		}
+		if baseEndpoint != nil {
+			o.BaseEndpoint = baseEndpoint
 		}
 	}), nil
 }

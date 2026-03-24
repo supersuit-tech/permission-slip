@@ -60,6 +60,22 @@ func TestDynamoDBConnector_ValidateCredentials(t *testing.T) {
 			creds:   connectors.NewCredentials(map[string]string{"access_key_id": "x"}),
 			wantErr: true,
 		},
+		{
+			name: "optional endpoint_url valid",
+			creds: connectors.NewCredentials(map[string]string{
+				"access_key_id": "AKIA", "secret_access_key": "s",
+				"endpoint_url": "http://localhost:4566",
+			}),
+			wantErr: false,
+		},
+		{
+			name: "invalid endpoint_url",
+			creds: connectors.NewCredentials(map[string]string{
+				"access_key_id": "AKIA", "secret_access_key": "s",
+				"endpoint_url": "not-a-url",
+			}),
+			wantErr: true,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
