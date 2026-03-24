@@ -201,6 +201,29 @@ func TestValidateCredentials(t *testing.T) {
 	}
 }
 
+func TestDeriveRequestID_FitsPayPalLimit(t *testing.T) {
+	t.Parallel()
+	// Use a realistic action type and large params to ensure SHA256 output is truncated.
+	params := json.RawMessage(`{"order":{"intent":"CAPTURE","purchase_units":[{"amount":{"currency_code":"USD","value":"99.99"}}]}}`)
+	id := deriveRequestID("paypal.create_order", params)
+	if len(id) > maxRequestIDLen {
+		t.Errorf("deriveRequestID length = %d, want <= %d; value = %q", len(id), maxRequestIDLen, id)
+	}
+	if len(id) == 0 {
+		t.Error("deriveRequestID returned empty string")
+	}
+	// Same inputs must produce same output (deterministic).
+	id2 := deriveRequestID("paypal.create_order", params)
+	if id != id2 {
+		t.Errorf("deriveRequestID not deterministic: %q != %q", id, id2)
+	}
+	// Different inputs must produce different output.
+	id3 := deriveRequestID("paypal.capture_order", params)
+	if id == id3 {
+		t.Error("different action types produced same request ID")
+	}
+}
+
 func TestAPIBaseURLForCreds_SandboxTrimmed(t *testing.T) {
 	t.Parallel()
 	c := connectors.NewCredentials(map[string]string{
