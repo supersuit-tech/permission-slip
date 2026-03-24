@@ -10,6 +10,59 @@ import (
 //go:embed logo.svg
 var logoSVG string
 
+// lineItemOneOf is the shared oneOf schema for line item elements, used by both
+// the line_items property and the items alias to keep them consistent.
+const lineItemOneOf = `[
+	{
+		"type": "string",
+		"maxLength": 2048,
+		"description": "Plain product name, expanded to {\"name\": \"...\"} before sending to Instacart"
+	},
+	{
+		"type": "object",
+		"required": ["name"],
+		"additionalProperties": true,
+		"properties": {
+			"name": {
+				"type": "string",
+				"maxLength": 2048,
+				"description": "Product or ingredient text for Instacart to match (e.g. \"2 lb chicken breast\")"
+			},
+			"display_text": {
+				"type": "string",
+				"description": "Display title for the matched item"
+			},
+			"quantity": {
+				"type": "number",
+				"description": "Deprecated by Instacart; prefer line_item_measurements"
+			},
+			"unit": {
+				"type": "string",
+				"description": "Deprecated by Instacart; prefer line_item_measurements"
+			},
+			"line_item_measurements": {
+				"type": "array",
+				"items": {
+					"type": "object",
+					"properties": {
+						"quantity": {"type": "number"},
+						"unit": {"type": "string"}
+					},
+					"additionalProperties": false
+				}
+			},
+			"upcs": {
+				"type": "array",
+				"items": {"type": "string"}
+			},
+			"product_ids": {
+				"type": "array",
+				"items": {"type": "integer"}
+			}
+		}
+	}
+]`
+
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
 func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
@@ -27,7 +80,10 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 				DisplayTemplate: "Create Instacart link — {{line_items:count}} items",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["line_items"],
+					"anyOf": [
+						{"required": ["line_items"]},
+						{"required": ["items"]}
+					],
 					"properties": {
 						"title": {
 							"type": "string",
@@ -60,64 +116,14 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "array",
 							"minItems": 1,
 							"maxItems": 200,
-							"items": {
-								"oneOf": [
-									{
-										"type": "string",
-										"maxLength": 2048,
-										"description": "Plain product name, expanded to {\"name\": \"...\"} before sending to Instacart"
-									},
-									{
-										"type": "object",
-										"required": ["name"],
-										"additionalProperties": true,
-										"properties": {
-											"name": {
-												"type": "string",
-												"maxLength": 2048,
-												"description": "Product or ingredient text for Instacart to match (e.g. \"2 lb chicken breast\")"
-											},
-											"display_text": {
-												"type": "string",
-												"description": "Display title for the matched item"
-											},
-											"quantity": {
-												"type": "number",
-												"description": "Deprecated by Instacart; prefer line_item_measurements"
-											},
-											"unit": {
-												"type": "string",
-												"description": "Deprecated by Instacart; prefer line_item_measurements"
-											},
-											"line_item_measurements": {
-												"type": "array",
-												"items": {
-													"type": "object",
-													"properties": {
-														"quantity": {"type": "number"},
-														"unit": {"type": "string"}
-													},
-													"additionalProperties": false
-												}
-											},
-											"upcs": {
-												"type": "array",
-												"items": {"type": "string"}
-											},
-											"product_ids": {
-												"type": "array",
-												"items": {"type": "integer"}
-											}
-										}
-									}
-								]
-							},
+							"items": {"oneOf": ` + lineItemOneOf + `},
 							"description": "Items to include. Each element is a LineItem object with at least name, or use line_item_measurements for quantities (see Instacart docs). You may use the parameter name items instead of line_items. For convenience, each element may be a plain string (same as {\"name\": \"...\"})."
 						},
 						"items": {
 							"type": "array",
 							"minItems": 1,
 							"maxItems": 200,
+							"items": {"oneOf": ` + lineItemOneOf + `},
 							"description": "Alias for line_items. Rewritten to line_items before validation."
 						},
 						"landing_page_configuration": {
