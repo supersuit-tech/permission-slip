@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	neturl "net/url"
 	"strings"
 	"time"
 
@@ -289,6 +290,24 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 	}
 
 	return nil
+}
+
+// doGet sends a GET request to a Slack API method with query parameters.
+// Used for endpoints like conversations.info and users.info that only accept
+// application/x-www-form-urlencoded (not JSON body). The params map is
+// encoded as URL query parameters.
+func (c *SlackConnector) doGet(ctx context.Context, method string, creds connectors.Credentials, params map[string]string, dest any) error {
+	token, err := c.getToken(creds)
+	if err != nil {
+		return err
+	}
+
+	query := neturl.Values{}
+	for k, v := range params {
+		query.Set(k, v)
+	}
+	url := c.baseURL + "/" + method + "?" + query.Encode()
+	return c.doGetURL(ctx, url, token, dest)
 }
 
 // doGetURL sends a GET request to the given full URL with Bearer auth and
