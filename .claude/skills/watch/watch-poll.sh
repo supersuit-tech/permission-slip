@@ -123,14 +123,6 @@ PR_NUMBER_FILE="$WORK_DIR/pr-number.txt"
 [[ -f "$TURNS_FILE" ]] || echo "0" > "$TURNS_FILE"
 echo "$PR_NUMBER" > "$PR_NUMBER_FILE"
 
-# Bot username(s) to filter out
-BOT_USERS=(
-  "claude-code[bot]"
-  "github-actions[bot]"
-  "claude[bot]"
-  "greptile-apps[bot]"
-)
-
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
@@ -147,7 +139,7 @@ gh_api() {
 }
 
 # ---------------------------------------------------------------------------
-# Fetch comments from all three endpoints, filter to new + non-bot
+# Fetch new comments from all three endpoints
 # Returns JSON array of work items
 # ---------------------------------------------------------------------------
 fetch_new_comments() {
@@ -169,10 +161,6 @@ fetch_new_comments() {
       and .body != null and .body != ""
       and .state != "PENDING"
     )] | sort_by(.id)')
-
-  # Filter out bots
-  new_reviews=$(echo "$new_reviews" | jq -r --argjson bots "$(printf '%s\n' "${BOT_USERS[@]}" | jq -R . | jq -s .)" '
-    [.[] | select(.user.login as $u | $bots | index($u) | not)]')
 
   local max_review_id
   max_review_id=$(echo "$new_reviews" | jq -r '[.[].id] | max // 0')
@@ -199,9 +187,6 @@ fetch_new_comments() {
   local new_rcs
   new_rcs=$(echo "$review_comments" | jq -r --argjson last "$last_rc_id" '
     [.[] | select(.id > $last and .in_reply_to_id == null)] | sort_by(.id)')
-
-  new_rcs=$(echo "$new_rcs" | jq -r --argjson bots "$(printf '%s\n' "${BOT_USERS[@]}" | jq -R . | jq -s .)" '
-    [.[] | select(.user.login as $u | $bots | index($u) | not)]')
 
   local max_rc_id
   max_rc_id=$(echo "$new_rcs" | jq -r '[.[].id] | max // 0')
@@ -230,9 +215,6 @@ fetch_new_comments() {
   local new_ics
   new_ics=$(echo "$issue_comments" | jq -r --argjson last "$last_ic_id" '
     [.[] | select(.id > $last)] | sort_by(.id)')
-
-  new_ics=$(echo "$new_ics" | jq -r --argjson bots "$(printf '%s\n' "${BOT_USERS[@]}" | jq -R . | jq -s .)" '
-    [.[] | select(.user.login as $u | $bots | index($u) | not)]')
 
   local max_ic_id
   max_ic_id=$(echo "$new_ics" | jq -r '[.[].id] | max // 0')
