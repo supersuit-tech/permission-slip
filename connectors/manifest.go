@@ -72,6 +72,7 @@ type ManifestOAuthProvider struct {
 	TokenURL        string            `json:"token_url"`
 	Scopes          []string          `json:"scopes,omitempty"`
 	AuthorizeParams map[string]string `json:"authorize_params,omitempty"`
+	PKCE            bool              `json:"pkce,omitempty"`
 }
 
 // ManifestTemplate describes a predefined configuration preset for an action.
@@ -141,13 +142,16 @@ var validAuthTypes = map[string]bool{
 // manifest override security-critical values (redirect_uri, state, client_id)
 // that the platform manages.
 var ReservedAuthorizeParams = map[string]bool{
-	"redirect_uri":  true,
-	"state":         true,
-	"client_id":     true,
-	"client_secret": true,
-	"response_type": true,
-	"code":          true,
-	"grant_type":    true,
+	"redirect_uri":            true,
+	"state":                   true,
+	"client_id":               true,
+	"client_secret":           true,
+	"response_type":           true,
+	"code":                    true,
+	"grant_type":              true,
+	"code_challenge":          true,
+	"code_challenge_method":   true,
+	"code_verifier":           true,
 }
 
 // validateURL parses a URL and checks scheme and host. allowedSchemes specifies

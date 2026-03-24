@@ -4,7 +4,7 @@ connectors:
     summary: List Available Connectors
     description: |
       List all available connectors (external service integrations) that Permission Slip
-      supports. Each connector represents an external service (e.g., GitHub, Stripe, Slack)
+      supports. Each connector represents an external service (e.g., GitHub, Stripe, PayPal, Slack)
       and defines which actions are available.
       
       Agents use this endpoint to discover what actions they can submit for approval. 
@@ -25,6 +25,13 @@ connectors:
       
       This endpoint is publicly accessible (no signature required) to allow agents to 
       discover available actions before registration.
+
+      ## PayPal / Venmo
+
+      The **paypal** connector exposes PayPal REST actions (payouts, Checkout orders, invoicing,
+      refunds). Users connect via OAuth (`GET /v1/oauth/paypal/authorize`). Optional credential
+      key `environment`=`sandbox` routes REST calls to PayPal's sandbox API host. See
+      `docs/oauth-setup.md` (PayPal OAuth Setup) and `connectors/paypal/README.md` in the repo.
     
     tags:
       - Connectors
@@ -82,6 +89,9 @@ connectorById:
       
       This endpoint is publicly accessible (no signature required) to allow agents to 
       discover action schemas before registration.
+
+      For connector-specific setup (e.g. PayPal OAuth and optional `environment` credential for
+      sandbox REST), see the repository docs referenced in the list-connectors description.
     
     tags:
       - Connectors

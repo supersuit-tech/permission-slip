@@ -1,6 +1,8 @@
 package api
 
 import (
+	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -156,6 +158,9 @@ func TestListOAuthProviders_ReturnsRegistered(t *testing.T) {
 			if p.Source != "built_in" {
 				t.Errorf("expected built_in source, got %s", p.Source)
 			}
+			if p.PKCE {
+				t.Error("expected google PKCE false in provider list")
+			}
 		}
 		if p.ID == "unconfigured" {
 			if p.HasCredentials {
@@ -231,7 +236,7 @@ func TestCreateAndVerifyOAuthState(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -254,11 +259,72 @@ func TestCreateAndVerifyOAuthState(t *testing.T) {
 	}
 }
 
+func TestCreateAndVerifyOAuthState_WithPKCEVerifier(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
+	verifier := oauth2.GenerateVerifier()
+
+	state, err := createOAuthState(deps, "user-123", "dropbox", []string{"files.content.read"}, "", "", "", verifier)
+	if err != nil {
+		t.Fatalf("createOAuthState: %v", err)
+	}
+	verified, err := verifyOAuthState(deps, state)
+	if err != nil {
+		t.Fatalf("verifyOAuthState: %v", err)
+	}
+	if verified.PKCEVerifier != verifier {
+		t.Errorf("PKCEVerifier round-trip: got %q, want %q", verified.PKCEVerifier, verifier)
+	}
+
+	// JWT payload is only base64url-encoded (not encrypted); verifier must not appear in plaintext.
+	parts := strings.Split(state, ".")
+	if len(parts) != 3 {
+		t.Fatalf("expected JWT with 3 segments, got %d", len(parts))
+	}
+	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode JWT payload: %v", err)
+	}
+	if strings.Contains(string(payloadJSON), verifier) {
+		t.Error("PKCE verifier must not appear in plaintext JWT payload")
+	}
+	if !strings.Contains(string(payloadJSON), "pkce_sealed") {
+		t.Error("expected pkce_sealed claim in JWT payload")
+	}
+}
+
+func TestVerifyOAuthState_LegacyPlaintextPKCEClaim(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
+	verifier := "legacy-plaintext-verifier-43charsxxxxxxxxxxxxxxxxxxxxx"
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub":           "user-legacy",
+		"provider":      "dropbox",
+		"scopes":        []any{"files.content.read"},
+		"iat":           now.Unix(),
+		"exp":           now.Add(10 * time.Minute).Unix(),
+		"pkce_verifier": verifier,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	stateStr, err := token.SignedString([]byte(testOAuthStateSecret))
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	verified, err := verifyOAuthState(deps, stateStr)
+	if err != nil {
+		t.Fatalf("verifyOAuthState: %v", err)
+	}
+	if verified.PKCEVerifier != verifier {
+		t.Errorf("legacy PKCE: got %q, want %q", verified.PKCEVerifier, verifier)
+	}
+}
+
 func TestVerifyOAuthState_InvalidSignature(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -319,7 +385,7 @@ func TestVerifyOAuthState_MissingClaims(t *testing.T) {
 func TestVerifyOAuthState_NoSecret(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{}
-	_, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "")
+	_, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "", "")
 	if err == nil {
 		t.Fatal("expected error when no secret configured")
 	}
@@ -363,6 +429,60 @@ func TestOAuthAuthorize_Redirect(t *testing.T) {
 	}
 	if !strings.Contains(parsed.Query().Get("redirect_uri"), "/api/v1/oauth/google/callback") {
 		t.Errorf("expected callback URL in redirect_uri, got %s", parsed.Query().Get("redirect_uri"))
+	}
+}
+
+func TestOAuthAuthorize_Dropbox_IncludesPKCE(t *testing.T) {
+	t.Parallel()
+	reg := oauth.NewRegistry()
+	_ = reg.Register(oauth.Provider{
+		ID:           "dropbox",
+		AuthorizeURL: "https://www.dropbox.com/oauth2/authorize",
+		TokenURL:     "https://api.dropboxapi.com/oauth2/token",
+		Scopes:       []string{"files.content.read"},
+		PKCE:         true,
+		AuthorizeParams: map[string]string{
+			"token_access_type": "offline",
+		},
+		ClientID:     "test-dropbox-client-id",
+		ClientSecret: "test-dropbox-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	deps := &Deps{
+		OAuthProviders:   reg,
+		OAuthStateSecret: testOAuthStateSecret,
+		BaseURL:          "http://localhost:3000",
+	}
+
+	uid := "user-dropbox-pkce-test"
+	r := httptest.NewRequest(http.MethodGet, "/oauth/dropbox/authorize", nil)
+	r.SetPathValue("provider", "dropbox")
+	ctx := context.WithValue(r.Context(), profileKey{}, &db.Profile{ID: uid})
+	r = r.WithContext(ctx)
+
+	w := httptest.NewRecorder()
+	handleOAuthAuthorize(deps)(w, r)
+
+	if w.Code != http.StatusTemporaryRedirect {
+		t.Fatalf("expected 307, got %d: %s", w.Code, w.Body.String())
+	}
+	loc := w.Header().Get("Location")
+	if loc == "" {
+		t.Fatal("expected Location header")
+	}
+	parsed, err := url.Parse(loc)
+	if err != nil {
+		t.Fatalf("parse location: %v", err)
+	}
+	q := parsed.Query()
+	if q.Get("code_challenge_method") != "S256" {
+		t.Errorf("expected code_challenge_method=S256, got %q", q.Get("code_challenge_method"))
+	}
+	if q.Get("code_challenge") == "" {
+		t.Error("expected non-empty code_challenge")
+	}
+	if q.Get("token_access_type") != "offline" {
+		t.Errorf("expected token_access_type=offline from AuthorizeParams, got %q", q.Get("token_access_type"))
 	}
 }
 
@@ -736,7 +856,7 @@ func TestOAuthCallback_ProviderMismatch(t *testing.T) {
 	router := NewRouter(deps)
 
 	// Create state for "microsoft" but hit google callback
-	state, err := createOAuthState(deps, uid, "microsoft", []string{"openid"}, "", "", "")
+	state, err := createOAuthState(deps, uid, "microsoft", []string{"openid"}, "", "", "", "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -765,7 +885,7 @@ func TestOAuthCallback_ProviderError(t *testing.T) {
 
 	// State validation now runs before the provider error check, so we need a
 	// valid state token to reach the error-handling branch.
-	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "", "")
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -820,7 +940,7 @@ func TestOAuthCallback_MissingCode(t *testing.T) {
 	deps := oauthDeps(tx)
 	router := NewRouter(deps)
 
-	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "", "")
+	state, err := createOAuthState(deps, uid, "google", []string{"openid"}, "", "", "", "")
 	if err != nil {
 		t.Fatalf("create state: %v", err)
 	}
@@ -1165,7 +1285,7 @@ func TestCreateAndVerifyOAuthState_WithShop(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-456", "shopify", []string{"write_orders"}, "mystore", "", "")
+	state, err := createOAuthState(deps, "user-456", "shopify", []string{"write_orders"}, "mystore", "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}
@@ -1192,7 +1312,7 @@ func TestCreateAndVerifyOAuthState_EmptyShop(t *testing.T) {
 	t.Parallel()
 	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
 
-	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "")
+	state, err := createOAuthState(deps, "user-123", "google", []string{"openid"}, "", "", "", "")
 	if err != nil {
 		t.Fatalf("createOAuthState: %v", err)
 	}

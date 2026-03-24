@@ -22,7 +22,7 @@ func init() {
 		"airtable", "atlassian", "calendly", "datadog", "discord",
 		"docusign", "dropbox", "figma", "github", "google", "hubspot", "kroger",
 		"linear", "linkedin", "meta", "microsoft", "netlify", "notion",
-		"pagerduty", "quickbooks", "salesforce", "sendgrid", "shopify", "slack",
+		"pagerduty", "paypal", "quickbooks", "salesforce", "sendgrid", "shopify", "slack",
 		"square", "stripe", "vercel", "zendesk", "zoom",
 	} {
 		builtInOAuthProviders[id] = true

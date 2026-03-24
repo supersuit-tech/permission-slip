@@ -41,6 +41,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/netlify"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/notion"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/pagerduty"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/paypal"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/plaid"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/postgres"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/quickbooks"

@@ -1,0 +1,40 @@
+package paypal
+
+import (
+	"context"
+	"encoding/json"
+	"net/http"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+type remindInvoiceAction struct {
+	conn *PayPalConnector
+}
+
+type remindInvoiceParams struct {
+	InvoiceID string          `json:"invoice_id"`
+	Body      json.RawMessage `json:"body"`
+}
+
+func (a *remindInvoiceAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params remindInvoiceParams
+	if err := parseParams(req, &params); err != nil {
+		return nil, err
+	}
+	seg, err := pathSegment("invoice_id", params.InvoiceID)
+	if err != nil {
+		return nil, err
+	}
+	body, err := optionalJSONObject(params.Body, "body")
+	if err != nil {
+		return nil, err
+	}
+	path := "/v2/invoicing/invoices/" + seg + "/remind"
+	reqID := deriveRequestID(req.ActionType, req.Parameters)
+	raw, err := a.conn.doJSONRaw(ctx, req.Credentials, http.MethodPost, path, body, reqID)
+	if err != nil {
+		return nil, err
+	}
+	return connectors.JSONResult(raw)
+}

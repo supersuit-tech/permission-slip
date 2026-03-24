@@ -16,6 +16,8 @@
 //   - CSRF protection via signed JWT state tokens (HS256, 10-min TTL)
 //   - State encodes user ID + provider to prevent session fixation
 //   - Callback derives user identity from the signed state token (no session required)
+//   - PKCE verifiers are AES-256-GCM sealed with the state signing key before embedding
+//     in the JWT payload so they are not exposed in browser history or logs (JWT is only signed)
 //   - Tokens stored server-side in Supabase Vault (AES-256-GCM)
 //   - Provider path params validated against ProviderIDPattern
 //   - No tokens or secrets are ever returned in API responses
@@ -72,6 +74,7 @@ type oauthProviderResponse struct {
 	Scopes         []string `json:"scopes"`
 	Source         string   `json:"source"`
 	HasCredentials bool     `json:"has_credentials"`
+	PKCE           bool     `json:"pkce"`
 }
 
 type oauthProviderListResponse struct {
@@ -148,7 +151,11 @@ func oauthStateSecret(deps *Deps) string {
 //
 // The returnTo parameter is the frontend path the user should be sent back
 // to after the callback (e.g. "/agents/1"). Pass "" to redirect to "/".
-func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop, returnTo, replaceID string) (string, error) {
+//
+// pkceVerifier, when non-empty, is sealed and stored in the state JWT, then
+// recovered on callback for the token exchange (RFC 7636). Must be paired with
+// S256 challenge on the authorization request.
+func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop, returnTo, replaceID, pkceVerifier string) (string, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
 		return "", fmt.Errorf("no OAuth state secret configured")
@@ -169,6 +176,13 @@ func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop
 	}
 	if replaceID != "" {
 		claims["replace_id"] = replaceID
+	}
+	if pkceVerifier != "" {
+		sealed, err := sealOAuthStatePKCE(secret, pkceVerifier)
+		if err != nil {
+			return "", fmt.Errorf("seal pkce verifier: %w", err)
+		}
+		claims["pkce_sealed"] = sealed
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
@@ -193,6 +207,9 @@ type oauthState struct {
 	// set, storeOAuthTokens deletes only that specific connection. When empty,
 	// a new connection is created alongside any existing ones.
 	ReplaceID string
+	// PKCEVerifier is the RFC 7636 code verifier when PKCE is used for this
+	// flow. Empty when the provider does not require PKCE.
+	PKCEVerifier string
 }
 
 // verifyOAuthState validates the signed state JWT and returns the encoded
@@ -234,7 +251,18 @@ func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 	shop, _ := claims["shop"].(string)
 	returnTo, _ := claims["return_to"].(string)
 	replaceID, _ := claims["replace_id"].(string)
-	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop, ReturnTo: returnTo, ReplaceID: replaceID}, nil
+	var pkceVerifier string
+	if sealed, ok := claims["pkce_sealed"].(string); ok && sealed != "" {
+		v, err := openOAuthStatePKCE(secret, sealed)
+		if err != nil {
+			return nil, fmt.Errorf("invalid state token pkce: %w", err)
+		}
+		pkceVerifier = v
+	} else if legacy, ok := claims["pkce_verifier"].(string); ok && legacy != "" {
+		// In-flight tokens from before pkce_sealed (plaintext in JWT payload).
+		pkceVerifier = legacy
+	}
+	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop, ReturnTo: returnTo, ReplaceID: replaceID, PKCEVerifier: pkceVerifier}, nil
 }
 
 // --- Helpers ---
@@ -394,6 +422,7 @@ func handleListOAuthProviders(deps *Deps) http.HandlerFunc {
 				Scopes:         p.Scopes,
 				Source:         string(p.Source),
 				HasCredentials: p.HasClientCredentials(),
+				PKCE:           p.PKCE,
 			}
 		}
 		RespondJSON(w, http.StatusOK, oauthProviderListResponse{Providers: data})
@@ -482,7 +511,11 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 		// Optional: replace an existing connection instead of creating alongside.
 		replaceID := r.URL.Query().Get("replace")
 		profile := Profile(r.Context())
-		state, err := createOAuthState(deps, profile.ID, providerID, storedOAuthScopes, instanceID, returnTo, replaceID)
+		var pkceVerifier string
+		if provider.PKCE {
+			pkceVerifier = oauth2.GenerateVerifier()
+		}
+		state, err := createOAuthState(deps, profile.ID, providerID, storedOAuthScopes, instanceID, returnTo, replaceID, pkceVerifier)
 		if err != nil {
 			log.Printf("[%s] OAuthAuthorize: create state: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -500,6 +533,9 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 				continue
 			}
 			authOpts = append(authOpts, oauth2.SetAuthURLParam(k, v))
+		}
+		if pkceVerifier != "" {
+			authOpts = append(authOpts, oauth2.S256ChallengeOption(pkceVerifier))
 		}
 		authURL := cfg.AuthCodeURL(state, authOpts...)
 		http.Redirect(w, r, authURL, http.StatusTemporaryRedirect)
@@ -609,7 +645,11 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 		// Exchange authorization code for tokens.
 		ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 		defer cancel()
-		token, err := cfg.Exchange(ctx, code)
+		var exchangeOpts []oauth2.AuthCodeOption
+		if state.PKCEVerifier != "" {
+			exchangeOpts = append(exchangeOpts, oauth2.VerifierOption(state.PKCEVerifier))
+		}
+		token, err := cfg.Exchange(ctx, code, exchangeOpts...)
 		if err != nil {
 			log.Printf("[%s] OAuthCallback: token exchange failed: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)

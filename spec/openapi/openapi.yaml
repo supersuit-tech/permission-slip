@@ -15,7 +15,7 @@ info:
     - **Action**: Pre-defined, structured request with a type, validated parameters, and execution logic — the core primitive
     - **Agent**: Automated system with a cryptographic key pair that submits actions for approval
     - **Approver**: Human authorized to approve or deny agent actions
-    - **Connector**: Integration with an external service (e.g., Gmail, Stripe) that defines available actions
+    - **Connector**: Integration with an external service (e.g., Gmail, Stripe, PayPal) that defines available actions
     - **Credential**: Encrypted API key or OAuth token for an external service, stored in Permission Slip's vault
     - **Registration**: One-time setup where agent proves identity via public key
     - **Approval Request**: Async request for permission to execute a specific action
@@ -53,7 +53,7 @@ info:
     ## Architecture
     
     ```
-    Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, etc.)
+    Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, PayPal, etc.)
                    │
                    ▼
               User (approve/deny)
