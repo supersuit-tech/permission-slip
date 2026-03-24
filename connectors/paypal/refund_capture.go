@@ -24,7 +24,8 @@ func (a *refundCaptureAction) Execute(ctx context.Context, req connectors.Action
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
-	if err := validatePayPalPathID("capture_id", params.CaptureID); err != nil {
+	seg, err := pathSegment("capture_id", params.CaptureID)
+	if err != nil {
 		return nil, err
 	}
 	var body map[string]any
@@ -35,7 +36,7 @@ func (a *refundCaptureAction) Execute(ctx context.Context, req connectors.Action
 			return nil, err
 		}
 	}
-	path := "/v2/payments/captures/" + params.CaptureID + "/refund"
+	path := "/v2/payments/captures/" + seg + "/refund"
 	reqID := deriveRequestID(req.ActionType, req.Parameters)
 	raw, err := a.conn.doJSONRaw(ctx, req.Credentials, http.MethodPost, path, body, reqID)
 	if err != nil {

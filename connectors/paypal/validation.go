@@ -2,6 +2,7 @@ package paypal
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 	"unicode"
 
@@ -26,4 +27,12 @@ func validatePayPalPathID(field, id string) error {
 		}
 	}
 	return nil
+}
+
+// pathSegment returns url.PathEscape(id) after validation, for safe path construction.
+func pathSegment(field, id string) (string, error) {
+	if err := validatePayPalPathID(field, id); err != nil {
+		return "", err
+	}
+	return url.PathEscape(strings.TrimSpace(id)), nil
 }

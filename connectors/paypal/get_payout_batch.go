@@ -22,10 +22,11 @@ func (a *getPayoutBatchAction) Execute(ctx context.Context, req connectors.Actio
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
-	if err := validatePayPalPathID("payout_batch_id", params.PayoutBatchID); err != nil {
+	seg, err := pathSegment("payout_batch_id", params.PayoutBatchID)
+	if err != nil {
 		return nil, err
 	}
-	path := "/v1/payments/payouts/" + params.PayoutBatchID
+	path := "/v1/payments/payouts/" + seg
 	var raw json.RawMessage
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, path, nil, &raw, ""); err != nil {
 		return nil, err

@@ -22,10 +22,11 @@ func (a *getOrderAction) Execute(ctx context.Context, req connectors.ActionReque
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
-	if err := validatePayPalPathID("order_id", params.OrderID); err != nil {
+	seg, err := pathSegment("order_id", params.OrderID)
+	if err != nil {
 		return nil, err
 	}
-	path := "/v2/checkout/orders/" + params.OrderID
+	path := "/v2/checkout/orders/" + seg
 	var raw json.RawMessage
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, path, nil, &raw, ""); err != nil {
 		return nil, err

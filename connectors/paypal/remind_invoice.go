@@ -23,7 +23,8 @@ func (a *remindInvoiceAction) Execute(ctx context.Context, req connectors.Action
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
-	if err := validatePayPalPathID("invoice_id", params.InvoiceID); err != nil {
+	seg, err := pathSegment("invoice_id", params.InvoiceID)
+	if err != nil {
 		return nil, err
 	}
 	var body map[string]any
@@ -34,7 +35,7 @@ func (a *remindInvoiceAction) Execute(ctx context.Context, req connectors.Action
 			return nil, err
 		}
 	}
-	path := "/v2/invoicing/invoices/" + params.InvoiceID + "/remind"
+	path := "/v2/invoicing/invoices/" + seg + "/remind"
 	reqID := deriveRequestID(req.ActionType, req.Parameters)
 	raw, err := a.conn.doJSONRaw(ctx, req.Credentials, http.MethodPost, path, body, reqID)
 	if err != nil {

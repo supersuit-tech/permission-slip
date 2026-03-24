@@ -24,7 +24,8 @@ func (a *captureOrderAction) Execute(ctx context.Context, req connectors.ActionR
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}
-	if err := validatePayPalPathID("order_id", params.OrderID); err != nil {
+	seg, err := pathSegment("order_id", params.OrderID)
+	if err != nil {
 		return nil, err
 	}
 	var body map[string]any
@@ -35,7 +36,7 @@ func (a *captureOrderAction) Execute(ctx context.Context, req connectors.ActionR
 			return nil, err
 		}
 	}
-	path := "/v2/checkout/orders/" + params.OrderID + "/capture"
+	path := "/v2/checkout/orders/" + seg + "/capture"
 	reqID := deriveRequestID(req.ActionType, req.Parameters)
 	raw, err := a.conn.doJSONRaw(ctx, req.Credentials, http.MethodPost, path, body, reqID)
 	if err != nil {

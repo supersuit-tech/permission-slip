@@ -26,4 +26,7 @@ func TestManifest_Valid(t *testing.T) {
 	if len(m.RequiredCredentials) != 1 || m.RequiredCredentials[0].OAuthProvider != "paypal" {
 		t.Errorf("credentials: %+v", m.RequiredCredentials)
 	}
+	if len(m.Templates) != 5 {
+		t.Errorf("Templates count = %d, want 5", len(m.Templates))
+	}
 }

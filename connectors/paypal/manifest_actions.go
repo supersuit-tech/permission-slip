@@ -20,7 +20,7 @@ func paypalActions() []connectors.ManifestAction {
 				"properties": {
 					"payout_batch": {
 						"type": "object",
-						"description": "PayPal payout batch JSON (sender_batch_header, items[]). Each item can target a Venmo wallet via recipient_wallet: VENMO.",
+						"description": "PayPal payout batch JSON (sender_batch_header, items[]). For Venmo recipients use recipient_wallet: VENMO with recipient_type PHONE (E.164) or USER_HANDLE (Venmo username). Docs: https://developer.paypal.com/docs/api/payments.payouts-batch/v1/",
 						"additionalProperties": true
 					}
 				}
@@ -72,7 +72,7 @@ func paypalActions() []connectors.ManifestAction {
 				"properties": {
 					"order": {
 						"type": "object",
-						"description": "Order create payload (intent, purchase_units, payment_source, application_context, etc.)",
+						"description": "Order create payload (intent, purchase_units, optional payment_source.paypal for wallet checkout, application_context with https return_url/cancel_url). Docs: https://developer.paypal.com/docs/api/orders/v2/",
 						"additionalProperties": true
 					}
 				}
