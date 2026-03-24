@@ -209,7 +209,8 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "integer",
 							"minimum": 0,
 							"default": 0,
-							"description": "Pagination offset"
+							"description": "Pagination offset",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -238,7 +239,8 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "integer",
 							"minimum": 0,
 							"default": 0,
-							"description": "Pagination offset"
+							"description": "Pagination offset",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -278,7 +280,8 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "integer",
 							"minimum": 0,
 							"default": 0,
-							"description": "Pagination offset"
+							"description": "Pagination offset",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),

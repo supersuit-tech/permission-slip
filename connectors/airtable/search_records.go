@@ -22,6 +22,7 @@ type searchRecordsParams struct {
 	Fields     []string    `json:"fields,omitempty"`
 	MaxRecords int         `json:"max_records,omitempty"`
 	Sort       []sortField `json:"sort,omitempty"`
+	Offset     string      `json:"offset,omitempty"`
 }
 
 func (p searchRecordsParams) validate() error {
@@ -66,6 +67,9 @@ func (a *searchRecordsAction) Execute(ctx context.Context, req connectors.Action
 		if s.Direction != "" {
 			q.Set(fmt.Sprintf("sort[%d][direction]", i), s.Direction)
 		}
+	}
+	if params.Offset != "" {
+		q.Set("offset", params.Offset)
 	}
 
 	reqURL += "?" + q.Encode()

@@ -120,7 +120,9 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"due_date": {
 							"type": "string",
-							"description": "Due date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Due date in YYYY-MM-DD format",
+							"x-ui": {"widget": "date"}
 						},
 						"description": {
 							"type": "string",

@@ -103,7 +103,8 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 						"send_at": {
 							"type": "string",
 							"format": "date-time",
-							"description": "ISO 8601 timestamp for when to send (must be in the future, e.g. 2026-03-15T10:00:00Z)"
+							"description": "ISO 8601 timestamp for when to send (must be in the future, e.g. 2026-03-15T10:00:00Z)",
+							"x-ui": {"widget": "datetime"}
 						},
 						"suppression_group_id": {
 							"type": "integer",

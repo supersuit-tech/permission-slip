@@ -36,11 +36,23 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"checkin": {
 							"type": "string",
-							"description": "Check-in date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Check-in date (YYYY-MM-DD)",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "checkout",
+								"datetime_range_role": "lower"
+							}
 						},
 						"checkout": {
 							"type": "string",
-							"description": "Check-out date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Check-out date (YYYY-MM-DD)",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "checkin",
+								"datetime_range_role": "upper"
+							}
 						},
 						"region_id": {
 							"type": "string",
@@ -99,11 +111,23 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"checkin": {
 							"type": "string",
-							"description": "Check-in date (YYYY-MM-DD) for rate information"
+							"format": "date",
+							"description": "Check-in date (YYYY-MM-DD) for rate information",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "checkout",
+								"datetime_range_role": "lower"
+							}
 						},
 						"checkout": {
 							"type": "string",
-							"description": "Check-out date (YYYY-MM-DD) for rate information"
+							"format": "date",
+							"description": "Check-out date (YYYY-MM-DD) for rate information",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "checkin",
+								"datetime_range_role": "upper"
+							}
 						},
 						"occupancy": {
 							"type": "string",

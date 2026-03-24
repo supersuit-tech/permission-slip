@@ -149,7 +149,7 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "intercom.search_tickets",
 				Name:        "Search Tickets",
-				Description: "Search tickets using a single-field filter. Use '=' for exact match, '~' for contains, 'IN' for multiple values.",
+				Description: "Search tickets using a single-field filter. Use '=' for exact match, '~' for contains, 'IN' for multiple values. Optional created_at / updated_at bounds are combined with AND.",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -167,6 +167,46 @@ func (c *IntercomConnector) Manifest() *connectors.ConnectorManifest {
 						"value": {
 							"type": "string",
 							"description": "Value to search for (e.g. 'submitted', 'billing issue')"
+						},
+						"created_at_after": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Only tickets with created_at strictly after this time (RFC 3339 or Unix timestamp)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "created_at_before",
+								"datetime_range_role": "lower"
+							}
+						},
+						"created_at_before": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Only tickets with created_at strictly before this time (RFC 3339 or Unix timestamp)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "created_at_after",
+								"datetime_range_role": "upper"
+							}
+						},
+						"updated_at_after": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Only tickets with updated_at strictly after this time (RFC 3339 or Unix timestamp)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "updated_at_before",
+								"datetime_range_role": "lower"
+							}
+						},
+						"updated_at_before": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Only tickets with updated_at strictly before this time (RFC 3339 or Unix timestamp)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "updated_at_after",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),

@@ -29,7 +29,8 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"offset": {
 							"type": "string",
-							"description": "Pagination offset from a previous response"
+							"description": "Pagination offset from a previous response",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -86,7 +87,8 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"offset": {
 							"type": "string",
-							"description": "Pagination offset from a previous response"
+							"description": "Pagination offset from a previous response",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -259,6 +261,11 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 								}
 							},
 							"description": "Sort order for results"
+						},
+						"offset": {
+							"type": "string",
+							"description": "Pagination offset from a previous response",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
