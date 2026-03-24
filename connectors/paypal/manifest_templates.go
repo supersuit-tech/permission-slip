@@ -45,9 +45,13 @@ func paypalTemplates() []connectors.ManifestTemplate {
 							}
 						}
 					],
-					"application_context": {
-						"return_url": "https://example.com/paypal/return",
-						"cancel_url": "https://example.com/paypal/cancel"
+					"payment_source": {
+						"paypal": {
+							"experience_context": {
+								"return_url": "https://example.com/paypal/return",
+								"cancel_url": "https://example.com/paypal/cancel"
+							}
+						}
 					}
 				}
 			}`)),

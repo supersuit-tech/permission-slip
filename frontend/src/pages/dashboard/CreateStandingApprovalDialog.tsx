@@ -169,6 +169,9 @@ export function CreateStandingApprovalDialog({
     [activeConfigs, selectedConfigId],
   );
 
+  // Invariant: each agent should have at most one active config per action_type.
+  // If duplicates exist, Array.find picks the first match — which may not be the
+  // intended config. The backend enforces uniqueness, so this is a defensive note.
   const matchingConfigForContext = useMemo(() => {
     if (!ctxActionType) return null;
     return activeConfigs.find((c) => c.action_type === ctxActionType) ?? null;
@@ -322,6 +325,12 @@ export function CreateStandingApprovalDialog({
       setManualConstraintsJson("");
       setStep(3);
     } else if (step === 3) {
+      // When we skip step 2 (hasInitialContext), configs may still be loading.
+      // Guard here so source_action_configuration_id is resolved before submit.
+      if (configsLoading) {
+        toast.error("Please wait for configurations to finish loading");
+        return;
+      }
       if (schemaLoading) {
         toast.error("Please wait for the parameter schema to finish loading");
         return;
@@ -626,7 +635,7 @@ export function CreateStandingApprovalDialog({
                 onClick={handleNext}
                 disabled={
                   (step === 2 && configsLoading) ||
-                  (step === 3 && schemaLoading)
+                  (step === 3 && (schemaLoading || configsLoading))
                 }
               >
                 Next
