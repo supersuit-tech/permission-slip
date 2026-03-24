@@ -1,4 +1,4 @@
-name: Trigger Webhook
+name: Trigger Webhook (disabled)
 on:
   workflow_dispatch:
     inputs:
@@ -17,6 +17,7 @@ on:
 
 jobs:
   notify:
+    if: false  # Webhook notifications disabled — no longer in use
     runs-on: ubuntu-latest
     steps:
       - name: Send Webhook

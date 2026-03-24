@@ -77,13 +77,8 @@ if [[ "$WEBHOOK_ONLY" == "true" ]]; then
     echo "[post] ERROR: --webhook-only requires --work-dir and a prior successful watch-post run with --skip-webhook (missing ${pending_file})." >&2
     exit 2
   fi
-  echo "[post] Triggering webhook notification only..."
-  if gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null; then
-    rm -f "$pending_file"
-  else
-    echo "[post] WARNING: Failed to trigger webhook (sentinel kept for retry)." >&2
-    exit 1
-  fi
+  echo "[post] Webhook notifications disabled — skipping."
+  rm -f "$pending_file"
   echo "POST_WEBHOOK_ONLY=true"
   exit 0
 fi
@@ -225,20 +220,11 @@ fi
 # ---------------------------------------------------------------------------
 # Trigger webhook notification (skipped with --no-notify or --skip-webhook)
 # ---------------------------------------------------------------------------
-if [[ "$NO_NOTIFY" == "true" || "$SKIP_WEBHOOK" == "true" ]]; then
-  echo "[post] Skipping webhook notification (--no-notify or --skip-webhook)."
-else
-  echo "[post] Triggering webhook notification..."
-  gh_cmd workflow run trigger-webhook.yml -f pr_url="${PR_URL}" 2>/dev/null || echo "[post] WARNING: Failed to trigger webhook"
-  if [[ -n "$WORK_DIR" && -f "${WORK_DIR}/post-webhook-pending" ]]; then
-    rm -f "${WORK_DIR}/post-webhook-pending"
-  fi
-fi
+# Webhook notifications disabled — trigger-webhook.yml is no longer in use.
+# The flags (--no-notify, --skip-webhook) are kept for backwards compatibility.
+echo "[post] Webhook notifications disabled — skipping."
 
-if [[ -n "$WORK_DIR" && "$SKIP_WEBHOOK" == "true" && "$NO_NOTIFY" == "false" ]]; then
-  touch "${WORK_DIR}/post-webhook-pending"
-  echo "[post] Wrote ${WORK_DIR}/post-webhook-pending (use --webhook-only after final green run to notify)."
-fi
+# post-webhook-pending sentinel no longer needed (webhook disabled)
 
 echo ""
 echo "POST_COMPLETE"
