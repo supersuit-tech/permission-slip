@@ -47,12 +47,20 @@ export function AddCredentialDialog({
   const [apiKey, setApiKey] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [cdpApiKeyID, setCdpApiKeyID] = useState("");
+  const [cdpApiKeySecret, setCdpApiKeySecret] = useState("");
+  const [cdpWalletSecret, setCdpWalletSecret] = useState("");
+
+  const isCoinbaseAgentKit = credential.service === "coinbase_agentkit";
 
   function resetForm() {
     setLabel("");
     setApiKey("");
     setUsername("");
     setPassword("");
+    setCdpApiKeyID("");
+    setCdpApiKeySecret("");
+    setCdpWalletSecret("");
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -92,6 +100,21 @@ export function AddCredentialDialog({
   const resolvedTitle = title ?? "Add Credential";
 
   function buildCredentials(): Record<string, string> | null {
+    if (isCoinbaseAgentKit) {
+      if (
+        !cdpApiKeyID.trim() ||
+        !cdpApiKeySecret.trim() ||
+        !cdpWalletSecret.trim()
+      ) {
+        toast.error("API Key ID, API Key Secret, and Wallet Secret are required");
+        return null;
+      }
+      return {
+        api_key_id: cdpApiKeyID.trim(),
+        api_key_secret: cdpApiKeySecret.trim(),
+        wallet_secret: cdpWalletSecret.trim(),
+      };
+    }
     if (credential.auth_type === "basic") {
       if (!username.trim() || !password.trim()) {
         toast.error("Username and password are required");
@@ -131,7 +154,61 @@ export function AddCredentialDialog({
                 disabled={isLoading}
               />
             </div>
-            {isBasic ? (
+            {isCoinbaseAgentKit ? (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="cdp-api-key-id">API Key ID</Label>
+                  <Input
+                    id="cdp-api-key-id"
+                    placeholder="From CDP Portal → API Keys"
+                    value={cdpApiKeyID}
+                    onChange={(e) => setCdpApiKeyID(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cdp-api-key-secret">API Key Secret</Label>
+                  <Input
+                    id="cdp-api-key-secret"
+                    type="password"
+                    placeholder="PEM EC private key or Ed25519 secret from portal"
+                    value={cdpApiKeySecret}
+                    onChange={(e) => setCdpApiKeySecret(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="cdp-wallet-secret">Wallet Secret</Label>
+                  <Input
+                    id="cdp-wallet-secret"
+                    type="password"
+                    placeholder="Base64 PKCS#8 wallet secret from Wallet API product"
+                    value={cdpWalletSecret}
+                    onChange={(e) => setCdpWalletSecret(e.target.value)}
+                    disabled={isLoading}
+                    required
+                    autoComplete="off"
+                  />
+                </div>
+                <p className="text-muted-foreground text-xs">
+                  Create keys at{" "}
+                  <a
+                    href="https://portal.cdp.coinbase.com/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline"
+                  >
+                    portal.cdp.coinbase.com
+                  </a>
+                  . The wallet secret is required for signing and sending
+                  transactions.
+                </p>
+              </>
+            ) : isBasic ? (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="cred-username">Username</Label>
