@@ -279,10 +279,12 @@ func TestExecuteConnectorAction_OAuthPath_NoConnection_NoBinding(t *testing.T) {
 	}
 }
 
-// TestExecuteConnectorAction_DualAuth_NoBinding_ReturnsError verifies that when a
-// connector supports both OAuth and API key, but no credential binding exists,
-// execution fails with a clear error instead of auto-resolving.
-func TestExecuteConnectorAction_DualAuth_NoBinding_ReturnsError(t *testing.T) {
+// TestExecuteConnectorAction_OAuth_NoBinding_ReturnsError verifies that when a
+// connector requires OAuth but no credential binding exists, execution fails
+// with a clear error instead of auto-resolving.
+// (Previously tested with dual oauth2+api_key auth, but mixed auth types are
+// now prevented at the schema level per issue #803.)
+func TestExecuteConnectorAction_OAuth_NoBinding_ReturnsError(t *testing.T) {
 	t.Parallel()
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{
@@ -292,16 +294,7 @@ func TestExecuteConnectorAction_DualAuth_NoBinding_ReturnsError(t *testing.T) {
 		// No OAuth connection — no binding will be created.
 	})
 
-	// Add a static api_key credential alongside the OAuth one.
-	testhelper.InsertConnectorRequiredCredential(t, f.TX, "testnotion", "testnotion", "api_key")
-	vaultID, vaultErr := f.Vault.CreateSecret(t.Context(), nil, "testnotion-cred", []byte(`{"api_key":"ntn_test_key_123"}`))
-	if vaultErr != nil {
-		t.Fatalf("create vault secret: %v", vaultErr)
-	}
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, f.TX, credID, f.UserID, "testnotion", vaultID)
-
-	// Without a binding, execution should fail even though credentials exist.
+	// Without a binding, execution should fail even though the connector exists.
 	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
 	if err == nil {
 		t.Fatal("expected error when no credential binding exists")
@@ -311,11 +304,12 @@ func TestExecuteConnectorAction_DualAuth_NoBinding_ReturnsError(t *testing.T) {
 	}
 }
 
-// TestExecuteConnectorAction_DualAuth_NeedsReauth_NoFallback verifies that when
-// a connector supports both OAuth and API key, but the OAuth connection exists
-// with status needs_reauth, we do NOT silently fall back to API key — the user
-// must re-authorize OAuth.
-func TestExecuteConnectorAction_DualAuth_NeedsReauth_NoFallback(t *testing.T) {
+// TestExecuteConnectorAction_OAuth_NeedsReauth verifies that when a connector
+// requires OAuth and the connection has status needs_reauth, execution returns
+// an OAuthRefreshError instead of proceeding.
+// (Previously tested with dual oauth2+api_key auth to verify no fallback, but
+// mixed auth types are now prevented at the schema level per issue #803.)
+func TestExecuteConnectorAction_OAuth_NeedsReauth(t *testing.T) {
 	t.Parallel()
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{
@@ -325,18 +319,9 @@ func TestExecuteConnectorAction_DualAuth_NeedsReauth_NoFallback(t *testing.T) {
 		Connection:  &testhelper.OAuthConnectionOpts{Status: "needs_reauth"},
 	})
 
-	// Add a static api_key credential alongside the OAuth one.
-	testhelper.InsertConnectorRequiredCredential(t, f.TX, "testnotion", "testnotion", "api_key")
-	vaultID, vaultErr := f.Vault.CreateSecret(t.Context(), nil, "testnotion-cred", []byte(`{"api_key":"ntn_test_key_123"}`))
-	if vaultErr != nil {
-		t.Fatalf("create vault secret: %v", vaultErr)
-	}
-	credID := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, f.TX, credID, f.UserID, "testnotion", vaultID)
-
 	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
 	if err == nil {
-		t.Fatal("expected error for needs_reauth — should NOT fall back to API key")
+		t.Fatal("expected error for needs_reauth status")
 	}
 	if !connectors.IsOAuthRefreshError(err) {
 		t.Errorf("expected OAuthRefreshError, got %T: %v", err, err)
@@ -478,6 +463,38 @@ func TestExecuteConnectorAction_OAuthPath_NilTokenExpirySkipsRefresh(t *testing.
 	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	tok, _ := capturedCreds.Get("access_token")
+	if tok != "no-expiry-token" {
+		t.Errorf("expected access_token %q, got %q", "no-expiry-token", tok)
+	}
+}
+
+// TestExecuteConnectorAction_OAuthPath_NilExpiryNilOAuthRegistrySucceeds verifies
+// that tokens with no expiry work even when deps.OAuthProviders is nil.
+// This is the regression test for the OAuthProviders nil-check relocation.
+func TestExecuteConnectorAction_OAuthPath_NilExpiryNilOAuthRegistrySucceeds(t *testing.T) {
+	t.Parallel()
+
+	var capturedCreds connectors.Credentials
+	f := setupOAuthExecutionTest(t, oauthExecOpts{
+		OnExec:          func(creds connectors.Credentials) { capturedCreds = creds },
+		Connection:      &testhelper.OAuthConnectionOpts{Status: "active"},
+		NoOAuthRegistry: true,
+	})
+
+	// Store a token with no expiry — refresh should never be attempted.
+	accessVaultID, _ := f.Vault.CreateSecret(t.Context(), f.TX, "access", []byte("no-expiry-token"))
+	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
+	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, nil)
+
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	if err != nil {
+		t.Fatalf("unexpected error with nil OAuthProviders and nil expiry: %v", err)
 	}
 	if result == nil {
 		t.Fatal("expected non-nil result")

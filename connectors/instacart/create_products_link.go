@@ -132,5 +132,9 @@ func (a *createProductsLinkAction) Execute(ctx context.Context, req connectors.A
 		return nil, err
 	}
 
+	if strings.TrimSpace(apiResp.ProductsLinkURL) == "" {
+		return nil, &connectors.ExternalError{Message: "Instacart returned an empty products_link_url"}
+	}
+
 	return connectors.JSONResult(apiResp)
 }

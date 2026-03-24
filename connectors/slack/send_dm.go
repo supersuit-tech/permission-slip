@@ -56,7 +56,7 @@ func (a *sendDMAction) Execute(ctx context.Context, req connectors.ActionRequest
 		return nil, err
 	}
 	if !openResp.OK {
-		return nil, mapSlackError(openResp.Error)
+		return nil, openResp.asError()
 	}
 
 	dmChannelID := openResp.Channel.ID
@@ -71,7 +71,7 @@ func (a *sendDMAction) Execute(ctx context.Context, req connectors.ActionRequest
 		return nil, err
 	}
 	if !msgResp.OK {
-		return nil, mapSlackError(msgResp.Error)
+		return nil, msgResp.asError()
 	}
 
 	return connectors.JSONResult(map[string]string{

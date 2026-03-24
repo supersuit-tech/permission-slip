@@ -85,7 +85,7 @@ func (a *readChannelMessagesAction) Execute(ctx context.Context, req connectors.
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	return connectors.JSONResult(toMessagesResult(&resp))
@@ -104,8 +104,8 @@ func toSlackTimestamp(value string) (string, error) {
 	if _, err := strconv.ParseFloat(value, 64); err == nil {
 		return value, nil
 	}
-	// Try parsing as RFC 3339.
-	t, err := time.Parse(time.RFC3339, value)
+	// Try parsing as RFC 3339 (with optional fractional seconds).
+	t, err := time.Parse(time.RFC3339Nano, value)
 	if err != nil {
 		return "", fmt.Errorf("expected a date/time or Unix timestamp, got %q", value)
 	}

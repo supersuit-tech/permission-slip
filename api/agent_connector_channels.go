@@ -89,6 +89,7 @@ func handleListAgentConnectorChannels(deps *Deps) http.HandlerFunc {
 				return
 			}
 			log.Printf("[%s] ListAgentConnectorChannels validate creds: %v", TraceID(r.Context()), err)
+			CaptureConnectorError(r.Context(), err, connErrCtx)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Credential validation failed"))
 			return
 		}

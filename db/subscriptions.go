@@ -419,11 +419,17 @@ func ClearExpiredSubscriptionQuotaGrace(ctx context.Context, db DBTX, userID str
 	return err
 }
 
+// IsInQuotaGrace reports whether the subscription has an active
+// post-downgrade quota grace window (paid quotas still apply).
+func (s *Subscription) IsInQuotaGrace() bool {
+	return s.QuotaPlanID != nil && s.QuotaEntitlementsUntil != nil && time.Now().Before(*s.QuotaEntitlementsUntil)
+}
+
 // EffectiveQuotaPlan returns the plan whose resource/request quotas should
 // apply. During an active quota grace period after downgrade, this is the
 // snapshotted paid plan; otherwise the current plan row.
 func (sp *SubscriptionWithPlan) EffectiveQuotaPlan() *Plan {
-	if sp.QuotaPlanID != nil && sp.QuotaEntitlementsUntil != nil && time.Now().Before(*sp.QuotaEntitlementsUntil) {
+	if sp.IsInQuotaGrace() {
 		if p := GetPlan(*sp.QuotaPlanID); p != nil {
 			return p
 		}
@@ -441,7 +447,7 @@ func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*Subs
 	if sub == nil {
 		return nil, nil
 	}
-	if sub.QuotaPlanID != nil && sub.QuotaEntitlementsUntil != nil && !time.Now().Before(*sub.QuotaEntitlementsUntil) {
+	if !sub.IsInQuotaGrace() && sub.QuotaPlanID != nil {
 		if err := ClearExpiredSubscriptionQuotaGrace(ctx, db, userID); err != nil {
 			return nil, err
 		}
