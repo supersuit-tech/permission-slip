@@ -1,3 +1,5 @@
+// AES-256-GCM helpers for sealing the PKCE code verifier inside the OAuth state JWT.
+// JWTs are signed but not encrypted; without this, the verifier would be readable from the base64url-encoded payload.
 package api
 
 import (

@@ -29,10 +29,12 @@ OAuthProvider:
       type: boolean
       description: >
         When true, the platform uses PKCE (RFC 7636) for this provider's authorize
-        and token exchange. Clients only need to start the usual browser redirect;
-        the verifier is stored server-side in the OAuth state token.
+        and token exchange. The browser still follows the normal redirect to
+        `GET /v1/oauth/{provider}/authorize`; the code verifier is generated and
+        recovered server-side inside the signed OAuth state JWT (sealed so the JWT
+        payload does not contain the verifier in plaintext).
       default: false
-      example: false
+      example: true
 
 OAuthProviderListResponse:
   type: object
