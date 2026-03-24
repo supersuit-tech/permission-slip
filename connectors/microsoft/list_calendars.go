@@ -66,9 +66,5 @@ func graphNextRelativePath(baseURL, nextLink string) string {
 	if !strings.HasPrefix(full, base+"/") && !strings.HasPrefix(full, base+"?") {
 		return ""
 	}
-	rel := full[len(base):]
-	if rel == "" {
-		return ""
-	}
-	return rel // always starts with '/' or '?' per prefix check above
+	return full[len(base):] // always non-empty, starts with '/' or '?' per prefix check above
 }
