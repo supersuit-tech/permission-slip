@@ -53,6 +53,9 @@ func JSONResult(v any) (*ActionResult, error) {
 // UTF-8 sequences. Use this for schema-facing validation where maxLength
 // counts Unicode code points, not bytes.
 func TruncateUTF8(s string, maxChars int) string {
+	if maxChars <= 0 {
+		return "...(truncated)"
+	}
 	count := 0
 	for i := range s {
 		if count == maxChars {
