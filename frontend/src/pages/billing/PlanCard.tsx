@@ -7,13 +7,12 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import type { BillingPricing, Plan, PlanLimits, Subscription } from "@/hooks/useBillingPlan";
+import type { BillingPricing, Plan, Subscription } from "@/hooks/useBillingPlan";
 import { DetailRow } from "./DetailRow";
 import { formatDate } from "./formatters";
 
 interface PlanCardProps {
   plan: Plan;
-  effectiveLimits: PlanLimits;
   subscription: Subscription;
   pricing?: BillingPricing;
 }

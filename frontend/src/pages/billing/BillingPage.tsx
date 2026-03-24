@@ -107,7 +107,6 @@ export function BillingPage() {
         <>
           <PlanCard
             plan={billingPlan.plan}
-            effectiveLimits={billingPlan.effective_limits}
             subscription={billingPlan.subscription}
             pricing={billingPlan.pricing}
           />
