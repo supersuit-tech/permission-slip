@@ -164,7 +164,7 @@ func TestCreateProductsLink_LineItemNameTooLong(t *testing.T) {
 	t.Parallel()
 	conn := New()
 	action := conn.Actions()["instacart.create_products_link"]
-	longName := make([]byte, maxLineItemNameBytes+1)
+	longName := make([]byte, maxLineItemNameChars+1)
 	for i := range longName {
 		longName[i] = 'a'
 	}

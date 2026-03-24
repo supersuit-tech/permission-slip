@@ -30,11 +30,11 @@ func TestTruncateErrorMessage_Long(t *testing.T) {
 	t.Parallel()
 	msg := strings.Repeat("x", maxErrorMessageLen+100)
 	result := truncateErrorMessage(msg)
-	if !strings.HasSuffix(result, "... (truncated)") {
+	if !strings.HasSuffix(result, "...(truncated)") {
 		t.Errorf("expected truncated suffix, got %q", result[len(result)-20:])
 	}
-	if len(result) != maxErrorMessageLen+len("... (truncated)") {
-		t.Errorf("expected length %d, got %d", maxErrorMessageLen+len("... (truncated)"), len(result))
+	if len(result) != maxErrorMessageLen+len("...(truncated)") {
+		t.Errorf("expected length %d, got %d", maxErrorMessageLen+len("...(truncated)"), len(result))
 	}
 }
 
