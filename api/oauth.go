@@ -252,8 +252,9 @@ func newOAuth2Config(deps *Deps, provider oauth.Provider) *oauth2.Config {
 		ClientID:     provider.ClientID,
 		ClientSecret: provider.ClientSecret,
 		Endpoint: oauth2.Endpoint{
-			AuthURL:  provider.AuthorizeURL,
-			TokenURL: provider.TokenURL,
+			AuthURL:   provider.AuthorizeURL,
+			TokenURL:  provider.TokenURL,
+			AuthStyle: provider.AuthStyle,
 		},
 		RedirectURL: oauthCallbackURL(deps, provider.ID),
 		Scopes:      scopes,
@@ -463,8 +464,9 @@ func handleOAuthAuthorize(deps *Deps) http.HandlerFunc {
 			cfg.Scopes = deduplicateScopes(append(cfg.Scopes, extraScopes...))
 		}
 
-		// Slack user-token-only OAuth: scopes are sent as user_scope via
-		// AuthorizeParams; the oauth2 library must not add a bot "scope" query param.
+		// Slack sends comma-separated scopes via AuthorizeParams "scope";
+		// clear the oauth2 library's space-separated scope list so it doesn't
+		// add a duplicate (and incorrectly formatted) scope query param.
 		storedOAuthScopes := cfg.Scopes
 		if providerID == "slack" {
 			cfg.Scopes = nil
@@ -615,19 +617,14 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Slack user-token-only OAuth: the Web API user token is nested under
-		// authed_user.access_token; promote it to the primary access_token we
-		// store and use for all connector actions. If Slack omits it, the app
-		// is likely still configured for bot scopes only — fail with a clear
-		// message instead of storing a bot token the connector cannot use.
-		if providerID == "slack" {
-			if oauth.SlackAuthedUserAccessToken(token) == "" {
-				redirectToFrontend(w, r, deps, providerID, "error",
-					"Slack did not return a user OAuth token. In your Slack app settings, add the required User Token Scopes, remove Bot Token Scopes from the install flow, then connect again.",
-					state.ReturnTo, "")
-				return
-			}
-			token = oauth.NormalizeSlackUserOAuthToken(token)
+		// Slack user-token-only OAuth: the v2_user token endpoint returns
+		// the user token (xoxp-) at the top level, so no authed_user
+		// extraction is needed. Verify we got a user token (not empty).
+		if providerID == "slack" && token.AccessToken == "" {
+			redirectToFrontend(w, r, deps, providerID, "error",
+				"Slack did not return a user OAuth token. Check your Slack app User Token Scopes configuration, then try again.",
+				state.ReturnTo, "")
+			return
 		}
 
 		// Store tokens in vault within a transaction. Use scopes from the

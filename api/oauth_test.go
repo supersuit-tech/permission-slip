@@ -93,16 +93,16 @@ func oauthDeps(tx db.DBTX) *Deps {
 	}
 }
 
-// oauthDepsWithSlack registers the Slack provider like production (user_scope only).
+// oauthDepsWithSlack registers the Slack provider like production (v2_user endpoints).
 func oauthDepsWithSlack(tx db.DBTX) *Deps {
 	reg := oauth.NewRegistry()
 	_ = reg.Register(oauth.Provider{
 		ID:           "slack",
-		AuthorizeURL: "https://slack.com/oauth/v2/authorize",
-		TokenURL:     "https://slack.com/api/oauth.v2.access",
+		AuthorizeURL: "https://slack.com/oauth/v2_user/authorize",
+		TokenURL:     "https://slack.com/api/oauth.v2.user.access",
 		Scopes:       slackconnector.OAuthScopes,
 		AuthorizeParams: map[string]string{
-			"user_scope": strings.Join(slackconnector.OAuthScopes, ","),
+			"scope": strings.Join(slackconnector.OAuthScopes, ","),
 		},
 		ClientID:     "test-slack-client-id",
 		ClientSecret: "test-slack-client-secret",
@@ -366,7 +366,7 @@ func TestOAuthAuthorize_Redirect(t *testing.T) {
 	}
 }
 
-func TestOAuthAuthorize_Slack_NoBotScopeQueryParam(t *testing.T) {
+func TestOAuthAuthorize_Slack_UserTokenEndpoints(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -390,16 +390,22 @@ func TestOAuthAuthorize_Slack_NoBotScopeQueryParam(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse location: %v", err)
 	}
+	// Must use the v2_user authorize endpoint.
+	if !strings.HasPrefix(loc, "https://slack.com/oauth/v2_user/authorize") {
+		t.Errorf("expected v2_user authorize URL, got %s", loc)
+	}
 	q := parsed.Query()
-	if _, hasScope := q["scope"]; hasScope {
-		t.Errorf("Slack authorize URL must not include bot \"scope\" query key; got scope=%q", q.Get("scope"))
+	// Scopes should be comma-separated in the "scope" param (not user_scope).
+	sc := q.Get("scope")
+	if sc == "" {
+		t.Fatal("expected scope query param")
 	}
-	us := q.Get("user_scope")
-	if us == "" {
-		t.Fatal("expected user_scope query param")
+	if !strings.Contains(sc, "chat:write") {
+		t.Errorf("scope should include chat:write, got %q", sc)
 	}
-	if !strings.Contains(us, "chat:write") {
-		t.Errorf("user_scope should include chat:write, got %q", us)
+	// The oauth2 library's space-separated scope must NOT appear (cfg.Scopes is nil).
+	if strings.Contains(sc, " ") {
+		t.Errorf("scope should be comma-separated, got %q", sc)
 	}
 }
 
