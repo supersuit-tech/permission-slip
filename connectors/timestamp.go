@@ -20,7 +20,7 @@ func ParseUnixTimestampOrRFC3339(s string) (int64, error) {
 	if f, err := strconv.ParseFloat(s, 64); err == nil {
 		return unixSecondsFromNumeric(f), nil
 	}
-	t, err := time.Parse(time.RFC3339, s)
+	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
 		return 0, fmt.Errorf("expected Unix timestamp or RFC 3339 datetime, got %q", s)
 	}
@@ -42,7 +42,7 @@ func NormalizeHubSpotAnalyticsTimeParam(s string) (string, error) {
 		t := time.Unix(sec, 0).UTC()
 		return t.Format("2006-01-02"), nil
 	}
-	t, err := time.Parse(time.RFC3339, s)
+	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
 		return "", fmt.Errorf("expected YYYY-MM-DD, RFC 3339, or Unix timestamp, got %q", s)
 	}
@@ -63,7 +63,7 @@ func NormalizePlaidDateParam(s string) (string, error) {
 		t := time.Unix(sec, 0).UTC()
 		return t.Format("2006-01-02"), nil
 	}
-	t, err := time.Parse(time.RFC3339, s)
+	t, err := time.Parse(time.RFC3339Nano, s)
 	if err != nil {
 		return "", fmt.Errorf("expected YYYY-MM-DD, RFC 3339, or Unix timestamp, got %q", s)
 	}

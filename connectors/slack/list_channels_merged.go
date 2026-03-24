@@ -71,7 +71,7 @@ func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connector
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	seen := make(map[string]bool)

@@ -71,7 +71,7 @@ func (a *readThreadAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	return connectors.JSONResult(toMessagesResult(&resp))
