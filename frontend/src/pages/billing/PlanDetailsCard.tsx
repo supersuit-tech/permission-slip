@@ -200,7 +200,7 @@ function DowngradeSection({ usage, subscription }: DowngradeSectionProps) {
         isPending={isDowngrading}
         error={downgradeError}
         usage={usage}
-        paidEntitlementsEndDate={subscription.quota_entitlements_until ? formatDate(subscription.quota_entitlements_until) : ""}
+        paidEntitlementsEndDate={subscription.quota_entitlements_until ? formatDate(subscription.quota_entitlements_until) : "your grace period end"}
       />
     </>
   );

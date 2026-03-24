@@ -447,7 +447,7 @@ func GetSubscriptionWithPlan(ctx context.Context, db DBTX, userID string) (*Subs
 	if sub == nil {
 		return nil, nil
 	}
-	if sub.QuotaPlanID != nil && sub.QuotaEntitlementsUntil != nil && !sub.IsInQuotaGrace() {
+	if !sub.IsInQuotaGrace() && sub.QuotaPlanID != nil {
 		if err := ClearExpiredSubscriptionQuotaGrace(ctx, db, userID); err != nil {
 			return nil, err
 		}

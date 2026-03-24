@@ -718,6 +718,14 @@ func handleEndQuotaGraceNow(w http.ResponseWriter, r *http.Request, deps *Deps, 
 		return
 	}
 
+	warnings, warnErr := buildDowngradeLimitWarnings(r.Context(), deps, userID, freePlan)
+	if warnErr != nil {
+		log.Printf("[%s] Downgrade (end grace): limit warnings: %v", TraceID(r.Context()), warnErr)
+		CaptureError(r.Context(), warnErr)
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify plan limits"))
+		return
+	}
+
 	tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 	if err != nil {
 		log.Printf("[%s] Downgrade (end grace): begin tx: %v", TraceID(r.Context()), err)
@@ -727,14 +735,6 @@ func handleEndQuotaGraceNow(w http.ResponseWriter, r *http.Request, deps *Deps, 
 	}
 	if owned {
 		defer db.RollbackTx(r.Context(), tx)
-	}
-
-	warnings, warnErr := buildDowngradeLimitWarnings(r.Context(), deps, userID, freePlan)
-	if warnErr != nil {
-		log.Printf("[%s] Downgrade (end grace): limit warnings: %v", TraceID(r.Context()), warnErr)
-		CaptureError(r.Context(), warnErr)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify plan limits"))
-		return
 	}
 
 	updated, err := db.ClearSubscriptionQuotaGrace(r.Context(), tx, userID)
