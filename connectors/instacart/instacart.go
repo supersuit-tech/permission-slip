@@ -32,6 +32,9 @@ const (
 	maxResponseBytes = 2 * 1024 * 1024 // 2 MiB
 )
 
+// allowedBaseHosts is the allowlist for credential base_url. Only these hosts
+// are accepted so a compromised or mistyped credential cannot be used to
+// redirect API calls to an arbitrary origin (SSRF-style abuse).
 var allowedBaseHosts = map[string]struct{}{
 	"connect.instacart.com":       {},
 	"connect.dev.instacart.tools": {},

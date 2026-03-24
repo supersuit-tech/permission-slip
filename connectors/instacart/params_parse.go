@@ -14,7 +14,8 @@ const (
 )
 
 // parseAndValidateProductsLinkParams unmarshals JSON, expands string
-// line_items shorthand, and validates. Shared by Execute and ValidateRequest.
+// line_items shorthand, and validates. Shared by Execute and ValidateRequest
+// so approval-time validation and execution always apply the same rules.
 func parseAndValidateProductsLinkParams(raw json.RawMessage) (createProductsLinkParams, error) {
 	var params createProductsLinkParams
 	if err := json.Unmarshal(raw, &params); err != nil {

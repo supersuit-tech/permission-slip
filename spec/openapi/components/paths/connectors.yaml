@@ -10,6 +10,10 @@ connectors:
       Agents use this endpoint to discover what actions they can submit for approval. 
       This replaces the old service discovery model — agents don't need to know about 
       individual service URLs, they just query Permission Slip for available actions.
+
+      Built-in connectors (for example `instacart` with `instacart.create_products_link`)
+      appear here automatically from connector manifests; parameter schemas and optional
+      display templates are the source of truth at runtime, not this OpenAPI document.
       
       ## Use Cases
       
