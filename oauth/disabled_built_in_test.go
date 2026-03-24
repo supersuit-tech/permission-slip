@@ -3,6 +3,7 @@ package oauth_test
 import (
 	"testing"
 
+	"github.com/supersuit-tech/permission-slip-web/connectors"
 	"github.com/supersuit-tech/permission-slip-web/oauth"
 	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
 )
@@ -19,7 +20,10 @@ func TestBuiltInOAuthDisabledForKrogerNotQuickBooks(t *testing.T) {
 
 func TestBuiltInProviders_OmitsDisabledConnectors(t *testing.T) {
 	t.Parallel()
-	disabled := map[string]bool{"kroger": true}
+	disabled := make(map[string]bool)
+	for _, id := range connectors.DisabledBuiltInConnectorIDs() {
+		disabled[id] = true
+	}
 	for _, p := range oauth.BuiltInProviders() {
 		if disabled[p.ID] {
 			t.Errorf("%q should not appear in BuiltInProviders when connector is disabled", p.ID)

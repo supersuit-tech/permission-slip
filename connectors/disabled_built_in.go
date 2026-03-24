@@ -12,6 +12,12 @@ import (
 // seed the database, or appear in connector/OAuth listings. Add an empty file
 // at connectors/<connector_id>/disabled (this path is next to this .go file).
 //
+// NOTE: This embed directive requires at least one connectors/<id>/disabled
+// file to exist. If all connectors are re-enabled (every disabled file
+// removed), the build will fail with "no matching files found". In that case,
+// replace this with an explicit empty embed and update init() to skip the FS
+// scan, or keep a single disabled file as a placeholder.
+//
 //go:embed */disabled
 var disabledBuiltInMarkerFS embed.FS
 
