@@ -1,10 +1,6 @@
 package instacart
 
-import (
-	"encoding/json"
-
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-)
+import "encoding/json"
 
 // ParameterAliases maps agent-friendly parameter names to the keys Instacart's API expects.
 func (a *createProductsLinkAction) ParameterAliases() map[string]string {
@@ -47,12 +43,8 @@ func (a *createProductsLinkAction) Normalize(params json.RawMessage) json.RawMes
 
 // ValidateRequest rejects parameters that will fail Instacart validation before storage.
 func (a *createProductsLinkAction) ValidateRequest(params json.RawMessage) error {
-	var p createProductsLinkParams
-	if err := json.Unmarshal(params, &p); err != nil {
-		return &connectors.ValidationError{Message: "invalid parameters: not a JSON object"}
-	}
-	p.LineItems = expandStringLineItemsInPlace(p.LineItems)
-	return p.validate()
+	_, err := parseAndValidateProductsLinkParams(params)
+	return err
 }
 
 func expandStringLineItemsJSON(raw json.RawMessage) (json.RawMessage, bool) {

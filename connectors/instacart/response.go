@@ -17,6 +17,27 @@ type instacartSingleError struct {
 	} `json:"error"`
 }
 
+// instacartMultiError is documented for multiple validation errors.
+type instacartMultiError struct {
+	Errors []struct {
+		Message string `json:"message"`
+	} `json:"errors"`
+}
+
+const maxAPIErrorMessageRunes = 512
+
+func truncateForErrorMessage(s string) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return s
+	}
+	runes := []rune(s)
+	if len(runes) <= maxAPIErrorMessageRunes {
+		return s
+	}
+	return string(runes[:maxAPIErrorMessageRunes]) + "...(truncated)"
+}
+
 // checkResponse maps non-success HTTP responses to typed connector errors.
 func checkResponse(statusCode int, header http.Header, body []byte) error {
 	if statusCode >= 200 && statusCode < 300 {
@@ -31,7 +52,12 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 
 	var single instacartSingleError
 	if json.Unmarshal(body, &single) == nil && single.Error.Message != "" {
-		msg = strings.TrimSpace(single.Error.Message)
+		msg = truncateForErrorMessage(single.Error.Message)
+	} else {
+		var multi instacartMultiError
+		if json.Unmarshal(body, &multi) == nil && len(multi.Errors) > 0 && multi.Errors[0].Message != "" {
+			msg = truncateForErrorMessage(multi.Errors[0].Message)
+		}
 	}
 
 	switch {

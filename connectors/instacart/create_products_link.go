@@ -64,6 +64,9 @@ func (p *createProductsLinkParams) validate() error {
 		if item.Name == "" {
 			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: name is required", i)}
 		}
+		if len(item.Name) > maxLineItemNameBytes {
+			return &connectors.ValidationError{Message: fmt.Sprintf("line_items[%d]: name exceeds maximum length (%d bytes)", i, maxLineItemNameBytes)}
+		}
 	}
 
 	if len(p.LandingPageConfiguration) > 0 && !json.Valid(p.LandingPageConfiguration) {
@@ -73,12 +76,8 @@ func (p *createProductsLinkParams) validate() error {
 }
 
 func (a *createProductsLinkAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params createProductsLinkParams
-	if err := json.Unmarshal(req.Parameters, &params); err != nil {
-		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
-	}
-	params.LineItems = expandStringLineItemsInPlace(params.LineItems)
-	if err := params.validate(); err != nil {
+	params, err := parseAndValidateProductsLinkParams(req.Parameters)
+	if err != nil {
 		return nil, err
 	}
 

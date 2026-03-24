@@ -65,6 +65,7 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 								"properties": {
 									"name": {
 										"type": "string",
+										"maxLength": 2048,
 										"description": "Product or ingredient text for Instacart to match (e.g. \"2 lb chicken breast\")"
 									},
 									"display_text": {

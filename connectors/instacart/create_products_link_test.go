@@ -122,6 +122,28 @@ func TestCreateProductsLink_MissingLineItems(t *testing.T) {
 	}
 }
 
+func TestCreateProductsLink_LineItemNameTooLong(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	action := conn.Actions()["instacart.create_products_link"]
+	longName := make([]byte, maxLineItemNameBytes+1)
+	for i := range longName {
+		longName[i] = 'a'
+	}
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "instacart.create_products_link",
+		Parameters:  json.RawMessage(`{"line_items":[{"name":"` + string(longName) + `"}]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("want ValidationError, got %T", err)
+	}
+}
+
 func TestCreateProductsLink_EmptyLineItemName(t *testing.T) {
 	t.Parallel()
 	conn := New()

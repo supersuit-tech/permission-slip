@@ -2,6 +2,7 @@ package instacart
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
@@ -20,6 +21,33 @@ func TestCheckResponse_Unauthorized(t *testing.T) {
 	err := checkResponse(http.StatusUnauthorized, nil, body)
 	if !connectors.IsAuthError(err) {
 		t.Fatalf("want AuthError, got %T: %v", err, err)
+	}
+}
+
+func TestCheckResponse_MultiErrorFirstMessage(t *testing.T) {
+	t.Parallel()
+	body := []byte(`{"errors":[{"message":"Invalid health filters"}]}`)
+	err := checkResponse(http.StatusBadRequest, nil, body)
+	ext, ok := err.(*connectors.ExternalError)
+	if !ok {
+		t.Fatalf("want ExternalError, got %T", err)
+	}
+	if !strings.Contains(ext.Message, "Invalid health") {
+		t.Errorf("message = %q", ext.Message)
+	}
+}
+
+func TestCheckResponse_TruncateLongMessage(t *testing.T) {
+	t.Parallel()
+	longMsg := strings.Repeat("x", 600)
+	body := []byte(`{"error":{"message":"` + longMsg + `"}}`)
+	err := checkResponse(http.StatusBadRequest, nil, body)
+	ext, ok := err.(*connectors.ExternalError)
+	if !ok {
+		t.Fatalf("want ExternalError, got %T", err)
+	}
+	if !strings.Contains(ext.Message, "...(truncated)") {
+		t.Errorf("expected truncated API message in %q", ext.Message)
 	}
 }
 
