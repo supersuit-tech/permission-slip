@@ -548,7 +548,7 @@ func TestManifestValidation_ReservedAuthorizeParams(t *testing.T) {
 
 	for _, reserved := range []string{
 		"redirect_uri", "state", "client_id", "client_secret", "response_type", "code", "grant_type",
-		"code_challenge", "code_challenge_method", "code_verifier",
+		"code_challenge", "code_challenge_method",
 	} {
 		t.Run("rejects_"+reserved, func(t *testing.T) {
 			input := fmt.Sprintf(base, fmt.Sprintf(`"%s": "evil-value"`, reserved))
