@@ -195,17 +195,15 @@ func (c *SlackConnector) hasChannelAccess(ctx context.Context, creds connectors.
 // isChannelPrivate checks whether a C-prefixed channel is private by calling
 // conversations.info and inspecting the is_private field.
 func (c *SlackConnector) isChannelPrivate(ctx context.Context, creds connectors.Credentials, channelID string) (bool, error) {
-	body := struct {
-		Channel string `json:"channel"`
-	}{Channel: channelID}
-
 	var resp struct {
 		slackResponse
 		Channel struct {
 			IsPrivate bool `json:"is_private"`
 		} `json:"channel"`
 	}
-	if err := c.doPost(ctx, "conversations.info", creds, body, &resp); err != nil {
+	// conversations.info only accepts GET / form-encoded POST, not JSON body.
+	// Using doGet avoids the "invalid_arguments" error with user tokens.
+	if err := c.doGet(ctx, "conversations.info", creds, map[string]string{"channel": channelID}, &resp); err != nil {
 		return false, err
 	}
 	if !resp.OK {

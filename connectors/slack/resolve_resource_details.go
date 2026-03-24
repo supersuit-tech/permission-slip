@@ -56,8 +56,8 @@ func (c *SlackConnector) resolveChannel(ctx context.Context, creds connectors.Cr
 		Channel channelInfo `json:"channel"`
 	}
 
-	body := map[string]string{"channel": p.Channel}
-	if err := c.doPost(ctx, "conversations.info", creds, body, &resp); err != nil {
+	// conversations.info only accepts GET / form-encoded POST, not JSON body.
+	if err := c.doGet(ctx, "conversations.info", creds, map[string]string{"channel": p.Channel}, &resp); err != nil {
 		return nil, err
 	}
 	if !resp.OK {
@@ -105,8 +105,8 @@ func (c *SlackConnector) resolveUser(ctx context.Context, creds connectors.Crede
 		User userInfo `json:"user"`
 	}
 
-	body := map[string]string{"user": p.UserID}
-	if err := c.doPost(ctx, "users.info", creds, body, &resp); err != nil {
+	// users.info only accepts GET / form-encoded POST, not JSON body.
+	if err := c.doGet(ctx, "users.info", creds, map[string]string{"user": p.UserID}, &resp); err != nil {
 		return nil, err
 	}
 	if !resp.OK {
