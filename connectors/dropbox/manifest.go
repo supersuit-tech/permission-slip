@@ -109,7 +109,9 @@ func (c *DropboxConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"expires": {
 							"type": "string",
-							"description": "Expiration date for the shared link (ISO 8601 format)"
+							"format": "date-time",
+							"description": "Expiration date for the shared link (ISO 8601 format)",
+							"x-ui": {"widget": "datetime"}
 						}
 					}
 				}`)),

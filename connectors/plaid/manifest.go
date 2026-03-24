@@ -85,13 +85,23 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_date": {
 							"type": "string",
-							"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-							"description": "Start date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "Start date (YYYY-MM-DD). RFC 3339 datetimes are accepted and normalized to the UTC calendar date.",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "end_date",
+								"datetime_range_role": "lower"
+							}
 						},
 						"end_date": {
 							"type": "string",
-							"pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-							"description": "End date in YYYY-MM-DD format"
+							"format": "date",
+							"description": "End date (YYYY-MM-DD). RFC 3339 datetimes are accepted and normalized to the UTC calendar date.",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "start_date",
+								"datetime_range_role": "upper"
+							}
 						},
 						"account_ids": {
 							"type": "array",
@@ -107,7 +117,8 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 						"offset": {
 							"type": "integer",
 							"minimum": 0,
-							"description": "Number of transactions to skip (for pagination)"
+							"description": "Number of transactions to skip (for pagination)",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),

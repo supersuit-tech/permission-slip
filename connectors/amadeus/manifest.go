@@ -43,8 +43,18 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"origin": {"type": "string", "description": "Origin IATA code (e.g. 'SFO')"},
 						"destination": {"type": "string", "description": "Destination IATA code (e.g. 'LAX')"},
-						"departure_date": {"type": "string", "format": "date", "description": "Departure date (YYYY-MM-DD)"},
-						"return_date": {"type": "string", "format": "date", "description": "Return date for round trip (YYYY-MM-DD)"},
+						"departure_date": {
+							"type": "string",
+							"format": "date",
+							"description": "Departure date (YYYY-MM-DD)",
+							"x-ui": {"widget": "date", "datetime_range_pair": "return_date", "datetime_range_role": "lower"}
+						},
+						"return_date": {
+							"type": "string",
+							"format": "date",
+							"description": "Return date for round trip (YYYY-MM-DD)",
+							"x-ui": {"widget": "date", "datetime_range_pair": "departure_date", "datetime_range_role": "upper"}
+						},
 						"adults": {"type": "integer", "minimum": 1, "maximum": 9, "default": 1, "description": "Number of adult travelers (1-9)"},
 						"cabin": {"type": "string", "enum": ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"], "description": "Cabin class"},
 						"nonstop": {"type": "boolean", "default": false, "description": "Only show nonstop flights"},
@@ -121,8 +131,18 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 						"city_code": {"type": "string", "description": "City IATA code (e.g. 'PAR')"},
 						"latitude": {"type": "string", "description": "Latitude for geo search"},
 						"longitude": {"type": "string", "description": "Longitude for geo search"},
-						"check_in_date": {"type": "string", "format": "date", "description": "Check-in date (YYYY-MM-DD)"},
-						"check_out_date": {"type": "string", "format": "date", "description": "Check-out date (YYYY-MM-DD)"},
+						"check_in_date": {
+							"type": "string",
+							"format": "date",
+							"description": "Check-in date (YYYY-MM-DD)",
+							"x-ui": {"widget": "date", "datetime_range_pair": "check_out_date", "datetime_range_role": "lower"}
+						},
+						"check_out_date": {
+							"type": "string",
+							"format": "date",
+							"description": "Check-out date (YYYY-MM-DD)",
+							"x-ui": {"widget": "date", "datetime_range_pair": "check_in_date", "datetime_range_role": "upper"}
+						},
 						"adults": {"type": "integer", "default": 1, "description": "Number of adults"},
 						"room_quantity": {"type": "integer", "default": 1, "description": "Number of rooms"},
 						"ratings": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 5}, "description": "Hotel star ratings to filter by"},

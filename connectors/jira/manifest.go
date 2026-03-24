@@ -279,11 +279,23 @@ func (c *JiraConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_date": {
 							"type": "string",
-							"description": "Sprint start date (ISO 8601, e.g. 2024-01-15T09:00:00.000Z)"
+							"format": "date-time",
+							"description": "Sprint start date (ISO 8601, e.g. 2024-01-15T09:00:00.000Z)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "end_date",
+								"datetime_range_role": "lower"
+							}
 						},
 						"end_date": {
 							"type": "string",
-							"description": "Sprint end date (ISO 8601, e.g. 2024-01-29T09:00:00.000Z)"
+							"format": "date-time",
+							"description": "Sprint end date (ISO 8601, e.g. 2024-01-29T09:00:00.000Z)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "start_date",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),
