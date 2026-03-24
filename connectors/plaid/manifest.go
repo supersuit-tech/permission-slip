@@ -86,7 +86,7 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 						"start_date": {
 							"type": "string",
 							"format": "date",
-							"description": "Start date (YYYY-MM-DD). RFC 3339 datetimes are accepted and normalized to the UTC calendar date.",
+							"description": "Start date (YYYY-MM-DD). Unix seconds or epoch milliseconds are also accepted and normalized to the UTC calendar date.",
 							"x-ui": {
 								"widget": "date",
 								"datetime_range_pair": "end_date",
@@ -96,7 +96,7 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 						"end_date": {
 							"type": "string",
 							"format": "date",
-							"description": "End date (YYYY-MM-DD). RFC 3339 datetimes are accepted and normalized to the UTC calendar date.",
+							"description": "End date (YYYY-MM-DD). Unix seconds or epoch milliseconds are also accepted and normalized to the UTC calendar date.",
 							"x-ui": {
 								"widget": "date",
 								"datetime_range_pair": "start_date",
