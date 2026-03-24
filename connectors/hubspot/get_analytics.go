@@ -74,12 +74,21 @@ func (a *getAnalyticsAction) Execute(ctx context.Context, req connectors.ActionR
 		url.PathEscape(params.TimePeriod),
 	)
 
-	query := url.Values{}
-	if params.Start != "" {
-		query.Set("start", params.Start)
+	startNorm, err := connectors.NormalizeHubSpotAnalyticsTimeParam(params.Start)
+	if err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid start: %v", err)}
 	}
-	if params.End != "" {
-		query.Set("end", params.End)
+	endNorm, err := connectors.NormalizeHubSpotAnalyticsTimeParam(params.End)
+	if err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid end: %v", err)}
+	}
+
+	query := url.Values{}
+	if startNorm != "" {
+		query.Set("start", startNorm)
+	}
+	if endNorm != "" {
+		query.Set("end", endNorm)
 	}
 	if len(query) > 0 {
 		path += "?" + query.Encode()

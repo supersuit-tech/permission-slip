@@ -36,15 +36,19 @@ func (p *listTransactionsParams) validate() error {
 	if p.StartDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: start_date"}
 	}
-	if !datePattern.MatchString(p.StartDate) {
-		return &connectors.ValidationError{Message: fmt.Sprintf("start_date must be in YYYY-MM-DD format, got %q", p.StartDate)}
+	startNorm, err := connectors.NormalizePlaidDateParam(p.StartDate)
+	if err != nil {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid start_date: %v", err)}
 	}
+	p.StartDate = startNorm
 	if p.EndDate == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: end_date"}
 	}
-	if !datePattern.MatchString(p.EndDate) {
-		return &connectors.ValidationError{Message: fmt.Sprintf("end_date must be in YYYY-MM-DD format, got %q", p.EndDate)}
+	endNorm, err := connectors.NormalizePlaidDateParam(p.EndDate)
+	if err != nil {
+		return &connectors.ValidationError{Message: fmt.Sprintf("invalid end_date: %v", err)}
 	}
+	p.EndDate = endNorm
 	if p.StartDate > p.EndDate {
 		return &connectors.ValidationError{Message: "start_date must be before or equal to end_date"}
 	}

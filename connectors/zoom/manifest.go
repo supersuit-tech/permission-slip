@@ -64,7 +64,9 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_time": {
 							"type": "string",
-							"description": "Start time in ISO 8601 format (e.g. '2024-01-15T09:00:00Z')"
+							"format": "date-time",
+							"description": "Start time in ISO 8601 format (e.g. '2024-01-15T09:00:00Z')",
+							"x-ui": {"widget": "datetime"}
 						},
 						"duration": {
 							"type": "integer",
@@ -130,7 +132,9 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"start_time": {
 							"type": "string",
-							"description": "Updated start time in ISO 8601 format"
+							"format": "date-time",
+							"description": "Updated start time in ISO 8601 format",
+							"x-ui": {"widget": "datetime"}
 						},
 						"duration": {
 							"type": "integer",

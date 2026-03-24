@@ -41,8 +41,8 @@ func TestGetAnalytics_Success(t *testing.T) {
 	params, _ := json.Marshal(getAnalyticsParams{
 		ObjectType: "deals",
 		TimePeriod: "monthly",
-		Start:      "2026-01-01",
-		End:        "2026-03-01",
+		Start:      "2026-01-01T00:00:00Z",
+		End:        "2026-03-01T23:59:59Z",
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{

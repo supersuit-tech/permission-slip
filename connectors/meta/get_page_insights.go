@@ -20,19 +20,19 @@ type getPageInsightsParams struct {
 	PageID string `json:"page_id"`
 	Metric string `json:"metric,omitempty"`
 	Period string `json:"period,omitempty"`
-	Since  int64  `json:"since,omitempty"`
-	Until  int64  `json:"until,omitempty"`
+	Since  string `json:"since,omitempty"`
+	Until  string `json:"until,omitempty"`
 }
 
 var validPageInsightMetrics = map[string]bool{
-	"page_impressions":                   true,
-	"page_impressions_unique":            true,
-	"page_engaged_users":                 true,
-	"page_post_engagements":              true,
-	"page_fan_adds":                      true,
-	"page_fan_removes":                   true,
-	"page_views_total":                   true,
-	"page_reach":                         true,
+	"page_impressions":        true,
+	"page_impressions_unique": true,
+	"page_engaged_users":      true,
+	"page_post_engagements":   true,
+	"page_fan_adds":           true,
+	"page_fan_removes":        true,
+	"page_views_total":        true,
+	"page_reach":              true,
 }
 
 var validPageInsightPeriods = map[string]bool{
@@ -63,16 +63,16 @@ type pageInsightsResponse struct {
 }
 
 type pageInsightDataPoint struct {
-	ID     string              `json:"id"`
-	Name   string              `json:"name"`
-	Period string              `json:"period"`
-	Values []pageInsightValue  `json:"values"`
-	Title  string              `json:"title"`
+	ID     string             `json:"id"`
+	Name   string             `json:"name"`
+	Period string             `json:"period"`
+	Values []pageInsightValue `json:"values"`
+	Title  string             `json:"title"`
 }
 
 type pageInsightValue struct {
-	Value     interface{} `json:"value"`
-	EndTime   string      `json:"end_time"`
+	Value   interface{} `json:"value"`
+	EndTime string      `json:"end_time"`
 }
 
 func (a *getPageInsightsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
@@ -96,11 +96,19 @@ func (a *getPageInsightsAction) Execute(ctx context.Context, req connectors.Acti
 	q := url.Values{}
 	q.Set("metric", metric)
 	q.Set("period", period)
-	if params.Since > 0 {
-		q.Set("since", strconv.FormatInt(params.Since, 10))
+	sinceUnix, err := connectors.ParseUnixTimestampOrRFC3339(params.Since)
+	if err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid since: %v", err)}
 	}
-	if params.Until > 0 {
-		q.Set("until", strconv.FormatInt(params.Until, 10))
+	untilUnix, err := connectors.ParseUnixTimestampOrRFC3339(params.Until)
+	if err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid until: %v", err)}
+	}
+	if sinceUnix > 0 {
+		q.Set("since", strconv.FormatInt(sinceUnix, 10))
+	}
+	if untilUnix > 0 {
+		q.Set("until", strconv.FormatInt(untilUnix, 10))
 	}
 
 	reqURL := fmt.Sprintf("%s/%s/insights?%s", a.conn.baseURL, params.PageID, q.Encode())

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -19,6 +20,11 @@ type searchTicketsParams struct {
 	Field    string `json:"field"`
 	Operator string `json:"operator"`
 	Value    string `json:"value"`
+	// Optional bounds for ticket search — combined with the primary filter via AND.
+	CreatedAtAfter  string `json:"created_at_after,omitempty"`
+	CreatedAtBefore string `json:"created_at_before,omitempty"`
+	UpdatedAtAfter  string `json:"updated_at_after,omitempty"`
+	UpdatedAtBefore string `json:"updated_at_before,omitempty"`
 }
 
 var validOperators = map[string]bool{
@@ -50,13 +56,57 @@ func (a *searchTicketsAction) Execute(ctx context.Context, req connectors.Action
 		return nil, err
 	}
 
-	body := map[string]any{
-		"query": map[string]any{
+	predicates := []map[string]any{
+		{
 			"field":    params.Field,
 			"operator": params.Operator,
 			"value":    params.Value,
 		},
 	}
+
+	appendTimePredicate := func(field, op, raw string) error {
+		if raw == "" {
+			return nil
+		}
+		sec, err := connectors.ParseUnixTimestampOrRFC3339(raw)
+		if err != nil {
+			return err
+		}
+		v := strconv.FormatInt(sec, 10)
+		if err != nil {
+			return err
+		}
+		predicates = append(predicates, map[string]any{
+			"field":    field,
+			"operator": op,
+			"value":    v,
+		})
+		return nil
+	}
+	if err := appendTimePredicate("created_at", ">", params.CreatedAtAfter); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid created_at_after: %v", err)}
+	}
+	if err := appendTimePredicate("created_at", "<", params.CreatedAtBefore); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid created_at_before: %v", err)}
+	}
+	if err := appendTimePredicate("updated_at", ">", params.UpdatedAtAfter); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid updated_at_after: %v", err)}
+	}
+	if err := appendTimePredicate("updated_at", "<", params.UpdatedAtBefore); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid updated_at_before: %v", err)}
+	}
+
+	var query any
+	if len(predicates) == 1 {
+		query = predicates[0]
+	} else {
+		query = map[string]any{
+			"operator": "AND",
+			"value":    predicates,
+		}
+	}
+
+	body := map[string]any{"query": query}
 
 	var resp searchTicketsResponse
 	if err := a.conn.do(ctx, req.Credentials, http.MethodPost, "/tickets/search", body, &resp); err != nil {
