@@ -150,6 +150,8 @@ func readJSONBody(raw json.RawMessage, fieldName string) (map[string]any, error)
 }
 
 // doJSON sends a JSON request with Bearer auth and optional PayPal-Request-Id.
+// The connector's HTTP client does not follow redirects (see New) so authorization
+// headers are not replayed against an unexpected host after a 3xx.
 func (c *PayPalConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, path string, requestBody any, respBody any, requestID string) error {
 	tok, ok := creds.Get(credKeyAccessToken)
 	if !ok || strings.TrimSpace(tok) == "" {

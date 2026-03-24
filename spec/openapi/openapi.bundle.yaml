@@ -15,7 +15,7 @@ info:
     - **Action**: Pre-defined, structured request with a type, validated parameters, and execution logic — the core primitive
     - **Agent**: Automated system with a cryptographic key pair that submits actions for approval
     - **Approver**: Human authorized to approve or deny agent actions
-    - **Connector**: Integration with an external service (e.g., Gmail, Stripe) that defines available actions
+    - **Connector**: Integration with an external service (e.g., Gmail, Stripe, PayPal) that defines available actions
     - **Credential**: Encrypted API key or OAuth token for an external service, stored in Permission Slip's vault
     - **Registration**: One-time setup where agent proves identity via public key
     - **Approval Request**: Async request for permission to execute a specific action
@@ -53,7 +53,7 @@ info:
     ## Architecture
 
     ```
-    Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, etc.)
+    Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, PayPal, etc.)
                    │
                    ▼
               User (approve/deny)
@@ -118,7 +118,7 @@ paths:
       summary: List Available Connectors
       description: |
         List all available connectors (external service integrations) that Permission Slip
-        supports. Each connector represents an external service (e.g., GitHub, Stripe, Slack)
+        supports. Each connector represents an external service (e.g., GitHub, Stripe, PayPal, Slack)
         and defines which actions are available.
 
         Agents use this endpoint to discover what actions they can submit for approval. 
@@ -135,6 +135,13 @@ paths:
 
         This endpoint is publicly accessible (no signature required) to allow agents to 
         discover available actions before registration.
+
+        ## PayPal / Venmo
+
+        The **paypal** connector exposes PayPal REST actions (payouts, Checkout orders, invoicing,
+        refunds). Users connect via OAuth (`GET /v1/oauth/paypal/authorize`). Optional credential
+        key `environment`=`sandbox` routes REST calls to PayPal's sandbox API host. See
+        `docs/oauth-setup.md` (PayPal OAuth Setup) and `connectors/paypal/README.md` in the repo.
       tags:
         - Connectors
       security: []
@@ -185,6 +192,9 @@ paths:
 
         This endpoint is publicly accessible (no signature required) to allow agents to 
         discover action schemas before registration.
+
+        For connector-specific setup (e.g. PayPal OAuth and optional `environment` credential for
+        sandbox REST), see the repository docs referenced in the list-connectors description.
       tags:
         - Connectors
       security: []
