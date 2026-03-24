@@ -36,12 +36,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel name (e.g. #general) or ID (e.g. C01234567)"
+							"description": "Channel name (e.g. #general) or ID (e.g. C01234567)",
+							"x-ui": {"placeholder": "#general or C01234567", "help_text": "A channel name like #general or a channel ID starting with C"}
 						},
 						"message": {
 							"type": "string",
 							"description": "Message text (supports Slack mrkdwn formatting)",
-							"x-ui": {"widget": "textarea"}
+							"x-ui": {"widget": "textarea", "placeholder": "Enter the message text"}
 						}
 					}
 				}`)),
@@ -57,12 +58,14 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"name": {
 							"type": "string",
-							"description": "Channel name (lowercase, no spaces, max 80 chars)"
+							"description": "Channel name (lowercase, no spaces, max 80 chars)",
+							"x-ui": {"placeholder": "new-channel-name", "help_text": "Lowercase, no spaces, max 80 characters (e.g. project-updates)"}
 						},
 						"is_private": {
 							"type": "boolean",
 							"default": false,
-							"description": "Create as a private channel"
+							"description": "Create as a private channel",
+							"x-ui": {"label": "Private channel", "help_text": "Private channels are only visible to invited members"}
 						}
 					}
 				}`)),
@@ -78,21 +81,25 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"types": {
 							"type": "string",
 							"default": "public_channel,private_channel,mpim,im",
-							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set. im/mpim/private_channel results are filtered to the authorizing user; user-token merge fills in human-only DMs when configured."
+							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set. im/mpim/private_channel results are filtered to the authorizing user; user-token merge fills in human-only DMs when configured.",
+							"x-ui": {"label": "Channel types", "placeholder": "public_channel,private_channel,mpim,im", "help_text": "Comma-separated list: public_channel, private_channel, mpim (group DMs), im (direct messages)"}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 100,
-							"description": "Max channels to return (1-1000)"
+							"description": "Max channels to return (1-1000)",
+							"x-ui": {"label": "Max results", "help_text": "Maximum number of channels to return (1–1000, default 100)"}
 						},
 						"cursor": {
 							"type": "string",
-							"description": "Pagination cursor from a previous response"
+							"description": "Pagination cursor from a previous response",
+							"x-ui": {"hidden": true}
 						},
 						"exclude_archived": {
 							"type": "boolean",
 							"default": true,
-							"description": "Exclude archived channels from results"
+							"description": "Exclude archived channels from results",
+							"x-ui": {"label": "Exclude archived", "help_text": "When enabled, archived channels are hidden from results"}
 						}
 					}
 				}`)),
@@ -108,24 +115,31 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID: C… (channel), D… (DM), or G… (group DM)"
+							"description": "Channel ID: C… (channel), D… (DM), or G… (group DM)",
+							"x-ui": {"placeholder": "C01234567", "help_text": "The channel, DM, or group DM to read from (e.g. C01234567)"}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 20,
-							"description": "Max messages to return (1-1000)"
+							"description": "Max messages to return (1-1000)",
+							"x-ui": {"label": "Max messages", "help_text": "Maximum number of messages to return (1–1000, default 20)"}
 						},
 						"oldest": {
 							"type": "string",
-							"description": "Only messages after this Unix timestamp"
+							"format": "date-time",
+							"description": "Only messages after this date/time (RFC 3339)",
+							"x-ui": {"label": "After", "widget": "datetime", "help_text": "Only include messages sent after this date and time", "datetime_range_pair": "latest", "datetime_range_role": "lower"}
 						},
 						"latest": {
 							"type": "string",
-							"description": "Only messages before this Unix timestamp"
+							"format": "date-time",
+							"description": "Only messages before this date/time (RFC 3339)",
+							"x-ui": {"label": "Before", "widget": "datetime", "help_text": "Only include messages sent before this date and time", "datetime_range_pair": "oldest", "datetime_range_role": "upper"}
 						},
 						"cursor": {
 							"type": "string",
-							"description": "Pagination cursor from a previous response"
+							"description": "Pagination cursor from a previous response",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -141,20 +155,24 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID containing the thread: C…, D…, or G…"
+							"description": "Channel ID containing the thread: C…, D…, or G…",
+							"x-ui": {"placeholder": "C01234567", "help_text": "The channel, DM, or group DM containing the thread"}
 						},
 						"thread_ts": {
 							"type": "string",
-							"description": "Timestamp of the parent message (e.g. 1234567890.123456)"
+							"description": "Timestamp of the parent message (e.g. 1234567890.123456)",
+							"x-ui": {"label": "Thread ID", "placeholder": "1234567890.123456", "help_text": "The unique timestamp ID of the parent message that started the thread"}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 50,
-							"description": "Max replies to return (1-1000)"
+							"description": "Max replies to return (1-1000)",
+							"x-ui": {"label": "Max replies", "help_text": "Maximum number of replies to return (1–1000, default 50)"}
 						},
 						"cursor": {
 							"type": "string",
-							"description": "Pagination cursor from a previous response"
+							"description": "Pagination cursor from a previous response",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -170,17 +188,19 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel name (e.g. #general) or ID (e.g. C01234567)"
+							"description": "Channel name (e.g. #general) or ID (e.g. C01234567)",
+							"x-ui": {"placeholder": "#general or C01234567", "help_text": "A channel name like #general or a channel ID starting with C"}
 						},
 						"message": {
 							"type": "string",
 							"description": "Message text (supports Slack mrkdwn formatting)",
-							"x-ui": {"widget": "textarea"}
+							"x-ui": {"widget": "textarea", "placeholder": "Enter the message text"}
 						},
 						"post_at": {
 							"type": "string",
 							"format": "date-time",
-							"description": "When the message should be sent in RFC 3339 format (e.g. 2026-03-20T09:00:00Z)"
+							"description": "When the message should be sent in RFC 3339 format (e.g. 2026-03-20T09:00:00Z)",
+							"x-ui": {"label": "Send at", "help_text": "The date and time to deliver the message"}
 						}
 					}
 				}`)),
@@ -196,11 +216,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID (e.g. C01234567)"
+							"description": "Channel ID (e.g. C01234567)",
+							"x-ui": {"placeholder": "C01234567", "help_text": "The channel whose topic you want to update"}
 						},
 						"topic": {
 							"type": "string",
-							"description": "New channel topic (max 250 characters)"
+							"description": "New channel topic (max 250 characters)",
+							"x-ui": {"placeholder": "Enter the new topic", "help_text": "The new topic text (max 250 characters)"}
 						}
 					}
 				}`)),
@@ -216,11 +238,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID (e.g. C01234567)"
+							"description": "Channel ID (e.g. C01234567)",
+							"x-ui": {"placeholder": "C01234567", "help_text": "The channel to invite users to"}
 						},
 						"users": {
 							"type": "string",
-							"description": "Comma-separated list of user IDs to invite (e.g. U01234567,U09876543)"
+							"description": "Comma-separated list of user IDs to invite (e.g. U01234567,U09876543)",
+							"x-ui": {"label": "User IDs", "placeholder": "U01234567,U09876543", "help_text": "Comma-separated Slack user IDs to invite"}
 						}
 					}
 				}`)),
@@ -236,20 +260,23 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID (e.g. C01234567)"
+							"description": "Channel ID (e.g. C01234567)",
+							"x-ui": {"placeholder": "C01234567", "help_text": "The channel to upload the file to"}
 						},
 						"filename": {
 							"type": "string",
-							"description": "Name of the file (e.g. report.csv)"
+							"description": "Name of the file (e.g. report.csv)",
+							"x-ui": {"label": "File name", "placeholder": "report.csv", "help_text": "The name for the uploaded file (e.g. report.csv)"}
 						},
 						"content": {
 							"type": "string",
 							"description": "File content as text",
-							"x-ui": {"widget": "textarea"}
+							"x-ui": {"widget": "textarea", "label": "File content", "placeholder": "Paste or enter file content"}
 						},
 						"title": {
 							"type": "string",
-							"description": "Display title for the file (defaults to filename)"
+							"description": "Display title for the file (defaults to filename)",
+							"x-ui": {"placeholder": "Optional display title", "help_text": "A display title shown in Slack (defaults to the file name)"}
 						}
 					}
 				}`)),
@@ -265,15 +292,18 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID containing the message (e.g. C01234567)"
+							"description": "Channel ID containing the message (e.g. C01234567)",
+							"x-ui": {"placeholder": "C01234567", "help_text": "The channel containing the message"}
 						},
 						"timestamp": {
 							"type": "string",
-							"description": "Timestamp of the message to react to (e.g. 1234567890.123456)"
+							"description": "Timestamp of the message to react to (e.g. 1234567890.123456)",
+							"x-ui": {"label": "Message ID", "placeholder": "1234567890.123456", "help_text": "The unique timestamp ID of the message to react to"}
 						},
 						"name": {
 							"type": "string",
-							"description": "Emoji name without colons (e.g. thumbsup, white_check_mark)"
+							"description": "Emoji name without colons (e.g. thumbsup, white_check_mark)",
+							"x-ui": {"label": "Emoji", "placeholder": "thumbsup", "help_text": "Emoji name without colons (e.g. thumbsup, heart, white_check_mark)"}
 						}
 					}
 				}`)),
@@ -289,12 +319,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "User ID to send the DM to (e.g. U01234567)"
+							"description": "User ID to send the DM to (e.g. U01234567)",
+							"x-ui": {"label": "Recipient", "placeholder": "U01234567", "help_text": "The Slack user ID to send the direct message to"}
 						},
 						"message": {
 							"type": "string",
 							"description": "Message text (supports Slack mrkdwn formatting)",
-							"x-ui": {"widget": "textarea"}
+							"x-ui": {"widget": "textarea", "placeholder": "Enter the message text"}
 						}
 					}
 				}`)),
@@ -310,16 +341,18 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID containing the message (e.g. C01234567)"
+							"description": "Channel ID containing the message (e.g. C01234567)",
+							"x-ui": {"placeholder": "C01234567", "help_text": "The channel containing the message to edit"}
 						},
 						"ts": {
 							"type": "string",
-							"description": "Timestamp of the message to update (e.g. 1234567890.123456)"
+							"description": "Timestamp of the message to update (e.g. 1234567890.123456)",
+							"x-ui": {"label": "Message ID", "placeholder": "1234567890.123456", "help_text": "The unique timestamp ID of the message to update"}
 						},
 						"message": {
 							"type": "string",
 							"description": "New message text (supports Slack mrkdwn formatting)",
-							"x-ui": {"widget": "textarea"}
+							"x-ui": {"widget": "textarea", "label": "New message", "placeholder": "Enter the updated message text"}
 						}
 					}
 				}`)),
@@ -335,11 +368,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"channel": {
 							"type": "string",
-							"description": "Channel ID containing the message (e.g. C01234567)"
+							"description": "Channel ID containing the message (e.g. C01234567)",
+							"x-ui": {"placeholder": "C01234567", "help_text": "The channel containing the message to delete"}
 						},
 						"ts": {
 							"type": "string",
-							"description": "Timestamp of the message to delete (e.g. 1234567890.123456)"
+							"description": "Timestamp of the message to delete (e.g. 1234567890.123456)",
+							"x-ui": {"label": "Message ID", "placeholder": "1234567890.123456", "help_text": "The unique timestamp ID of the message to delete"}
 						}
 					}
 				}`)),
@@ -355,11 +390,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"limit": {
 							"type": "integer",
 							"default": 100,
-							"description": "Max users to return (1-1000)"
+							"description": "Max users to return (1-1000)",
+							"x-ui": {"label": "Max results", "help_text": "Maximum number of users to return (1–1000, default 100)"}
 						},
 						"cursor": {
 							"type": "string",
-							"description": "Pagination cursor from a previous response"
+							"description": "Pagination cursor from a previous response",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -375,21 +412,25 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search query (supports Slack search modifiers like in:#channel, from:@user)"
+							"description": "Search query (supports Slack search modifiers like in:#channel, from:@user)",
+							"x-ui": {"placeholder": "search terms or in:#channel from:@user", "help_text": "Search query — supports Slack modifiers like in:#channel, from:@user"}
 						},
 						"count": {
 							"type": "integer",
 							"default": 20,
-							"description": "Max results per page (1-100)"
+							"description": "Max results per page (1-100)",
+							"x-ui": {"label": "Max results", "help_text": "Maximum number of results per page (1–100, default 20)"}
 						},
 						"page": {
 							"type": "integer",
 							"default": 1,
-							"description": "Page number for pagination"
+							"description": "Page number for pagination",
+							"x-ui": {"hidden": true}
 						},
 						"sort": {
 							"type": "string",
-							"description": "Sort order: score (relevance) or timestamp"
+							"description": "Sort order: score (relevance) or timestamp",
+							"x-ui": {"label": "Sort by", "help_text": "Sort results by relevance (score) or date (timestamp)"}
 						}
 					}
 				}`)),

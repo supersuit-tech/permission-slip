@@ -38,6 +38,8 @@ export interface SchemaPropertyUI {
   remote_select_label_key?: string;
   /** Placeholder for manual entry when user toggles fallback. */
   remote_select_fallback_placeholder?: string;
+  /** Hide the field from the configuration form entirely (e.g. pagination cursors). */
+  hidden?: boolean;
   visible_when?: VisibleWhen;
   /**
    * Sibling parameter key for datetime range pairing (e.g. time_min ↔ time_max).
@@ -195,6 +197,15 @@ export function getOrderedFieldKeys(schema: ParametersSchema): string[] {
 }
 
 /**
+ * Check whether a field is marked as hidden via `x-ui.hidden`.
+ * Hidden fields are excluded from the configuration form entirely
+ * (e.g. pagination cursors that only the agent uses internally).
+ */
+export function isFieldHidden(prop: SchemaProperty): boolean {
+  return prop["x-ui"]?.hidden === true;
+}
+
+/**
  * Check whether a field should be visible given the current form values.
  * Returns true if the field has no visible_when rule or if the condition is met.
  */
@@ -301,6 +312,7 @@ function parsePropertyUI(raw: unknown): SchemaPropertyUI | undefined {
   if (typeof obj.group === "string") ui.group = obj.group;
   if (typeof obj.help_url === "string") ui.help_url = obj.help_url;
   if (typeof obj.help_text === "string") ui.help_text = obj.help_text;
+  if (typeof obj.hidden === "boolean") ui.hidden = obj.hidden;
   if (typeof obj.remote_select_options_path === "string" && obj.remote_select_options_path.length > 0) {
     ui.remote_select_options_path = obj.remote_select_options_path;
   }
