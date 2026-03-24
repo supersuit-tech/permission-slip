@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -35,11 +36,11 @@ func checkResponse(statusCode int, header http.Header, body []byte) error {
 
 	var single instacartSingleError
 	if json.Unmarshal(body, &single) == nil && single.Error.Message != "" {
-		msg = connectors.TruncateUTF8(single.Error.Message, maxAPIErrorMessageRunes)
+		msg = connectors.TruncateUTF8(strings.TrimSpace(single.Error.Message), maxAPIErrorMessageRunes)
 	} else {
 		var multi instacartMultiError
 		if json.Unmarshal(body, &multi) == nil && len(multi.Errors) > 0 && multi.Errors[0].Message != "" {
-			msg = connectors.TruncateUTF8(multi.Errors[0].Message, maxAPIErrorMessageRunes)
+			msg = connectors.TruncateUTF8(strings.TrimSpace(multi.Errors[0].Message), maxAPIErrorMessageRunes)
 		}
 	}
 
