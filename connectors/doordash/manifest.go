@@ -251,7 +251,8 @@ func listDeliveriesManifest() connectors.ManifestAction {
 			},
 			"starting_after": {
 				"type": "string",
-				"description": "Pagination cursor from a previous list_deliveries response"
+				"description": "Pagination cursor from a previous list_deliveries response",
+				"x-ui": {"hidden": true}
 			},
 			"status": {
 				"type": "string",
