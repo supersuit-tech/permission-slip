@@ -61,49 +61,64 @@ func (c *InstacartConnector) Manifest() *connectors.ConnectorManifest {
 							"minItems": 1,
 							"maxItems": 200,
 							"items": {
-								"type": "object",
-								"required": ["name"],
-								"additionalProperties": true,
-								"properties": {
-									"name": {
+								"oneOf": [
+									{
 										"type": "string",
 										"maxLength": 2048,
-										"description": "Product or ingredient text for Instacart to match (e.g. \"2 lb chicken breast\")"
+										"description": "Plain product name, expanded to {\"name\": \"...\"} before sending to Instacart"
 									},
-									"display_text": {
-										"type": "string",
-										"description": "Display title for the matched item"
-									},
-									"quantity": {
-										"type": "number",
-										"description": "Deprecated by Instacart; prefer line_item_measurements"
-									},
-									"unit": {
-										"type": "string",
-										"description": "Deprecated by Instacart; prefer line_item_measurements"
-									},
-									"line_item_measurements": {
-										"type": "array",
-										"items": {
-											"type": "object",
-											"properties": {
-												"quantity": {"type": "number"},
-												"unit": {"type": "string"}
+									{
+										"type": "object",
+										"required": ["name"],
+										"additionalProperties": true,
+										"properties": {
+											"name": {
+												"type": "string",
+												"maxLength": 2048,
+												"description": "Product or ingredient text for Instacart to match (e.g. \"2 lb chicken breast\")"
 											},
-											"additionalProperties": false
+											"display_text": {
+												"type": "string",
+												"description": "Display title for the matched item"
+											},
+											"quantity": {
+												"type": "number",
+												"description": "Deprecated by Instacart; prefer line_item_measurements"
+											},
+											"unit": {
+												"type": "string",
+												"description": "Deprecated by Instacart; prefer line_item_measurements"
+											},
+											"line_item_measurements": {
+												"type": "array",
+												"items": {
+													"type": "object",
+													"properties": {
+														"quantity": {"type": "number"},
+														"unit": {"type": "string"}
+													},
+													"additionalProperties": false
+												}
+											},
+											"upcs": {
+												"type": "array",
+												"items": {"type": "string"}
+											},
+											"product_ids": {
+												"type": "array",
+												"items": {"type": "integer"}
+											}
 										}
-									},
-									"upcs": {
-										"type": "array",
-										"items": {"type": "string"}
-									},
-									"product_ids": {
-										"type": "array",
-										"items": {"type": "integer"}
 									}
-								}
+								]
 							},
 							"description": "Items to include. Each element is a LineItem object with at least name, or use line_item_measurements for quantities (see Instacart docs). You may use the parameter name items instead of line_items. For convenience, each element may be a plain string (same as {\"name\": \"...\"})."
+						},
+						"items": {
+							"type": "array",
+							"minItems": 1,
+							"maxItems": 200,
+							"description": "Alias for line_items. Rewritten to line_items before validation."
 						},
 						"landing_page_configuration": {
 							"type": "object",
