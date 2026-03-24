@@ -67,11 +67,8 @@ func graphNextRelativePath(baseURL, nextLink string) string {
 		return ""
 	}
 	rel := full[len(base):]
-	if rel == "" || rel == "/" {
+	if rel == "" {
 		return ""
 	}
-	if rel[0] == '/' || rel[0] == '?' {
-		return rel
-	}
-	return "/" + rel
+	return rel // always starts with '/' or '?' per prefix check above
 }
