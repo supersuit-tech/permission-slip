@@ -1,0 +1,34 @@
+package paypal
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"net/http"
+
+	"github.com/supersuit-tech/permission-slip-web/connectors"
+)
+
+type getPayoutItemAction struct {
+	conn *PayPalConnector
+}
+
+type getPayoutItemParams struct {
+	PayoutItemID string `json:"payout_item_id"`
+}
+
+func (a *getPayoutItemAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params getPayoutItemParams
+	if err := json.Unmarshal(req.Parameters, &params); err != nil {
+		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
+	}
+	if err := validatePayPalPathID("payout_item_id", params.PayoutItemID); err != nil {
+		return nil, err
+	}
+	path := "/v1/payments/payouts-item/" + params.PayoutItemID
+	var raw json.RawMessage
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, path, nil, &raw, ""); err != nil {
+		return nil, err
+	}
+	return connectors.JSONResult(raw)
+}
