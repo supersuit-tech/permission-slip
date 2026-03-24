@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -273,6 +274,49 @@ func TestCreateAndVerifyOAuthState_WithPKCEVerifier(t *testing.T) {
 	}
 	if verified.PKCEVerifier != verifier {
 		t.Errorf("PKCEVerifier round-trip: got %q, want %q", verified.PKCEVerifier, verifier)
+	}
+
+	// JWT payload is only base64url-encoded (not encrypted); verifier must not appear in plaintext.
+	parts := strings.Split(state, ".")
+	if len(parts) != 3 {
+		t.Fatalf("expected JWT with 3 segments, got %d", len(parts))
+	}
+	payloadJSON, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		t.Fatalf("decode JWT payload: %v", err)
+	}
+	if strings.Contains(string(payloadJSON), verifier) {
+		t.Error("PKCE verifier must not appear in plaintext JWT payload")
+	}
+	if !strings.Contains(string(payloadJSON), "pkce_sealed") {
+		t.Error("expected pkce_sealed claim in JWT payload")
+	}
+}
+
+func TestVerifyOAuthState_LegacyPlaintextPKCEClaim(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{OAuthStateSecret: testOAuthStateSecret}
+	verifier := "legacy-plaintext-verifier-43charsxxxxxxxxxxxxxxxxxxxxx"
+	now := time.Now()
+	claims := jwt.MapClaims{
+		"sub":           "user-legacy",
+		"provider":      "dropbox",
+		"scopes":        []any{"files.content.read"},
+		"iat":           now.Unix(),
+		"exp":           now.Add(10 * time.Minute).Unix(),
+		"pkce_verifier": verifier,
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	stateStr, err := token.SignedString([]byte(testOAuthStateSecret))
+	if err != nil {
+		t.Fatalf("sign: %v", err)
+	}
+	verified, err := verifyOAuthState(deps, stateStr)
+	if err != nil {
+		t.Fatalf("verifyOAuthState: %v", err)
+	}
+	if verified.PKCEVerifier != verifier {
+		t.Errorf("legacy PKCE: got %q, want %q", verified.PKCEVerifier, verifier)
 	}
 }
 

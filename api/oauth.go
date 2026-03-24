@@ -16,6 +16,8 @@
 //   - CSRF protection via signed JWT state tokens (HS256, 10-min TTL)
 //   - State encodes user ID + provider to prevent session fixation
 //   - Callback derives user identity from the signed state token (no session required)
+//   - PKCE verifiers are AES-256-GCM sealed with the state signing key before embedding
+//     in the JWT payload so they are not exposed in browser history or logs (JWT is only signed)
 //   - Tokens stored server-side in Supabase Vault (AES-256-GCM)
 //   - Provider path params validated against ProviderIDPattern
 //   - No tokens or secrets are ever returned in API responses
@@ -23,6 +25,11 @@ package api
 
 import (
 	"context"
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,6 +50,60 @@ import (
 
 // oauthStateTTL is the maximum lifetime of an OAuth CSRF state token.
 const oauthStateTTL = 10 * time.Minute
+
+// oauthStatePKCENonceSize is the GCM nonce length for sealing PKCE verifiers in state JWTs.
+const oauthStatePKCENonceSize = 12
+
+func oauthStateAEAD(secret string) (cipher.AEAD, error) {
+	sum := sha256.Sum256([]byte(secret))
+	block, err := aes.NewCipher(sum[:])
+	if err != nil {
+		return nil, err
+	}
+	return cipher.NewGCM(block)
+}
+
+// sealOAuthStatePKCE encrypts the PKCE verifier for storage inside the signed state JWT.
+// The JWT is only signed (not encrypted), so the verifier must not appear in plaintext in the payload.
+func sealOAuthStatePKCE(secret, verifier string) (string, error) {
+	if verifier == "" {
+		return "", nil
+	}
+	aead, err := oauthStateAEAD(secret)
+	if err != nil {
+		return "", err
+	}
+	nonce := make([]byte, oauthStatePKCENonceSize)
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return "", err
+	}
+	sealed := aead.Seal(nonce, nonce, []byte(verifier), nil)
+	return base64.RawURLEncoding.EncodeToString(sealed), nil
+}
+
+func openOAuthStatePKCE(secret, encoded string) (string, error) {
+	if encoded == "" {
+		return "", nil
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(encoded)
+	if err != nil {
+		return "", fmt.Errorf("decode pkce blob: %w", err)
+	}
+	if len(raw) < oauthStatePKCENonceSize {
+		return "", fmt.Errorf("pkce blob too short")
+	}
+	aead, err := oauthStateAEAD(secret)
+	if err != nil {
+		return "", err
+	}
+	nonce := raw[:oauthStatePKCENonceSize]
+	ciphertext := raw[oauthStatePKCENonceSize:]
+	plain, err := aead.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return "", fmt.Errorf("decrypt pkce blob: %w", err)
+	}
+	return string(plain), nil
+}
 
 // subdomainPattern matches valid RFC 1123-style subdomains: lowercase
 // alphanumeric and hyphens, not starting or ending with a hyphen, max 63 chars.
@@ -150,9 +211,9 @@ func oauthStateSecret(deps *Deps) string {
 // The returnTo parameter is the frontend path the user should be sent back
 // to after the callback (e.g. "/agents/1"). Pass "" to redirect to "/".
 //
-// pkceVerifier, when non-empty, is stored in the state JWT and passed to the
-// token endpoint on callback (RFC 7636). Must be paired with S256 challenge
-// on the authorization request.
+// pkceVerifier, when non-empty, is sealed and stored in the state JWT, then
+// recovered on callback for the token exchange (RFC 7636). Must be paired with
+// S256 challenge on the authorization request.
 func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop, returnTo, replaceID, pkceVerifier string) (string, error) {
 	secret := oauthStateSecret(deps)
 	if secret == "" {
@@ -176,7 +237,11 @@ func createOAuthState(deps *Deps, userID, provider string, scopes []string, shop
 		claims["replace_id"] = replaceID
 	}
 	if pkceVerifier != "" {
-		claims["pkce_verifier"] = pkceVerifier
+		sealed, err := sealOAuthStatePKCE(secret, pkceVerifier)
+		if err != nil {
+			return "", fmt.Errorf("seal pkce verifier: %w", err)
+		}
+		claims["pkce_sealed"] = sealed
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	return token.SignedString([]byte(secret))
@@ -245,7 +310,17 @@ func verifyOAuthState(deps *Deps, stateStr string) (*oauthState, error) {
 	shop, _ := claims["shop"].(string)
 	returnTo, _ := claims["return_to"].(string)
 	replaceID, _ := claims["replace_id"].(string)
-	pkceVerifier, _ := claims["pkce_verifier"].(string)
+	var pkceVerifier string
+	if sealed, ok := claims["pkce_sealed"].(string); ok && sealed != "" {
+		v, err := openOAuthStatePKCE(secret, sealed)
+		if err != nil {
+			return nil, fmt.Errorf("invalid state token pkce: %w", err)
+		}
+		pkceVerifier = v
+	} else if legacy, ok := claims["pkce_verifier"].(string); ok && legacy != "" {
+		// In-flight tokens from before pkce_sealed (plaintext in JWT payload).
+		pkceVerifier = legacy
+	}
 	return &oauthState{UserID: sub, Provider: prov, Scopes: scopes, Shop: shop, ReturnTo: returnTo, ReplaceID: replaceID, PKCEVerifier: pkceVerifier}, nil
 }
 
