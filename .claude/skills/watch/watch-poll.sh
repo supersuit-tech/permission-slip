@@ -110,11 +110,16 @@ fi
 LAST_REVIEW_ID_FILE="$WORK_DIR/last-review-id"
 LAST_REVIEW_COMMENT_ID_FILE="$WORK_DIR/last-review-comment-id"
 LAST_ISSUE_COMMENT_ID_FILE="$WORK_DIR/last-issue-comment-id"
+STAGED_REVIEW_ID_FILE="$WORK_DIR/.staged-review-id"
+STAGED_REVIEW_COMMENT_ID_FILE="$WORK_DIR/.staged-review-comment-id"
+STAGED_ISSUE_COMMENT_ID_FILE="$WORK_DIR/.staged-issue-comment-id"
+PENDING_ITEMS_FILE="$WORK_DIR/pending-items.json"
 WORK_ITEMS_FILE="$WORK_DIR/work-items.json"
 ACTION_LOG_FILE="$WORK_DIR/action-log.json"
 CHECKLIST_CACHE_FILE="$WORK_DIR/checklist-cache.txt"
 TURNS_FILE="$WORK_DIR/turns-count"
 WRAPUP_COMMENT_ID_FILE="$WORK_DIR/wrapup-comment-id"
+DRAIN_PASSES_FILE="$WORK_DIR/drain-passes"
 PR_NUMBER_FILE="$WORK_DIR/pr-number.txt"
 
 # Only initialize state files if they don't already exist (fresh session)
@@ -123,13 +128,15 @@ PR_NUMBER_FILE="$WORK_DIR/pr-number.txt"
 [[ -f "$LAST_ISSUE_COMMENT_ID_FILE" ]] || echo "0" > "$LAST_ISSUE_COMMENT_ID_FILE"
 [[ -f "$ACTION_LOG_FILE" ]] || echo "[]" > "$ACTION_LOG_FILE"
 [[ -f "$TURNS_FILE" ]] || echo "0" > "$TURNS_FILE"
+[[ -f "$DRAIN_PASSES_FILE" ]] || echo "0" > "$DRAIN_PASSES_FILE"
 echo "$PR_NUMBER" > "$PR_NUMBER_FILE"
 
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
-POLL_INTERVAL=60
-MAX_IDLE_CYCLES=6
+POLL_INTERVAL="${POLL_INTERVAL_OVERRIDE:-60}"
+MAX_IDLE_CYCLES="${MAX_IDLE_CYCLES_OVERRIDE:-6}"
+MAX_DRAIN_PASSES=2
 IDLE_COUNTER=0
 CYCLE=0
 
@@ -138,6 +145,102 @@ CYCLE=0
 # ---------------------------------------------------------------------------
 gh_api() {
   GH_HOST="${GH_HOST}" GH_REPO="${GH_REPO}" gh api "$@"
+}
+
+# ---------------------------------------------------------------------------
+# Commit staged last-seen IDs to actual files.
+# Called only after work items are safely persisted (build_work_items).
+# This prevents data loss: if the script exits before committing, the next
+# invocation re-fetches the same comments because IDs haven't advanced.
+# ---------------------------------------------------------------------------
+commit_seen_ids() {
+  for suffix in review-id review-comment-id issue-comment-id; do
+    local staged="$WORK_DIR/.staged-${suffix}"
+    local actual="$WORK_DIR/last-${suffix}"
+    if [[ -f "$staged" ]]; then
+      local staged_val
+      staged_val=$(cat "$staged")
+      if [[ "$staged_val" != "0" && "$staged_val" != "null" && -n "$staged_val" ]]; then
+        echo "$staged_val" > "$actual"
+      fi
+      rm -f "$staged"
+    fi
+  done
+}
+
+# ---------------------------------------------------------------------------
+# Check for unprocessed pending items from a previous AGENT_NEEDED exit.
+# Compares pending-items.json comment IDs against action-log.json entries.
+# Returns JSON array of comment items that were never processed.
+# ---------------------------------------------------------------------------
+check_pending_items() {
+  if [[ ! -f "$PENDING_ITEMS_FILE" ]]; then
+    echo "[]"
+    return
+  fi
+
+  local pending
+  pending=$(cat "$PENDING_ITEMS_FILE")
+  local pending_count
+  pending_count=$(echo "$pending" | jq 'length')
+  if [[ "$pending_count" -eq 0 ]]; then
+    rm -f "$PENDING_ITEMS_FILE"
+    echo "[]"
+    return
+  fi
+
+  # Extract comment IDs that were acted on (implemented or declined) from action log.
+  # The action log tracks comment_id for each implemented/declined entry.
+  local action_log
+  action_log=$(cat "$ACTION_LOG_FILE")
+
+  # Get pending comment items
+  local pending_items
+  pending_items=$(echo "$pending" | jq '[.[] | select(.type != null)]')
+  local pending_item_count
+  pending_item_count=$(echo "$pending_items" | jq 'length')
+
+  if [[ "$pending_item_count" -eq 0 ]]; then
+    rm -f "$PENDING_ITEMS_FILE"
+    echo "[]"
+    return
+  fi
+
+  # Extract IDs of pending comments
+  local pending_ids
+  pending_ids=$(echo "$pending_items" | jq '[.[].id]')
+
+  # Extract comment IDs that appear in action log entries (implemented/declined)
+  # Match by comment_id field if present, or fall back to matching author+request text
+  local processed_ids
+  processed_ids=$(echo "$action_log" | jq --argjson pids "$pending_ids" '
+    [.[] | select(.type == "implemented" or .type == "declined") | .comment_id // empty] |
+    [.[] | select(. != null)] |
+    . as $acted |
+    $pids | [.[] | select(. as $id | $acted | index($id) | not)]')
+
+  local remaining_count
+  remaining_count=$(echo "$processed_ids" | jq 'length')
+
+  if [[ "$remaining_count" -eq 0 ]]; then
+    # All pending comments were processed
+    rm -f "$PENDING_ITEMS_FILE"
+    echo "[]"
+  else
+    # Return only the unprocessed pending comments
+    echo "$pending_items" | jq --argjson remaining "$processed_ids" '
+      [.[] | select(.id as $id | $remaining | index($id))]'
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Save pending items so they survive across invocations.
+# Called when exiting AGENT_NEEDED — records which comments we handed off.
+# ---------------------------------------------------------------------------
+save_pending_items() {
+  local comments="$1"
+  # Save pending comment items directly (no metadata needed — we track by comment ID)
+  echo "$comments" > "$PENDING_ITEMS_FILE"
 }
 
 # ---------------------------------------------------------------------------
@@ -167,7 +270,7 @@ fetch_new_comments() {
   local max_review_id
   max_review_id=$(echo "$new_reviews" | jq -r '[.[].id] | max // 0')
   if [[ "$max_review_id" != "0" && "$max_review_id" != "null" ]]; then
-    echo "$max_review_id" > "$LAST_REVIEW_ID_FILE"
+    echo "$max_review_id" > "$STAGED_REVIEW_ID_FILE"
   fi
 
   # Map reviews to work items
@@ -193,7 +296,7 @@ fetch_new_comments() {
   local max_rc_id
   max_rc_id=$(echo "$new_rcs" | jq -r '[.[].id] | max // 0')
   if [[ "$max_rc_id" != "0" && "$max_rc_id" != "null" ]]; then
-    echo "$max_rc_id" > "$LAST_REVIEW_COMMENT_ID_FILE"
+    echo "$max_rc_id" > "$STAGED_REVIEW_COMMENT_ID_FILE"
   fi
 
   items=$(echo "$items" | jq --argjson rcs "$new_rcs" '
@@ -221,7 +324,7 @@ fetch_new_comments() {
   local max_ic_id
   max_ic_id=$(echo "$new_ics" | jq -r '[.[].id] | max // 0')
   if [[ "$max_ic_id" != "0" && "$max_ic_id" != "null" ]]; then
-    echo "$max_ic_id" > "$LAST_ISSUE_COMMENT_ID_FILE"
+    echo "$max_ic_id" > "$STAGED_ISSUE_COMMENT_ID_FILE"
   fi
 
   items=$(echo "$items" | jq --argjson ics "$new_ics" '
@@ -588,6 +691,9 @@ echo ""
 if [[ "$MAX_TURNS" -gt 0 && "$CURRENT_TURNS" -ge "$MAX_TURNS" ]]; then
   echo "=== Turn limit reached (${CURRENT_TURNS}/${MAX_TURNS}) ==="
 
+  # Clean up pending queue and drain counter — session is ending
+  rm -f "$PENDING_ITEMS_FILE" "$DRAIN_PASSES_FILE"
+
   # Print session context for the calling agent
   print_session_context
 
@@ -629,6 +735,14 @@ else
   echo "[pre-poll] Merge: ${pre_merge}"
 fi
 
+# --- Check for unprocessed pending items from previous AGENT_NEEDED exit ---
+pending_comments=$(check_pending_items)
+pending_count=$(echo "$pending_comments" | jq 'length')
+if [[ "$pending_count" -gt 0 ]]; then
+  echo "[pending] Found ${pending_count} unprocessed items from previous run"
+  echo "[pending] Re-including in next work batch"
+fi
+
 # --- Polling loop ---
 while true; do
   CYCLE=$((CYCLE + 1))
@@ -645,6 +759,18 @@ while true; do
   if [[ "$comment_count" -gt 0 ]]; then
     echo "[${CYCLE}] Found ${comment_count} new comments/reviews"
     had_activity=true
+  fi
+
+  # 1b. Merge in any unprocessed pending items from a previous run
+  if [[ "$pending_count" -gt 0 ]]; then
+    echo "[${CYCLE}] Merging ${pending_count} pending items from previous run"
+    new_comments=$(echo "$new_comments" "$pending_comments" | jq -s '.[0] + .[1] | unique_by(.id)')
+    comment_count=$(echo "$new_comments" | jq 'length')
+    had_activity=true
+    # Clear pending after merging — they're now in this cycle's batch
+    pending_count=0
+    pending_comments="[]"
+    rm -f "$PENDING_ITEMS_FILE"
   fi
 
   # 2. Merge from main
@@ -678,6 +804,15 @@ while true; do
 
     build_work_items "$new_comments" "$merge_status" "$conflict_files" "$checklist_items"
 
+    # Commit staged last-seen IDs only after work items are safely persisted.
+    # This is the key reliability fix: if the script crashes before this point,
+    # the next invocation will re-fetch the same comments from the API because
+    # the last-seen IDs haven't advanced yet.
+    commit_seen_ids
+
+    # Save pending items so we can detect if the agent doesn't process them
+    save_pending_items "$new_comments"
+
     # Increment turns counter
     CURRENT_TURNS=$(cat "$TURNS_FILE")
     echo $((CURRENT_TURNS + 1)) > "$TURNS_FILE"
@@ -688,11 +823,13 @@ while true; do
     echo "ACTION_LOG_FILE=${ACTION_LOG_FILE}"
 
     # The caller (SKILL.md) reads these signals and invokes the agent.
-    # After the agent finishes, it calls this script again with --resume
-    # to continue the loop. For simplicity, we exit here and let the
-    # skill orchestrate the agent invocation.
+    # After the agent finishes, it calls this script again with --work-dir
+    # to continue the loop. We exit here and let the skill orchestrate.
     exit 0
   else
+    # Clean up staged IDs on idle cycles (nothing new to commit)
+    rm -f "$STAGED_REVIEW_ID_FILE" "$STAGED_REVIEW_COMMENT_ID_FILE" "$STAGED_ISSUE_COMMENT_ID_FILE"
+
     IDLE_COUNTER=$((IDLE_COUNTER + 1))
     echo "[${CYCLE}] No activity. Idle counter: ${IDLE_COUNTER}/${MAX_IDLE_CYCLES}"
   fi
@@ -700,7 +837,96 @@ while true; do
   # 5. Check idle timeout
   if [[ $IDLE_COUNTER -ge $MAX_IDLE_CYCLES ]]; then
     echo ""
+
+    # --- Post-idle drain: check for unresolved review threads ---
+    # Prevents the session ending with open review threads that landed
+    # between our last AGENT_NEEDED and now. Capped at MAX_DRAIN_PASSES
+    # to avoid infinite loops when threads can't be resolved.
+    drain_passes=$(cat "$DRAIN_PASSES_FILE")
+
+    if [[ "$drain_passes" -lt "$MAX_DRAIN_PASSES" ]]; then
+      echo "[drain] Checking for unresolved review threads before wrap-up... (pass $((drain_passes + 1))/${MAX_DRAIN_PASSES})"
+      unresolved_threads_raw=$(gh_api graphql -f query="
+        query {
+          repository(owner: \"${OWNER}\", name: \"${REPO}\") {
+            pullRequest(number: ${PR_NUMBER}) {
+              merged
+              reviewThreads(first: 100) {
+                pageInfo {
+                  hasNextPage
+                }
+                nodes {
+                  id
+                  isResolved
+                  comments(first: 1) {
+                    nodes {
+                      databaseId
+                      body
+                      author { login }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }" 2>/dev/null || echo '{}')
+
+      # Warn if there are more than 100 review threads (pagination not implemented)
+      has_next_page=$(echo "$unresolved_threads_raw" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage // false' 2>/dev/null || echo "false")
+      if [[ "$has_next_page" == "true" ]]; then
+        echo "[drain] WARNING: PR has >100 review threads; drain may be incomplete" >&2
+      fi
+
+      unresolved_threads=$(echo "$unresolved_threads_raw" | jq -r '
+        .data.repository.pullRequest.reviewThreads.nodes
+        | [.[] | select(.isResolved == false)]' 2>/dev/null || echo "[]")
+
+      unresolved_count=$(echo "$unresolved_threads" | jq 'length' 2>/dev/null || echo "0")
+
+      if [[ "$unresolved_count" -gt 0 ]]; then
+        echo "[drain] Found ${unresolved_count} unresolved review threads — running AGENT_NEEDED pass"
+
+        # Build synthetic comment items from unresolved threads
+        drain_comments=$(echo "$unresolved_threads" | jq '[.[] | {
+          type: "review_comment",
+          id: .comments.nodes[0].databaseId,
+          author: .comments.nodes[0].author.login,
+          body: .comments.nodes[0].body,
+          node_id: .id,
+          path: "",
+          line: null,
+          diff_hunk: "",
+          created_at: ""
+        }] | [.[] | select(.id != null)]')
+
+        drain_count=$(echo "$drain_comments" | jq 'length')
+        if [[ "$drain_count" -gt 0 ]]; then
+          # No staged IDs to commit — drain comments come from GraphQL,
+          # not from fetch_new_comments(), so last-seen IDs are unchanged.
+          build_work_items "$drain_comments" "clean" "" "[]"
+          save_pending_items "$drain_comments"
+
+          # Increment drain pass counter
+          echo $((drain_passes + 1)) > "$DRAIN_PASSES_FILE"
+
+          CURRENT_TURNS=$(cat "$TURNS_FILE")
+          echo $((CURRENT_TURNS + 1)) > "$TURNS_FILE"
+
+          echo "AGENT_NEEDED"
+          echo "REASON=post-idle drain: ${drain_count} unresolved review threads (pass $((drain_passes + 1))/${MAX_DRAIN_PASSES})"
+          echo "WORK_ITEMS_FILE=${WORK_ITEMS_FILE}"
+          echo "ACTION_LOG_FILE=${ACTION_LOG_FILE}"
+          exit 0
+        fi
+      fi
+    else
+      echo "[drain] Drain pass limit reached (${drain_passes}/${MAX_DRAIN_PASSES}) — proceeding to wrap-up"
+    fi
+
     echo "=== Idle timeout reached (${MAX_IDLE_CYCLES} cycles) ==="
+
+    # Clean up pending queue and drain counter — session is ending
+    rm -f "$PENDING_ITEMS_FILE" "$DRAIN_PASSES_FILE"
 
     # Generate and post wrap-up
     echo "[wrap-up] Generating session summary..."

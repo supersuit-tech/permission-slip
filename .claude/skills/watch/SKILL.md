@@ -128,6 +128,18 @@ When the script prints **`AGENT_NEEDED`** and exits **0**, it has **not** posted
 
 - **`--max-turns 1`:** Expect **two** poll runs in the common case: first run → `AGENT_NEEDED` (do work); second run → `IDLE_TIMEOUT` (wrap-up posted) → **Step 5**.
 
+#### Reliability: deferred ID advancement and pending queue
+
+`watch-poll.sh` uses **deferred ID advancement** to prevent data loss. When `fetch_new_comments()` finds new comments, it writes their max IDs to **staged** files (`.staged-*`), not the actual `last-*-id` files. The staged IDs are only **committed** (moved to actual files) after `build_work_items()` has safely persisted them to `work-items.json`. This means:
+
+- If the script crashes between fetching and building work items, the next invocation re-fetches the same comments (IDs haven't advanced).
+- On `AGENT_NEEDED` exit, the script saves a **pending queue** (`pending-items.json`) recording which comments were handed off. On re-invocation, it checks whether the action log grew (indicating the agent processed the items). If not, the pending comments are re-included in the next cycle.
+- The idle counter **never increments** when the pending queue is non-empty — this prevents `IDLE_TIMEOUT` from firing when there's unprocessed work.
+
+#### Post-idle drain for unresolved threads
+
+Before emitting `IDLE_TIMEOUT`, the script performs a **drain check**: it queries the PR's review threads via GraphQL and looks for any that are still unresolved. If unresolved threads exist, it synthesizes one more `AGENT_NEEDED` pass with those threads as work items. This handles the case where comments landed between the last `AGENT_NEEDED` and the idle timeout, or where the PR was merged while review threads remained open.
+
 **Exit code 100**: Pre-poll merge conflict. The script detected conflicts before the polling loop started. Read `WORK_ITEMS_FILE` for conflict details and resolve them (see Step 3), then re-run the polling script.
 
 ### Step 3: Process work items (AI reasoning)
