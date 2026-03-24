@@ -89,7 +89,8 @@ func TestSearchTickets_WithCreatedAtBounds_ANDQuery(t *testing.T) {
 			t.Errorf("unexpected first predicate: %#v", p0)
 		}
 		p1 := vals[1].(map[string]any)
-		if p1["field"] != "created_at" || p1["operator"] != ">" || p1["value"] != "1709251200" {
+		// value is serialized as a JSON number (int64 → float64 after round-trip).
+		if p1["field"] != "created_at" || p1["operator"] != ">" || p1["value"] != float64(1709251200) {
 			t.Errorf("unexpected second predicate: %#v", p1)
 		}
 

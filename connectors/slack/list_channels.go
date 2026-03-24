@@ -117,9 +117,10 @@ func listChannelEntryMatchesTypes(types string, ch listChannelEntry) bool {
 			if ch.IsMPIM {
 				return true
 			}
-			// Fallback if API omits is_mpim: treat G-prefix non-DM as mpim (Slack encodes
-			// group DMs as G; legacy G-prefix private channels are rare and usually include is_mpim=false).
-			if len(ch.ID) > 0 && ch.ID[0] == 'G' && !ch.IsIM {
+			// Fallback if API omits is_mpim: treat G-prefix non-DM, non-private-channel
+			// as mpim. Pre-2020 workspaces used G-prefix for private channels too, so
+			// we exclude those by checking !ch.IsPrivate (real MPIMs aren't marked private).
+			if len(ch.ID) > 0 && ch.ID[0] == 'G' && !ch.IsIM && !ch.IsPrivate {
 				return true
 			}
 		case "private_channel":

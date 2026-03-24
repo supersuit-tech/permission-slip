@@ -49,7 +49,7 @@ func (a *createChannelAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	if resp.Channel == nil {
