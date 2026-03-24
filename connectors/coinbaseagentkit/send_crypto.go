@@ -9,15 +9,11 @@ import (
 
 	"github.com/coinbase/cdp-sdk/go/openapi"
 	"github.com/ethereum/go-ethereum"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
-
-// Minimal ERC-20 transfer ABI for encoding calldata.
-const erc20TransferABI = `[{"name":"transfer","type":"function","inputs":[{"name":"to","type":"address"},{"name":"amount","type":"uint256"}],"outputs":[{"name":"","type":"bool"}]}]`
 
 type sendCryptoParams struct {
 	FromAddress string `json:"from_address"`
@@ -82,25 +78,9 @@ func (a *sendCryptoAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("fetch pending nonce: %v", err)}
 	}
 
-	tip, err := ethCl.SuggestGasTipCap(ctx)
+	tip, gasFeeCap, err := suggestEIP1559Fees(ctx, ethCl)
 	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("suggest gas tip: %v", err)}
-	}
-	header, err := ethCl.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("fetch chain head: %v", err)}
-	}
-	var gasFeeCap *big.Int
-	if header.BaseFee != nil {
-		gasFeeCap = new(big.Int).Add(
-			new(big.Int).Mul(header.BaseFee, big.NewInt(2)),
-			tip,
-		)
-	} else {
-		gasFeeCap, err = ethCl.SuggestGasPrice(ctx)
-		if err != nil {
-			return nil, &connectors.ExternalError{Message: fmt.Sprintf("suggest gas price: %v", err)}
-		}
+		return nil, &connectors.ExternalError{Message: err.Error()}
 	}
 
 	var tx *types.Transaction
@@ -124,7 +104,7 @@ func (a *sendCryptoAction) Execute(ctx context.Context, req connectors.ActionReq
 			return nil, &connectors.ValidationError{Message: "token_contract must be a 0x-prefixed 40-hex-character contract address"}
 		}
 		tokenAddr := common.HexToAddress(tokenStr)
-		parsed, err := abi.JSON(strings.NewReader(erc20TransferABI))
+		parsed, err := parsedErc20TransferABI()
 		if err != nil {
 			return nil, &connectors.ExternalError{Message: fmt.Sprintf("parse ERC-20 ABI: %v", err)}
 		}
@@ -208,27 +188,4 @@ func (a *sendCryptoAction) Execute(ctx context.Context, req connectors.ActionReq
 		"to_address":       strings.TrimSpace(p.ToAddress),
 		"network":          string(net),
 	})
-}
-
-func publicRPCForSendNetwork(n openapi.SendEvmTransactionJSONBodyNetwork) (string, bool) {
-	switch n {
-	case openapi.SendEvmTransactionJSONBodyNetworkBase:
-		return "https://mainnet.base.org", true
-	case openapi.SendEvmTransactionJSONBodyNetworkBaseSepolia:
-		return "https://sepolia.base.org", true
-	case openapi.SendEvmTransactionJSONBodyNetworkEthereum:
-		return "https://ethereum.publicnode.com", true
-	case openapi.SendEvmTransactionJSONBodyNetworkEthereumSepolia:
-		return "https://ethereum-sepolia.publicnode.com", true
-	case openapi.SendEvmTransactionJSONBodyNetworkPolygon:
-		return "https://polygon-rpc.com", true
-	case openapi.SendEvmTransactionJSONBodyNetworkArbitrum:
-		return "https://arb1.arbitrum.io/rpc", true
-	case openapi.SendEvmTransactionJSONBodyNetworkOptimism:
-		return "https://mainnet.optimism.io", true
-	case openapi.SendEvmTransactionJSONBodyNetworkAvalanche:
-		return "https://api.avax.network/ext/bc/C/rpc", true
-	default:
-		return "", false
-	}
 }

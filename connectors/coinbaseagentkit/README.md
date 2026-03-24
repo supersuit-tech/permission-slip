@@ -24,3 +24,5 @@ Create keys at [portal.cdp.coinbase.com](https://portal.cdp.coinbase.com/).
 - `coinbase_agentkit.get_swap_price` — read-only swap quote
 
 `send_crypto` and `swap_tokens` use public RPC endpoints only for nonce and fee estimation; signing and broadcast go through CDP.
+
+Before signing a swap from a CDP quote, the connector validates the quoted transaction’s `to` address format, gas limit (must be positive and at most 16M), and calldata length (at most 256 KiB) so obviously malformed quotes fail fast.

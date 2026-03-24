@@ -118,29 +118,11 @@ func (a *swapTokensAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, &connectors.ExternalError{Message: fmt.Sprintf("fetch pending nonce: %v", err)}
 	}
 
-	tip, err := ethCl.SuggestGasTipCap(ctx)
+	tip, gasFeeCap, err := suggestEIP1559Fees(ctx, ethCl)
 	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("suggest gas tip: %v", err)}
+		return nil, &connectors.ExternalError{Message: err.Error()}
 	}
-	header, err := ethCl.HeaderByNumber(ctx, nil)
-	if err != nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("fetch chain head: %v", err)}
-	}
-	var gasFeeCap *big.Int
-	if header.BaseFee != nil {
-		gasFeeCap = new(big.Int).Add(new(big.Int).Mul(header.BaseFee, big.NewInt(2)), tip)
-	} else {
-		gasFeeCap, err = ethCl.SuggestGasPrice(ctx)
-		if err != nil {
-			return nil, &connectors.ExternalError{Message: fmt.Sprintf("suggest gas price: %v", err)}
-		}
-	}
-	if qGas, ok := parseBigIntString(quote.Transaction.GasPrice, "quote gas price"); ok && qGas.Cmp(gasFeeCap) > 0 {
-		gasFeeCap = qGas
-	}
-	if gasFeeCap.Cmp(tip) < 0 {
-		tip = new(big.Int).Set(gasFeeCap)
-	}
+	tip, gasFeeCap = adjustFeeCapsFromQuoteGasPrice(tip, gasFeeCap, quote.Transaction.GasPrice)
 
 	gasLimit, err := parseUint64String(quote.Transaction.Gas, "gas limit")
 	if err != nil {
@@ -152,6 +134,9 @@ func (a *swapTokensAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 	data := common.FromHex(quote.Transaction.Data)
+	if err := validateSwapQuoteTx(quote.Transaction.To, gasLimit, data); err != nil {
+		return nil, err
+	}
 
 	unsigned := types.NewTx(&types.DynamicFeeTx{
 		ChainID:   chainID,
@@ -250,23 +235,6 @@ func swapToSendNetwork(n openapi.EvmSwapsNetwork) (openapi.SendEvmTransactionJSO
 		return openapi.SendEvmTransactionJSONBodyNetworkPolygon, nil
 	default:
 		return "", &connectors.ValidationError{Message: fmt.Sprintf("cannot map swap network to send network: %s", n)}
-	}
-}
-
-func publicRPCForSwapNetwork(n openapi.EvmSwapsNetwork) (string, bool) {
-	switch n {
-	case openapi.EvmSwapsNetworkBase:
-		return "https://mainnet.base.org", true
-	case openapi.EvmSwapsNetworkEthereum:
-		return "https://ethereum.publicnode.com", true
-	case openapi.EvmSwapsNetworkPolygon:
-		return "https://polygon-rpc.com", true
-	case openapi.EvmSwapsNetworkArbitrum:
-		return "https://arb1.arbitrum.io/rpc", true
-	case openapi.EvmSwapsNetworkOptimism:
-		return "https://mainnet.optimism.io", true
-	default:
-		return "", false
 	}
 }
 
