@@ -42,7 +42,12 @@ func (p *putItemParams) validate() error {
 		return err
 	}
 	if len(p.AllowedWriteAttributes) > 0 {
-		return validateAttrAllowlist(p.AllowedWriteAttributes)
+		if err := validateAttrAllowlist(p.AllowedWriteAttributes); err != nil {
+			return err
+		}
+	}
+	if err := validateExprAttrNames(p.ExpressionAttributeNames, buildAllowedSet(p.AllowedWriteAttributes)); err != nil {
+		return err
 	}
 	return nil
 }
@@ -60,7 +65,7 @@ func (a *putItemAction) Execute(ctx context.Context, req connectors.ActionReques
 	if err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid item attribute values: %v", err)}
 	}
-	if err := validateItemWriteSubset(itemAv, allowedReadSet(params.AllowedWriteAttributes)); err != nil {
+	if err := validateItemWriteSubset(itemAv, buildAllowedSet(params.AllowedWriteAttributes)); err != nil {
 		return nil, err
 	}
 
