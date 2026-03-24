@@ -24,6 +24,9 @@ func TestBuiltInProviders_OmitsDisabledConnectors(t *testing.T) {
 	for _, id := range connectors.DisabledBuiltInConnectorIDs() {
 		disabled[id] = true
 	}
+	if len(disabled) == 0 {
+		t.Skip("no connectors currently disabled; nothing to verify")
+	}
 	for _, p := range oauth.BuiltInProviders() {
 		if disabled[p.ID] {
 			t.Errorf("%q should not appear in BuiltInProviders when connector is disabled", p.ID)
