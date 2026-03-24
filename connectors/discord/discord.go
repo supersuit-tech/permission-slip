@@ -637,7 +637,7 @@ func (c *DiscordConnector) doRequest(ctx context.Context, method, path string, c
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Discord API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Discord API request canceled"}
+			return &connectors.CanceledError{Message: "Discord API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Discord API request failed: %v", err)}
 	}

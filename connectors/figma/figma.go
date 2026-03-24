@@ -304,7 +304,7 @@ func (c *FigmaConnector) doRequest(req *http.Request, dest any) error {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Figma API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Figma API request canceled"}
+			return &connectors.CanceledError{Message: "Figma API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Figma API request failed: %v", err)}
 	}

@@ -178,7 +178,7 @@ func (c *ZapierConnector) doPost(ctx context.Context, targetURL string, body any
 			return nil, 0, &connectors.TimeoutError{Message: fmt.Sprintf("Zapier webhook request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return nil, 0, &connectors.TimeoutError{Message: "Zapier webhook request canceled"}
+			return nil, 0, &connectors.CanceledError{Message: "Zapier webhook request canceled"}
 		}
 		return nil, 0, &connectors.ExternalError{Message: fmt.Sprintf("Zapier webhook request failed: %v", err)}
 	}

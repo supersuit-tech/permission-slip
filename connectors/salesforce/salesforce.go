@@ -266,7 +266,7 @@ func wrapHTTPError(err error) error {
 		return &connectors.TimeoutError{Message: fmt.Sprintf("Salesforce API request timed out: %v", err)}
 	}
 	if errors.Is(err, context.Canceled) {
-		return &connectors.TimeoutError{Message: "Salesforce API request canceled"}
+		return &connectors.CanceledError{Message: "Salesforce API request canceled"}
 	}
 	return &connectors.ExternalError{Message: fmt.Sprintf("Salesforce API request failed: %v", err)}
 }

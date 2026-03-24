@@ -67,10 +67,7 @@ func extractErrorMessage(body []byte) string {
 	return truncate(string(body), 200)
 }
 
-// truncate shortens s to maxLen characters, appending "..." if truncated.
+// truncate shortens s to maxLen characters, appending an ellipsis if truncated.
 func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
+	return connectors.TruncateUTF8(s, maxLen)
 }

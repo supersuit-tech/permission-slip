@@ -79,8 +79,5 @@ func formatErrorMessage(body []byte) string {
 }
 
 func truncateBody(body []byte) string {
-	if len(body) <= maxErrorBodyLen {
-		return string(body)
-	}
-	return string(body[:maxErrorBodyLen]) + "... (truncated)"
+	return connectors.TruncateUTF8(string(body), maxErrorBodyLen)
 }

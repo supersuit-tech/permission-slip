@@ -150,8 +150,11 @@ func (c *ConfluenceConnector) do(ctx context.Context, creds connectors.Credentia
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		if connectors.IsTimeout(err) || errors.Is(err, context.Canceled) {
+		if connectors.IsTimeout(err) {
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Confluence API request timed out: %v", err)}
+		}
+		if errors.Is(err, context.Canceled) {
+			return &connectors.CanceledError{Message: "Confluence API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Confluence API request failed: %v", err)}
 	}

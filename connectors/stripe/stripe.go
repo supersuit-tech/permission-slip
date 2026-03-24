@@ -266,7 +266,7 @@ func (c *StripeConnector) do(ctx context.Context, creds connectors.Credentials, 
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Stripe API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Stripe API request canceled"}
+			return &connectors.CanceledError{Message: "Stripe API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Stripe API request failed: %v", err)}
 	}

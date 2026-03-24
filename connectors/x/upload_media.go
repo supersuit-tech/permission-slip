@@ -182,7 +182,7 @@ func (c *XConnector) doUpload(ctx context.Context, creds connectors.Credentials,
 			return &connectors.TimeoutError{Message: fmt.Sprintf("upload request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "upload request canceled"}
+			return &connectors.CanceledError{Message: "upload request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("upload request failed: %v", err)}
 	}

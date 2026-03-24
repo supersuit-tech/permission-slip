@@ -120,8 +120,5 @@ func parsedHasCategory(errs []squareError, category string) bool {
 // This prevents large or unexpected response payloads from leaking into
 // error messages that may surface in logs or API responses.
 func truncateBody(body []byte) string {
-	if len(body) <= maxErrorBodyLen {
-		return string(body)
-	}
-	return string(body[:maxErrorBodyLen]) + "... (truncated)"
+	return connectors.TruncateUTF8(string(body), maxErrorBodyLen)
 }

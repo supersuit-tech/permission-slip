@@ -432,9 +432,9 @@ func TestExpediaConnector_Do_ContextCanceled(t *testing.T) {
 	if err == nil {
 		t.Fatal("do() expected error, got nil")
 	}
-	// Should be a TimeoutError (we map context.Canceled to TimeoutError).
-	if !connectors.IsTimeoutError(err) {
-		t.Errorf("do() error = %T (%v), want *connectors.TimeoutError", err, err)
+	// Should be a CanceledError (context.Canceled is not retryable).
+	if !connectors.IsCanceledError(err) {
+		t.Errorf("do() error = %T (%v), want *connectors.CanceledError", err, err)
 	}
 }
 

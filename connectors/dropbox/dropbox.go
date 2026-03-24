@@ -281,7 +281,7 @@ func (c *DropboxConnector) mapHTTPError(err error) error {
 		return &connectors.TimeoutError{Message: fmt.Sprintf("Dropbox API request timed out: %v", err)}
 	}
 	if errors.Is(err, context.Canceled) {
-		return &connectors.TimeoutError{Message: "Dropbox API request canceled"}
+		return &connectors.CanceledError{Message: "Dropbox API request canceled"}
 	}
 	return &connectors.ExternalError{Message: fmt.Sprintf("Dropbox API request failed: %v", err)}
 }

@@ -138,7 +138,7 @@ func (c *WalmartConnector) do(ctx context.Context, creds connectors.Credentials,
 			return &connectors.TimeoutError{Message: fmt.Sprintf("Walmart API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.TimeoutError{Message: "Walmart API request canceled"}
+			return &connectors.CanceledError{Message: "Walmart API request canceled"}
 		}
 		return &connectors.ExternalError{Message: fmt.Sprintf("Walmart API request failed: %v", err)}
 	}

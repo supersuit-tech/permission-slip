@@ -287,7 +287,7 @@ func mapRedisError(err error) error {
 		return &connectors.TimeoutError{Message: fmt.Sprintf("Redis operation timed out: %v", err)}
 	}
 	if errors.Is(err, context.Canceled) {
-		return &connectors.TimeoutError{Message: "Redis operation canceled"}
+		return &connectors.CanceledError{Message: "Redis operation canceled"}
 	}
 	errMsg := err.Error()
 	if strings.Contains(errMsg, "NOAUTH") || strings.Contains(errMsg, "WRONGPASS") ||
