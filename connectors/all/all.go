@@ -21,6 +21,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/docusign"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/doordash"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/dropbox"
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/dynamodb"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/expedia"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/figma"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/github"
