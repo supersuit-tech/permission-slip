@@ -125,6 +125,8 @@ func (c *PayPalConnector) resolveAPIBase(creds connectors.Credentials) string {
 }
 
 // maxRequestIDLen is PayPal's maximum length for the PayPal-Request-Id header.
+// See https://developer.paypal.com/api/rest/reference/idempotency/ — PayPal
+// recommends UUID format (36 chars) because it fits the 38-character limit.
 const maxRequestIDLen = 38
 
 func deriveRequestID(actionType string, rawParams json.RawMessage) string {

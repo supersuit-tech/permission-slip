@@ -89,6 +89,13 @@ func TestCreateOrderAction_HTTPServer(t *testing.T) {
 		if r.Header.Get("Authorization") != "Bearer tok" {
 			t.Errorf("auth %q", r.Header.Get("Authorization"))
 		}
+		rid := r.Header.Get("PayPal-Request-Id")
+		if rid == "" {
+			t.Error("missing PayPal-Request-Id header")
+		}
+		if len(rid) > maxRequestIDLen {
+			t.Errorf("PayPal-Request-Id length = %d, want <= %d", len(rid), maxRequestIDLen)
+		}
 		w.Header().Set("Content-Type", "application/json")
 		_, _ = w.Write([]byte(`{"id":"ORD-1","status":"CREATED"}`))
 	}))
