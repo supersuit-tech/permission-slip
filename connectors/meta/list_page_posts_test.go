@@ -91,8 +91,8 @@ func TestListPagePosts_WithTimeRange(t *testing.T) {
 
 	params, _ := json.Marshal(listPagePostsParams{
 		PageID: "page_123",
-		Since:  1709251200,
-		Until:  1709337600,
+		Since:  "1709251200",
+		Until:  "1709337600",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{

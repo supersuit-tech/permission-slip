@@ -46,7 +46,8 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 						"start": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "Starting index for pagination (use with limit for paging through results)"
+							"description": "Starting index for pagination (use with limit for paging through results)",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),

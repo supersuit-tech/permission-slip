@@ -41,22 +41,42 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"created_at_min": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Show orders created at or after this date (ISO 8601, e.g. 2024-01-01T00:00:00Z)"
+							"description": "Show orders created at or after this date (ISO 8601, e.g. 2024-01-01T00:00:00Z)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "created_at_max",
+								"datetime_range_role": "lower"
+							}
 						},
 						"created_at_max": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Show orders created at or before this date (ISO 8601, e.g. 2024-12-31T23:59:59Z)"
+							"description": "Show orders created at or before this date (ISO 8601, e.g. 2024-12-31T23:59:59Z)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "created_at_min",
+								"datetime_range_role": "upper"
+							}
 						},
 						"updated_at_min": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Show orders updated at or after this date (ISO 8601)"
+							"description": "Show orders updated at or after this date (ISO 8601)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "updated_at_max",
+								"datetime_range_role": "lower"
+							}
 						},
 						"updated_at_max": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Show orders updated at or before this date (ISO 8601)"
+							"description": "Show orders updated at or before this date (ISO 8601)",
+							"x-ui": {
+								"widget": "datetime",
+								"datetime_range_pair": "updated_at_min",
+								"datetime_range_role": "upper"
+							}
 						},
 						"fields": {
 							"type": "string",

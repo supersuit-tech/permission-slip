@@ -26,20 +26,13 @@ var knownMissingAnnotations = map[string]bool{
 	"sendgrid.sendgrid.send_transactional_email:html_content": true,
 
 	// datetime — various connectors with ISO 8601 fields missing format
-	"asana.asana.create_task:due_at":                         true,
-	"asana.asana.update_task:due_at":                         true,
-	"dropbox.dropbox.share_file:expires":                     true,
-	"hubspot.hubspot.create_deal:closedate":                  true,
-	"hubspot.hubspot.update_deal_stage:close_date":           true,
-	"jira.jira.create_sprint:start_date":                     true,
-	"jira.jira.create_sprint:end_date":                       true,
-	"microsoft.microsoft.create_calendar_event:start":        true,
-	"microsoft.microsoft.create_calendar_event:end":          true,
-	"pagerduty.pagerduty.list_on_call:since":                 true,
-	"pagerduty.pagerduty.list_on_call:until":                 true,
-	"trello.trello.create_card:due":                          true,
-	"zoom.zoom.create_meeting:start_time":                    true,
-	"zoom.zoom.update_meeting:start_time":                    true,
+	"hubspot.hubspot.create_deal:closedate":           true,
+	"hubspot.hubspot.update_deal_stage:close_date":    true,
+	"microsoft.microsoft.create_calendar_event:start": true,
+	"microsoft.microsoft.create_calendar_event:end":   true,
+	"pagerduty.pagerduty.list_on_call:since":          true,
+	"pagerduty.pagerduty.list_on_call:until":          true,
+	"trello.trello.create_card:due":                   true,
 }
 
 // annotationIssue describes a single missing annotation found by the lint.

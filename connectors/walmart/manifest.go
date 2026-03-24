@@ -49,7 +49,8 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "integer",
 							"minimum": 0,
 							"default": 0,
-							"description": "Starting index for pagination"
+							"description": "Starting index for pagination",
+							"x-ui": {"hidden": true}
 						},
 						"limit": {
 							"type": "integer",

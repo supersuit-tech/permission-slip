@@ -46,11 +46,15 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"due_on": {
 							"type": "string",
-							"description": "Due date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Due date (YYYY-MM-DD)",
+							"x-ui": {"widget": "date"}
 						},
 						"due_at": {
 							"type": "string",
-							"description": "Due date and time (ISO 8601)"
+							"format": "date-time",
+							"description": "Due date and time (ISO 8601)",
+							"x-ui": {"widget": "datetime"}
 						},
 						"tags": {
 							"type": "array",
@@ -91,11 +95,15 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"due_on": {
 							"type": "string",
-							"description": "Due date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Due date (YYYY-MM-DD)",
+							"x-ui": {"widget": "date"}
 						},
 						"due_at": {
 							"type": "string",
-							"description": "Due date and time (ISO 8601)"
+							"format": "date-time",
+							"description": "Due date and time (ISO 8601)",
+							"x-ui": {"widget": "datetime"}
 						},
 						"completed": {
 							"type": "boolean",
@@ -175,7 +183,9 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"due_on": {
 							"type": "string",
-							"description": "Due date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Due date (YYYY-MM-DD)",
+							"x-ui": {"widget": "date"}
 						}
 					}
 				}`)),
@@ -212,11 +222,23 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"due_on_before": {
 							"type": "string",
-							"description": "Filter tasks due before this date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Filter tasks due before this date (YYYY-MM-DD)",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "due_on_after",
+								"datetime_range_role": "upper"
+							}
 						},
 						"due_on_after": {
 							"type": "string",
-							"description": "Filter tasks due after this date (YYYY-MM-DD)"
+							"format": "date",
+							"description": "Filter tasks due after this date (YYYY-MM-DD)",
+							"x-ui": {
+								"widget": "date",
+								"datetime_range_pair": "due_on_before",
+								"datetime_range_role": "lower"
+							}
 						},
 						"limit": {
 							"type": "integer",
