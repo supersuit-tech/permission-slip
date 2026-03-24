@@ -66,7 +66,7 @@ func (a *inviteToChannelAction) Execute(ctx context.Context, req connectors.Acti
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	result := map[string]string{

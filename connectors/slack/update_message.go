@@ -64,7 +64,7 @@ func (a *updateMessageAction) Execute(ctx context.Context, req connectors.Action
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	return connectors.JSONResult(map[string]string{

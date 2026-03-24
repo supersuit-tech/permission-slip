@@ -138,7 +138,7 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	if !resp.OK {
-		return nil, mapSlackError(resp.Error)
+		return nil, resp.asError()
 	}
 
 	// Filter search results to only include matches from channels the user

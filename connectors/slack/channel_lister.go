@@ -2,7 +2,6 @@ package slack
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -22,6 +21,7 @@ func (c *SlackConnector) ChannelListCredentialActionType() string {
 // or a safety cap is hit.
 func (c *SlackConnector) ListChannels(ctx context.Context, creds connectors.Credentials, userEmail string) ([]connectors.ChannelListItem, error) {
 	var all []listChannelSummary
+	seen := make(map[string]bool)
 	cursor := ""
 	for page := 0; page < slackChannelListMaxPages; page++ {
 		params := listChannelsParams{
@@ -33,15 +33,20 @@ func (c *SlackConnector) ListChannels(ctx context.Context, creds connectors.Cred
 		if err != nil {
 			return nil, err
 		}
-		all = append(all, batch.Channels...)
+		for _, ch := range batch.Channels {
+			if seen[ch.ID] {
+				continue
+			}
+			seen[ch.ID] = true
+			all = append(all, ch)
+		}
 		if batch.NextCursor == "" {
 			break
 		}
 		cursor = batch.NextCursor
 	}
-	if cursor != "" {
-		return nil, fmt.Errorf("slack channel list exceeded max pages (%d)", slackChannelListMaxPages)
-	}
+	// Return partial results when the page cap is reached rather than
+	// erroring, so callers still get a usable (large) channel list.
 	out := make([]connectors.ChannelListItem, 0, len(all))
 	for _, ch := range all {
 		out = append(out, connectors.ChannelListItem{
