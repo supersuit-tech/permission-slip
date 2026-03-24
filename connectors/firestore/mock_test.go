@@ -4,6 +4,9 @@ import (
 	"context"
 	"sync"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
@@ -31,6 +34,9 @@ func (m *mockRunner) getDocument(ctx context.Context, path string) (map[string]i
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.getErr != nil {
+		if st, ok := status.FromError(m.getErr); ok && st.Code() == codes.NotFound {
+			return nil, nil
+		}
 		return nil, m.getErr
 	}
 	d, ok := m.getData[path]
@@ -103,7 +109,7 @@ func (m *mockRunner) queryCollection(ctx context.Context, collectionPath string,
 		return nil, m.queryErr
 	}
 	if len(m.queryDocs) == 0 {
-		return nil, nil
+		return []map[string]interface{}{}, nil
 	}
 	batch := m.queryDocs[0]
 	m.queryDocs = m.queryDocs[1:]
