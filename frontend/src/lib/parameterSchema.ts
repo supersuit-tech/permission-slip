@@ -18,6 +18,7 @@ export interface SchemaPropertyUI {
   widget?:
     | "text"
     | "select"
+    | "multi-select"
     | "remote-select"
     | "textarea"
     | "toggle"
@@ -144,6 +145,7 @@ export function parseParametersSchema(
 export const VALID_WIDGETS = [
   "text",
   "select",
+  "multi-select",
   "remote-select",
   "textarea",
   "toggle",

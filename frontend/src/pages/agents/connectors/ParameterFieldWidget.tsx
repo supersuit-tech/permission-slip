@@ -97,6 +97,8 @@ function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
       return <RemoteSelectField {...props} />;
     case "select":
       return <SelectWidget {...props} />;
+    case "multi-select":
+      return <MultiSelectWidget {...props} />;
     case "textarea":
       return <TextareaWidget {...props} />;
     case "toggle":
@@ -205,6 +207,39 @@ function SelectWidget({ inputId, value, onChange, disabled, placeholder, enumVal
         </option>
       ))}
     </select>
+  );
+}
+
+function MultiSelectWidget({ inputId, value, onChange, disabled, enumValues, className }: WidgetRenderProps) {
+  const selected = new Set(value ? value.split(",").map((s) => s.trim()).filter(Boolean) : []);
+
+  function toggle(opt: string) {
+    const next = new Set(selected);
+    if (next.has(opt)) {
+      next.delete(opt);
+    } else {
+      next.add(opt);
+    }
+    // Preserve the enum order in the serialized value
+    const ordered = (enumValues ?? []).filter((v) => next.has(v));
+    onChange(ordered.join(","));
+  }
+
+  return (
+    <div className={`space-y-2${className ? ` ${className}` : ""}`} data-testid={`multi-select-${inputId}`}>
+      {(enumValues ?? []).map((opt) => (
+        <label key={opt} className="flex items-center gap-2 cursor-pointer">
+          <input
+            type="checkbox"
+            checked={selected.has(opt)}
+            onChange={() => toggle(opt)}
+            disabled={disabled}
+            className="accent-primary size-4 rounded"
+          />
+          <span className="text-sm">{opt}</span>
+        </label>
+      ))}
+    </div>
   );
 }
 

@@ -88,8 +88,9 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"types": {
 							"type": "string",
 							"default": "public_channel,private_channel,mpim,im",
+							"enum": ["public_channel", "private_channel", "mpim", "im"],
 							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set. im/mpim/private_channel results are filtered to the authorizing user; user-token merge fills in human-only DMs when configured.",
-							"x-ui": {"label": "Channel types", "placeholder": "public_channel,private_channel,mpim,im", "help_text": "Comma-separated list: public_channel, private_channel, mpim (group DMs), im (direct messages)"}
+							"x-ui": {"label": "Channel types", "widget": "multi-select", "help_text": "public_channel, private_channel, mpim (group DMs), im (direct messages)"}
 						},
 						"limit": {
 							"type": "integer",
