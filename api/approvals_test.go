@@ -498,6 +498,102 @@ func TestListApprovals_Pagination(t *testing.T) {
 	})
 }
 
+// ── GET /approvals/{approval_id} ──────────────────────────────────────────────
+
+func TestGetApproval_Success(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	apprID := testhelper.GenerateID(t, "appr_")
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertApproval(t, tx, apprID, agentID, uid)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/approvals/"+apprID, uid)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp approvalDetailResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.ApprovalID != apprID {
+		t.Errorf("expected approval_id %q, got %q", apprID, resp.ApprovalID)
+	}
+	if resp.Status != "pending" {
+		t.Errorf("expected status 'pending', got %q", resp.Status)
+	}
+}
+
+func TestGetApproval_NotFound(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/approvals/appr_nonexistent", uid)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGetApproval_OtherUsersApproval(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	// Create an approval owned by user1
+	uid1 := testhelper.GenerateUID(t)
+	apprID := testhelper.GenerateID(t, "appr_")
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid1, "u_"+uid1[:8])
+	testhelper.InsertApproval(t, tx, apprID, agentID, uid1)
+
+	// Authenticate as user2
+	uid2 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid2, "u_"+uid2[:8])
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/approvals/"+apprID, uid2)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 for other user's approval, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGetApproval_Unauthenticated(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := httptest.NewRequest(http.MethodGet, "/approvals/appr_test123", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
 // ── POST /approvals/{approval_id}/approve ────────────────────────────────────
 
 func TestApproveApproval_Success(t *testing.T) {
