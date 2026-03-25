@@ -14,8 +14,26 @@ import (
 // templateParamPattern matches {{param}} and {{param:directive}} placeholders.
 var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 
+// resourceDetailFields are keys that come from ResolveResourceDetails at
+// runtime, not from the action's ParametersSchema. Templates can reference
+// these because the frontend merges resourceDetails into the template lookup
+// (see ActionPreviewSummary.tsx buildParts and mobile approvalUtils.ts).
+var resourceDetailFields = map[string]bool{
+	// Slack: resolveChannel returns channel_name, resolveUser returns user_name.
+	"channel_name": true,
+	"user_name":    true,
+	// Google: various resolvers return title, file_name, start_time, subject, from, range.
+	"title":      true,
+	"file_name":  true,
+	"start_time": true,
+	"subject":    true,
+	"from":       true,
+	"range":      true,
+}
+
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a
-// display_template actually exists in the action's ParametersSchema properties.
+// display_template actually exists in the action's ParametersSchema properties
+// or is a known resource_details field populated at runtime.
 // This catches typos like {{start_tme:datetime}} at test time rather than
 // silently falling through to raw values at runtime.
 func TestDisplayTemplateParamsExist(t *testing.T) {
@@ -45,10 +63,34 @@ func TestDisplayTemplateParamsExist(t *testing.T) {
 			matches := templateParamPattern.FindAllStringSubmatch(action.DisplayTemplate, -1)
 			for _, match := range matches {
 				paramName := match[1]
-				if _, exists := schema.Properties[paramName]; !exists {
-					t.Errorf("%s: display_template references {{%s}} but parameter %q is not in parameters_schema properties",
-						action.ActionType, match[0], paramName)
+				if _, exists := schema.Properties[paramName]; exists {
+					continue
 				}
+				if resourceDetailFields[paramName] {
+					continue
+				}
+				t.Errorf("%s: display_template references {{%s}} but parameter %q is not in parameters_schema properties or known resource_details fields",
+					action.ActionType, match[0], paramName)
+			}
+		}
+	}
+}
+
+// TestAllActionsHaveDisplayTemplate ensures every connector action defines a
+// DisplayTemplate. Templates are the primary way human-readable summaries are
+// rendered in approval cards. Without one, the UI falls back to a generic
+// summary that may be confusing (see #862).
+func TestAllActionsHaveDisplayTemplate(t *testing.T) {
+	for _, c := range connectors.BuiltInConnectors() {
+		mp, ok := c.(connectors.ManifestProvider)
+		if !ok {
+			continue
+		}
+		manifest := mp.Manifest()
+		for _, action := range manifest.Actions {
+			if action.DisplayTemplate == "" {
+				t.Errorf("%s: action %q is missing a DisplayTemplate — every action must have one for readable approval summaries",
+					manifest.ID, action.ActionType)
 			}
 		}
 	}

@@ -26,6 +26,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Issue",
 				Description: "Create a new issue in a repository",
 				RiskLevel:   "low",
+				DisplayTemplate: "Create issue {{title}} in {{owner}}/{{repo}}",
 				Preview: &connectors.ActionPreview{
 					Layout: "record",
 					Fields: map[string]string{"title": "title", "subtitle": "repo"},
@@ -62,6 +63,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Merge Pull Request",
 				Description: "Merge an open pull request",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Merge PR #{{pull_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "pull_number"],
@@ -96,6 +98,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Pull Request",
 				Description: "Create a pull request from a branch",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Create PR {{title}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "title", "head", "base"],
@@ -144,6 +147,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Add Reviewer",
 				Description: "Request reviews on a pull request",
 				RiskLevel:   "low",
+				DisplayTemplate: "Request review on PR #{{pull_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "pull_number", "reviewers"],
@@ -177,6 +181,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Release",
 				Description: "Create a tagged release in a repository",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Create release {{tag_name}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "tag_name"],
@@ -226,6 +231,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Close Issue",
 				Description: "Close an issue with an optional comment",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Close issue #{{issue_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "issue_number"],
@@ -265,6 +271,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Add Label",
 				Description: "Add labels to an issue or pull request",
 				RiskLevel:   "low",
+				DisplayTemplate: "Add labels to #{{issue_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "issue_number", "labels"],
@@ -298,6 +305,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Add Comment",
 				Description: "Add a comment to an issue or pull request",
 				RiskLevel:   "low",
+				DisplayTemplate: "Comment on #{{issue_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "issue_number", "body"],
@@ -330,6 +338,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Branch",
 				Description: "Create a new branch from a ref",
 				RiskLevel:   "low",
+				DisplayTemplate: "Create branch {{branch_name}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "branch_name", "from_ref"],
@@ -362,6 +371,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Get File Contents",
 				Description: "Read file contents from a repository",
 				RiskLevel:   "low",
+				DisplayTemplate: "Read {{path}} from {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "path"],
@@ -394,6 +404,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create or Update File",
 				Description: "Create or update a file in a repository via the Contents API",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Write {{path}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "path", "message", "content"],
@@ -441,6 +452,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List Repositories",
 				Description: "List repositories for the authenticated user or an organization",
 				RiskLevel:   "low",
+				DisplayTemplate: "List repositories",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -487,6 +499,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Get Repository",
 				Description: "Get repository metadata",
 				RiskLevel:   "low",
+				DisplayTemplate: "Get repo {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo"],
@@ -509,6 +522,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List Pull Requests",
 				Description: "List pull requests for a repository with optional filtering",
 				RiskLevel:   "low",
+				DisplayTemplate: "List PRs in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo"],
@@ -572,6 +586,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Trigger Workflow",
 				Description: "Trigger a GitHub Actions workflow dispatch event",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Trigger workflow {{workflow_id}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "workflow_id", "ref"],
@@ -610,6 +625,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List Workflow Runs",
 				Description: "List workflow runs for a repository with optional status, event, and actor filtering",
 				RiskLevel:   "low",
+				DisplayTemplate: "List workflow runs in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo"],
@@ -670,6 +686,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Webhook",
 				Description: "Create a repository webhook",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Create webhook in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "url", "events"],
@@ -721,6 +738,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search Code",
 				Description: "Search code across repositories",
 				RiskLevel:   "low",
+				DisplayTemplate: "Search code: {{q}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["q"],
@@ -756,6 +774,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search Issues",
 				Description: "Search issues and pull requests across repositories",
 				RiskLevel:   "low",
+				DisplayTemplate: "Search issues: {{q}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["q"],
@@ -797,6 +816,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Repository",
 				Description: "Create a new repository for the authenticated user or an organization",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Create repo {{name}}",
 				Preview: &connectors.ActionPreview{
 					Layout: "record",
 					Fields: map[string]string{"title": "name", "subtitle": "org"},

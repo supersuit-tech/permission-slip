@@ -464,24 +464,47 @@ describe("buildSummary", () => {
     it("shows up to 3 highlighted params", () => {
       const schema: ParametersSchema = {
         type: "object",
-        required: ["a", "b"],
+        required: ["target", "region"],
         properties: {
-          a: { type: "string", description: "First" },
-          b: { type: "string", description: "Second" },
-          c: { type: "string", description: "Third" },
-          d: { type: "string", description: "Fourth" },
+          target: { type: "string", description: "Deploy target env", "x-ui": { label: "Target" } },
+          region: { type: "string", description: "Cloud region", "x-ui": { label: "Region" } },
+          count: { type: "integer", description: "Instance count", "x-ui": { label: "Count" } },
+          dry_run: { type: "boolean", description: "Dry run mode", "x-ui": { label: "Dry run" } },
         },
       };
       const result = buildSummary(
         "test.action",
-        { a: "1", b: "2", c: "3", d: "4" },
+        { target: "prod", region: "us-east", count: 3, dry_run: true },
         schema,
         null,
       );
-      expect(result).toContain("First");
-      expect(result).toContain("Second");
-      expect(result).toContain("Third");
-      expect(result).not.toContain("Fourth");
+      // Uses x-ui label, not description, for display labels (#862)
+      expect(result).toContain("Target");
+      expect(result).toContain("Region");
+      expect(result).toContain("Count");
+      expect(result).not.toContain("Dry run");
+    });
+
+    it("falls back to humanized key when no x-ui label", () => {
+      const schema: ParametersSchema = {
+        type: "object",
+        required: ["channel_id"],
+        properties: {
+          channel_id: {
+            type: "string",
+            description: "Channel ID: C… (channel), D… (DM), or G… (group DM)",
+          },
+        },
+      };
+      const result = buildSummary(
+        "test.action",
+        { channel_id: "C123" },
+        schema,
+        "Read Messages",
+      );
+      // Should use humanized key "Channel id", NOT the verbose description (#862)
+      expect(result).toContain("Channel id");
+      expect(result).not.toContain("Channel ID: C");
     });
 
     it("returns just the label when no params", () => {

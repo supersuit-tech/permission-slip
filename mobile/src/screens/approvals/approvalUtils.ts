@@ -74,8 +74,12 @@ export function buildActionSummary(
   resourceDetails?: Record<string, unknown> | null,
 ): string {
   // 1. Try display template from manifest.
+  // Merge resourceDetails so templates can resolve human-readable names (#862).
   if (displayTemplate) {
-    const result = renderDisplayTemplate(displayTemplate, parameters);
+    const lookup = resourceDetails
+      ? { ...parameters, ...resourceDetails }
+      : parameters;
+    const result = renderDisplayTemplate(displayTemplate, lookup);
     if (result) return result;
   }
 
@@ -87,7 +91,7 @@ export function buildActionSummary(
   }
 
   // 3. Fall back to generic.
-  return buildGenericSummary(actionType, parameters);
+  return buildGenericSummary(actionType, parameters, resourceDetails);
 }
 
 type ActionFormatter = (params: Record<string, unknown>, resourceDetails?: Record<string, unknown>) => string | null;
@@ -235,15 +239,30 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
 };
 
 /**
+ * Converts a snake_case parameter key into a human-readable label.
+ * e.g. "channel_name" → "Channel name", "user_id" → "User id"
+ */
+function humanizeKey(key: string): string {
+  const words = key.replace(/_/g, " ").toLowerCase();
+  return words.charAt(0).toUpperCase() + words.slice(1);
+}
+
+/**
  * Fallback summary builder when no action-specific formatter matches.
  * Constructs a label from the action type plus up to 3 parameter highlights.
+ * Uses humanized key names instead of raw keys for readability (#862).
  */
 function buildGenericSummary(
   actionType: string,
   parameters: Record<string, unknown>,
+  resourceDetails?: Record<string, unknown> | null,
 ): string {
   const label = humanizeActionType(actionType);
-  const entries = Object.entries(parameters);
+  // Merge resourceDetails so resolved names appear instead of raw IDs (#862).
+  const merged = resourceDetails
+    ? { ...parameters, ...resourceDetails }
+    : parameters;
+  const entries = Object.entries(merged);
   if (entries.length === 0) return label;
 
   const highlights: string[] = [];
@@ -251,7 +270,7 @@ function buildGenericSummary(
     if (highlights.length >= 3) break;
     if (value == null) continue;
     const display = formatValue(value);
-    if (display) highlights.push(`${key}: ${display}`);
+    if (display) highlights.push(`${humanizeKey(key)}: ${display}`);
   }
 
   if (highlights.length === 0) return label;

@@ -148,8 +148,13 @@ function buildParts(
   resourceDetails?: Record<string, unknown> | null,
 ): SummaryPart[] {
   // 1. Try display template from manifest.
+  // Merge resourceDetails into the lookup so templates can resolve human-readable
+  // names (e.g. {{channel_name}} → "#general") instead of raw IDs (#862).
   if (displayTemplate) {
-    const templateParts = renderTemplate(displayTemplate, parameters);
+    const lookup = resourceDetails
+      ? { ...parameters, ...resourceDetails }
+      : parameters;
+    const templateParts = renderTemplate(displayTemplate, lookup);
     if (templateParts) return templateParts;
   }
 
@@ -161,7 +166,7 @@ function buildParts(
   }
 
   // 3. Fall back to generic.
-  return buildGenericParts(actionType, parameters, schema, actionName);
+  return buildGenericParts(actionType, parameters, schema, actionName, resourceDetails);
 }
 
 // ---------------------------------------------------------------------------
@@ -381,10 +386,16 @@ function buildGenericParts(
   parameters: Record<string, unknown>,
   schema: ParametersSchema | null,
   actionName: string | null,
+  resourceDetails?: Record<string, unknown> | null,
 ): SummaryPart[] {
   const label = actionName ?? humanizeActionType(actionType);
 
-  const highlights = pickHighlights(parameters, schema);
+  // Merge resourceDetails so resolved names (e.g. channel_name) appear in
+  // generic highlights instead of raw IDs (#862).
+  const merged = resourceDetails
+    ? { ...parameters, ...resourceDetails }
+    : parameters;
+  const highlights = pickHighlights(merged, schema);
   if (highlights.length === 0) return [text(label)];
 
   const parts: SummaryPart[] = [text(`${label}: `)];
@@ -451,7 +462,11 @@ function pickHighlights(
     const displayVal = formatHighlightValue(value);
     if (!displayVal) continue;
     const prop = properties?.[key];
-    const label = prop?.description ?? humanizeKey(key);
+    // Use x-ui label (short UI label) or humanized key — never the full schema
+    // description, which is developer-facing help text and far too verbose for
+    // inline summaries (see #862).
+    const uiLabel = prop?.["x-ui"]?.label;
+    const label = uiLabel ?? humanizeKey(key);
     highlights.push({ label, displayVal });
   }
 
