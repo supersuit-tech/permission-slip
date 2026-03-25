@@ -248,7 +248,7 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 						"keywords": {
 							"type": "string",
 							"description": "Company name or keywords to search for",
-							"x-ui": {"label": "Keywords", "placeholder": "software engineer"}
+						"x-ui": {"label": "Keywords", "placeholder": "Acme Corp"}
 						},
 						"count": {
 							"type": "integer",

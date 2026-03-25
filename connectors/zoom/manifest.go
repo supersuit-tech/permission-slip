@@ -65,7 +65,7 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 							"enum": [1, 2],
 							"default": 2,
 							"description": "Meeting type: 1 (instant) or 2 (scheduled)",
-							"x-ui": {"widget": "select", "label": "Meeting type", "help_text": "1 = instant, 2 = scheduled, 3 = recurring (no fixed time), 8 = recurring (fixed time)"}
+						"x-ui": {"widget": "select", "label": "Meeting type", "help_text": "1 = instant, 2 = scheduled"}
 						},
 						"start_time": {
 							"type": "string",
