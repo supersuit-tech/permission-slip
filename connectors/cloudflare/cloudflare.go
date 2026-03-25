@@ -1,6 +1,12 @@
 // Package cloudflare implements the Cloudflare connector for the Permission
 // Slip connector execution layer. It uses the Cloudflare API v4 with API
 // tokens for authentication.
+//
+// Security notes:
+//   - All path parameters are validated against URL-reserved characters (see validate.go)
+//   - The Cloudflare response envelope is always checked for success:false, even on HTTP 200
+//   - Sensitive values (e.g. tunnel_secret) are auto-generated when possible to avoid
+//     flowing through the approval system as plaintext
 package cloudflare
 
 import (
