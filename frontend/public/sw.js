@@ -33,9 +33,22 @@ self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
   // Only navigate to same-origin paths to prevent open-redirect via crafted payloads.
-  // Reject "//" (protocol-relative URLs treated as absolute by browsers).
   const rawUrl = event.notification.data?.url || "/";
-  const url = rawUrl.startsWith("/") && !rawUrl.startsWith("//") ? rawUrl : "/";
+  let url = "/";
+  if (rawUrl.startsWith("/") && !rawUrl.startsWith("//")) {
+    // Relative path — safe to use directly.
+    url = rawUrl;
+  } else {
+    // Absolute URL — verify it's same-origin before using the path.
+    try {
+      const parsed = new URL(rawUrl);
+      if (parsed.origin === self.location.origin) {
+        url = parsed.pathname + parsed.search + parsed.hash;
+      }
+    } catch {
+      // Malformed URL — fall back to dashboard.
+    }
+  }
 
   event.waitUntil(
     clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {

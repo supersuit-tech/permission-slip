@@ -12,7 +12,7 @@ describe("linking config", () => {
 
   it("maps approval deep link to DeepLinkDetail screen", () => {
     expect(linking.config?.screens?.DeepLinkDetail).toBe(
-      "permission-slip/approve/:approvalId",
+      "approve/:approvalId",
     );
   });
 

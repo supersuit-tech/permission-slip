@@ -78,7 +78,10 @@ describe("useApprovalDetail", () => {
 
   it("returns error state on API failure", async () => {
     setupAuthMocks({ authenticated: true });
-    mockGet.mockResolvedValue({ error: { message: "Not found" } });
+    mockGet.mockResolvedValue({
+      error: { message: "Not found" },
+      response: { status: 404 },
+    });
 
     const { result } = renderHook(() => useApprovalDetail("apr_bad"), {
       wrapper,

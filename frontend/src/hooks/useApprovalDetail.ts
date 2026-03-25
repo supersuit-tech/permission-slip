@@ -6,6 +6,16 @@ import type { components } from "@/api/schema";
 
 export type ApprovalDetail = components["schemas"]["ApprovalSummary"];
 
+/** Error with an HTTP status code attached for downstream handling. */
+class ApprovalFetchError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+  ) {
+    super(message);
+  }
+}
+
 /**
  * Fetches a single approval by ID for the activity feed detail panel.
  * Only fetches when approvalId is non-null (lazy loading).
@@ -23,27 +33,40 @@ export function useApprovalDetail(approvalId: string | null) {
     queryKey: ["approval-detail", approvalId],
     queryFn: async () => {
       const token = tokenRef.current;
-      if (!token) throw new Error("Missing access token");
-      if (!approvalId) throw new Error("Missing approval ID");
-      const { data, error } = await client.GET(
+      if (!token) throw new ApprovalFetchError("Missing access token", 401);
+      if (!approvalId) throw new ApprovalFetchError("Missing approval ID", 400);
+      const { data, error, response } = await client.GET(
         "/v1/approvals/{approval_id}",
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { path: { approval_id: approvalId } },
         },
       );
-      if (error) throw new Error("Failed to load approval details");
+      if (error) {
+        throw new ApprovalFetchError(
+          "Failed to load approval details",
+          response?.status ?? 500,
+        );
+      }
       return data;
     },
     enabled: !!accessToken && !!approvalId,
     staleTime: Infinity,
+    // Don't retry auth or not-found errors — only retry server errors.
+    retry: (failureCount, err) => {
+      if (err instanceof ApprovalFetchError && err.status < 500) return false;
+      return failureCount < 2;
+    },
   });
+
+  const errorStatus =
+    query.error instanceof ApprovalFetchError ? query.error.status : null;
 
   return {
     approval: query.data ?? null,
     isLoading: query.isLoading,
-    error: query.isError
-      ? "Unable to load approval details."
-      : null,
+    error: query.isError ? "Unable to load approval details." : null,
+    /** HTTP status from the failed request (null when no error). */
+    errorStatus,
   };
 }

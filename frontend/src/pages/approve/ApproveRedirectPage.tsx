@@ -14,7 +14,9 @@ import { ReviewApprovalDialog } from "@/pages/dashboard/ReviewApprovalDialog";
 export function ApproveRedirectPage() {
   const { approvalId } = useParams<{ approvalId: string }>();
   const navigate = useNavigate();
-  const { approval, isLoading, error } = useApprovalDetail(approvalId ?? null);
+  const { approval, isLoading, error, errorStatus } = useApprovalDetail(
+    approvalId ?? null,
+  );
   const { agents } = useAgents();
   const [dialogOpen, setDialogOpen] = useState(false);
 
@@ -40,11 +42,16 @@ export function ApproveRedirectPage() {
   }
 
   if (error) {
+    const isNotFound = errorStatus === 404;
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center gap-4 text-center">
-        <p className="text-lg font-semibold">Approval not found</p>
+        <p className="text-lg font-semibold">
+          {isNotFound ? "Approval not found" : "Unable to load approval"}
+        </p>
         <p className="text-muted-foreground text-sm">
-          This approval may have expired or already been handled.
+          {isNotFound
+            ? "This approval may have expired or already been handled."
+            : "Something went wrong loading this approval. Please try again."}
         </p>
         <button
           type="button"

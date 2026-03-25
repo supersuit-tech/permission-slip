@@ -77,7 +77,10 @@ describe("ApproveRedirectPage", () => {
   it("shows error state when approval fetch fails", async () => {
     mockGet.mockImplementation((url: string) => {
       if (url === "/v1/approvals/{approval_id}") {
-        return Promise.resolve({ error: { message: "Not found" } });
+        return Promise.resolve({
+          error: { message: "Not found" },
+          response: { status: 404 },
+        });
       }
       if (url === "/v1/agents") {
         return Promise.resolve({ data: { data: mockAgents } });
@@ -96,7 +99,10 @@ describe("ApproveRedirectPage", () => {
     const user = userEvent.setup();
     mockGet.mockImplementation((url: string) => {
       if (url === "/v1/approvals/{approval_id}") {
-        return Promise.resolve({ error: { message: "Not found" } });
+        return Promise.resolve({
+          error: { message: "Not found" },
+          response: { status: 404 },
+        });
       }
       if (url === "/v1/agents") {
         return Promise.resolve({ data: { data: mockAgents } });
