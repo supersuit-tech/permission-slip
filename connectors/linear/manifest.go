@@ -54,7 +54,7 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 0,
 							"maximum": 4,
 							"description": "Priority: 0=none, 1=urgent, 2=high, 3=medium, 4=low",
-							"x-ui": {"label": "Priority", "help_text": "0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low", "widget": "select"}
+							"x-ui": {"label": "Priority", "help_text": "0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low", "widget": "number"}
 						},
 						"state_id": {
 							"type": "string",
@@ -109,7 +109,7 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 0,
 							"maximum": 4,
 							"description": "Priority: 0=none, 1=urgent, 2=high, 3=medium, 4=low",
-							"x-ui": {"label": "Priority", "help_text": "0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low", "widget": "select"}
+							"x-ui": {"label": "Priority", "help_text": "0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low", "widget": "number"}
 						},
 						"state_id": {
 							"type": "string",

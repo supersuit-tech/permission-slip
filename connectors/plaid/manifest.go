@@ -43,7 +43,7 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Plaid products to enable (e.g. auth, transactions, identity, balance)",
 							"x-ui": {
 								"label": "Products",
-								"widget": "select",
+								"widget": "list",
 								"help_text": "Plaid products to enable — e.g. transactions, auth, identity"
 							}
 						},
