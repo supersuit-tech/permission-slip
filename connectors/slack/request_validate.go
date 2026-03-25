@@ -163,6 +163,16 @@ func (a *deleteMessageAction) ValidateRequest(params json.RawMessage) error {
 	return validateChannelAndTSFromRaw(params)
 }
 
+// --- Search actions ---
+
+func (a *searchMessagesAction) ValidateRequest(params json.RawMessage) error {
+	var p searchMessagesParams
+	if err := json.Unmarshal(params, &p); err != nil {
+		return &connectors.ValidationError{Message: "invalid parameters: could not parse JSON"}
+	}
+	return p.validate()
+}
+
 // --- User ID actions ---
 
 func (a *sendDMAction) ValidateRequest(params json.RawMessage) error {
