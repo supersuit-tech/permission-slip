@@ -241,6 +241,11 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
 /**
  * Converts a snake_case parameter key into a human-readable label.
  * e.g. "channel_name" → "Channel name", "user_id" → "User id"
+ *
+ * NOTE: This is intentionally duplicated from the web frontend's
+ * frontend/src/lib/formatValues.ts `humanizeKey`. The web and mobile
+ * apps share no code at the module level, so keep both in sync when
+ * changing the logic.
  */
 function humanizeKey(key: string): string {
   const words = key.replace(/_/g, " ").toLowerCase();
@@ -259,8 +264,17 @@ function buildGenericSummary(
 ): string {
   const label = humanizeActionType(actionType);
   // Merge resourceDetails so resolved names appear instead of raw IDs (#862).
+  // Skip raw params whose resolved counterpart exists in resourceDetails
+  // (e.g. skip "channel" when "channel_name" is present) to avoid showing both.
+  const filtered = resourceDetails
+    ? Object.fromEntries(
+        Object.entries(parameters).filter(
+          ([key]) => !(resourceDetails[`${key}_name`] != null),
+        ),
+      )
+    : parameters;
   const merged = resourceDetails
-    ? { ...parameters, ...resourceDetails }
+    ? { ...filtered, ...resourceDetails }
     : parameters;
   const entries = Object.entries(merged);
   if (entries.length === 0) return label;

@@ -18,11 +18,22 @@ var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 // runtime, not from the action's ParametersSchema. Templates can reference
 // these because the frontend merges resourceDetails into the template lookup
 // (see ActionPreviewSummary.tsx buildParts and mobile approvalUtils.ts).
+//
+// When adding a new connector that implements ResourceDetailResolver, add its
+// returned keys here. Source files for each connector's resolver:
+//   - Slack: connectors/slack/resolve_resource_details.go
+//     • resolveChannel → channel_name
+//     • resolveUser    → user_name
+//   - Google: connectors/google/resolve_resource_details.go
+//     • resolveCalendarEvent → title, start_time
+//     • resolveFile          → file_name, title
+//     • resolveEmail         → subject, from
+//     • resolveSheet         → title, range
 var resourceDetailFields = map[string]bool{
-	// Slack: resolveChannel returns channel_name, resolveUser returns user_name.
+	// Slack (see connectors/slack/resolve_resource_details.go)
 	"channel_name": true,
 	"user_name":    true,
-	// Google: various resolvers return title, file_name, start_time, subject, from, range.
+	// Google (see connectors/google/resolve_resource_details.go)
 	"title":      true,
 	"file_name":  true,
 	"start_time": true,

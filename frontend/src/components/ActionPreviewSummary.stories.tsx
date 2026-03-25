@@ -230,7 +230,7 @@ export const SlackScheduleMessageWithResourceDetails: Story = {
     parameters: { channel: "C0AMRGKRTA4", message: "Reminder: standup in 5 min", post_at: "2026-03-25T09:00:00Z" },
     schema: null,
     actionName: "Schedule Message",
-    displayTemplate: "Schedule message to {{channel_name}} at {{post_at:datetime}}",
+    displayTemplate: "Schedule message to {{channel_name}}",
     resourceDetails: { channel_name: "#engineering" },
   },
 };

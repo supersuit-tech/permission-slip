@@ -209,7 +209,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Schedule Message",
 				Description: "Schedule a message for future delivery to a Slack channel as the authorizing user.",
 				RiskLevel:   "low",
-				DisplayTemplate: "Schedule message to {{channel_name}} at {{post_at:datetime}}",
+				DisplayTemplate: "Schedule message to {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "message", "post_at"],
@@ -313,7 +313,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Upload File",
 				Description: "Upload a file to a Slack channel",
 				RiskLevel:   "low",
-				DisplayTemplate: "Upload {{filename}} to {{channel_name}}",
+				DisplayTemplate: "Upload file to {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "filename", "content"],
@@ -353,7 +353,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Add Reaction",
 				Description: "Add an emoji reaction to a Slack message",
 				RiskLevel:   "low",
-				DisplayTemplate: "React with :{{name}}: in {{channel_name}}",
+				DisplayTemplate: "Add reaction in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "name"],

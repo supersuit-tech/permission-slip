@@ -392,8 +392,17 @@ function buildGenericParts(
 
   // Merge resourceDetails so resolved names (e.g. channel_name) appear in
   // generic highlights instead of raw IDs (#862).
+  // Skip raw params whose resolved counterpart exists in resourceDetails
+  // (e.g. skip "channel" when "channel_name" is present) to avoid showing both.
+  const filtered = resourceDetails
+    ? Object.fromEntries(
+        Object.entries(parameters).filter(
+          ([key]) => !(resourceDetails[`${key}_name`] != null),
+        ),
+      )
+    : parameters;
   const merged = resourceDetails
-    ? { ...parameters, ...resourceDetails }
+    ? { ...filtered, ...resourceDetails }
     : parameters;
   const highlights = pickHighlights(merged, schema);
   if (highlights.length === 0) return [text(label)];
