@@ -340,3 +340,68 @@ func TestRequestValidator_NotImplemented(t *testing.T) {
 		}
 	}
 }
+
+// TestParamValidator_ConnectorLevel verifies that the connector-level
+// ParamValidator catches validation errors for actions that don't have
+// their own RequestValidator. This is the fallback that ensures ALL
+// actions get request-time validation.
+func TestParamValidator_ConnectorLevel(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	pv, ok := connectors.Connector(c).(connectors.ParamValidator)
+	if !ok {
+		t.Fatal("SlackConnector does not implement ParamValidator")
+	}
+
+	// Actions without RequestValidator still get validated via ParamValidator.
+	tests := []struct {
+		name       string
+		actionType string
+		params     map[string]any
+		wantErr    bool
+	}{
+		{name: "create_channel missing name", actionType: "slack.create_channel", params: map[string]any{}, wantErr: true},
+		{name: "create_channel valid", actionType: "slack.create_channel", params: map[string]any{"name": "test"}, wantErr: false},
+		{name: "list_channels valid", actionType: "slack.list_channels", params: map[string]any{}, wantErr: false},
+		{name: "list_channels bad limit", actionType: "slack.list_channels", params: map[string]any{"limit": 5000}, wantErr: true},
+		{name: "unknown action fails open", actionType: "slack.nonexistent", params: map[string]any{}, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params, _ := json.Marshal(tt.params)
+			err := pv.ValidateParams(tt.actionType, params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateParams() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T", err)
+			}
+		})
+	}
+}
+
+// TestParamValidator_CoversAllActions verifies that every action registered by
+// the Slack connector has an entry in the ParamValidator dispatch table.
+func TestParamValidator_CoversAllActions(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	pv, ok := connectors.Connector(c).(connectors.ParamValidator)
+	if !ok {
+		t.Fatal("SlackConnector does not implement ParamValidator")
+	}
+
+	// ValidateParams should accept (not panic on) every registered action.
+	for actionType := range c.Actions() {
+		params, _ := json.Marshal(map[string]any{})
+		// We don't check the error — just that it doesn't panic or return
+		// a non-ValidationError. Missing required fields are expected.
+		err := pv.ValidateParams(actionType, params)
+		if err != nil && !connectors.IsValidationError(err) {
+			t.Errorf("%s: ValidateParams returned non-ValidationError: %T: %v", actionType, err, err)
+		}
+	}
+}

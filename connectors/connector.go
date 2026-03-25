@@ -49,6 +49,18 @@ type RequestValidator interface {
 	ValidateRequest(params json.RawMessage) error
 }
 
+// ParamValidator is an optional interface for connectors that can validate
+// action parameters at approval request time. Unlike RequestValidator (which
+// is per-action), ParamValidator lives on the Connector and dispatches
+// validation by action type. The approval handler checks this as a fallback
+// when the action does not implement RequestValidator.
+//
+// Return a ValidationError to reject the request immediately. Return nil to
+// accept (or if the action type is unrecognized — fail-open for safety).
+type ParamValidator interface {
+	ValidateParams(actionType string, params json.RawMessage) error
+}
+
 // Connector represents an integration with an external service.
 // It owns shared configuration (HTTP clients, base URLs, auth helpers)
 // and registers the actions it supports.

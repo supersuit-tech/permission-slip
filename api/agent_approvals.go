@@ -151,7 +151,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		// normalization (Normalizer). Must run before ValidateConfigurationReference
 		// so constraints are evaluated against canonical keys.
 		if deps.Connectors != nil {
-			action, ok := deps.Connectors.GetAction(actionType)
+			action, conn, ok := deps.Connectors.GetActionWithConnector(actionType)
 			if !ok {
 				errResp := BadRequest(ErrUnsupportedActionType, fmt.Sprintf("unknown action type %q", actionType))
 				errResp.Error.Details = map[string]any{"action_type": actionType}
@@ -181,17 +181,26 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			// instead of the approval failing at execution time.
 			// If "parameters" is absent entirely, skip — schema validation
 			// (validateActionParameters below) catches missing required fields.
-			if rv, ok := action.(connectors.RequestValidator); ok {
-				if rawParams, hasParams := actionObj["parameters"]; hasParams {
-					if err := rv.ValidateRequest(json.RawMessage(rawParams)); err != nil {
-						var ve *connectors.ValidationError
-						if errors.As(err, &ve) {
-							RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, ve.Message))
-						} else {
-							RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid action parameters"))
-						}
-						return
+			//
+			// Priority: action-level RequestValidator first, then fall back to
+			// connector-level ParamValidator. This allows per-action overrides
+			// (e.g., Slack channel ID format checks) while providing generic
+			// coverage via the connector's dispatch table.
+			if rawParams, hasParams := actionObj["parameters"]; hasParams {
+				var validationErr error
+				if rv, ok := action.(connectors.RequestValidator); ok {
+					validationErr = rv.ValidateRequest(json.RawMessage(rawParams))
+				} else if pv, ok := conn.(connectors.ParamValidator); ok {
+					validationErr = pv.ValidateParams(actionType, json.RawMessage(rawParams))
+				}
+				if validationErr != nil {
+					var ve *connectors.ValidationError
+					if errors.As(validationErr, &ve) {
+						RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, ve.Message))
+					} else {
+						RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid action parameters"))
 					}
+					return
 				}
 			}
 		}

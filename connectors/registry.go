@@ -65,6 +65,24 @@ func (r *Registry) GetAction(actionType string) (Action, bool) {
 	return action, ok
 }
 
+// GetActionWithConnector is like GetAction but also returns the owning
+// Connector. Used by the approval handler to check connector-level
+// interfaces (e.g., ParamValidator) after action-level checks.
+func (r *Registry) GetActionWithConnector(actionType string) (Action, Connector, bool) {
+	parts := strings.SplitN(actionType, ".", 2)
+	if len(parts) != 2 {
+		return nil, nil, false
+	}
+	r.mu.RLock()
+	conn, ok := r.connectors[parts[0]]
+	r.mu.RUnlock()
+	if !ok {
+		return nil, nil, false
+	}
+	action, ok := conn.Actions()[actionType]
+	return action, conn, ok
+}
+
 // Remove deletes a connector from the registry. Returns false if id was not present.
 func (r *Registry) Remove(id string) bool {
 	r.mu.Lock()
