@@ -556,14 +556,14 @@ func validateParametersSchemaUI(schema json.RawMessage, actionIdx int) error {
 			continue
 		}
 		if prop.XUI.Widget != "" && !validWidgets[prop.XUI.Widget] {
-			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, remote-select, textarea, toggle, number, date, datetime, list", actionIdx, propName, prop.XUI.Widget)
+			return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q must be one of: text, select, multi-select, remote-select, textarea, toggle, number, date, datetime, list", actionIdx, propName, prop.XUI.Widget)
 		}
-		// A "select" widget needs enum values to populate the dropdown.
-		if prop.XUI.Widget == "select" {
+		// "select" and "multi-select" widgets need enum values to populate options.
+		if prop.XUI.Widget == "select" || prop.XUI.Widget == "multi-select" {
 			var propObj map[string]json.RawMessage
 			if err := json.Unmarshal(propRaw, &propObj); err == nil {
 				if _, hasEnum := propObj["enum"]; !hasEnum {
-					return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget \"select\" requires an \"enum\" array on the property", actionIdx, propName)
+					return fmt.Errorf("manifest validation: actions[%d].parameters_schema.properties.%s x-ui.widget %q requires an \"enum\" array on the property", actionIdx, propName, prop.XUI.Widget)
 				}
 			}
 		}
