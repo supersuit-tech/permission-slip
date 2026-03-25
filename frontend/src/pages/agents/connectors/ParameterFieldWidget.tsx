@@ -9,6 +9,7 @@ import { isConcreteDatetimeString } from "@/lib/datetime";
 import { CalendarRemoteSelectWidget } from "./CalendarRemoteSelectWidget";
 import { SlackChannelRemoteSelectWidget } from "./SlackChannelRemoteSelectWidget";
 import { SlackUserRemoteSelectWidget } from "./SlackUserRemoteSelectWidget";
+import { SlackUserRemoteMultiSelectWidget } from "./SlackUserRemoteMultiSelectWidget";
 
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
@@ -72,7 +73,7 @@ export function ParameterFieldWidget({
         connectorId,
         propertyUI: ui,
       })}
-      <FieldHints ui={ui} omitHelpText={widget === "remote-select"} />
+      <FieldHints ui={ui} omitHelpText={widget === "remote-select" || widget === "remote-multi-select"} />
     </div>
   );
 }
@@ -96,6 +97,8 @@ function renderWidget(widget: WidgetType, props: WidgetRenderProps) {
   switch (widget) {
     case "remote-select":
       return <RemoteSelectField {...props} />;
+    case "remote-multi-select":
+      return <RemoteMultiSelectField {...props} />;
     case "select":
       return <SelectWidget {...props} />;
     case "multi-select":
@@ -188,6 +191,63 @@ function RemoteSelectField({
       agentId={agentId}
       connectorId={connectorId}
       ui={propertyUI}
+    />
+  );
+}
+
+function RemoteMultiSelectField({
+  inputId,
+  value,
+  onChange,
+  disabled,
+  placeholder,
+  className,
+  agentId,
+  connectorId,
+  propertyUI,
+}: WidgetRenderProps) {
+  if (
+    !propertyUI ||
+    agentId === undefined ||
+    agentId <= 0 ||
+    !connectorId
+  ) {
+    return (
+      <TextWidget
+        inputId={inputId}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder={placeholder}
+        className={className}
+      />
+    );
+  }
+  const path = propertyUI.remote_select_options_path ?? "";
+  if (connectorId === "slack" && path.endsWith("/users")) {
+    return (
+      <SlackUserRemoteMultiSelectWidget
+        inputId={inputId}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder={placeholder}
+        className={className}
+        agentId={agentId}
+        connectorId={connectorId}
+        ui={propertyUI}
+      />
+    );
+  }
+  // Fallback: plain text for unsupported remote-multi-select paths
+  return (
+    <TextWidget
+      inputId={inputId}
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      placeholder={placeholder}
+      className={className}
     />
   );
 }

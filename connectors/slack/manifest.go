@@ -288,13 +288,13 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"description": "Comma-separated list of user IDs to invite (e.g. U01234567,U09876543)",
 							"x-ui": {
-								"widget": "remote-select",
-								"label": "User",
+								"widget": "remote-multi-select",
+								"label": "Users",
 								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/users",
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
-								"remote_select_fallback_placeholder": "User ID (e.g. U01234567)",
-								"help_text": "Choose a user or enter a user ID."
+								"remote_select_fallback_placeholder": "Comma-separated user IDs (e.g. U01234567,U09876543)",
+								"help_text": "Select one or more users to invite."
 							}
 						}
 					}
