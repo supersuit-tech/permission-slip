@@ -150,3 +150,23 @@ type ChannelLister interface {
 	ChannelListCredentialActionType() string
 }
 
+// UserListItem is one user row for dashboard pickers (e.g. Slack user select).
+type UserListItem struct {
+	ID           string `json:"id"`
+	Name         string `json:"name,omitempty"`
+	RealName     string `json:"real_name,omitempty"`
+	DisplayName  string `json:"display_name,omitempty"`
+	Email        string `json:"email,omitempty"`
+	IsBot        bool   `json:"is_bot,omitempty"`
+	DisplayLabel string `json:"display_label"`
+}
+
+// UserLister is optionally implemented by connectors that can list users
+// for UI configuration (session-authenticated proxy endpoints).
+type UserLister interface {
+	ListUsers(ctx context.Context, creds Credentials) ([]UserListItem, error)
+	// UserListCredentialActionType is the connector_actions.action_type used
+	// to look up required credentials for this list call (must exist in the DB).
+	UserListCredentialActionType() string
+}
+

@@ -166,7 +166,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["channel", "thread_ts"],
+					"required": ["channel"],
 					"properties": {
 						"channel": {
 							"type": "string",
@@ -183,7 +183,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"thread_ts": {
 							"type": "string",
 							"description": "Timestamp of the parent message (e.g. 1234567890.123456)",
-							"x-ui": {"label": "Thread ID", "placeholder": "1234567890.123456", "help_text": "The unique timestamp ID of the parent message that started the thread"}
+							"x-ui": {"hidden": true}
 						},
 						"limit": {
 							"type": "integer",
@@ -287,7 +287,15 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"users": {
 							"type": "string",
 							"description": "Comma-separated list of user IDs to invite (e.g. U01234567,U09876543)",
-							"x-ui": {"label": "User IDs", "placeholder": "U01234567,U09876543", "help_text": "Comma-separated Slack user IDs to invite"}
+							"x-ui": {
+								"widget": "remote-select",
+								"label": "User",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/users",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "User ID (e.g. U01234567)",
+								"help_text": "Choose a user or enter a user ID."
+							}
 						}
 					}
 				}`)),
@@ -338,7 +346,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["channel", "timestamp", "name"],
+					"required": ["channel", "name"],
 					"properties": {
 						"channel": {
 							"type": "string",
@@ -355,7 +363,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"timestamp": {
 							"type": "string",
 							"description": "Timestamp of the message to react to (e.g. 1234567890.123456)",
-							"x-ui": {"label": "Message ID", "placeholder": "1234567890.123456", "help_text": "The unique timestamp ID of the message to react to"}
+							"x-ui": {"hidden": true}
 						},
 						"name": {
 							"type": "string",
@@ -377,7 +385,15 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"user_id": {
 							"type": "string",
 							"description": "User ID to send the DM to (e.g. U01234567)",
-							"x-ui": {"label": "Recipient", "placeholder": "U01234567", "help_text": "The Slack user ID to send the direct message to"}
+							"x-ui": {
+								"widget": "remote-select",
+								"label": "Recipient",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/users",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "User ID (e.g. U01234567)",
+								"help_text": "Choose a user or enter a user ID."
+							}
 						},
 						"message": {
 							"type": "string",
@@ -394,7 +410,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["channel", "ts", "message"],
+					"required": ["channel", "message"],
 					"properties": {
 						"channel": {
 							"type": "string",
@@ -411,7 +427,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"ts": {
 							"type": "string",
 							"description": "Timestamp of the message to update (e.g. 1234567890.123456)",
-							"x-ui": {"label": "Message ID", "placeholder": "1234567890.123456", "help_text": "The unique timestamp ID of the message to update"}
+							"x-ui": {"hidden": true}
 						},
 						"message": {
 							"type": "string",
@@ -428,7 +444,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["channel", "ts"],
+					"required": ["channel"],
 					"properties": {
 						"channel": {
 							"type": "string",
@@ -445,7 +461,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 						"ts": {
 							"type": "string",
 							"description": "Timestamp of the message to delete (e.g. 1234567890.123456)",
-							"x-ui": {"label": "Message ID", "placeholder": "1234567890.123456", "help_text": "The unique timestamp ID of the message to delete"}
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
