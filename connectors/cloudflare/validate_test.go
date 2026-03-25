@@ -118,6 +118,31 @@ func TestDoJSON_EnvelopeSuccessFalse(t *testing.T) {
 	}
 }
 
+func TestDoJSON_EnvelopeSuccessFalse_EmptyErrors(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": false,
+			"errors":  []any{},
+			"result":  nil,
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+
+	var resp json.RawMessage
+	err := conn.doGet(t.Context(), validCreds(), "/zones/bad", &resp)
+	if err == nil {
+		t.Fatal("expected error for success:false with empty errors, got nil")
+	}
+	if !connectors.IsExternalError(err) {
+		t.Errorf("expected ExternalError, got %T: %v", err, err)
+	}
+}
+
 func TestDoJSON_EnvelopeSuccessFalse_NilRespBody(t *testing.T) {
 	t.Parallel()
 

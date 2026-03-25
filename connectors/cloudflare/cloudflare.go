@@ -142,12 +142,15 @@ func (c *CloudflareConnector) doJSON(ctx context.Context, creds connectors.Crede
 	if err := json.Unmarshal(respBytes, &envelope); err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("parsing Cloudflare response: %v", err)}
 	}
-	if !envelope.Success && len(envelope.Errors) > 0 {
-		msg := truncateErrorMessage(envelope.Errors[0].Message)
-		for _, e := range envelope.Errors[1:] {
-			msg += "; " + truncateErrorMessage(e.Message)
+	if !envelope.Success {
+		if len(envelope.Errors) > 0 {
+			msg := truncateErrorMessage(envelope.Errors[0].Message)
+			for _, e := range envelope.Errors[1:] {
+				msg += "; " + truncateErrorMessage(e.Message)
+			}
+			return &connectors.ExternalError{Message: fmt.Sprintf("Cloudflare API error: %s", msg)}
 		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Cloudflare API error: %s", msg)}
+		return &connectors.ExternalError{Message: "Cloudflare API returned success: false with no error details"}
 	}
 
 	if respBody != nil {
