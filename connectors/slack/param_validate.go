@@ -15,6 +15,10 @@ func (c *SlackConnector) ValidateParams(actionType string, params json.RawMessag
 }
 
 // paramValidators maps action types to their parameter validation functions.
+// This intentionally includes ALL actions, even those that already implement
+// RequestValidator. The approval handler prefers RequestValidator when present,
+// so these entries are only reached if an action's RequestValidator is removed.
+// Keeping the full table avoids silent validation gaps during refactoring.
 var paramValidators = map[string]connectors.ParamValidatorFunc{
 	"slack.add_reaction": makeParamValidator[addReactionParams](),
 	"slack.create_channel": makeParamValidator[createChannelParams](),

@@ -296,12 +296,14 @@ func TestRequestValidator_SearchMessages(t *testing.T) {
 		{name: "missing query", params: map[string]any{}, wantErr: true},
 		{name: "empty query", params: map[string]any{"query": ""}, wantErr: true},
 		{name: "valid count", params: map[string]any{"query": "test", "count": 50}, wantErr: false},
+		{name: "count zero uses default", params: map[string]any{"query": "test", "count": 0}, wantErr: false},
 		{name: "count too high", params: map[string]any{"query": "test", "count": 200}, wantErr: true},
 		{name: "count too low", params: map[string]any{"query": "test", "count": -1}, wantErr: true},
 		{name: "valid sort score", params: map[string]any{"query": "test", "sort": "score"}, wantErr: false},
 		{name: "valid sort timestamp", params: map[string]any{"query": "test", "sort": "timestamp"}, wantErr: false},
 		{name: "invalid sort", params: map[string]any{"query": "test", "sort": "relevance"}, wantErr: true},
 		{name: "negative page", params: map[string]any{"query": "test", "page": -1}, wantErr: true},
+		{name: "page zero uses default", params: map[string]any{"query": "test", "page": 0}, wantErr: false},
 		{name: "valid page", params: map[string]any{"query": "test", "page": 2}, wantErr: false},
 	}
 
@@ -383,8 +385,10 @@ func TestParamValidator_ConnectorLevel(t *testing.T) {
 	}
 }
 
-// TestParamValidator_CoversAllActions verifies that every action registered by
-// the Slack connector has an entry in the ParamValidator dispatch table.
+// TestParamValidator_CoversAllActions verifies that ValidateParams does not
+// panic or return non-ValidationErrors for any registered action, and that
+// every registered action has an entry in the paramValidators map (so no
+// action silently falls through the fail-open path).
 func TestParamValidator_CoversAllActions(t *testing.T) {
 	t.Parallel()
 	c := New()
@@ -394,8 +398,12 @@ func TestParamValidator_CoversAllActions(t *testing.T) {
 		t.Fatal("SlackConnector does not implement ParamValidator")
 	}
 
-	// ValidateParams should accept (not panic on) every registered action.
 	for actionType := range c.Actions() {
+		// Verify every action has an explicit entry in the dispatch table.
+		if _, registered := paramValidators[actionType]; !registered {
+			t.Errorf("%s: no entry in paramValidators map", actionType)
+		}
+
 		params, _ := json.Marshal(map[string]any{})
 		// We don't check the error — just that it doesn't panic or return
 		// a non-ValidationError. Missing required fields are expected.
