@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { X } from "lucide-react";
 import type { SchemaPropertyUI } from "@/lib/parameterSchema";
 import { useAgentConnectorUsers } from "@/hooks/useAgentConnectorUsers";
+import { readLabel } from "./remoteSelectUtils";
 
 export interface SlackUserRemoteMultiSelectWidgetProps {
   inputId: string;
@@ -27,23 +28,18 @@ export interface SlackUserRemoteMultiSelectWidgetProps {
 const DEFAULT_NO_CREDENTIAL =
   "Connect a Slack credential to select users.";
 
-function readLabel(row: Record<string, unknown>, labelKey: string): string {
-  const direct = row[labelKey];
-  if (typeof direct === "string" && direct.length > 0) return direct;
-  const displayLabel = row.display_label;
-  if (typeof displayLabel === "string" && displayLabel.length > 0)
-    return displayLabel;
-  const id = row.id;
-  return typeof id === "string" ? id : "";
-}
-
 /** Parse comma-separated IDs into a deduplicated array. */
 function parseSelected(value: string): string[] {
   if (!value) return [];
+  const seen = new Set<string>();
   return value
     .split(",")
     .map((s) => s.trim())
-    .filter(Boolean);
+    .filter((s) => {
+      if (!s || seen.has(s)) return false;
+      seen.add(s);
+      return true;
+    });
 }
 
 export function SlackUserRemoteMultiSelectWidget({
@@ -60,6 +56,7 @@ export function SlackUserRemoteMultiSelectWidget({
   const [manual, setManual] = useState(false);
   const [search, setSearch] = useState("");
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -118,6 +115,7 @@ export function SlackUserRemoteMultiSelectWidget({
       if (selectedSet.has(id)) return;
       serialize([...selectedIds, id]);
       setSearch("");
+      setActiveIndex(-1);
     },
     [selectedIds, selectedSet, serialize],
   );
@@ -130,18 +128,53 @@ export function SlackUserRemoteMultiSelectWidget({
   );
 
   const handleBlur = useCallback((e: React.FocusEvent) => {
-    // Close dropdown only if focus leaves the entire container
     if (
       containerRef.current &&
       !containerRef.current.contains(e.relatedTarget as Node)
     ) {
       setDropdownOpen(false);
+      setActiveIndex(-1);
     }
   }, []);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (!dropdownOpen || filteredOptions.length === 0) return;
+
+      switch (e.key) {
+        case "ArrowDown":
+          e.preventDefault();
+          setActiveIndex((prev) =>
+            prev < filteredOptions.length - 1 ? prev + 1 : 0,
+          );
+          break;
+        case "ArrowUp":
+          e.preventDefault();
+          setActiveIndex((prev) =>
+            prev > 0 ? prev - 1 : filteredOptions.length - 1,
+          );
+          break;
+        case "Enter": {
+          e.preventDefault();
+          const opt = filteredOptions[activeIndex];
+          if (opt) addUser(opt.id);
+          break;
+        }
+        case "Escape":
+          e.preventDefault();
+          setDropdownOpen(false);
+          setActiveIndex(-1);
+          break;
+      }
+    },
+    [dropdownOpen, filteredOptions, activeIndex, addUser],
+  );
 
   const noCredentialText = ui.help_text?.trim() || DEFAULT_NO_CREDENTIAL;
   const selectDisabled = disabled || isLoading || isFetching;
   const usersReady = hasCredential && !isLoading && !isFetching && !error;
+
+  const listboxId = `${inputId}-listbox`;
 
   const selectClassName = `border-input bg-muted ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none disabled:opacity-50${className ? ` ${className}` : ""}`;
 
@@ -189,7 +222,7 @@ export function SlackUserRemoteMultiSelectWidget({
           className={selectClassName}
           data-testid={`slack-user-remote-multi-select-binding-pending-${inputId}`}
         >
-          <option value="">Checking credentials...</option>
+          <option value="">Checking credentials\u2026</option>
         </select>
       </div>
     );
@@ -284,27 +317,40 @@ export function SlackUserRemoteMultiSelectWidget({
         <Input
           id={inputId}
           type="text"
+          role="combobox"
           value={search}
           onChange={(e) => {
             setSearch(e.target.value);
             setDropdownOpen(true);
+            setActiveIndex(-1);
           }}
           onFocus={() => setDropdownOpen(true)}
+          onKeyDown={handleKeyDown}
           disabled={selectDisabled}
           placeholder={
             isLoading || isFetching
-              ? "Loading..."
-              : placeholder ?? "Search users..."
+              ? "Loading\u2026"
+              : placeholder ?? "Search users\u2026"
           }
           aria-busy={isLoading || isFetching ? "true" : undefined}
+          aria-expanded={dropdownOpen}
+          aria-controls={listboxId}
+          aria-autocomplete="list"
+          aria-activedescendant={
+            activeIndex >= 0
+              ? `${listboxId}-option-${activeIndex}`
+              : undefined
+          }
           className={className}
           autoComplete="off"
           data-testid={`slack-user-remote-multi-select-search-${inputId}`}
         />
         {dropdownOpen && usersReady && (
           <ul
+            id={listboxId}
             className="border-input bg-popover text-popover-foreground absolute z-50 mt-1 max-h-48 w-full overflow-auto rounded-md border shadow-md"
             role="listbox"
+            aria-label="User suggestions"
             data-testid={`slack-user-remote-multi-select-dropdown-${inputId}`}
           >
             {filteredOptions.length === 0 ? (
@@ -314,17 +360,22 @@ export function SlackUserRemoteMultiSelectWidget({
                   : "No matching users"}
               </li>
             ) : (
-              filteredOptions.map((opt) => (
+              filteredOptions.map((opt, idx) => (
                 <li
                   key={opt.id}
+                  id={`${listboxId}-option-${idx}`}
                   role="option"
-                  aria-selected={false}
-                  className="hover:bg-accent hover:text-accent-foreground cursor-pointer px-3 py-1.5 text-sm"
+                  aria-selected={idx === activeIndex}
+                  className={`cursor-pointer px-3 py-1.5 text-sm${
+                    idx === activeIndex
+                      ? " bg-accent text-accent-foreground"
+                      : " hover:bg-accent hover:text-accent-foreground"
+                  }`}
                   onMouseDown={(e) => {
-                    // Prevent input blur before click registers
                     e.preventDefault();
                     addUser(opt.id);
                   }}
+                  onMouseEnter={() => setActiveIndex(idx)}
                 >
                   {opt.label}
                 </li>

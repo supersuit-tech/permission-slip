@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import type { SchemaPropertyUI } from "@/lib/parameterSchema";
 import { useAgentConnectorUsers } from "@/hooks/useAgentConnectorUsers";
+import { readLabel } from "./remoteSelectUtils";
 
 export interface SlackUserRemoteSelectWidgetProps {
   inputId: string;
@@ -25,16 +26,6 @@ export interface SlackUserRemoteSelectWidgetProps {
 
 const DEFAULT_NO_CREDENTIAL =
   "Connect a Slack credential to select a user.";
-
-function readLabel(row: Record<string, unknown>, labelKey: string): string {
-  const direct = row[labelKey];
-  if (typeof direct === "string" && direct.length > 0) return direct;
-  const displayLabel = row.display_label;
-  if (typeof displayLabel === "string" && displayLabel.length > 0)
-    return displayLabel;
-  const id = row.id;
-  return typeof id === "string" ? id : "";
-}
 
 export function SlackUserRemoteSelectWidget({
   inputId,
