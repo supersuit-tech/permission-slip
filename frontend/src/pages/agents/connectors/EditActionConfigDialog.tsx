@@ -92,7 +92,7 @@ export function EditActionConfigDialog({
       return;
     }
 
-    const emptyRequired = getEmptyRequiredParams(paramValues, schema?.required);
+    const emptyRequired = getEmptyRequiredParams(paramValues, schema?.required, schema?.properties);
     if (emptyRequired.length > 0) {
       toast.error(`Required parameters need a value or wildcard: ${emptyRequired.join(", ")}`);
       return;

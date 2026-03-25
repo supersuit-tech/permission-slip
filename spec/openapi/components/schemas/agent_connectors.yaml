@@ -211,6 +211,44 @@ AgentConnectorChannelListResponse:
       items:
         $ref: '../schemas/agent_connectors.yaml#/ChannelListItem'
 
+UserListItem:
+  type: object
+  required:
+    - id
+    - display_label
+  properties:
+    id:
+      type: string
+      description: Slack user ID (U…).
+    name:
+      type: string
+      description: Slack username.
+    real_name:
+      type: string
+      description: User's real name.
+    display_name:
+      type: string
+      description: User's display name.
+    email:
+      type: string
+      description: User's email address when available.
+    is_bot:
+      type: boolean
+      description: True for bot users.
+    display_label:
+      type: string
+      description: Human-readable label for pickers (real name with email).
+
+AgentConnectorUserListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/agent_connectors.yaml#/UserListItem'
+
 AgentConnectorCredentialResponse:
   type: object
   required:

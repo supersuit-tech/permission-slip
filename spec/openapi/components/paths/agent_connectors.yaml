@@ -408,6 +408,56 @@ agentConnectorCalendars:
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
 
+agentConnectorUsers:
+  get:
+    operationId: listAgentConnectorUsers
+    summary: List users for agent connector
+    description: |
+      Returns workspace users visible to the OAuth credential assigned to this agent–connector pair.
+      Used by the dashboard to populate user pickers for Slack actions.
+
+      Requires session authentication (Supabase JWT). The agent must belong to the current user.
+
+    tags:
+      - Agents
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+
+    responses:
+      '200':
+        description: Users listed successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorUserListResponse'
+
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Agent, connector, or user listing not supported
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
 agentConnectorChannels:
   get:
     operationId: listAgentConnectorChannels
