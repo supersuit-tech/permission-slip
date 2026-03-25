@@ -329,11 +329,9 @@ func listCatalogManifest() connectors.ManifestAction {
 			"properties": {
 				"types": {
 					"type": "string",
-					"description": "Comma-separated object types: ITEM, CATEGORY, DISCOUNT, TAX, MODIFIER, IMAGE. Default: all types. Example: \"ITEM,CATEGORY\"",
-					"x-ui": {
-						"label": "Object types",
-						"placeholder": "ITEM,CATEGORY"
-					}
+					"enum": ["ITEM", "CATEGORY", "DISCOUNT", "TAX", "MODIFIER", "IMAGE"],
+					"description": "Catalog object types to include. Default: all types.",
+					"x-ui": {"label": "Object types", "widget": "multi-select", "help_text": "Select which catalog object types to return"}
 				},
 				"cursor": {
 					"type": "string",
