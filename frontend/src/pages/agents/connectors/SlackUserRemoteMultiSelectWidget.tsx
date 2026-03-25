@@ -139,6 +139,14 @@ export function SlackUserRemoteMultiSelectWidget({
 
   const handleKeyDown = useCallback(
     (e: React.KeyboardEvent) => {
+      // Escape should always close the dropdown, even with zero results
+      if (e.key === "Escape" && dropdownOpen) {
+        e.preventDefault();
+        setDropdownOpen(false);
+        setActiveIndex(-1);
+        return;
+      }
+
       if (!dropdownOpen || filteredOptions.length === 0) return;
 
       switch (e.key) {
@@ -160,11 +168,6 @@ export function SlackUserRemoteMultiSelectWidget({
           if (opt) addUser(opt.id);
           break;
         }
-        case "Escape":
-          e.preventDefault();
-          setDropdownOpen(false);
-          setActiveIndex(-1);
-          break;
       }
     },
     [dropdownOpen, filteredOptions, activeIndex, addUser],
@@ -333,7 +336,7 @@ export function SlackUserRemoteMultiSelectWidget({
               : placeholder ?? "Search users\u2026"
           }
           aria-busy={isLoading || isFetching ? "true" : undefined}
-          aria-expanded={dropdownOpen}
+          aria-expanded={dropdownOpen && usersReady}
           aria-controls={listboxId}
           aria-autocomplete="list"
           aria-activedescendant={
