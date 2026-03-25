@@ -20,11 +20,6 @@ import (
 // instead. This list exists only for pre-existing connectors that predate the
 // lint.
 var knownMissingAnnotations = map[string]bool{
-	// textarea — sendgrid HTML content fields
-	"sendgrid.sendgrid.send_campaign:html_content":            true,
-	"sendgrid.sendgrid.schedule_campaign:html_content":        true,
-	"sendgrid.sendgrid.send_transactional_email:html_content": true,
-
 	// datetime — various connectors with ISO 8601 fields missing format
 	"hubspot.hubspot.create_deal:closedate":           true,
 	"hubspot.hubspot.update_deal_stage:close_date":    true,
