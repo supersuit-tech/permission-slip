@@ -28,22 +28,26 @@ func (c *DropboxConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"path": {
 							"type": "string",
-							"description": "Destination path in Dropbox (e.g. /Documents/report.pdf)"
+							"description": "Destination path in Dropbox (e.g. /Documents/report.pdf)",
+							"x-ui": {"label": "Path", "placeholder": "/Documents/report.pdf", "help_text": "Dropbox file path starting with /"}
 						},
 						"content": {
 							"type": "string",
-							"description": "Base64-encoded file content"
+							"description": "Base64-encoded file content",
+							"x-ui": {"label": "File content", "widget": "textarea"}
 						},
 						"mode": {
 							"type": "string",
 							"enum": ["add", "overwrite"],
 							"default": "add",
-							"description": "Write mode: add (fail on conflict unless autorename) or overwrite"
+							"description": "Write mode: add (fail on conflict unless autorename) or overwrite",
+							"x-ui": {"label": "Write mode", "widget": "select", "help_text": "'add' creates new, 'overwrite' replaces existing"}
 						},
 						"autorename": {
 							"type": "boolean",
 							"default": true,
-							"description": "Automatically rename on conflict (e.g. file (1).txt)"
+							"description": "Automatically rename on conflict (e.g. file (1).txt)",
+							"x-ui": {"label": "Auto-rename", "widget": "toggle"}
 						}
 					}
 				}`)),
@@ -59,7 +63,8 @@ func (c *DropboxConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"path": {
 							"type": "string",
-							"description": "Path of the file to download (e.g. /Documents/report.pdf)"
+							"description": "Path of the file to download (e.g. /Documents/report.pdf)",
+							"x-ui": {"label": "Path", "placeholder": "/Documents/report.pdf", "help_text": "Dropbox file path starting with /"}
 						}
 					}
 				}`)),
@@ -75,12 +80,14 @@ func (c *DropboxConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"path": {
 							"type": "string",
-							"description": "Path of the folder to create (e.g. /Projects/Q1)"
+							"description": "Path of the folder to create (e.g. /Projects/Q1)",
+							"x-ui": {"label": "Path", "placeholder": "/Projects/Q1", "help_text": "Dropbox file path starting with /"}
 						},
 						"autorename": {
 							"type": "boolean",
 							"default": false,
-							"description": "Automatically rename if a folder with this name already exists"
+							"description": "Automatically rename if a folder with this name already exists",
+							"x-ui": {"label": "Auto-rename", "widget": "toggle"}
 						}
 					}
 				}`)),
@@ -96,22 +103,25 @@ func (c *DropboxConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"path": {
 							"type": "string",
-							"description": "Path of the file or folder to share (e.g. /Documents/report.pdf)"
+							"description": "Path of the file or folder to share (e.g. /Documents/report.pdf)",
+							"x-ui": {"label": "Path", "placeholder": "/Documents/report.pdf", "help_text": "Dropbox file path starting with /"}
 						},
 						"requested_visibility": {
 							"type": "string",
 							"enum": ["public", "team_only", "password"],
-							"description": "Visibility of the shared link"
+							"description": "Visibility of the shared link",
+							"x-ui": {"label": "Link visibility", "widget": "select"}
 						},
 						"link_password": {
 							"type": "string",
-							"description": "Password for the shared link (required when visibility is password)"
+							"description": "Password for the shared link (required when visibility is password)",
+							"x-ui": {"label": "Link password", "help_text": "Required when visibility is 'password'"}
 						},
 						"expires": {
 							"type": "string",
 							"format": "date-time",
 							"description": "Expiration date for the shared link (ISO 8601 format)",
-							"x-ui": {"widget": "datetime"}
+							"x-ui": {"label": "Expires", "widget": "datetime", "help_text": "When the shared link will stop working"}
 						}
 					}
 				}`)),
@@ -127,21 +137,25 @@ func (c *DropboxConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search query string"
+							"description": "Search query string",
+							"x-ui": {"label": "Search query", "placeholder": "quarterly report"}
 						},
 						"path": {
 							"type": "string",
-							"description": "Scope search to a specific folder (default: root)"
+							"description": "Scope search to a specific folder (default: root)",
+							"x-ui": {"label": "Path", "placeholder": "/Documents/report.pdf", "help_text": "Dropbox file path starting with /"}
 						},
 						"max_results": {
 							"type": "integer",
 							"default": 20,
-							"description": "Maximum number of results to return (1-1000)"
+							"description": "Maximum number of results to return (1-1000)",
+							"x-ui": {"label": "Max results"}
 						},
 						"file_extensions": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Filter by file extensions (e.g. [\"pdf\", \"docx\"])"
+							"description": "Filter by file extensions (e.g. [\"pdf\", \"docx\"])",
+							"x-ui": {"label": "File types", "placeholder": "pdf,docx", "help_text": "Comma-separated file extensions to filter by"}
 						}
 					}
 				}`)),
@@ -157,21 +171,25 @@ func (c *DropboxConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"from_path": {
 							"type": "string",
-							"description": "Current path of the file or folder (e.g. /old/path.txt)"
+							"description": "Current path of the file or folder (e.g. /old/path.txt)",
+							"x-ui": {"label": "Source path", "placeholder": "/old/path.txt", "help_text": "Dropbox file path starting with /"}
 						},
 						"to_path": {
 							"type": "string",
-							"description": "New path for the file or folder (e.g. /new/path.txt)"
+							"description": "New path for the file or folder (e.g. /new/path.txt)",
+							"x-ui": {"label": "Destination path", "placeholder": "/new/path.txt", "help_text": "Dropbox file path starting with /"}
 						},
 						"autorename": {
 							"type": "boolean",
 							"default": false,
-							"description": "Automatically rename if a file with this name already exists at the destination"
+							"description": "Automatically rename if a file with this name already exists at the destination",
+							"x-ui": {"label": "Auto-rename", "widget": "toggle"}
 						},
 						"allow_ownership_transfer": {
 							"type": "boolean",
 							"default": false,
-							"description": "Allow moves that result in ownership transfer for the content being moved"
+							"description": "Allow moves that result in ownership transfer for the content being moved",
+							"x-ui": {"label": "Allow ownership transfer", "widget": "toggle"}
 						}
 					}
 				}`)),

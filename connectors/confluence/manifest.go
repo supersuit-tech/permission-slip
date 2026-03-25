@@ -30,25 +30,46 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"space_id": {
 							"type": "string",
-							"description": "ID of the space to create the page in"
+							"description": "ID of the space to create the page in",
+							"x-ui": {
+								"label": "Space ID",
+								"help_text": "Find via confluence.list_spaces or the space URL"
+							}
 						},
 						"title": {
 							"type": "string",
-							"description": "Page title"
+							"description": "Page title",
+							"x-ui": {
+								"label": "Title",
+								"placeholder": "My Page Title"
+							}
 						},
 						"body": {
 							"type": "string",
-							"description": "Page body content (storage format XHTML or plain text)"
+							"description": "Page body content (storage format XHTML or plain text)",
+							"x-ui": {
+								"label": "Body",
+								"widget": "textarea",
+								"help_text": "Confluence storage format (XHTML) or plain text"
+							}
 						},
 						"parent_id": {
 							"type": "string",
-							"description": "ID of the parent page (optional, creates at space root if omitted)"
+							"description": "ID of the parent page (optional, creates at space root if omitted)",
+							"x-ui": {
+								"label": "Parent page ID",
+								"help_text": "ID of the parent page — omit to create at space root"
+							}
 						},
 						"status": {
 							"type": "string",
 							"enum": ["current", "draft"],
 							"default": "current",
-							"description": "Page status (current or draft)"
+							"description": "Page status (current or draft)",
+							"x-ui": {
+								"label": "Status",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
@@ -64,28 +85,53 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "ID of the page to update"
+							"description": "ID of the page to update",
+							"x-ui": {
+								"label": "Page ID",
+								"help_text": "Numeric page ID — visible in the page URL"
+							}
 						},
 						"title": {
 							"type": "string",
-							"description": "Updated page title"
+							"description": "Updated page title",
+							"x-ui": {
+								"label": "Title",
+								"placeholder": "My Page Title"
+							}
 						},
 						"body": {
 							"type": "string",
-							"description": "Updated page body content (storage format, full replacement)"
+							"description": "Updated page body content (storage format, full replacement)",
+							"x-ui": {
+								"label": "Body",
+								"widget": "textarea",
+								"help_text": "Confluence storage format (XHTML) or plain text"
+							}
 						},
 						"version_number": {
 							"type": "integer",
-							"description": "Version number for optimistic locking (must be current version + 1)"
+							"description": "Version number for optimistic locking (must be current version + 1)",
+							"x-ui": {
+								"label": "Version number",
+								"help_text": "Must be current version + 1 — use confluence.get_page to find the current version"
+							}
 						},
 						"version_message": {
 							"type": "string",
-							"description": "Optional message describing the change"
+							"description": "Optional message describing the change",
+							"x-ui": {
+								"label": "Version message",
+								"placeholder": "Updated content"
+							}
 						},
 						"status": {
 							"type": "string",
 							"enum": ["current", "draft"],
-							"description": "Page status (current or draft)"
+							"description": "Page status (current or draft)",
+							"x-ui": {
+								"label": "Status",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
@@ -101,13 +147,21 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "ID of the page to retrieve"
+							"description": "ID of the page to retrieve",
+							"x-ui": {
+								"label": "Page ID",
+								"help_text": "Numeric page ID — visible in the page URL"
+							}
 						},
 						"body_format": {
 							"type": "string",
 							"enum": ["storage", "atlas_doc_format", "view"],
 							"default": "storage",
-							"description": "Format for the page body (storage, atlas_doc_format, or view)"
+							"description": "Format for the page body (storage, atlas_doc_format, or view)",
+							"x-ui": {
+								"label": "Body format",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
@@ -123,12 +177,20 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"cql": {
 							"type": "string",
-							"description": "CQL query string (e.g. type=page AND space=DEV AND text~\"deployment\")"
+							"description": "CQL query string (e.g. type=page AND space=DEV AND text~\"deployment\")",
+							"x-ui": {
+								"label": "CQL query",
+								"placeholder": "type=page AND space=DEV AND text~\"deployment\"",
+								"help_text": "Confluence Query Language"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 25,
-							"description": "Maximum number of results to return (max 250)"
+							"description": "Maximum number of results to return (max 250)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						}
 					}
 				}`)),
@@ -144,11 +206,20 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "ID of the page to comment on"
+							"description": "ID of the page to comment on",
+							"x-ui": {
+								"label": "Page ID",
+								"help_text": "Numeric page ID — visible in the page URL"
+							}
 						},
 						"body": {
 							"type": "string",
-							"description": "Comment body (storage format XHTML or plain text)"
+							"description": "Comment body (storage format XHTML or plain text)",
+							"x-ui": {
+								"label": "Body",
+								"widget": "textarea",
+								"help_text": "Confluence storage format (XHTML) or plain text"
+							}
 						}
 					}
 				}`)),
@@ -166,13 +237,20 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 							"default": 25,
 							"minimum": 1,
 							"maximum": 250,
-							"description": "Maximum number of spaces to return (1-250, default 25)"
+							"description": "Maximum number of spaces to return (1-250, default 25)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						},
 						"status": {
 							"type": "string",
 							"enum": ["current", "archived"],
 							"default": "current",
-							"description": "Filter by space status (default: current)"
+							"description": "Filter by space status (default: current)",
+							"x-ui": {
+								"label": "Status",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
@@ -188,20 +266,31 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"space_id": {
 							"type": "string",
-							"description": "ID of the space to list pages from"
+							"description": "ID of the space to list pages from",
+							"x-ui": {
+								"label": "Space ID",
+								"help_text": "Find via confluence.list_spaces or the space URL"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 25,
 							"minimum": 1,
 							"maximum": 250,
-							"description": "Maximum number of pages to return (1-250, default 25)"
+							"description": "Maximum number of pages to return (1-250, default 25)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						},
 						"status": {
 							"type": "string",
 							"enum": ["current", "archived", "deleted", "trashed"],
 							"default": "current",
-							"description": "Filter by page status (default: current)"
+							"description": "Filter by page status (default: current)",
+							"x-ui": {
+								"label": "Status",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
@@ -217,7 +306,11 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "ID of the page to delete"
+							"description": "ID of the page to delete",
+							"x-ui": {
+								"label": "Page ID",
+								"help_text": "Numeric page ID — visible in the page URL"
+							}
 						}
 					}
 				}`)),
@@ -233,18 +326,30 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "ID of the page to get attachments for"
+							"description": "ID of the page to get attachments for",
+							"x-ui": {
+								"label": "Page ID",
+								"help_text": "Numeric page ID — visible in the page URL"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 25,
 							"minimum": 1,
 							"maximum": 250,
-							"description": "Maximum number of attachments to return (1-250, default 25)"
+							"description": "Maximum number of attachments to return (1-250, default 25)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						},
 						"media_type": {
 							"type": "string",
-							"description": "Filter by MIME type (e.g. 'image/png', 'application/pdf')"
+							"description": "Filter by MIME type (e.g. 'image/png', 'application/pdf')",
+							"x-ui": {
+								"label": "MIME type",
+								"placeholder": "image/png",
+								"help_text": "Inferred from filename if omitted"
+							}
 						}
 					}
 				}`)),
@@ -260,23 +365,44 @@ func (c *ConfluenceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "ID of the page to attach the file to"
+							"description": "ID of the page to attach the file to",
+							"x-ui": {
+								"label": "Page ID",
+								"help_text": "Numeric page ID — visible in the page URL"
+							}
 						},
 						"filename": {
 							"type": "string",
-							"description": "Filename for the attachment (e.g. 'diagram.png')"
+							"description": "Filename for the attachment (e.g. 'diagram.png')",
+							"x-ui": {
+								"label": "File name",
+								"placeholder": "diagram.png"
+							}
 						},
 						"content_base64": {
 							"type": "string",
-							"description": "Base64-encoded file content"
+							"description": "Base64-encoded file content",
+							"x-ui": {
+								"label": "File content (Base64)",
+								"help_text": "Base64-encoded file content — max 10 MB decoded"
+							}
 						},
 						"media_type": {
 							"type": "string",
-							"description": "MIME type (e.g. 'image/png'). Inferred from filename extension if omitted."
+							"description": "MIME type (e.g. 'image/png'). Inferred from filename extension if omitted.",
+							"x-ui": {
+								"label": "MIME type",
+								"placeholder": "image/png",
+								"help_text": "Inferred from filename if omitted"
+							}
 						},
 						"comment": {
 							"type": "string",
-							"description": "Optional comment describing the attachment"
+							"description": "Optional comment describing the attachment",
+							"x-ui": {
+								"label": "Comment",
+								"placeholder": "Uploaded via API"
+							}
 						}
 					}
 				}`)),

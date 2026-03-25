@@ -66,4 +66,6 @@ import (
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/zapier"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/zendesk"
 	_ "github.com/supersuit-tech/permission-slip-web/connectors/zoom"
+
+	_ "github.com/supersuit-tech/permission-slip-web/connectors/cloudflare"
 )

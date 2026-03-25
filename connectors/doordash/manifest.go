@@ -95,24 +95,29 @@ func getQuoteManifest() connectors.ManifestAction {
 			"properties": {
 				"pickup_address": {
 					"type": "string",
-					"description": "Full street address for pickup (e.g. \"901 Market St, San Francisco, CA 94103\")"
+					"description": "Full street address for pickup (e.g. \"901 Market St, San Francisco, CA 94103\")",
+					"x-ui": {"label": "Pickup address", "placeholder": "901 Market St, San Francisco, CA 94103"}
 				},
 				"dropoff_address": {
 					"type": "string",
-					"description": "Full street address for dropoff (e.g. \"123 Main St, San Francisco, CA 94105\")"
+					"description": "Full street address for dropoff (e.g. \"123 Main St, San Francisco, CA 94105\")",
+					"x-ui": {"label": "Dropoff address", "placeholder": "123 Main St, San Francisco, CA 94105"}
 				},
 				"pickup_phone": {
 					"type": "string",
-					"description": "Phone number for pickup contact (e.g. \"+15551234567\")"
+					"description": "Phone number for pickup contact (e.g. \"+15551234567\")",
+					"x-ui": {"label": "Pickup phone", "placeholder": "+15551234567"}
 				},
 				"dropoff_phone": {
 					"type": "string",
-					"description": "Phone number for dropoff contact (e.g. \"+15559876543\")"
+					"description": "Phone number for dropoff contact (e.g. \"+15559876543\")",
+					"x-ui": {"label": "Dropoff phone", "placeholder": "+15559876543"}
 				},
 				"order_value": {
 					"type": "integer",
 					"minimum": 0,
-					"description": "Total value of items being delivered in cents (e.g. 2500 = $25.00). Affects delivery fee calculation."
+					"description": "Total value of items being delivered in cents (e.g. 2500 = $25.00). Affects delivery fee calculation.",
+					"x-ui": {"label": "Order value", "help_text": "In cents (e.g. 1999 = $19.99)"}
 				}
 			}
 		}`)),
@@ -133,44 +138,54 @@ func createDeliveryManifest() connectors.ManifestAction {
 			"properties": {
 				"pickup_address": {
 					"type": "string",
-					"description": "Full street address for pickup (e.g. \"901 Market St, San Francisco, CA 94103\")"
+					"description": "Full street address for pickup (e.g. \"901 Market St, San Francisco, CA 94103\")",
+					"x-ui": {"label": "Pickup address", "placeholder": "901 Market St, San Francisco, CA 94103"}
 				},
 				"pickup_phone": {
 					"type": "string",
-					"description": "Phone number for pickup contact (e.g. \"+15551234567\")"
+					"description": "Phone number for pickup contact (e.g. \"+15551234567\")",
+					"x-ui": {"label": "Pickup phone", "placeholder": "+15551234567"}
 				},
 				"pickup_business_name": {
 					"type": "string",
-					"description": "Business name at the pickup location"
+					"description": "Business name at the pickup location",
+					"x-ui": {"label": "Pickup business name", "placeholder": "Joe's Pizza"}
 				},
 				"pickup_instructions": {
 					"type": "string",
-					"description": "Instructions for the Dasher at pickup (e.g. \"Ring doorbell, ask for John\")"
+					"description": "Instructions for the Dasher at pickup (e.g. \"Ring doorbell, ask for John\")",
+					"x-ui": {"label": "Pickup instructions", "placeholder": "Ring doorbell, ask for John", "widget": "textarea"}
 				},
 				"dropoff_address": {
 					"type": "string",
-					"description": "Full street address for dropoff (e.g. \"123 Main St, San Francisco, CA 94105\")"
+					"description": "Full street address for dropoff (e.g. \"123 Main St, San Francisco, CA 94105\")",
+					"x-ui": {"label": "Dropoff address", "placeholder": "123 Main St, San Francisco, CA 94105"}
 				},
 				"dropoff_phone": {
 					"type": "string",
-					"description": "Phone number for dropoff contact (e.g. \"+15559876543\")"
+					"description": "Phone number for dropoff contact (e.g. \"+15559876543\")",
+					"x-ui": {"label": "Dropoff phone", "placeholder": "+15559876543"}
 				},
 				"dropoff_contact_given_name": {
 					"type": "string",
-					"description": "First name of the person receiving the delivery"
+					"description": "First name of the person receiving the delivery",
+					"x-ui": {"label": "Recipient first name", "placeholder": "John"}
 				},
 				"dropoff_instructions": {
 					"type": "string",
-					"description": "Instructions for the Dasher at dropoff (e.g. \"Leave at front door\")"
+					"description": "Instructions for the Dasher at dropoff (e.g. \"Leave at front door\")",
+					"x-ui": {"label": "Dropoff instructions", "placeholder": "Leave at front door", "widget": "textarea"}
 				},
 				"order_value": {
 					"type": "integer",
 					"minimum": 0,
-					"description": "Total value of items being delivered in cents (e.g. 2500 = $25.00)"
+					"description": "Total value of items being delivered in cents (e.g. 2500 = $25.00)",
+					"x-ui": {"label": "Order value", "help_text": "In cents (e.g. 1999 = $19.99)"}
 				},
 				"items": {
 					"type": "array",
 					"description": "List of items being delivered",
+					"x-ui": {"label": "Items"},
 					"items": {
 						"type": "object",
 						"required": ["name", "quantity"],
@@ -178,16 +193,19 @@ func createDeliveryManifest() connectors.ManifestAction {
 						"properties": {
 							"name": {
 								"type": "string",
-								"description": "Item name (e.g. \"Documents\", \"Package\")"
+								"description": "Item name (e.g. \"Documents\", \"Package\")",
+								"x-ui": {"label": "Item name", "placeholder": "Documents"}
 							},
 							"quantity": {
 								"type": "integer",
 								"minimum": 1,
-								"description": "Number of this item"
+								"description": "Number of this item",
+								"x-ui": {"label": "Quantity"}
 							},
 							"description": {
 								"type": "string",
-								"description": "Additional item description"
+								"description": "Additional item description",
+								"x-ui": {"label": "Description", "placeholder": "Fragile, handle with care"}
 							}
 						}
 					}
@@ -210,7 +228,8 @@ func getDeliveryManifest() connectors.ManifestAction {
 			"properties": {
 				"delivery_id": {
 					"type": "string",
-					"description": "The external_delivery_id of the delivery to check"
+					"description": "The external_delivery_id of the delivery to check",
+					"x-ui": {"label": "Delivery ID", "help_text": "DoorDash delivery UUID"}
 				}
 			}
 		}`)),
@@ -230,7 +249,8 @@ func cancelDeliveryManifest() connectors.ManifestAction {
 			"properties": {
 				"delivery_id": {
 					"type": "string",
-					"description": "The external_delivery_id of the delivery to cancel"
+					"description": "The external_delivery_id of the delivery to cancel",
+					"x-ui": {"label": "Delivery ID", "help_text": "DoorDash delivery UUID"}
 				}
 			}
 		}`)),
@@ -247,17 +267,19 @@ func listDeliveriesManifest() connectors.ManifestAction {
 			"limit": {
 				"type": "integer",
 				"minimum": 1,
-				"description": "Maximum number of deliveries to return (default 20)"
+				"description": "Maximum number of deliveries to return (default 20)",
+				"x-ui": {"label": "Max results"}
 			},
 			"starting_after": {
 				"type": "string",
 				"description": "Pagination cursor from a previous list_deliveries response",
-				"x-ui": {"hidden": true}
+				"x-ui": {"label": "Starting after", "hidden": true, "help_text": "Pagination cursor from a previous response"}
 			},
 			"status": {
 				"type": "string",
 				"enum": ` + statusEnumJSON() + `,
-				"description": "Filter by delivery status"
+				"description": "Filter by delivery status",
+				"x-ui": {"label": "Status", "widget": "select"}
 			}
 		}
 	}`

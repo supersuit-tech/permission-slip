@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -31,34 +32,41 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 						"name": {
 							"type": "string",
 							"maxLength": 100,
-							"description": "Internal name for this campaign (e.g. 'March 2026 Newsletter')"
+							"description": "Internal name for this campaign (e.g. 'March 2026 Newsletter')",
+							"x-ui": {"label": "Campaign name", "placeholder": "March 2026 Newsletter"}
 						},
 						"subject": {
 							"type": "string",
 							"maxLength": 998,
-							"description": "Email subject line seen by recipients"
+							"description": "Email subject line seen by recipients",
+							"x-ui": {"label": "Subject", "placeholder": "Your Monthly Newsletter"}
 						},
 						"html_content": {
 							"type": "string",
-							"description": "HTML body of the email. At least one of html_content or plain_content is required."
+							"description": "HTML body of the email. At least one of html_content or plain_content is required.",
+							"x-ui": {"label": "HTML content", "widget": "textarea"}
 						},
 						"plain_content": {
 							"type": "string",
-							"description": "Plain text body of the email. At least one of html_content or plain_content is required."
+							"description": "Plain text body of the email. At least one of html_content or plain_content is required.",
+							"x-ui": {"label": "Plain text content", "widget": "textarea"}
 						},
 						"list_ids": {
 							"type": "array",
 							"items": {"type": "string"},
 							"minItems": 1,
-							"description": "Contact list IDs to send to. Use sendgrid.list_lists to find available list IDs."
+							"description": "Contact list IDs to send to. Use sendgrid.list_lists to find available list IDs.",
+							"x-ui": {"label": "List IDs", "help_text": "SendGrid contact list IDs — find in Marketing > Lists"}
 						},
 						"sender_id": {
 							"type": "integer",
-							"description": "Verified sender identity ID. Use sendgrid.list_senders to find your sender ID."
+							"description": "Verified sender identity ID. Use sendgrid.list_senders to find your sender ID.",
+							"x-ui": {"label": "Sender", "help_text": "Verified sender ID — find in Settings > Sender Authentication"}
 						},
 						"suppression_group_id": {
 							"type": "integer",
-							"description": "Unsubscribe group ID for managing opt-outs (optional but recommended)"
+							"description": "Unsubscribe group ID for managing opt-outs (optional but recommended)",
+							"x-ui": {"label": "Unsubscribe group", "help_text": "Suppression group ID — find in Suppressions > Unsubscribe Groups"}
 						}
 					}
 				}`)),
@@ -75,40 +83,47 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 						"name": {
 							"type": "string",
 							"maxLength": 100,
-							"description": "Internal name for this campaign (e.g. 'April Product Launch')"
+							"description": "Internal name for this campaign (e.g. 'April Product Launch')",
+							"x-ui": {"label": "Campaign name", "placeholder": "April Product Launch"}
 						},
 						"subject": {
 							"type": "string",
 							"maxLength": 998,
-							"description": "Email subject line seen by recipients"
+							"description": "Email subject line seen by recipients",
+							"x-ui": {"label": "Subject", "placeholder": "Your Monthly Newsletter"}
 						},
 						"html_content": {
 							"type": "string",
-							"description": "HTML body of the email. At least one of html_content or plain_content is required."
+							"description": "HTML body of the email. At least one of html_content or plain_content is required.",
+							"x-ui": {"label": "HTML content", "widget": "textarea"}
 						},
 						"plain_content": {
 							"type": "string",
-							"description": "Plain text body of the email. At least one of html_content or plain_content is required."
+							"description": "Plain text body of the email. At least one of html_content or plain_content is required.",
+							"x-ui": {"label": "Plain text content", "widget": "textarea"}
 						},
 						"list_ids": {
 							"type": "array",
 							"items": {"type": "string"},
 							"minItems": 1,
-							"description": "Contact list IDs to send to. Use sendgrid.list_lists to find available list IDs."
+							"description": "Contact list IDs to send to. Use sendgrid.list_lists to find available list IDs.",
+							"x-ui": {"label": "List IDs", "help_text": "SendGrid contact list IDs — find in Marketing > Lists"}
 						},
 						"sender_id": {
 							"type": "integer",
-							"description": "Verified sender identity ID. Use sendgrid.list_senders to find your sender ID."
+							"description": "Verified sender identity ID. Use sendgrid.list_senders to find your sender ID.",
+							"x-ui": {"label": "Sender", "help_text": "Verified sender ID — find in Settings > Sender Authentication"}
 						},
 						"send_at": {
 							"type": "string",
 							"format": "date-time",
 							"description": "ISO 8601 timestamp for when to send (must be in the future, e.g. 2026-03-15T10:00:00Z)",
-							"x-ui": {"widget": "datetime"}
+							"x-ui": {"widget": "datetime", "label": "Send at", "help_text": "Scheduled send time in ISO 8601 format"}
 						},
 						"suppression_group_id": {
 							"type": "integer",
-							"description": "Unsubscribe group ID for managing opt-outs (optional but recommended)"
+							"description": "Unsubscribe group ID for managing opt-outs (optional but recommended)",
+							"x-ui": {"label": "Unsubscribe group", "help_text": "Suppression group ID — find in Suppressions > Unsubscribe Groups"}
 						}
 					}
 				}`)),
@@ -124,20 +139,24 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"list_id": {
 							"type": "string",
-							"description": "Contact list ID. Use sendgrid.list_lists to find available list IDs."
+							"description": "Contact list ID. Use sendgrid.list_lists to find available list IDs.",
+							"x-ui": {"label": "List ID", "help_text": "SendGrid contact list IDs — find in Marketing > Lists"}
 						},
 						"email": {
 							"type": "string",
 							"format": "email",
-							"description": "Subscriber email address"
+							"description": "Subscriber email address",
+							"x-ui": {"label": "Email", "placeholder": "jane@example.com"}
 						},
 						"first_name": {
 							"type": "string",
-							"description": "Subscriber first name (optional)"
+							"description": "Subscriber first name (optional)",
+							"x-ui": {"label": "First name", "placeholder": "Jane"}
 						},
 						"last_name": {
 							"type": "string",
-							"description": "Subscriber last name (optional)"
+							"description": "Subscriber last name (optional)",
+							"x-ui": {"label": "Last name", "placeholder": "Doe"}
 						}
 					}
 				}`)),
@@ -153,11 +172,13 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"list_id": {
 							"type": "string",
-							"description": "Contact list ID. Use sendgrid.list_lists to find available list IDs."
+							"description": "Contact list ID. Use sendgrid.list_lists to find available list IDs.",
+							"x-ui": {"label": "List ID", "help_text": "SendGrid contact list IDs — find in Marketing > Lists"}
 						},
 						"contact_id": {
 							"type": "string",
-							"description": "Contact ID to remove from the list"
+							"description": "Contact ID to remove from the list",
+							"x-ui": {"label": "Contact ID", "help_text": "SendGrid contact identifier"}
 						}
 					}
 				}`)),
@@ -174,12 +195,14 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 						"name": {
 							"type": "string",
 							"maxLength": 100,
-							"description": "Template name (e.g. 'Welcome Email', 'Order Confirmation')"
+							"description": "Template name (e.g. 'Welcome Email', 'Order Confirmation')",
+							"x-ui": {"label": "Template name", "placeholder": "Welcome Email"}
 						},
 						"generation": {
 							"type": "string",
 							"enum": ["legacy", "dynamic"],
-							"description": "Template generation — use 'dynamic' for Handlebars support (default: dynamic)"
+							"description": "Template generation — use 'dynamic' for Handlebars support (default: dynamic)",
+							"x-ui": {"label": "Generation", "widget": "select", "help_text": "'dynamic' for modern templates with Handlebars, 'legacy' for older substitution tags"}
 						}
 					}
 				}`)),
@@ -195,7 +218,8 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"singlesend_id": {
 							"type": "string",
-							"description": "Single send campaign ID (returned by send_campaign or schedule_campaign)"
+							"description": "Single send campaign ID (returned by send_campaign or schedule_campaign)",
+							"x-ui": {"label": "Campaign ID", "help_text": "Single send campaign ID"}
 						}
 					}
 				}`)),
@@ -242,63 +266,76 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 						"to": {
 							"type": "string",
 							"format": "email",
-							"description": "Recipient email address"
+							"description": "Recipient email address",
+							"x-ui": {"label": "To", "placeholder": "jane@example.com"}
 						},
 						"to_name": {
 							"type": "string",
-							"description": "Recipient display name (optional)"
+							"description": "Recipient display name (optional)",
+							"x-ui": {"label": "Recipient name", "placeholder": "Jane Doe"}
 						},
 						"from": {
 							"type": "string",
 							"format": "email",
-							"description": "Sender email address — must be a verified sender in your SendGrid account"
+							"description": "Sender email address — must be a verified sender in your SendGrid account",
+							"x-ui": {"label": "From", "placeholder": "jane@example.com"}
 						},
 						"from_name": {
 							"type": "string",
-							"description": "Sender display name (optional)"
+							"description": "Sender display name (optional)",
+							"x-ui": {"label": "Sender name", "placeholder": "Jane Doe"}
 						},
 						"subject": {
 							"type": "string",
 							"maxLength": 998,
-							"description": "Email subject line. Required when template_id is not provided."
+							"description": "Email subject line. Required when template_id is not provided.",
+							"x-ui": {"label": "Subject", "placeholder": "Your Monthly Newsletter"}
 						},
 						"html_content": {
 							"type": "string",
-							"description": "HTML body. Required when template_id is not provided and plain_content is also absent."
+							"description": "HTML body. Required when template_id is not provided and plain_content is also absent.",
+							"x-ui": {"label": "HTML content", "widget": "textarea"}
 						},
 						"plain_content": {
 							"type": "string",
-							"description": "Plain-text body. Required when template_id is not provided and html_content is also absent."
+							"description": "Plain-text body. Required when template_id is not provided and html_content is also absent.",
+							"x-ui": {"label": "Plain text content", "widget": "textarea"}
 						},
 						"template_id": {
 							"type": "string",
-							"description": "SendGrid dynamic template ID (e.g. d-xxxx). When set, html_content/plain_content/subject can be omitted if defined in the template."
+							"description": "SendGrid dynamic template ID (e.g. d-xxxx). When set, html_content/plain_content/subject can be omitted if defined in the template.",
+							"x-ui": {"label": "Template ID", "help_text": "Dynamic template ID — find in Email API > Dynamic Templates"}
 						},
 						"dynamic_template_data": {
 							"type": "object",
 							"description": "Key/value pairs substituted into the dynamic template via Handlebars (e.g. {\"first_name\": \"Jane\"}). Only used when template_id is set.",
-							"additionalProperties": true
+							"additionalProperties": true,
+							"x-ui": {"label": "Template data", "help_text": "Handlebars substitution variables as key-value pairs"}
 						},
 						"reply_to": {
 							"type": "string",
 							"format": "email",
-							"description": "Reply-to email address (optional)"
+							"description": "Reply-to email address (optional)",
+							"x-ui": {"label": "Reply-to email", "placeholder": "jane@example.com"}
 						},
 						"cc": {
 							"type": "array",
 							"items": {"type": "string", "format": "email"},
-							"description": "CC recipients (optional). Useful for sending copies to account managers, team inboxes, etc."
+							"description": "CC recipients (optional). Useful for sending copies to account managers, team inboxes, etc.",
+							"x-ui": {"label": "CC", "help_text": "Carbon copy recipients — max 1000 per SendGrid API limits"}
 						},
 						"bcc": {
 							"type": "array",
 							"items": {"type": "string", "format": "email"},
-							"description": "BCC recipients (optional). Useful for silent compliance copies or audit trails."
+							"description": "BCC recipients (optional). Useful for silent compliance copies or audit trails.",
+							"x-ui": {"label": "BCC", "help_text": "Blind carbon copy recipients — max 1000 per SendGrid API limits"}
 						},
 						"categories": {
 							"type": "array",
 							"items": {"type": "string"},
 							"maxItems": 10,
-							"description": "Labels for filtering and grouping in the SendGrid Activity Feed and stats (e.g. [\"welcome\", \"onboarding\"]). Maximum 10."
+							"description": "Labels for filtering and grouping in the SendGrid Activity Feed and stats (e.g. [\"welcome\", \"onboarding\"]). Maximum 10.",
+							"x-ui": {"label": "Categories"}
 						}
 					}
 				}`)),
@@ -315,27 +352,33 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 						"email": {
 							"type": "string",
 							"format": "email",
-							"description": "Contact email address"
+							"description": "Contact email address",
+							"x-ui": {"label": "Email", "placeholder": "jane@example.com"}
 						},
 						"first_name": {
 							"type": "string",
-							"description": "Contact first name (optional)"
+							"description": "Contact first name (optional)",
+							"x-ui": {"label": "First name", "placeholder": "Jane"}
 						},
 						"last_name": {
 							"type": "string",
-							"description": "Contact last name (optional)"
+							"description": "Contact last name (optional)",
+							"x-ui": {"label": "Last name", "placeholder": "Doe"}
 						},
 						"phone_number": {
 							"type": "string",
-							"description": "Contact phone number (optional)"
+							"description": "Contact phone number (optional)",
+							"x-ui": {"label": "Phone number", "placeholder": "+1 (555) 123-4567"}
 						},
 						"city": {
 							"type": "string",
-							"description": "Contact city (optional)"
+							"description": "Contact city (optional)",
+							"x-ui": {"label": "City", "placeholder": "San Francisco"}
 						},
 						"country": {
 							"type": "string",
-							"description": "Contact country (optional)"
+							"description": "Contact country (optional)",
+							"x-ui": {"label": "Country", "placeholder": "United States"}
 						}
 					}
 				}`)),
@@ -351,22 +394,26 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 						"start_time": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Filter bounces created after this time (ISO 8601, e.g. 2026-01-01T00:00:00Z)"
+							"description": "Filter bounces created after this time (ISO 8601, e.g. 2026-01-01T00:00:00Z)",
+							"x-ui": {"widget": "datetime", "label": "Start time", "help_text": "Only include bounces after this date"}
 						},
 						"end_time": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Filter bounces created before this time (ISO 8601, e.g. 2026-01-31T23:59:59Z)"
+							"description": "Filter bounces created before this time (ISO 8601, e.g. 2026-01-31T23:59:59Z)",
+							"x-ui": {"widget": "datetime", "label": "End time", "help_text": "Only include bounces before this date"}
 						},
 						"limit": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "Maximum number of results to return"
+							"description": "Maximum number of results to return",
+							"x-ui": {"label": "Max results"}
 						},
 						"offset": {
 							"type": "integer",
 							"minimum": 0,
-							"description": "Number of results to skip for pagination"
+							"description": "Number of results to skip for pagination",
+							"x-ui": {"label": "Offset"}
 						}
 					}
 				}`)),
@@ -382,12 +429,14 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 						"limit": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "Maximum number of results to return"
+							"description": "Maximum number of results to return",
+							"x-ui": {"label": "Max results"}
 						},
 						"offset": {
 							"type": "integer",
 							"minimum": 0,
-							"description": "Number of results to skip for pagination"
+							"description": "Number of results to skip for pagination",
+							"x-ui": {"label": "Offset"}
 						}
 					}
 				}`)),
