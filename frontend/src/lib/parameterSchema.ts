@@ -20,6 +20,7 @@ export interface SchemaPropertyUI {
     | "select"
     | "multi-select"
     | "remote-select"
+    | "remote-multi-select"
     | "textarea"
     | "toggle"
     | "number"
@@ -147,6 +148,7 @@ export const VALID_WIDGETS = [
   "select",
   "multi-select",
   "remote-select",
+  "remote-multi-select",
   "textarea",
   "toggle",
   "number",

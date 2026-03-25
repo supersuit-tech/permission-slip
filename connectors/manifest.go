@@ -116,16 +116,17 @@ var validPreviewLayouts = map[string]bool{
 
 // validWidgets are the allowed values for x-ui.widget on schema properties.
 var validWidgets = map[string]bool{
-	"text":           true,
-	"select":         true,
-	"multi-select":   true,
-	"remote-select":  true,
-	"textarea":       true,
-	"toggle":         true,
-	"number":         true,
-	"date":           true,
-	"datetime":       true,
-	"list":           true,
+	"text":                true,
+	"select":              true,
+	"multi-select":        true,
+	"remote-select":       true,
+	"remote-multi-select": true,
+	"textarea":            true,
+	"toggle":              true,
+	"number":              true,
+	"date":                true,
+	"datetime":            true,
+	"list":                true,
 }
 
 // validAuthTypes are the allowed values for credential auth types.
