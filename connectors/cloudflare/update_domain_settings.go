@@ -23,7 +23,13 @@ func (p *updateDomainSettingsParams) validate() error {
 	if err := requirePathParam("account_id", p.AccountID); err != nil {
 		return err
 	}
-	return requirePathParam("domain", p.Domain)
+	if err := requirePathParam("domain", p.Domain); err != nil {
+		return err
+	}
+	if p.AutoRenew == nil {
+		return &connectors.ValidationError{Message: "must specify at least one setting to update (auto_renew)"}
+	}
+	return nil
 }
 
 func (a *updateDomainSettingsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {

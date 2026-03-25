@@ -58,37 +58,22 @@ func TestUpdateDomainSettings_Execute(t *testing.T) {
 	}
 }
 
-func TestUpdateDomainSettings_OmittedAutoRenew(t *testing.T) {
+func TestUpdateDomainSettings_NoSettingsProvided(t *testing.T) {
 	t.Parallel()
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body map[string]any
-		json.NewDecoder(r.Body).Decode(&body)
-
-		// auto_renew should NOT be in the body when omitted from params
-		if _, ok := body["auto_renew"]; ok {
-			t.Error("auto_renew should not be sent when omitted from params")
-		}
-
-		w.WriteHeader(http.StatusOK)
-		json.NewEncoder(w).Encode(map[string]any{
-			"success": true,
-			"errors":  []any{},
-			"result":  map[string]any{"domain_name": "example.com"},
-		})
-	}))
-	defer srv.Close()
-
-	conn := newForTest(srv.Client(), srv.URL)
+	conn := New()
 	action := &updateDomainSettingsAction{conn: conn}
 
-	// No auto_renew in params
+	// No auto_renew in params — should require at least one setting
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		Parameters:  json.RawMessage(`{"account_id":"acc1","domain":"example.com"}`),
 		Credentials: validCreds(),
 	})
-	if err != nil {
-		t.Fatalf("Execute() error: %v", err)
+	if err == nil {
+		t.Fatal("expected error for no settings provided, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
 
