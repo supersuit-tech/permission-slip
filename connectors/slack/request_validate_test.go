@@ -274,6 +274,52 @@ func TestRequestValidator_InviteUsers(t *testing.T) {
 	}
 }
 
+// TestRequestValidator_SearchMessages verifies that search_messages validates
+// parameters at request time so malformed queries are rejected before the user
+// sees the approval.
+func TestRequestValidator_SearchMessages(t *testing.T) {
+	t.Parallel()
+	c := New()
+	action := c.Actions()["slack.search_messages"]
+
+	rv, ok := action.(connectors.RequestValidator)
+	if !ok {
+		t.Fatal("slack.search_messages does not implement RequestValidator")
+	}
+
+	tests := []struct {
+		name    string
+		params  map[string]any
+		wantErr bool
+	}{
+		{name: "valid query", params: map[string]any{"query": "hello world"}, wantErr: false},
+		{name: "missing query", params: map[string]any{}, wantErr: true},
+		{name: "empty query", params: map[string]any{"query": ""}, wantErr: true},
+		{name: "valid count", params: map[string]any{"query": "test", "count": 50}, wantErr: false},
+		{name: "count too high", params: map[string]any{"query": "test", "count": 200}, wantErr: true},
+		{name: "count too low", params: map[string]any{"query": "test", "count": -1}, wantErr: true},
+		{name: "valid sort score", params: map[string]any{"query": "test", "sort": "score"}, wantErr: false},
+		{name: "valid sort timestamp", params: map[string]any{"query": "test", "sort": "timestamp"}, wantErr: false},
+		{name: "invalid sort", params: map[string]any{"query": "test", "sort": "relevance"}, wantErr: true},
+		{name: "negative page", params: map[string]any{"query": "test", "page": -1}, wantErr: true},
+		{name: "valid page", params: map[string]any{"query": "test", "page": 2}, wantErr: false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			params, _ := json.Marshal(tt.params)
+			err := rv.ValidateRequest(params)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("ValidateRequest() error = %v, wantErr %v", err, tt.wantErr)
+			}
+			if tt.wantErr && err != nil && !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T", err)
+			}
+		})
+	}
+}
+
 // TestRequestValidator_NotImplemented verifies that actions without ID parameters
 // do not implement RequestValidator (no unnecessary interface).
 func TestRequestValidator_NotImplemented(t *testing.T) {
@@ -285,7 +331,6 @@ func TestRequestValidator_NotImplemented(t *testing.T) {
 		"slack.create_channel",
 		"slack.list_channels",
 		"slack.list_users",
-		"slack.search_messages",
 	}
 
 	for _, actionType := range noValidation {
