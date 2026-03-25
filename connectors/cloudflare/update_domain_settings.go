@@ -16,7 +16,7 @@ type updateDomainSettingsAction struct {
 type updateDomainSettingsParams struct {
 	AccountID string `json:"account_id"`
 	Domain    string `json:"domain"`
-	AutoRenew bool   `json:"auto_renew"`
+	AutoRenew *bool  `json:"auto_renew"`
 }
 
 func (p *updateDomainSettingsParams) validate() error {
@@ -36,8 +36,10 @@ func (a *updateDomainSettingsAction) Execute(ctx context.Context, req connectors
 	}
 
 	body := map[string]any{
-		"name":       params.Domain,
-		"auto_renew": params.AutoRenew,
+		"name": params.Domain,
+	}
+	if params.AutoRenew != nil {
+		body["auto_renew"] = *params.AutoRenew
 	}
 
 	var result json.RawMessage

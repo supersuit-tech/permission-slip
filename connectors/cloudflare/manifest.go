@@ -14,7 +14,7 @@ func (c *CloudflareConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "cloudflare",
 		Name:        "Cloudflare",
-		Description: "Cloudflare integration for DNS management, domain registration, tunnels, and cache purging",
+		Description: "Cloudflare integration for DNS management, domain settings, tunnels, and cache purging",
 		Status:      "early_preview",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{

@@ -25,8 +25,12 @@ func (p *purgeCacheParams) validate() error {
 	if err := requirePathParam("zone_id", p.ZoneID); err != nil {
 		return err
 	}
-	if !p.PurgeAll && len(p.Files) == 0 && len(p.Tags) == 0 && len(p.Hosts) == 0 {
+	hasSelective := len(p.Files) > 0 || len(p.Tags) > 0 || len(p.Hosts) > 0
+	if !p.PurgeAll && !hasSelective {
 		return &connectors.ValidationError{Message: "must specify purge_everything, files, tags, or hosts"}
+	}
+	if p.PurgeAll && hasSelective {
+		return &connectors.ValidationError{Message: "purge_everything cannot be combined with files, tags, or hosts"}
 	}
 	return nil
 }

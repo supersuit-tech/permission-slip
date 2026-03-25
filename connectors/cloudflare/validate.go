@@ -18,8 +18,8 @@ func validatePathParam(name, value string) error {
 	return nil
 }
 
-// requireParam checks that a parameter is non-empty and safe for use in URL
-// paths. Use this for required parameters that appear in API path segments.
+// requirePathParam checks that a parameter is non-empty and safe for use in
+// URL paths. Use this for required parameters that appear in API path segments.
 func requirePathParam(name, value string) error {
 	if value == "" {
 		return &connectors.ValidationError{Message: fmt.Sprintf("missing required parameter: %s", name)}

@@ -58,6 +58,40 @@ func TestUpdateDomainSettings_Execute(t *testing.T) {
 	}
 }
 
+func TestUpdateDomainSettings_OmittedAutoRenew(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		json.NewDecoder(r.Body).Decode(&body)
+
+		// auto_renew should NOT be in the body when omitted from params
+		if _, ok := body["auto_renew"]; ok {
+			t.Error("auto_renew should not be sent when omitted from params")
+		}
+
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(map[string]any{
+			"success": true,
+			"errors":  []any{},
+			"result":  map[string]any{"domain_name": "example.com"},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &updateDomainSettingsAction{conn: conn}
+
+	// No auto_renew in params
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		Parameters:  json.RawMessage(`{"account_id":"acc1","domain":"example.com"}`),
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("Execute() error: %v", err)
+	}
+}
+
 func TestUpdateDomainSettings_MissingRequired(t *testing.T) {
 	t.Parallel()
 

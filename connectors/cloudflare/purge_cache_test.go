@@ -72,3 +72,21 @@ func TestPurgeCache_MissingTarget(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestPurgeCache_MutualExclusion(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &purgeCacheAction{conn: conn}
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		Parameters:  json.RawMessage(`{"zone_id":"zone1","purge_everything":true,"files":["https://example.com/a.css"]}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for mutually exclusive options, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
