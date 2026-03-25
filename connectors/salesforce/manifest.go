@@ -31,11 +31,13 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"sobject_type": {
 							"type": "string",
-							"description": "Salesforce object type (e.g. Lead, Contact, Account, Opportunity, Case)"
+							"description": "Salesforce object type (e.g. Lead, Contact, Account, Opportunity, Case)",
+							"x-ui": {"label": "Object type", "placeholder": "Lead", "help_text": "Salesforce object API name — e.g. Lead, Contact, Account, Opportunity"}
 						},
 						"fields": {
 							"type": "object",
-							"description": "Field name to value map (e.g. {\"LastName\": \"Smith\", \"Company\": \"Acme\"})"
+							"description": "Field name to value map (e.g. {\"LastName\": \"Smith\", \"Company\": \"Acme\"})",
+							"x-ui": {"label": "Fields", "help_text": "Key-value object of field API names to values"}
 						}
 					}
 				}`)),
@@ -51,15 +53,18 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"sobject_type": {
 							"type": "string",
-							"description": "Salesforce object type (e.g. Lead, Contact, Account, Opportunity, Case)"
+							"description": "Salesforce object type (e.g. Lead, Contact, Account, Opportunity, Case)",
+							"x-ui": {"label": "Object type", "placeholder": "Lead", "help_text": "Salesforce object API name — e.g. Lead, Contact, Account, Opportunity"}
 						},
 						"record_id": {
 							"type": "string",
-							"description": "The 15 or 18-character Salesforce record ID"
+							"description": "The 15 or 18-character Salesforce record ID",
+							"x-ui": {"label": "Record ID", "placeholder": "001xx000003DGbYAAW", "help_text": "15 or 18-character Salesforce record ID"}
 						},
 						"fields": {
 							"type": "object",
-							"description": "Partial field updates — only include fields you want to change"
+							"description": "Partial field updates — only include fields you want to change",
+							"x-ui": {"label": "Fields", "help_text": "Key-value object of field API names to values"}
 						}
 					}
 				}`)),
@@ -75,14 +80,16 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"soql": {
 							"type": "string",
-							"description": "SOQL query string (e.g. \"SELECT Id, Name FROM Lead WHERE Status = 'Open'\")"
+							"description": "SOQL query string (e.g. \"SELECT Id, Name FROM Lead WHERE Status = 'Open'\")",
+							"x-ui": {"label": "SOQL query", "widget": "textarea", "placeholder": "SELECT Id, Name FROM Account WHERE Industry = 'Technology'", "help_text": "Salesforce Object Query Language"}
 						},
 						"max_records": {
 							"type": "integer",
 							"default": 200,
 							"minimum": 1,
 							"maximum": 2000,
-							"description": "Maximum number of records to return (1-2000, default 200)"
+							"description": "Maximum number of records to return (1-2000, default 200)",
+							"x-ui": {"label": "Max records", "placeholder": "200"}
 						}
 					}
 				}`)),
@@ -98,35 +105,41 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"subject": {
 							"type": "string",
-							"description": "Task subject line"
+							"description": "Task subject line",
+							"x-ui": {"label": "Subject", "placeholder": "Follow up call"}
 						},
 						"what_id": {
 							"type": "string",
-							"description": "Related record ID (Account, Opportunity, etc.)"
+							"description": "Related record ID (Account, Opportunity, etc.)",
+							"x-ui": {"label": "Related to (What)", "help_text": "Record ID of the related object (Account, Opportunity, etc.)"}
 						},
 						"who_id": {
 							"type": "string",
-							"description": "Related Contact or Lead ID"
+							"description": "Related Contact or Lead ID",
+							"x-ui": {"label": "Related to (Who)", "help_text": "Record ID of a Contact or Lead"}
 						},
 						"status": {
 							"type": "string",
 							"default": "Not Started",
-							"description": "Task status (default: 'Not Started')"
+							"description": "Task status (default: 'Not Started')",
+							"x-ui": {"label": "Status", "placeholder": "Not Started"}
 						},
 						"priority": {
 							"type": "string",
 							"default": "Normal",
-							"description": "Task priority (e.g. High, Normal, Low)"
+							"description": "Task priority (e.g. High, Normal, Low)",
+							"x-ui": {"label": "Priority", "placeholder": "Normal"}
 						},
 						"due_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Due date in YYYY-MM-DD format",
-							"x-ui": {"widget": "date"}
+							"x-ui": {"widget": "date", "label": "Due date", "help_text": "Expected completion date"}
 						},
 						"description": {
 							"type": "string",
-							"description": "Task description or notes"
+							"description": "Task description or notes",
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -142,15 +155,18 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"parent_id": {
 							"type": "string",
-							"description": "The Salesforce record ID to attach the note to"
+							"description": "The Salesforce record ID to attach the note to",
+							"x-ui": {"label": "Parent record", "help_text": "Record ID to attach the note to"}
 						},
 						"title": {
 							"type": "string",
-							"description": "Note title"
+							"description": "Note title",
+							"x-ui": {"label": "Title", "placeholder": "Meeting notes"}
 						},
 						"body": {
 							"type": "string",
-							"description": "Note body content (plain text)"
+							"description": "Note body content (plain text)",
+							"x-ui": {"label": "Note body", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -166,27 +182,33 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"name": {
 							"type": "string",
-							"description": "Opportunity name"
+							"description": "Opportunity name",
+							"x-ui": {"label": "Name", "placeholder": "Acme Corp - Enterprise Deal"}
 						},
 						"stage_name": {
 							"type": "string",
-							"description": "Sales stage (e.g. Prospecting, Qualification, Closed Won)"
+							"description": "Sales stage (e.g. Prospecting, Qualification, Closed Won)",
+							"x-ui": {"label": "Stage", "placeholder": "Prospecting", "help_text": "Must match a valid opportunity stage in your org"}
 						},
 						"close_date": {
 							"type": "string",
-							"description": "Expected close date in YYYY-MM-DD format"
+							"description": "Expected close date in YYYY-MM-DD format",
+							"x-ui": {"label": "Close date", "widget": "date"}
 						},
 						"amount": {
 							"type": "number",
-							"description": "Opportunity amount (revenue)"
+							"description": "Opportunity amount (revenue)",
+							"x-ui": {"label": "Amount", "placeholder": "50000", "help_text": "Deal value in your org's currency"}
 						},
 						"account_id": {
 							"type": "string",
-							"description": "Related Account record ID (15 or 18 characters)"
+							"description": "Related Account record ID (15 or 18 characters)",
+							"x-ui": {"label": "Account", "help_text": "Account record ID"}
 						},
 						"description": {
 							"type": "string",
-							"description": "Opportunity description"
+							"description": "Opportunity description",
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -202,27 +224,33 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"record_id": {
 							"type": "string",
-							"description": "Opportunity record ID (15 or 18 characters)"
+							"description": "Opportunity record ID (15 or 18 characters)",
+							"x-ui": {"label": "Record ID", "placeholder": "001xx000003DGbYAAW", "help_text": "15 or 18-character Salesforce record ID"}
 						},
 						"stage_name": {
 							"type": "string",
-							"description": "New sales stage"
+							"description": "New sales stage",
+							"x-ui": {"label": "Stage", "placeholder": "Prospecting", "help_text": "Must match a valid opportunity stage in your org"}
 						},
 						"amount": {
 							"type": "number",
-							"description": "Updated opportunity amount"
+							"description": "Updated opportunity amount",
+							"x-ui": {"label": "Amount", "placeholder": "50000", "help_text": "Deal value in your org's currency"}
 						},
 						"close_date": {
 							"type": "string",
-							"description": "Updated close date in YYYY-MM-DD format"
+							"description": "Updated close date in YYYY-MM-DD format",
+							"x-ui": {"label": "Close date", "widget": "date"}
 						},
 						"name": {
 							"type": "string",
-							"description": "Updated opportunity name"
+							"description": "Updated opportunity name",
+							"x-ui": {"label": "Name", "placeholder": "Acme Corp - Enterprise Deal"}
 						},
 						"description": {
 							"type": "string",
-							"description": "Updated description"
+							"description": "Updated description",
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -238,43 +266,53 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"last_name": {
 							"type": "string",
-							"description": "Lead last name"
+							"description": "Lead last name",
+							"x-ui": {"label": "Last name", "placeholder": "Smith"}
 						},
 						"company": {
 							"type": "string",
-							"description": "Lead company name"
+							"description": "Lead company name",
+							"x-ui": {"label": "Company", "placeholder": "Acme Corp"}
 						},
 						"first_name": {
 							"type": "string",
-							"description": "Lead first name"
+							"description": "Lead first name",
+							"x-ui": {"label": "First name", "placeholder": "Jane"}
 						},
 						"email": {
 							"type": "string",
-							"description": "Lead email address"
+							"description": "Lead email address",
+							"x-ui": {"label": "Email", "placeholder": "jane@acme.com"}
 						},
 						"phone": {
 							"type": "string",
-							"description": "Lead phone number"
+							"description": "Lead phone number",
+							"x-ui": {"label": "Phone", "placeholder": "+1 (555) 123-4567"}
 						},
 						"title": {
 							"type": "string",
-							"description": "Lead job title"
+							"description": "Lead job title",
+							"x-ui": {"label": "Title", "placeholder": "VP of Sales"}
 						},
 						"lead_source": {
 							"type": "string",
-							"description": "Lead source (e.g. Web, Phone Inquiry, Partner)"
+							"description": "Lead source (e.g. Web, Phone Inquiry, Partner)",
+							"x-ui": {"label": "Lead source", "placeholder": "Web"}
 						},
 						"status": {
 							"type": "string",
-							"description": "Lead status (e.g. Open - Not Contacted, Working, Closed - Converted)"
+							"description": "Lead status (e.g. Open - Not Contacted, Working, Closed - Converted)",
+							"x-ui": {"label": "Status", "placeholder": "Open - Not Contacted"}
 						},
 						"website": {
 							"type": "string",
-							"description": "Lead company website"
+							"description": "Lead company website",
+							"x-ui": {"label": "Website", "placeholder": "https://acme.com"}
 						},
 						"industry": {
 							"type": "string",
-							"description": "Lead industry"
+							"description": "Lead industry",
+							"x-ui": {"label": "Industry", "placeholder": "Technology"}
 						}
 					}
 				}`)),
@@ -290,31 +328,38 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"lead_id": {
 							"type": "string",
-							"description": "Lead record ID to convert (15 or 18 characters)"
+							"description": "Lead record ID to convert (15 or 18 characters)",
+							"x-ui": {"label": "Lead ID", "placeholder": "00Qxx000001abcDEFG", "help_text": "15 or 18-character Salesforce record ID"}
 						},
 						"converted_status": {
 							"type": "string",
-							"description": "Lead status to set after conversion (e.g. Closed - Converted)"
+							"description": "Lead status to set after conversion (e.g. Closed - Converted)",
+							"x-ui": {"label": "Converted status", "help_text": "Must be a valid converted lead status in your org"}
 						},
 						"account_id": {
 							"type": "string",
-							"description": "Existing Account ID to merge into (omit to create new account)"
+							"description": "Existing Account ID to merge into (omit to create new account)",
+							"x-ui": {"label": "Account", "help_text": "Account record ID"}
 						},
 						"contact_id": {
 							"type": "string",
-							"description": "Existing Contact ID to merge into (omit to create new contact)"
+							"description": "Existing Contact ID to merge into (omit to create new contact)",
+							"x-ui": {"label": "Contact", "help_text": "Contact record ID"}
 						},
 						"opportunity_name": {
 							"type": "string",
-							"description": "Name for the new Opportunity (ignored if do_not_create_opportunity is true)"
+							"description": "Name for the new Opportunity (ignored if do_not_create_opportunity is true)",
+							"x-ui": {"label": "Opportunity name", "placeholder": "Acme Corp - Enterprise Deal"}
 						},
 						"do_not_create_opportunity": {
 							"type": "boolean",
-							"description": "Set to true to skip creating an Opportunity during conversion"
+							"description": "Set to true to skip creating an Opportunity during conversion",
+							"x-ui": {"label": "Skip opportunity creation", "widget": "toggle"}
 						},
 						"owner_id": {
 							"type": "string",
-							"description": "User ID to assign as owner of the converted records"
+							"description": "User ID to assign as owner of the converted records",
+							"x-ui": {"label": "Owner", "help_text": "User record ID"}
 						}
 					}
 				}`)),
@@ -330,11 +375,13 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"sobject_type": {
 							"type": "string",
-							"description": "Salesforce object type (e.g. Lead, Contact, Account, Opportunity)"
+							"description": "Salesforce object type (e.g. Lead, Contact, Account, Opportunity)",
+							"x-ui": {"label": "Object type", "placeholder": "Lead", "help_text": "Salesforce object API name — e.g. Lead, Contact, Account, Opportunity"}
 						},
 						"record_id": {
 							"type": "string",
-							"description": "The 15 or 18-character Salesforce record ID to delete"
+							"description": "The 15 or 18-character Salesforce record ID to delete",
+							"x-ui": {"label": "Record ID", "placeholder": "001xx000003DGbYAAW", "help_text": "15 or 18-character Salesforce record ID"}
 						}
 					}
 				}`)),
@@ -350,7 +397,8 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"sobject_type": {
 							"type": "string",
-							"description": "Salesforce object type to describe (e.g. Lead, Opportunity, Account, or any custom object)"
+							"description": "Salesforce object type to describe (e.g. Lead, Opportunity, Account, or any custom object)",
+							"x-ui": {"label": "Object type", "placeholder": "Lead", "help_text": "Salesforce object API name — e.g. Lead, Contact, Account, Opportunity"}
 						}
 					}
 				}`)),
@@ -373,11 +421,13 @@ func (c *SalesforceConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"report_id": {
 							"type": "string",
-							"description": "Report record ID (15 or 18 characters)"
+							"description": "Report record ID (15 or 18 characters)",
+							"x-ui": {"label": "Report ID", "help_text": "18-character report ID — find in the report URL"}
 						},
 						"include_details": {
 							"type": "boolean",
-							"description": "Include detailed row-level data in the response (default: false, summary only)"
+							"description": "Include detailed row-level data in the response (default: false, summary only)",
+							"x-ui": {"label": "Include details", "widget": "toggle"}
 						}
 					}
 				}`)),

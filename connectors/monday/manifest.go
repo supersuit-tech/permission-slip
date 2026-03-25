@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest including action
 // schemas, required credentials, and configuration templates.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -30,19 +31,37 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"board_id": {
 							"type": "string",
-							"description": "The board ID to create the item on"
+							"description": "The board ID to create the item on",
+							"x-ui": {
+								"label": "Board ID",
+								"placeholder": "1234567890",
+								"help_text": "Find in board URL or use monday.list_boards"
+							}
 						},
 						"item_name": {
 							"type": "string",
-							"description": "Name of the new item"
+							"description": "Name of the new item",
+							"x-ui": {
+								"label": "Item Name",
+								"placeholder": "New item name"
+							}
 						},
 						"column_values": {
 							"type": "object",
-							"description": "JSON object mapping column IDs to values, e.g. {\"status\": {\"label\": \"Working on it\"}, \"date\": {\"date\": \"2024-01-15\"}}"
+							"description": "JSON object mapping column IDs to values, e.g. {\"status\": {\"label\": \"Working on it\"}, \"date\": {\"date\": \"2024-01-15\"}}",
+							"x-ui": {
+								"label": "Column Values",
+								"help_text": "JSON mapping column IDs to values. Example: {\"status\": {\"label\": \"Working on it\"}}. Use monday.get_board for column IDs."
+							}
 						},
 						"group_id": {
 							"type": "string",
-							"description": "Group ID to create the item in (use the group's unique ID, not its display name)"
+							"description": "Group ID to create the item in (use the group's unique ID, not its display name)",
+							"x-ui": {
+								"label": "Group ID",
+								"placeholder": "new_group",
+								"help_text": "Use monday.list_groups to discover IDs"
+							}
 						}
 					}
 				}`)),
@@ -58,15 +77,29 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"board_id": {
 							"type": "string",
-							"description": "The board ID containing the item"
+							"description": "The board ID containing the item",
+							"x-ui": {
+								"label": "Board ID",
+								"placeholder": "1234567890",
+								"help_text": "Find in board URL or use monday.list_boards"
+							}
 						},
 						"item_id": {
 							"type": "string",
-							"description": "The item ID to update"
+							"description": "The item ID to update",
+							"x-ui": {
+								"label": "Item ID",
+								"placeholder": "1234567890",
+								"help_text": "Visible in item URL"
+							}
 						},
 						"column_values": {
 							"type": "object",
-							"description": "JSON object mapping column IDs to new values"
+							"description": "JSON object mapping column IDs to new values",
+							"x-ui": {
+								"label": "Column Values",
+								"help_text": "JSON mapping column IDs to values. Example: {\"status\": {\"label\": \"Working on it\"}}. Use monday.get_board for column IDs."
+							}
 						}
 					}
 				}`)),
@@ -82,11 +115,21 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"item_id": {
 							"type": "string",
-							"description": "The item ID to add the update to"
+							"description": "The item ID to add the update to",
+							"x-ui": {
+								"label": "Item ID",
+								"placeholder": "1234567890",
+								"help_text": "Visible in item URL"
+							}
 						},
 						"body": {
 							"type": "string",
-							"description": "Update text content (supports HTML)"
+							"description": "Update text content (supports HTML)",
+							"x-ui": {
+								"label": "Body",
+								"placeholder": "Enter update text...",
+								"widget": "textarea"
+							}
 						}
 					}
 				}`)),
@@ -102,15 +145,28 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"parent_item_id": {
 							"type": "string",
-							"description": "The parent item ID to create the subitem under"
+							"description": "The parent item ID to create the subitem under",
+							"x-ui": {
+								"label": "Parent Item ID",
+								"placeholder": "1234567890",
+								"help_text": "Visible in item URL"
+							}
 						},
 						"item_name": {
 							"type": "string",
-							"description": "Name of the new subitem"
+							"description": "Name of the new subitem",
+							"x-ui": {
+								"label": "Subitem Name",
+								"placeholder": "New subitem name"
+							}
 						},
 						"column_values": {
 							"type": "object",
-							"description": "JSON object mapping column IDs to values"
+							"description": "JSON object mapping column IDs to values",
+							"x-ui": {
+								"label": "Column Values",
+								"help_text": "JSON mapping column IDs to values. Example: {\"status\": {\"label\": \"Working on it\"}}. Use monday.get_board for column IDs."
+							}
 						}
 					}
 				}`)),
@@ -126,11 +182,21 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"item_id": {
 							"type": "string",
-							"description": "The item ID to move"
+							"description": "The item ID to move",
+							"x-ui": {
+								"label": "Item ID",
+								"placeholder": "1234567890",
+								"help_text": "Visible in item URL"
+							}
 						},
 						"group_id": {
 							"type": "string",
-							"description": "The target group ID (e.g. 'done', 'in_progress')"
+							"description": "The target group ID (e.g. 'done', 'in_progress')",
+							"x-ui": {
+								"label": "Group ID",
+								"placeholder": "new_group",
+								"help_text": "Use monday.list_groups to discover IDs"
+							}
 						}
 					}
 				}`)),
@@ -146,24 +212,45 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"board_id": {
 							"type": "string",
-							"description": "The board ID to search on"
+							"description": "The board ID to search on",
+							"x-ui": {
+								"label": "Board ID",
+								"placeholder": "1234567890",
+								"help_text": "Find in board URL or use monday.list_boards"
+							}
 						},
 						"query": {
 							"type": "string",
-							"description": "Text search query"
+							"description": "Text search query",
+							"x-ui": {
+								"label": "Search Query",
+								"placeholder": "Search text..."
+							}
 						},
 						"column_id": {
 							"type": "string",
-							"description": "Column ID to filter by (use with column_value)"
+							"description": "Column ID to filter by (use with column_value)",
+							"x-ui": {
+								"label": "Column ID",
+								"placeholder": "status",
+								"help_text": "Internal column ID — use monday.get_board"
+							}
 						},
 						"column_value": {
 							"type": "string",
-							"description": "Column value to filter by (use with column_id)"
+							"description": "Column value to filter by (use with column_id)",
+							"x-ui": {
+								"label": "Column Value",
+								"placeholder": "Working on it"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 20,
-							"description": "Maximum number of items to return (default 20)"
+							"description": "Maximum number of items to return (default 20)",
+							"x-ui": {
+								"label": "Max Results"
+							}
 						}
 					}
 				}`)),
@@ -179,12 +266,19 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 						"limit": {
 							"type": "integer",
 							"default": 20,
-							"description": "Maximum number of boards to return (default 20)"
+							"description": "Maximum number of boards to return (default 20)",
+							"x-ui": {
+								"label": "Max Results"
+							}
 						},
 						"kind": {
 							"type": "string",
 							"enum": ["public", "private", "share"],
-							"description": "Board kind filter"
+							"description": "Board kind filter",
+							"x-ui": {
+								"label": "Board Kind",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
@@ -200,7 +294,12 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"board_id": {
 							"type": "string",
-							"description": "The board ID to retrieve"
+							"description": "The board ID to retrieve",
+							"x-ui": {
+								"label": "Board ID",
+								"placeholder": "1234567890",
+								"help_text": "Find in board URL or use monday.list_boards"
+							}
 						}
 					}
 				}`)),
@@ -216,20 +315,38 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"name": {
 							"type": "string",
-							"description": "Board name"
+							"description": "Board name",
+							"x-ui": {
+								"label": "Board Name",
+								"placeholder": "My New Board"
+							}
 						},
 						"kind": {
 							"type": "string",
 							"enum": ["public", "private", "share"],
-							"description": "Board kind (default: public)"
+							"description": "Board kind (default: public)",
+							"x-ui": {
+								"label": "Board Kind",
+								"widget": "select"
+							}
 						},
 						"folder_id": {
 							"type": "string",
-							"description": "Folder ID to create the board in"
+							"description": "Folder ID to create the board in",
+							"x-ui": {
+								"label": "Folder ID",
+								"placeholder": "1234567890",
+								"help_text": "Find the folder ID in the Monday.com URL when viewing the folder"
+							}
 						},
 						"workspace_id": {
 							"type": "string",
-							"description": "Workspace ID to create the board in"
+							"description": "Workspace ID to create the board in",
+							"x-ui": {
+								"label": "Workspace ID",
+								"placeholder": "1234567890",
+								"help_text": "Find the workspace ID in the Monday.com URL when viewing the workspace"
+							}
 						}
 					}
 				}`)),
@@ -245,7 +362,12 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"item_id": {
 							"type": "string",
-							"description": "The item ID to delete"
+							"description": "The item ID to delete",
+							"x-ui": {
+								"label": "Item ID",
+								"placeholder": "1234567890",
+								"help_text": "Visible in item URL"
+							}
 						}
 					}
 				}`)),
@@ -261,7 +383,12 @@ func (c *MondayConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"board_id": {
 							"type": "string",
-							"description": "The board ID to list groups for"
+							"description": "The board ID to list groups for",
+							"x-ui": {
+								"label": "Board ID",
+								"placeholder": "1234567890",
+								"help_text": "Find in board URL or use monday.list_boards"
+							}
 						}
 					}
 				}`)),

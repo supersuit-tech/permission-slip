@@ -30,28 +30,52 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"email": {
 							"type": "string",
-							"description": "Contact email address"
+							"description": "Contact email address",
+							"x-ui": {
+								"label": "Email",
+								"placeholder": "jane@example.com"
+							}
 						},
 						"firstname": {
 							"type": "string",
-							"description": "Contact first name"
+							"description": "Contact first name",
+							"x-ui": {
+								"label": "First name",
+								"placeholder": "Jane"
+							}
 						},
 						"lastname": {
 							"type": "string",
-							"description": "Contact last name"
+							"description": "Contact last name",
+							"x-ui": {
+								"label": "Last name",
+								"placeholder": "Doe"
+							}
 						},
 						"phone": {
 							"type": "string",
-							"description": "Contact phone number"
+							"description": "Contact phone number",
+							"x-ui": {
+								"label": "Phone",
+								"placeholder": "+1-555-123-4567"
+							}
 						},
 						"company": {
 							"type": "string",
-							"description": "Contact company name"
+							"description": "Contact company name",
+							"x-ui": {
+								"label": "Company",
+								"placeholder": "Acme Inc."
+							}
 						},
 						"properties": {
 							"type": "object",
 							"description": "Additional HubSpot contact properties (property name to value)",
-							"additionalProperties": {"type": "string"}
+							"additionalProperties": {"type": "string"},
+							"x-ui": {
+								"label": "Custom properties",
+								"help_text": "Key-value pairs for any custom HubSpot contact properties defined in your account"
+							}
 						}
 					}
 				}`)),
@@ -67,12 +91,21 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"contact_id": {
 							"type": "string",
-							"description": "HubSpot contact ID to update"
+							"description": "HubSpot contact ID to update",
+							"x-ui": {
+								"label": "Contact ID",
+								"placeholder": "123456",
+								"help_text": "Numeric ID visible in the HubSpot record URL"
+							}
 						},
 						"properties": {
 							"type": "object",
 							"description": "Property name to value map (e.g. {\"email\": \"...\", \"phone\": \"...\"})",
-							"additionalProperties": {"type": "string"}
+							"additionalProperties": {"type": "string"},
+							"x-ui": {
+								"label": "Properties to update",
+								"help_text": "Key-value pairs for any custom HubSpot contact properties defined in your account"
+							}
 						}
 					}
 				}`)),
@@ -88,33 +121,64 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"dealname": {
 							"type": "string",
-							"description": "Deal name"
+							"description": "Deal name",
+							"x-ui": {
+								"label": "Deal name",
+								"placeholder": "Acme Corp — Enterprise license"
+							}
 						},
 						"pipeline": {
 							"type": "string",
-							"description": "Pipeline ID"
+							"description": "Pipeline ID",
+							"x-ui": {
+								"label": "Pipeline",
+								"placeholder": "default",
+								"help_text": "Find via hubspot.list_pipelines or Settings > Deals > Pipelines in HubSpot"
+							}
 						},
 						"dealstage": {
 							"type": "string",
-							"description": "Deal stage ID"
+							"description": "Deal stage ID",
+							"x-ui": {
+								"label": "Deal stage",
+								"placeholder": "qualifiedtobuy",
+								"help_text": "Find via hubspot.list_pipelines or Settings > Deals > Pipelines in HubSpot"
+							}
 						},
 						"amount": {
 							"type": "string",
-							"description": "Deal amount"
+							"description": "Deal amount",
+							"x-ui": {
+								"label": "Amount",
+								"placeholder": "10000",
+								"help_text": "Deal value in your account's currency"
+							}
 						},
 						"closedate": {
 							"type": "string",
-							"description": "Expected close date (ISO 8601)"
+							"description": "Expected close date (ISO 8601)",
+							"x-ui": {
+								"label": "Close date",
+								"placeholder": "2026-06-30T00:00:00Z"
+							}
 						},
 						"associated_contacts": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Contact IDs to associate with the deal"
+							"description": "Contact IDs to associate with the deal",
+							"x-ui": {
+								"label": "Associated contacts",
+								"help_text": "Numeric contact IDs visible in each HubSpot contact record URL"
+							}
 						},
 						"properties": {
 							"type": "object",
 							"description": "Additional HubSpot deal properties",
-							"additionalProperties": {"type": "string"}
+							"additionalProperties": {"type": "string"},
+							"x-ui": {
+								"label": "Custom properties",
+								"help_text": "Key-value pairs for any custom HubSpot deal properties defined in your account"
+							}
 						}
 					}
 				}`)),
@@ -130,28 +194,54 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"subject": {
 							"type": "string",
-							"description": "Ticket subject"
+							"description": "Ticket subject",
+							"x-ui": {
+								"label": "Subject",
+								"placeholder": "Cannot access billing portal"
+							}
 						},
 						"content": {
 							"type": "string",
-							"description": "Ticket body/description"
+							"description": "Ticket body/description",
+							"x-ui": {
+								"label": "Description",
+								"widget": "textarea"
+							}
 						},
 						"hs_pipeline": {
 							"type": "string",
-							"description": "Pipeline ID"
+							"description": "Pipeline ID",
+							"x-ui": {
+								"label": "Pipeline",
+								"placeholder": "0",
+								"help_text": "Find via hubspot.list_pipelines or Settings > Deals > Pipelines in HubSpot"
+							}
 						},
 						"hs_pipeline_stage": {
 							"type": "string",
-							"description": "Pipeline stage ID"
+							"description": "Pipeline stage ID",
+							"x-ui": {
+								"label": "Pipeline stage",
+								"placeholder": "1",
+								"help_text": "Find via hubspot.list_pipelines or Settings > Deals > Pipelines in HubSpot"
+							}
 						},
 						"hs_ticket_priority": {
 							"type": "string",
-							"description": "Ticket priority (e.g. HIGH, MEDIUM, LOW)"
+							"description": "Ticket priority (e.g. HIGH, MEDIUM, LOW)",
+							"x-ui": {
+								"label": "Priority",
+								"placeholder": "MEDIUM"
+							}
 						},
 						"properties": {
 							"type": "object",
 							"description": "Additional HubSpot ticket properties",
-							"additionalProperties": {"type": "string"}
+							"additionalProperties": {"type": "string"},
+							"x-ui": {
+								"label": "Custom properties",
+								"help_text": "Key-value pairs for any custom HubSpot ticket properties defined in your account"
+							}
 						}
 					}
 				}`)),
@@ -168,15 +258,28 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 						"object_type": {
 							"type": "string",
 							"enum": ["contact", "deal", "ticket"],
-							"description": "CRM object type to attach the note to"
+							"description": "CRM object type to attach the note to",
+							"x-ui": {
+								"label": "Object type",
+								"widget": "select"
+							}
 						},
 						"object_id": {
 							"type": "string",
-							"description": "ID of the CRM object"
+							"description": "ID of the CRM object",
+							"x-ui": {
+								"label": "Object ID",
+								"placeholder": "123456",
+								"help_text": "The numeric ID of the contact, deal, or ticket"
+							}
 						},
 						"body": {
 							"type": "string",
-							"description": "Note content (HTML supported)"
+							"description": "Note content (HTML supported)",
+							"x-ui": {
+								"label": "Note body",
+								"widget": "textarea"
+							}
 						}
 					}
 				}`)),
@@ -193,7 +296,11 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 						"object_type": {
 							"type": "string",
 							"enum": ["contacts", "deals", "tickets", "companies"],
-							"description": "CRM object type to search"
+							"description": "CRM object type to search",
+							"x-ui": {
+								"label": "Object type",
+								"widget": "select"
+							}
 						},
 						"filters": {
 							"type": "array",
@@ -206,12 +313,19 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 									"value": {"type": "string", "description": "Value to compare against"}
 								}
 							},
-							"description": "Array of filter conditions"
+							"description": "Array of filter conditions",
+							"x-ui": {
+								"label": "Filters",
+								"help_text": "Each filter needs a propertyName, operator (EQ, NEQ, LT, GT, CONTAINS_TOKEN, etc.), and value"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 10,
-							"description": "Maximum number of results to return (default 10)"
+							"description": "Maximum number of results to return (default 10)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						}
 					}
 				}`)),
@@ -235,7 +349,11 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 									"value": {"type": "string", "description": "Value to compare against"}
 								}
 							},
-							"description": "Array of filter conditions"
+							"description": "Array of filter conditions",
+							"x-ui": {
+								"label": "Filters",
+								"help_text": "Each filter needs a propertyName, operator (EQ, NEQ, LT, GT, CONTAINS_TOKEN, etc.), and value"
+							}
 						},
 						"sorts": {
 							"type": "array",
@@ -247,17 +365,28 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 									"direction": {"type": "string", "enum": ["ASCENDING", "DESCENDING"], "description": "Sort direction (default ASCENDING)"}
 								}
 							},
-							"description": "Array of sort conditions"
+							"description": "Array of sort conditions",
+							"x-ui": {
+								"label": "Sort by",
+								"help_text": "Each sort entry needs a propertyName and optional direction (ASCENDING or DESCENDING)"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 10,
-							"description": "Maximum number of results (default 10, max 200)"
+							"description": "Maximum number of results (default 10, max 200)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						},
 						"properties": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Deal properties to include in the response (defaults to dealname, amount, dealstage, pipeline, closedate, createdate, hs_lastmodifieddate)"
+							"description": "Deal properties to include in the response (defaults to dealname, amount, dealstage, pipeline, closedate, createdate, hs_lastmodifieddate)",
+							"x-ui": {
+								"label": "Properties to return",
+								"help_text": "List of HubSpot deal property names to include in results. Leave empty for defaults."
+							}
 						}
 					}
 				}`)),
@@ -273,15 +402,29 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"deal_id": {
 							"type": "string",
-							"description": "HubSpot deal ID to update"
+							"description": "HubSpot deal ID to update",
+							"x-ui": {
+								"label": "Deal ID",
+								"placeholder": "123456",
+								"help_text": "Numeric ID visible in the HubSpot record URL"
+							}
 						},
 						"pipeline_stage": {
 							"type": "string",
-							"description": "Target pipeline stage ID"
+							"description": "Target pipeline stage ID",
+							"x-ui": {
+								"label": "Pipeline stage",
+								"placeholder": "closedwon",
+								"help_text": "Find via hubspot.list_pipelines or Settings > Deals > Pipelines in HubSpot"
+							}
 						},
 						"close_date": {
 							"type": "string",
-							"description": "Updated expected close date (ISO 8601)"
+							"description": "Updated expected close date (ISO 8601)",
+							"x-ui": {
+								"label": "Close date",
+								"placeholder": "2026-06-30T00:00:00Z"
+							}
 						}
 					}
 				}`)),
@@ -297,11 +440,21 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"flow_id": {
 							"type": "string",
-							"description": "Workflow (flow) ID to enroll the contact in"
+							"description": "Workflow (flow) ID to enroll the contact in",
+							"x-ui": {
+								"label": "Workflow ID",
+								"placeholder": "12345678",
+								"help_text": "Find via Automation > Workflows in HubSpot — the flow ID is in the URL"
+							}
 						},
 						"contact_id": {
 							"type": "string",
-							"description": "Contact ID to enroll"
+							"description": "Contact ID to enroll",
+							"x-ui": {
+								"label": "Contact ID",
+								"placeholder": "123456",
+								"help_text": "Numeric ID visible in the HubSpot record URL"
+							}
 						}
 					}
 				}`)),
@@ -317,25 +470,46 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"name": {
 							"type": "string",
-							"description": "Internal campaign name"
+							"description": "Internal campaign name",
+							"x-ui": {
+								"label": "Campaign name",
+								"placeholder": "Q3 Product Launch"
+							}
 						},
 						"subject": {
 							"type": "string",
-							"description": "Email subject line"
+							"description": "Email subject line",
+							"x-ui": {
+								"label": "Subject line",
+								"placeholder": "Introducing our newest feature"
+							}
 						},
 						"content": {
 							"type": "string",
-							"description": "Email body content (HTML supported)"
+							"description": "Email body content (HTML supported)",
+							"x-ui": {
+								"label": "Email body",
+								"widget": "textarea"
+							}
 						},
 						"list_ids": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Contact list IDs to send to"
+							"description": "Contact list IDs to send to",
+							"x-ui": {
+								"label": "Recipient lists",
+								"help_text": "Find list IDs in Contacts > Lists in HubSpot"
+							}
 						},
 						"send_now": {
 							"type": "boolean",
 							"default": false,
-							"description": "If true, send immediately; if false, create as draft"
+							"description": "If true, send immediately; if false, create as draft",
+							"x-ui": {
+								"label": "Send immediately",
+								"widget": "toggle",
+								"help_text": "WARNING: When enabled, the email is sent immediately to all contacts in the specified lists. This cannot be undone."
+							}
 						}
 					}
 				}`)),
@@ -352,21 +526,31 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 						"object_type": {
 							"type": "string",
 							"enum": ["contacts", "deals", "companies", "tickets"],
-							"description": "Object type to get analytics for"
+							"description": "Object type to get analytics for",
+							"x-ui": {
+								"label": "Object type",
+								"widget": "select"
+							}
 						},
 						"time_period": {
 							"type": "string",
 							"enum": ["total", "daily", "weekly", "monthly"],
-							"description": "Time period granularity"
+							"description": "Time period granularity",
+							"x-ui": {
+								"label": "Time period",
+								"widget": "select"
+							}
 						},
 						"start": {
 							"type": "string",
 							"format": "date-time",
 							"description": "Start of range (YYYY-MM-DD, RFC 3339, Unix seconds, or epoch milliseconds — normalized to UTC date for the API)",
 							"x-ui": {
+								"label": "Start date",
 								"widget": "datetime",
 								"datetime_range_pair": "end",
-								"datetime_range_role": "lower"
+								"datetime_range_role": "lower",
+								"help_text": "Beginning of the analytics date range"
 							}
 						},
 						"end": {
@@ -374,9 +558,11 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date-time",
 							"description": "End of range (YYYY-MM-DD, RFC 3339, Unix seconds, or epoch milliseconds — normalized to UTC date for the API)",
 							"x-ui": {
+								"label": "End date",
 								"widget": "datetime",
 								"datetime_range_pair": "start",
-								"datetime_range_role": "upper"
+								"datetime_range_role": "upper",
+								"help_text": "End of the analytics date range"
 							}
 						}
 					}
@@ -401,17 +587,28 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 									"value": {"type": "string", "description": "Value to compare against"}
 								}
 							},
-							"description": "Array of filter conditions"
+							"description": "Array of filter conditions",
+							"x-ui": {
+								"label": "Filters",
+								"help_text": "Each filter needs a propertyName, operator (EQ, NEQ, LT, GT, CONTAINS_TOKEN, etc.), and value"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 10,
-							"description": "Maximum number of results (default 10, max 200)"
+							"description": "Maximum number of results (default 10, max 200)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						},
 						"properties": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Contact properties to include in the response"
+							"description": "Contact properties to include in the response",
+							"x-ui": {
+								"label": "Properties to return",
+								"help_text": "List of HubSpot contact property names to include in results. Leave empty for defaults."
+							}
 						}
 					}
 				}`)),
@@ -427,12 +624,21 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"contact_id": {
 							"type": "string",
-							"description": "HubSpot contact ID (numeric)"
+							"description": "HubSpot contact ID (numeric)",
+							"x-ui": {
+								"label": "Contact ID",
+								"placeholder": "123456",
+								"help_text": "Numeric ID visible in the HubSpot record URL"
+							}
 						},
 						"properties": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Properties to include in the response (defaults to common fields)"
+							"description": "Properties to include in the response (defaults to common fields)",
+							"x-ui": {
+								"label": "Properties to return",
+								"help_text": "List of HubSpot contact property names to include in results. Leave empty for defaults."
+							}
 						}
 					}
 				}`)),
@@ -448,7 +654,12 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"contact_id": {
 							"type": "string",
-							"description": "HubSpot contact ID to archive"
+							"description": "HubSpot contact ID to archive",
+							"x-ui": {
+								"label": "Contact ID",
+								"placeholder": "123456",
+								"help_text": "Numeric ID visible in the HubSpot record URL"
+							}
 						}
 					}
 				}`)),
@@ -464,7 +675,12 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"deal_id": {
 							"type": "string",
-							"description": "HubSpot deal ID to archive"
+							"description": "HubSpot deal ID to archive",
+							"x-ui": {
+								"label": "Deal ID",
+								"placeholder": "123456",
+								"help_text": "Numeric ID visible in the HubSpot record URL"
+							}
 						}
 					}
 				}`)),
@@ -480,32 +696,60 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"name": {
 							"type": "string",
-							"description": "Company name"
+							"description": "Company name",
+							"x-ui": {
+								"label": "Company name",
+								"placeholder": "Acme Inc."
+							}
 						},
 						"domain": {
 							"type": "string",
-							"description": "Company website domain (e.g. acme.com)"
+							"description": "Company website domain (e.g. acme.com)",
+							"x-ui": {
+								"label": "Domain",
+								"placeholder": "acme.com"
+							}
 						},
 						"phone": {
 							"type": "string",
-							"description": "Company phone number"
+							"description": "Company phone number",
+							"x-ui": {
+								"label": "Phone",
+								"placeholder": "+1-555-123-4567"
+							}
 						},
 						"city": {
 							"type": "string",
-							"description": "City"
+							"description": "City",
+							"x-ui": {
+								"label": "City",
+								"placeholder": "San Francisco"
+							}
 						},
 						"country": {
 							"type": "string",
-							"description": "Country"
+							"description": "Country",
+							"x-ui": {
+								"label": "Country",
+								"placeholder": "United States"
+							}
 						},
 						"industry": {
 							"type": "string",
-							"description": "Industry (e.g. TECHNOLOGY, FINANCIAL_SERVICES)"
+							"description": "Industry (e.g. TECHNOLOGY, FINANCIAL_SERVICES)",
+							"x-ui": {
+								"label": "Industry",
+								"placeholder": "TECHNOLOGY"
+							}
 						},
 						"properties": {
 							"type": "object",
 							"description": "Additional HubSpot company properties",
-							"additionalProperties": {"type": "string"}
+							"additionalProperties": {"type": "string"},
+							"x-ui": {
+								"label": "Custom properties",
+								"help_text": "Key-value pairs for any custom HubSpot company properties defined in your account"
+							}
 						}
 					}
 				}`)),
@@ -521,36 +765,69 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"company_id": {
 							"type": "string",
-							"description": "HubSpot company ID (numeric)"
+							"description": "HubSpot company ID (numeric)",
+							"x-ui": {
+								"label": "Company ID",
+								"placeholder": "123456",
+								"help_text": "Numeric ID visible in the HubSpot record URL"
+							}
 						},
 						"name": {
 							"type": "string",
-							"description": "Updated company name"
+							"description": "Updated company name",
+							"x-ui": {
+								"label": "Company name",
+								"placeholder": "Acme Inc."
+							}
 						},
 						"domain": {
 							"type": "string",
-							"description": "Updated website domain (e.g. acme.com)"
+							"description": "Updated website domain (e.g. acme.com)",
+							"x-ui": {
+								"label": "Domain",
+								"placeholder": "acme.com"
+							}
 						},
 						"phone": {
 							"type": "string",
-							"description": "Updated company phone number"
+							"description": "Updated company phone number",
+							"x-ui": {
+								"label": "Phone",
+								"placeholder": "+1-555-123-4567"
+							}
 						},
 						"city": {
 							"type": "string",
-							"description": "Updated city"
+							"description": "Updated city",
+							"x-ui": {
+								"label": "City",
+								"placeholder": "San Francisco"
+							}
 						},
 						"country": {
 							"type": "string",
-							"description": "Updated country"
+							"description": "Updated country",
+							"x-ui": {
+								"label": "Country",
+								"placeholder": "United States"
+							}
 						},
 						"industry": {
 							"type": "string",
-							"description": "Updated industry (e.g. TECHNOLOGY, FINANCIAL_SERVICES)"
+							"description": "Updated industry (e.g. TECHNOLOGY, FINANCIAL_SERVICES)",
+							"x-ui": {
+								"label": "Industry",
+								"placeholder": "TECHNOLOGY"
+							}
 						},
 						"properties": {
 							"type": "object",
 							"description": "Additional HubSpot company properties to update (property name to value map)",
-							"additionalProperties": {"type": "string"}
+							"additionalProperties": {"type": "string"},
+							"x-ui": {
+								"label": "Custom properties",
+								"help_text": "Key-value pairs for any custom HubSpot company properties defined in your account"
+							}
 						}
 					}
 				}`)),
@@ -567,7 +844,11 @@ func (c *HubSpotConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"enum": ["deals", "tickets"],
 							"default": "deals",
-							"description": "Object type to list pipelines for (default: deals)"
+							"description": "Object type to list pipelines for (default: deals)",
+							"x-ui": {
+								"label": "Object type",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),

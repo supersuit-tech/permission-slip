@@ -30,21 +30,40 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"user_id": {
 							"type": "string",
-							"description": "A unique identifier for the user connecting their bank account"
+							"description": "A unique identifier for the user connecting their bank account",
+							"x-ui": {
+								"label": "User ID",
+								"placeholder": "user_abc123",
+								"help_text": "Unique identifier for the end user"
+							}
 						},
 						"products": {
 							"type": "array",
 							"items": {"type": "string", "enum": ["auth", "transactions", "identity", "balance"]},
-							"description": "Plaid products to enable (e.g. auth, transactions, identity, balance)"
+							"description": "Plaid products to enable (e.g. auth, transactions, identity, balance)",
+							"x-ui": {
+								"label": "Products",
+								"widget": "select",
+								"help_text": "Plaid products to enable — e.g. transactions, auth, identity"
+							}
 						},
 						"country_codes": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Country codes to enable (defaults to [\"US\"])"
+							"description": "Country codes to enable (defaults to [\"US\"])",
+							"x-ui": {
+								"label": "Countries",
+								"placeholder": "US",
+								"help_text": "ISO 3166-1 alpha-2 country codes — e.g. US, GB, CA"
+							}
 						},
 						"language": {
 							"type": "string",
-							"description": "Language for the Link flow (defaults to \"en\")"
+							"description": "Language for the Link flow (defaults to \"en\")",
+							"x-ui": {
+								"label": "Language",
+								"placeholder": "en"
+							}
 						}
 					}
 				}`)),
@@ -60,12 +79,21 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"access_token": {
 							"type": "string",
-							"description": "The access token for the connected bank account (Item)"
+							"description": "The access token for the connected bank account (Item)",
+							"x-ui": {
+								"label": "Access token",
+								"placeholder": "access-sandbox-...",
+								"help_text": "Plaid access token from the link flow — starts with 'access-'"
+							}
 						},
 						"account_ids": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Optional list of account IDs to filter results"
+							"description": "Optional list of account IDs to filter results",
+							"x-ui": {
+								"label": "Account IDs",
+								"help_text": "Filter to specific account IDs (omit for all accounts)"
+							}
 						}
 					}
 				}`)),
@@ -81,14 +109,21 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"access_token": {
 							"type": "string",
-							"description": "The access token for the connected bank account (Item)"
+							"description": "The access token for the connected bank account (Item)",
+							"x-ui": {
+								"label": "Access token",
+								"placeholder": "access-sandbox-...",
+								"help_text": "Plaid access token from the link flow — starts with 'access-'"
+							}
 						},
 						"start_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Start date (YYYY-MM-DD). Unix seconds or epoch milliseconds are also accepted and normalized to the UTC calendar date.",
 							"x-ui": {
+								"label": "Start date",
 								"widget": "date",
+								"help_text": "Beginning of the date range for transactions",
 								"datetime_range_pair": "end_date",
 								"datetime_range_role": "lower"
 							}
@@ -98,7 +133,9 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date",
 							"description": "End date (YYYY-MM-DD). Unix seconds or epoch milliseconds are also accepted and normalized to the UTC calendar date.",
 							"x-ui": {
+								"label": "End date",
 								"widget": "date",
+								"help_text": "End of the date range for transactions",
 								"datetime_range_pair": "start_date",
 								"datetime_range_role": "upper"
 							}
@@ -106,19 +143,29 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 						"account_ids": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Optional list of account IDs to filter results"
+							"description": "Optional list of account IDs to filter results",
+							"x-ui": {
+								"label": "Account IDs",
+								"help_text": "Filter to specific account IDs (omit for all accounts)"
+							}
 						},
 						"count": {
 							"type": "integer",
 							"minimum": 1,
 							"maximum": 500,
-							"description": "Maximum number of transactions to return (default 100, max 500)"
+							"description": "Maximum number of transactions to return (default 100, max 500)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						},
 						"offset": {
 							"type": "integer",
 							"minimum": 0,
 							"description": "Number of transactions to skip (for pagination)",
-							"x-ui": {"hidden": true}
+							"x-ui": {
+								"label": "Offset",
+								"hidden": true
+							}
 						}
 					}
 				}`)),
@@ -134,12 +181,21 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"access_token": {
 							"type": "string",
-							"description": "The access token for the connected bank account (Item)"
+							"description": "The access token for the connected bank account (Item)",
+							"x-ui": {
+								"label": "Access token",
+								"placeholder": "access-sandbox-...",
+								"help_text": "Plaid access token from the link flow — starts with 'access-'"
+							}
 						},
 						"account_ids": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Optional list of account IDs to filter results"
+							"description": "Optional list of account IDs to filter results",
+							"x-ui": {
+								"label": "Account IDs",
+								"help_text": "Filter to specific account IDs (omit for all accounts)"
+							}
 						}
 					}
 				}`)),
@@ -155,12 +211,21 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"access_token": {
 							"type": "string",
-							"description": "The access token for the connected bank account (Item)"
+							"description": "The access token for the connected bank account (Item)",
+							"x-ui": {
+								"label": "Access token",
+								"placeholder": "access-sandbox-...",
+								"help_text": "Plaid access token from the link flow — starts with 'access-'"
+							}
 						},
 						"account_ids": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Optional list of account IDs to filter results"
+							"description": "Optional list of account IDs to filter results",
+							"x-ui": {
+								"label": "Account IDs",
+								"help_text": "Filter to specific account IDs (omit for all accounts)"
+							}
 						}
 					}
 				}`)),
@@ -176,12 +241,22 @@ func (c *PlaidConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"institution_id": {
 							"type": "string",
-							"description": "The Plaid institution ID (e.g. ins_1)"
+							"description": "The Plaid institution ID (e.g. ins_1)",
+							"x-ui": {
+								"label": "Institution ID",
+								"placeholder": "ins_1",
+								"help_text": "Plaid institution ID"
+							}
 						},
 						"country_codes": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Country codes to search (defaults to [\"US\"])"
+							"description": "Country codes to search (defaults to [\"US\"])",
+							"x-ui": {
+								"label": "Countries",
+								"placeholder": "US",
+								"help_text": "ISO 3166-1 alpha-2 country codes — e.g. US, GB, CA"
+							}
 						}
 					}
 				}`)),

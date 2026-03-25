@@ -30,37 +30,61 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"customer_id": {
 							"type": "string",
-							"description": "QuickBooks customer ID (e.g. \"42\")"
+							"description": "QuickBooks customer ID (e.g. \"42\")",
+							"x-ui": {
+								"label": "Customer",
+								"help_text": "QuickBooks customer ID — use quickbooks.list_customers to find IDs"
+							}
 						},
 						"due_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Invoice due date in YYYY-MM-DD format (e.g. \"2025-12-31\")",
-							"x-ui": {"widget": "date"}
+							"x-ui": {
+								"widget": "date",
+								"label": "Due date",
+								"help_text": "Invoice due date"
+							}
 						},
 						"line_items": {
 							"type": "array",
 							"minItems": 1,
 							"maxItems": 250,
 							"description": "Invoice line items (max 250)",
+							"x-ui": {
+								"label": "Line items"
+							},
 							"items": {
 								"type": "object",
 								"additionalProperties": false,
 								"properties": {
 									"description": {
 										"type": "string",
-										"description": "Line item description shown on the invoice"
+										"description": "Line item description shown on the invoice",
+										"x-ui": {
+											"label": "Description",
+											"placeholder": "Description of goods or services"
+										}
 									},
 									"amount": {
 										"type": "number",
 										"minimum": 0.01,
-										"description": "Unit price in dollars (e.g. 150.00)"
+										"description": "Unit price in dollars (e.g. 150.00)",
+										"x-ui": {
+											"label": "Amount",
+											"placeholder": "100.00",
+											"help_text": "Amount in your company's currency (e.g. 100.00 for $100)"
+										}
 									},
 									"quantity": {
 										"type": "number",
 										"minimum": 1,
 										"default": 1,
-										"description": "Quantity (defaults to 1)"
+										"description": "Quantity (defaults to 1)",
+										"x-ui": {
+											"label": "Quantity",
+											"placeholder": "1"
+										}
 									}
 								}
 							}
@@ -68,7 +92,11 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						"email_to": {
 							"type": "string",
 							"format": "email",
-							"description": "Email address to send the invoice to"
+							"description": "Email address to send the invoice to",
+							"x-ui": {
+								"label": "Send to email",
+								"placeholder": "customer@example.com"
+							}
 						}
 					}
 				}`)),
@@ -85,16 +113,29 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"customer_id": {
 							"type": "string",
-							"description": "QuickBooks customer ID"
+							"description": "QuickBooks customer ID",
+							"x-ui": {
+								"label": "Customer",
+								"help_text": "QuickBooks customer ID — use quickbooks.list_customers to find IDs"
+							}
 						},
 						"amount": {
 							"type": "number",
 							"minimum": 0.01,
-							"description": "Payment amount in dollars (e.g. 500.00)"
+							"description": "Payment amount in dollars (e.g. 500.00)",
+							"x-ui": {
+								"label": "Amount",
+								"placeholder": "100.00",
+								"help_text": "Amount in your company's currency (e.g. 100.00 for $100)"
+							}
 						},
 						"invoice_id": {
 							"type": "string",
-							"description": "QuickBooks invoice ID to link this payment to (optional)"
+							"description": "QuickBooks invoice ID to link this payment to (optional)",
+							"x-ui": {
+								"label": "Invoice ID",
+								"help_text": "QuickBooks invoice ID to link this payment to"
+							}
 						}
 					}
 				}`)),
@@ -111,48 +152,80 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"account_id": {
 							"type": "string",
-							"description": "Bank or credit card account ID to record the expense against"
+							"description": "Bank or credit card account ID to record the expense against",
+							"x-ui": {
+								"label": "Account",
+								"help_text": "QuickBooks account ID — use quickbooks.list_accounts to find IDs"
+							}
 						},
 						"payment_type": {
 							"type": "string",
 							"enum": ["Cash", "Check", "CreditCard"],
 							"default": "Cash",
-							"description": "Payment method used for the expense"
+							"description": "Payment method used for the expense",
+							"x-ui": {
+								"widget": "select",
+								"label": "Payment type"
+							}
 						},
 						"lines": {
 							"type": "array",
 							"minItems": 1,
 							"maxItems": 250,
 							"description": "Expense line items (max 250)",
+							"x-ui": {
+								"label": "Line items"
+							},
 							"items": {
 								"type": "object",
 								"additionalProperties": false,
 								"properties": {
 									"description": {
 										"type": "string",
-										"description": "Line item description"
+										"description": "Line item description",
+										"x-ui": {
+											"label": "Description",
+											"placeholder": "Description of the expense"
+										}
 									},
 									"amount": {
 										"type": "number",
 										"minimum": 0.01,
-										"description": "Line item amount in dollars"
+										"description": "Line item amount in dollars",
+										"x-ui": {
+											"label": "Amount",
+											"placeholder": "100.00",
+											"help_text": "Amount in your company's currency (e.g. 100.00 for $100)"
+										}
 									},
 									"account_id": {
 										"type": "string",
-										"description": "Expense category account ID"
+										"description": "Expense category account ID",
+										"x-ui": {
+											"label": "Account",
+											"help_text": "QuickBooks account ID — use quickbooks.list_accounts to find IDs"
+										}
 									}
 								}
 							}
 						},
 						"vendor_id": {
 							"type": "string",
-							"description": "Vendor ID for the expense"
+							"description": "Vendor ID for the expense",
+							"x-ui": {
+								"label": "Vendor",
+								"help_text": "QuickBooks vendor ID"
+							}
 						},
 						"txn_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Transaction date in YYYY-MM-DD format",
-							"x-ui": {"widget": "date"}
+							"x-ui": {
+								"widget": "date",
+								"label": "Transaction date",
+								"help_text": "Date the expense was incurred"
+							}
 						}
 					}
 				}`)),
@@ -173,7 +246,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 							"x-ui": {
 								"widget": "date",
 								"datetime_range_pair": "end_date",
-								"datetime_range_role": "lower"
+								"datetime_range_role": "lower",
+								"label": "Start date",
+								"help_text": "Beginning of the reporting period"
 							}
 						},
 						"end_date": {
@@ -183,7 +258,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 							"x-ui": {
 								"widget": "date",
 								"datetime_range_pair": "start_date",
-								"datetime_range_role": "upper"
+								"datetime_range_role": "upper",
+								"label": "End date",
+								"help_text": "End of the reporting period"
 							}
 						}
 					}
@@ -205,7 +282,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 							"x-ui": {
 								"widget": "date",
 								"datetime_range_pair": "end_date",
-								"datetime_range_role": "lower"
+								"datetime_range_role": "lower",
+								"label": "Start date",
+								"help_text": "Beginning of the reporting period"
 							}
 						},
 						"end_date": {
@@ -215,7 +294,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 							"x-ui": {
 								"widget": "date",
 								"datetime_range_pair": "start_date",
-								"datetime_range_role": "upper"
+								"datetime_range_role": "upper",
+								"label": "End date",
+								"help_text": "End of the reporting period"
 							}
 						}
 					}
@@ -233,22 +314,40 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"account_id": {
 							"type": "string",
-							"description": "Bank account ID to deposit into"
+							"description": "Bank account ID to deposit into",
+							"x-ui": {
+								"label": "Account",
+								"help_text": "QuickBooks account ID — use quickbooks.list_accounts to find IDs"
+							}
 						},
 						"amount": {
 							"type": "number",
 							"minimum": 0.01,
-							"description": "Deposit amount in dollars"
+							"description": "Deposit amount in dollars",
+							"x-ui": {
+								"label": "Amount",
+								"placeholder": "100.00",
+								"help_text": "Amount in your company's currency (e.g. 100.00 for $100)"
+							}
 						},
 						"txn_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Transaction date in YYYY-MM-DD format",
-							"x-ui": {"widget": "date"}
+							"x-ui": {
+								"widget": "date",
+								"label": "Transaction date",
+								"help_text": "Date of the deposit"
+							}
 						},
 						"description": {
 							"type": "string",
-							"description": "Description or memo for the deposit"
+							"description": "Description or memo for the deposit",
+							"x-ui": {
+								"label": "Description",
+								"placeholder": "Memo or description for this deposit",
+								"widget": "textarea"
+							}
 						}
 					}
 				}`)),
@@ -265,28 +364,52 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"display_name": {
 							"type": "string",
-							"description": "Customer display name (must be unique in QuickBooks)"
+							"description": "Customer display name (must be unique in QuickBooks)",
+							"x-ui": {
+								"label": "Display name",
+								"help_text": "Must be unique across all customers/vendors"
+							}
 						},
 						"given_name": {
 							"type": "string",
-							"description": "Customer first name"
+							"description": "Customer first name",
+							"x-ui": {
+								"label": "First name",
+								"placeholder": "Jane"
+							}
 						},
 						"family_name": {
 							"type": "string",
-							"description": "Customer last name"
+							"description": "Customer last name",
+							"x-ui": {
+								"label": "Last name",
+								"placeholder": "Doe"
+							}
 						},
 						"email": {
 							"type": "string",
 							"format": "email",
-							"description": "Customer email address"
+							"description": "Customer email address",
+							"x-ui": {
+								"label": "Email",
+								"placeholder": "jane@example.com"
+							}
 						},
 						"phone": {
 							"type": "string",
-							"description": "Customer phone number"
+							"description": "Customer phone number",
+							"x-ui": {
+								"label": "Phone",
+								"placeholder": "(555) 123-4567"
+							}
 						},
 						"company_name": {
 							"type": "string",
-							"description": "Customer company name"
+							"description": "Customer company name",
+							"x-ui": {
+								"label": "Company name",
+								"placeholder": "Acme Inc."
+							}
 						}
 					}
 				}`)),
@@ -303,14 +426,21 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 						"account_type": {
 							"type": "string",
 							"enum": ["Bank", "Accounts Receivable", "Other Current Asset", "Fixed Asset", "Other Asset", "Accounts Payable", "Credit Card", "Other Current Liability", "Long Term Liability", "Equity", "Income", "Cost of Goods Sold", "Expense", "Other Income", "Other Expense"],
-							"description": "Filter by account type"
+							"description": "Filter by account type",
+							"x-ui": {
+								"widget": "select",
+								"label": "Account type"
+							}
 						},
 						"max_results": {
 							"type": "integer",
 							"default": 100,
 							"minimum": 1,
 							"maximum": 1000,
-							"description": "Maximum number of accounts to return (default 100, max 1000)"
+							"description": "Maximum number of accounts to return (default 100, max 1000)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						}
 					}
 				}`)),
@@ -327,28 +457,52 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"display_name": {
 							"type": "string",
-							"description": "Vendor display name (must be unique in QuickBooks)"
+							"description": "Vendor display name (must be unique in QuickBooks)",
+							"x-ui": {
+								"label": "Display name",
+								"help_text": "Must be unique across all customers/vendors"
+							}
 						},
 						"given_name": {
 							"type": "string",
-							"description": "Vendor contact first name"
+							"description": "Vendor contact first name",
+							"x-ui": {
+								"label": "First name",
+								"placeholder": "Jane"
+							}
 						},
 						"family_name": {
 							"type": "string",
-							"description": "Vendor contact last name"
+							"description": "Vendor contact last name",
+							"x-ui": {
+								"label": "Last name",
+								"placeholder": "Doe"
+							}
 						},
 						"email": {
 							"type": "string",
 							"format": "email",
-							"description": "Vendor email address"
+							"description": "Vendor email address",
+							"x-ui": {
+								"label": "Email",
+								"placeholder": "vendor@example.com"
+							}
 						},
 						"phone": {
 							"type": "string",
-							"description": "Vendor phone number"
+							"description": "Vendor phone number",
+							"x-ui": {
+								"label": "Phone",
+								"placeholder": "(555) 123-4567"
+							}
 						},
 						"company_name": {
 							"type": "string",
-							"description": "Vendor company name"
+							"description": "Vendor company name",
+							"x-ui": {
+								"label": "Company name",
+								"placeholder": "Acme Inc."
+							}
 						}
 					}
 				}`)),
@@ -365,19 +519,49 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"vendor_id": {
 							"type": "string",
-							"description": "QuickBooks vendor ID"
+							"description": "QuickBooks vendor ID",
+							"x-ui": {
+								"label": "Vendor",
+								"help_text": "QuickBooks vendor ID"
+							}
 						},
 						"line_items": {
 							"type": "array",
 							"minItems": 1,
+							"x-ui": {
+								"label": "Line items"
+							},
 							"items": {
 								"type": "object",
 								"required": ["amount"],
 								"additionalProperties": false,
 								"properties": {
-									"amount": {"type": "number", "minimum": 0.01, "description": "Line item amount in dollars"},
-									"description": {"type": "string", "description": "Line item description"},
-									"account_id": {"type": "string", "description": "Expense account ID"}
+									"amount": {
+										"type": "number",
+										"minimum": 0.01,
+										"description": "Line item amount in dollars",
+										"x-ui": {
+											"label": "Amount",
+											"placeholder": "100.00",
+											"help_text": "Amount in your company's currency (e.g. 100.00 for $100)"
+										}
+									},
+									"description": {
+										"type": "string",
+										"description": "Line item description",
+										"x-ui": {
+											"label": "Description",
+											"placeholder": "Description of the bill item"
+										}
+									},
+									"account_id": {
+										"type": "string",
+										"description": "Expense account ID",
+										"x-ui": {
+											"label": "Account",
+											"help_text": "QuickBooks account ID — use quickbooks.list_accounts to find IDs"
+										}
+									}
 								}
 							},
 							"description": "Bill line items"
@@ -386,13 +570,21 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"format": "date",
 							"description": "Payment due date in YYYY-MM-DD format",
-							"x-ui": {"widget": "date"}
+							"x-ui": {
+								"widget": "date",
+								"label": "Due date",
+								"help_text": "Payment due date for this bill"
+							}
 						},
 						"txn_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Bill date in YYYY-MM-DD format (defaults to today)",
-							"x-ui": {"widget": "date"}
+							"x-ui": {
+								"widget": "date",
+								"label": "Bill date",
+								"help_text": "Date the bill was received (defaults to today)"
+							}
 						}
 					}
 				}`)),
@@ -408,7 +600,11 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"customer_id": {
 							"type": "string",
-							"description": "Filter invoices by customer ID"
+							"description": "Filter invoices by customer ID",
+							"x-ui": {
+								"label": "Customer",
+								"help_text": "QuickBooks customer ID — use quickbooks.list_customers to find IDs"
+							}
 						},
 						"start_date": {
 							"type": "string",
@@ -417,7 +613,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 							"x-ui": {
 								"widget": "date",
 								"datetime_range_pair": "end_date",
-								"datetime_range_role": "lower"
+								"datetime_range_role": "lower",
+								"label": "Start date",
+								"help_text": "Filter invoices on or after this date"
 							}
 						},
 						"end_date": {
@@ -427,7 +625,9 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 							"x-ui": {
 								"widget": "date",
 								"datetime_range_pair": "start_date",
-								"datetime_range_role": "upper"
+								"datetime_range_role": "upper",
+								"label": "End date",
+								"help_text": "Filter invoices on or before this date"
 							}
 						},
 						"max_results": {
@@ -435,7 +635,10 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 							"default": 100,
 							"minimum": 1,
 							"maximum": 1000,
-							"description": "Maximum number of invoices to return (default 100, max 1000)"
+							"description": "Maximum number of invoices to return (default 100, max 1000)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						}
 					}
 				}`)),
@@ -451,14 +654,21 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"display_name": {
 							"type": "string",
-							"description": "Filter customers by display name (partial match)"
+							"description": "Filter customers by display name (partial match)",
+							"x-ui": {
+								"label": "Display name",
+								"placeholder": "Search by name"
+							}
 						},
 						"max_results": {
 							"type": "integer",
 							"default": 100,
 							"minimum": 1,
 							"maximum": 1000,
-							"description": "Maximum number of customers to return (default 100, max 1000)"
+							"description": "Maximum number of customers to return (default 100, max 1000)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						}
 					}
 				}`)),
@@ -475,12 +685,19 @@ func (c *QuickBooksConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"invoice_id": {
 							"type": "string",
-							"description": "QuickBooks invoice ID to send"
+							"description": "QuickBooks invoice ID to send",
+							"x-ui": {
+								"label": "Invoice ID"
+							}
 						},
 						"email_to": {
 							"type": "string",
 							"format": "email",
-							"description": "Override recipient email address. Omit to use the customer's email on file."
+							"description": "Override recipient email address. Omit to use the customer's email on file.",
+							"x-ui": {
+								"label": "Send to email",
+								"placeholder": "customer@example.com"
+							}
 						}
 					}
 				}`)),

@@ -27,8 +27,8 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(`{
 					"type": "object",
 					"properties": {
-						"keyword": {"type": "string", "description": "Airport name or IATA code (e.g. 'San Francisco' or 'SFO')"},
-						"subtype": {"type": "string", "enum": ["AIRPORT", "CITY"], "description": "Filter by location type"}
+						"keyword": {"type": "string", "description": "Airport name or IATA code (e.g. 'San Francisco' or 'SFO')", "x-ui": {"label": "Search keyword", "placeholder": "San Francisco or SFO"}},
+						"subtype": {"type": "string", "enum": ["AIRPORT", "CITY"], "description": "Filter by location type", "x-ui": {"label": "Location type", "widget": "select"}}
 					},
 					"required": ["keyword"]
 				}`),
@@ -41,24 +41,24 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(`{
 					"type": "object",
 					"properties": {
-						"origin": {"type": "string", "description": "Origin IATA code (e.g. 'SFO')"},
-						"destination": {"type": "string", "description": "Destination IATA code (e.g. 'LAX')"},
+						"origin": {"type": "string", "description": "Origin IATA code (e.g. 'SFO')", "x-ui": {"label": "Origin airport", "placeholder": "JFK", "help_text": "3-letter IATA airport code"}},
+						"destination": {"type": "string", "description": "Destination IATA code (e.g. 'LAX')", "x-ui": {"label": "Destination airport", "placeholder": "LAX", "help_text": "3-letter IATA airport code"}},
 						"departure_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Departure date (YYYY-MM-DD)",
-							"x-ui": {"widget": "date", "datetime_range_pair": "return_date", "datetime_range_role": "lower"}
+							"x-ui": {"label": "Departure date", "widget": "date", "datetime_range_pair": "return_date", "datetime_range_role": "lower"}
 						},
 						"return_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Return date for round trip (YYYY-MM-DD)",
-							"x-ui": {"widget": "date", "datetime_range_pair": "departure_date", "datetime_range_role": "upper"}
+							"x-ui": {"label": "Return date", "widget": "date", "datetime_range_pair": "departure_date", "datetime_range_role": "upper"}
 						},
-						"adults": {"type": "integer", "minimum": 1, "maximum": 9, "default": 1, "description": "Number of adult travelers (1-9)"},
-						"cabin": {"type": "string", "enum": ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"], "description": "Cabin class"},
-						"nonstop": {"type": "boolean", "default": false, "description": "Only show nonstop flights"},
-						"max_results": {"type": "integer", "default": 10, "description": "Maximum number of results"}
+						"adults": {"type": "integer", "minimum": 1, "maximum": 9, "default": 1, "description": "Number of adult travelers (1-9)", "x-ui": {"label": "Adults", "help_text": "Number of adult travelers (1-9)"}},
+						"cabin": {"type": "string", "enum": ["ECONOMY", "PREMIUM_ECONOMY", "BUSINESS", "FIRST"], "description": "Cabin class", "x-ui": {"label": "Travel class", "widget": "select"}},
+						"nonstop": {"type": "boolean", "default": false, "description": "Only show nonstop flights", "x-ui": {"label": "Nonstop only", "widget": "toggle"}},
+						"max_results": {"type": "integer", "default": 10, "description": "Maximum number of results", "x-ui": {"label": "Max results"}}
 					},
 					"required": ["origin", "destination", "departure_date"]
 				}`),
@@ -71,7 +71,7 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(`{
 					"type": "object",
 					"properties": {
-						"flight_offer": {"type": "object", "description": "Flight offer object from search results"}
+						"flight_offer": {"type": "object", "description": "Flight offer object from search results", "x-ui": {"label": "Flight offer", "help_text": "Flight offer object from amadeus.search_flights"}}
 					},
 					"required": ["flight_offer"]
 				}`),
@@ -84,7 +84,7 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(`{
 					"type": "object",
 					"properties": {
-						"flight_offer": {"type": "object", "description": "Priced flight offer object"},
+						"flight_offer": {"type": "object", "description": "Priced flight offer object", "x-ui": {"label": "Flight offer", "help_text": "Priced flight offer from amadeus.price_flight"}},
 						"travelers": {
 							"type": "array",
 							"items": {
@@ -93,29 +93,30 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 									"name": {
 										"type": "object",
 										"properties": {
-											"firstName": {"type": "string", "description": "Traveler's first/given name"},
-											"lastName": {"type": "string", "description": "Traveler's last/family name"}
+											"firstName": {"type": "string", "description": "Traveler's first/given name", "x-ui": {"label": "First name", "placeholder": "John"}},
+											"lastName": {"type": "string", "description": "Traveler's last/family name", "x-ui": {"label": "Last name", "placeholder": "Doe"}}
 										},
 										"required": ["firstName", "lastName"]
 									},
-									"dateOfBirth": {"type": "string", "format": "date", "description": "YYYY-MM-DD"},
-									"gender": {"type": "string", "enum": ["MALE", "FEMALE"]},
+									"dateOfBirth": {"type": "string", "format": "date", "description": "YYYY-MM-DD", "x-ui": {"label": "Date of birth"}},
+									"gender": {"type": "string", "enum": ["MALE", "FEMALE"], "x-ui": {"label": "Gender", "widget": "select"}},
 									"contact": {
 										"type": "object",
 										"properties": {
-											"email": {"type": "string", "format": "email"},
-											"phone": {"type": "string"}
+											"email": {"type": "string", "format": "email", "x-ui": {"label": "Email", "placeholder": "traveler@example.com"}},
+											"phone": {"type": "string", "x-ui": {"label": "Phone", "placeholder": "+1-555-123-4567"}}
 										},
 										"required": ["email", "phone"]
 									}
 								},
 								"required": ["name", "dateOfBirth", "gender", "contact"]
 							},
-							"description": "Array of traveler details"
+							"description": "Array of traveler details",
+							"x-ui": {"label": "Travelers"}
 						},
-						"payment_method_id": {"type": "string", "description": "Stored payment method ID"},
-						"idempotency_key": {"type": "string", "description": "Unique key to prevent duplicate bookings (e.g. UUID). Required — double-booking is expensive."},
-						"remarks": {"type": "string", "description": "Optional booking remarks"}
+						"payment_method_id": {"type": "string", "description": "Stored payment method ID", "x-ui": {"label": "Payment method", "help_text": "Stored payment method ID"}},
+						"idempotency_key": {"type": "string", "description": "Unique key to prevent duplicate bookings (e.g. UUID). Required — double-booking is expensive.", "x-ui": {"label": "Idempotency key", "help_text": "Unique key to prevent duplicate bookings (e.g. UUID)"}},
+						"remarks": {"type": "string", "description": "Optional booking remarks", "x-ui": {"label": "Remarks", "widget": "textarea"}}
 					},
 					"required": ["flight_offer", "travelers", "payment_method_id", "idempotency_key"]
 				}`),
@@ -128,26 +129,26 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(`{
 					"type": "object",
 					"properties": {
-						"city_code": {"type": "string", "description": "City IATA code (e.g. 'PAR')"},
-						"latitude": {"type": "string", "description": "Latitude for geo search"},
-						"longitude": {"type": "string", "description": "Longitude for geo search"},
+						"city_code": {"type": "string", "description": "City IATA code (e.g. 'PAR')", "x-ui": {"label": "City code", "placeholder": "LAX", "help_text": "3-letter IATA airport code"}},
+						"latitude": {"type": "string", "description": "Latitude for geo search", "x-ui": {"label": "Latitude"}},
+						"longitude": {"type": "string", "description": "Longitude for geo search", "x-ui": {"label": "Longitude"}},
 						"check_in_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Check-in date (YYYY-MM-DD)",
-							"x-ui": {"widget": "date", "datetime_range_pair": "check_out_date", "datetime_range_role": "lower"}
+							"x-ui": {"label": "Check-in date", "widget": "date", "datetime_range_pair": "check_out_date", "datetime_range_role": "lower"}
 						},
 						"check_out_date": {
 							"type": "string",
 							"format": "date",
 							"description": "Check-out date (YYYY-MM-DD)",
-							"x-ui": {"widget": "date", "datetime_range_pair": "check_in_date", "datetime_range_role": "upper"}
+							"x-ui": {"label": "Check-out date", "widget": "date", "datetime_range_pair": "check_in_date", "datetime_range_role": "upper"}
 						},
-						"adults": {"type": "integer", "default": 1, "description": "Number of adults"},
-						"room_quantity": {"type": "integer", "default": 1, "description": "Number of rooms"},
-						"ratings": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 5}, "description": "Hotel star ratings to filter by"},
-						"price_range": {"type": "string", "description": "Price range (e.g. '100-300')"},
-						"currency": {"type": "string", "description": "Currency code (e.g. 'USD')"}
+						"adults": {"type": "integer", "default": 1, "description": "Number of adults", "x-ui": {"label": "Adults", "help_text": "Number of adult guests"}},
+						"room_quantity": {"type": "integer", "default": 1, "description": "Number of rooms", "x-ui": {"label": "Rooms"}},
+						"ratings": {"type": "array", "items": {"type": "integer", "minimum": 1, "maximum": 5}, "description": "Hotel star ratings to filter by", "x-ui": {"label": "Star ratings"}},
+						"price_range": {"type": "string", "description": "Price range (e.g. '100-300')", "x-ui": {"label": "Price range", "placeholder": "100-300"}},
+						"currency": {"type": "string", "description": "Currency code (e.g. 'USD')", "x-ui": {"label": "Currency", "placeholder": "USD"}}
 					},
 					"required": ["check_in_date", "check_out_date"]
 				}`),
@@ -160,11 +161,11 @@ func (c *AmadeusConnector) Manifest() *connectors.ConnectorManifest {
 				ParametersSchema: json.RawMessage(`{
 					"type": "object",
 					"properties": {
-						"pickup_location": {"type": "string", "description": "Pickup IATA code"},
-						"pickup_date": {"type": "string", "description": "Pickup date/time"},
-						"dropoff_date": {"type": "string", "description": "Dropoff date/time"},
-						"dropoff_location": {"type": "string", "description": "Dropoff IATA code (defaults to pickup location)"},
-						"provider": {"type": "string", "description": "Transfer type/provider filter"}
+						"pickup_location": {"type": "string", "description": "Pickup IATA code", "x-ui": {"label": "Pickup location", "placeholder": "JFK", "help_text": "3-letter IATA airport code"}},
+						"pickup_date": {"type": "string", "description": "Pickup date/time", "x-ui": {"label": "Pickup date"}},
+						"dropoff_date": {"type": "string", "description": "Dropoff date/time", "x-ui": {"label": "Dropoff date"}},
+						"dropoff_location": {"type": "string", "description": "Dropoff IATA code (defaults to pickup location)", "x-ui": {"label": "Dropoff location", "placeholder": "LAX", "help_text": "3-letter IATA airport code"}},
+						"provider": {"type": "string", "description": "Transfer type/provider filter", "x-ui": {"label": "Provider"}}
 					},
 					"required": ["pickup_location", "pickup_date", "dropoff_date"]
 				}`),

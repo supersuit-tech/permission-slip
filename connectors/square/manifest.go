@@ -18,11 +18,19 @@ var moneySchema = `{
 	"properties": {
 		"amount": {
 			"type": "integer",
-			"description": "Amount in smallest currency unit. For USD: cents. Example: $10.50 = 1050"
+			"description": "Amount in smallest currency unit. For USD: cents. Example: $10.50 = 1050",
+			"x-ui": {
+				"label": "Amount",
+				"help_text": "In smallest currency unit (e.g. for USD: 1050 = $10.50)"
+			}
 		},
 		"currency": {
 			"type": "string",
-			"description": "ISO 4217 currency code (e.g. USD, EUR, GBP)"
+			"description": "ISO 4217 currency code (e.g. USD, EUR, GBP)",
+			"x-ui": {
+				"label": "Currency",
+				"placeholder": "USD"
+			}
 		}
 	}
 }`
@@ -186,12 +194,20 @@ func createOrderManifest() connectors.ManifestAction {
 			"properties": {
 				"location_id": {
 					"type": "string",
-					"description": "Square location ID (e.g. \"L1234ABCD\"). Find via the Square Dashboard or API."
+					"description": "Square location ID (e.g. \"L1234ABCD\"). Find via the Square Dashboard or API.",
+					"x-ui": {
+						"label": "Location ID",
+						"placeholder": "L1234ABCD",
+						"help_text": "Find via Square Dashboard or square.list_locations"
+					}
 				},
 				"line_items": {
 					"type": "array",
 					"minItems": 1,
 					"description": "One or more items in the order",
+					"x-ui": {
+						"label": "Line items"
+					},
 					"items": {
 						"type": "object",
 						"required": ["name", "quantity", "base_price_money"],
@@ -199,11 +215,19 @@ func createOrderManifest() connectors.ManifestAction {
 						"properties": {
 							"name": {
 								"type": "string",
-								"description": "Display name of the item (e.g. \"Latte\", \"T-Shirt\")"
+								"description": "Display name of the item (e.g. \"Latte\", \"T-Shirt\")",
+								"x-ui": {
+									"label": "Item name",
+									"placeholder": "Latte"
+								}
 							},
 							"quantity": {
 								"type": "string",
-								"description": "Quantity as a string (Square API requirement). Example: \"1\", \"2\""
+								"description": "Quantity as a string (Square API requirement). Example: \"1\", \"2\"",
+								"x-ui": {
+									"label": "Quantity",
+									"placeholder": "1"
+								}
 							},
 							"base_price_money": %s
 						}
@@ -211,11 +235,21 @@ func createOrderManifest() connectors.ManifestAction {
 				},
 				"customer_id": {
 					"type": "string",
-					"description": "Square customer ID to link this order to a customer profile"
+					"description": "Square customer ID to link this order to a customer profile",
+					"x-ui": {
+						"label": "Customer ID",
+						"placeholder": "CUST1234ABCD",
+						"help_text": "Use square.list_customers or square.create_customer"
+					}
 				},
 				"note": {
 					"type": "string",
-					"description": "Free-text note attached to the order (visible to staff)"
+					"description": "Free-text note attached to the order (visible to staff)",
+					"x-ui": {
+						"label": "Note",
+						"placeholder": "Special instructions...",
+						"widget": "textarea"
+					}
 				}
 			}
 		}`, moneySchema))),
@@ -235,24 +269,48 @@ func createPaymentManifest() connectors.ManifestAction {
 			"properties": {
 				"source_id": {
 					"type": "string",
-					"description": "Payment source: a card nonce from Square Web Payments SDK, a card-on-file ID, or \"CASH\" for cash payments. Use \"cnon:card-nonce-ok\" in sandbox."
+					"description": "Payment source: a card nonce from Square Web Payments SDK, a card-on-file ID, or \"CASH\" for cash payments. Use \"cnon:card-nonce-ok\" in sandbox.",
+					"x-ui": {
+						"label": "Payment source",
+						"placeholder": "CASH",
+						"help_text": "Use \"CASH\" for cash payments, a card nonce from Web Payments SDK, or \"cnon:card-nonce-ok\" in sandbox"
+					}
 				},
 				"amount_money": %s,
 				"order_id": {
 					"type": "string",
-					"description": "Link payment to an existing order (from square.create_order)"
+					"description": "Link payment to an existing order (from square.create_order)",
+					"x-ui": {
+						"label": "Order ID",
+						"placeholder": "ORD1234ABCD",
+						"help_text": "Use square.create_order or square.search_orders to find order IDs"
+					}
 				},
 				"customer_id": {
 					"type": "string",
-					"description": "Square customer ID to associate with this payment"
+					"description": "Square customer ID to associate with this payment",
+					"x-ui": {
+						"label": "Customer ID",
+						"placeholder": "CUST1234ABCD",
+						"help_text": "Use square.list_customers or square.create_customer"
+					}
 				},
 				"note": {
 					"type": "string",
-					"description": "Note displayed on the payment receipt"
+					"description": "Note displayed on the payment receipt",
+					"x-ui": {
+						"label": "Note",
+						"placeholder": "Payment for order...",
+						"widget": "textarea"
+					}
 				},
 				"reference_id": {
 					"type": "string",
-					"description": "Your own external reference ID for reconciliation"
+					"description": "Your own external reference ID for reconciliation",
+					"x-ui": {
+						"label": "Reference ID",
+						"placeholder": "REF-001"
+					}
 				}
 			}
 		}`, moneySchema))),
@@ -271,11 +329,17 @@ func listCatalogManifest() connectors.ManifestAction {
 			"properties": {
 				"types": {
 					"type": "string",
-					"description": "Comma-separated object types: ITEM, CATEGORY, DISCOUNT, TAX, MODIFIER, IMAGE. Default: all types. Example: \"ITEM,CATEGORY\""
+					"enum": ["ITEM", "CATEGORY", "DISCOUNT", "TAX", "MODIFIER", "IMAGE"],
+					"description": "Catalog object types to include. Default: all types.",
+					"x-ui": {"label": "Object types", "widget": "multi-select", "help_text": "Select which catalog object types to return"}
 				},
 				"cursor": {
 					"type": "string",
-					"description": "Pagination cursor from a previous list_catalog response to fetch the next page"
+					"description": "Pagination cursor from a previous list_catalog response to fetch the next page",
+					"x-ui": {
+						"label": "Pagination cursor",
+						"hidden": true
+					}
 				}
 			}
 		}`)),
@@ -295,28 +359,53 @@ func createCustomerManifest() connectors.ManifestAction {
 			"properties": {
 				"given_name": {
 					"type": "string",
-					"description": "Customer's first name (required)"
+					"description": "Customer's first name (required)",
+					"x-ui": {
+						"label": "First name",
+						"placeholder": "Jane"
+					}
 				},
 				"family_name": {
 					"type": "string",
-					"description": "Customer's last name"
+					"description": "Customer's last name",
+					"x-ui": {
+						"label": "Last name",
+						"placeholder": "Doe"
+					}
 				},
 				"email_address": {
 					"type": "string",
 					"format": "email",
-					"description": "Customer's email address"
+					"description": "Customer's email address",
+					"x-ui": {
+						"label": "Email address",
+						"placeholder": "jane@example.com"
+					}
 				},
 				"phone_number": {
 					"type": "string",
-					"description": "Customer's phone number (E.164 format preferred, e.g. \"+15551234567\")"
+					"description": "Customer's phone number (E.164 format preferred, e.g. \"+15551234567\")",
+					"x-ui": {
+						"label": "Phone number",
+						"placeholder": "+15551234567"
+					}
 				},
 				"company_name": {
 					"type": "string",
-					"description": "Customer's company or business name"
+					"description": "Customer's company or business name",
+					"x-ui": {
+						"label": "Company name",
+						"placeholder": "Acme Inc."
+					}
 				},
 				"note": {
 					"type": "string",
-					"description": "Internal note about the customer (not visible to the customer)"
+					"description": "Internal note about the customer (not visible to the customer)",
+					"x-ui": {
+						"label": "Note",
+						"placeholder": "Internal notes about this customer...",
+						"widget": "textarea"
+					}
 				}
 			}
 		}`)),
@@ -336,28 +425,57 @@ func createBookingManifest() connectors.ManifestAction {
 			"properties": {
 				"location_id": {
 					"type": "string",
-					"description": "Square location ID where the appointment takes place"
+					"description": "Square location ID where the appointment takes place",
+					"x-ui": {
+						"label": "Location ID",
+						"placeholder": "L1234ABCD",
+						"help_text": "Find via Square Dashboard or square.list_locations"
+					}
 				},
 				"customer_id": {
 					"type": "string",
-					"description": "Square customer ID for the person being booked"
+					"description": "Square customer ID for the person being booked",
+					"x-ui": {
+						"label": "Customer ID",
+						"placeholder": "CUST1234ABCD",
+						"help_text": "Use square.list_customers or square.create_customer"
+					}
 				},
 				"start_at": {
 					"type": "string",
 					"format": "date-time",
-					"description": "Appointment start time in RFC 3339 format (e.g. \"2024-03-15T14:30:00Z\")"
+					"description": "Appointment start time in RFC 3339 format (e.g. \"2024-03-15T14:30:00Z\")",
+					"x-ui": {
+						"label": "Start time",
+						"placeholder": "2024-03-15T14:30:00Z"
+					}
 				},
 				"service_variation_id": {
 					"type": "string",
-					"description": "Catalog service variation ID defining the service type and duration"
+					"description": "Catalog service variation ID defining the service type and duration",
+					"x-ui": {
+						"label": "Service variation ID",
+						"placeholder": "SVC1234ABCD",
+						"help_text": "Use square.list_catalog to find service variation IDs"
+					}
 				},
 				"team_member_id": {
 					"type": "string",
-					"description": "Specific staff member to assign (omit for any available)"
+					"description": "Specific staff member to assign (omit for any available)",
+					"x-ui": {
+						"label": "Team member ID",
+						"placeholder": "TM1234ABCD",
+						"help_text": "Omit for any available staff member"
+					}
 				},
 				"customer_note": {
 					"type": "string",
-					"description": "Note from the customer about the appointment (e.g. special requests)"
+					"description": "Note from the customer about the appointment (e.g. special requests)",
+					"x-ui": {
+						"label": "Customer note",
+						"placeholder": "Special requests or preferences...",
+						"widget": "textarea"
+					}
 				}
 			}
 		}`)),
@@ -379,21 +497,36 @@ func searchOrdersManifest() connectors.ManifestAction {
 					"type": "array",
 					"minItems": 1,
 					"items": {"type": "string"},
-					"description": "One or more Square location IDs to search across"
+					"description": "One or more Square location IDs to search across",
+					"x-ui": {
+						"label": "Location IDs",
+						"help_text": "Find via Square Dashboard or square.list_locations"
+					}
 				},
 				"query": {
 					"type": "object",
-					"description": "Search filters: {\"filter\": {\"state_filter\": {\"states\": [\"OPEN\"]}, \"date_time_filter\": {\"closed_at\": {\"start_at\": \"...\", \"end_at\": \"...\"}}}}"
+					"description": "Search filters: {\"filter\": {\"state_filter\": {\"states\": [\"OPEN\"]}, \"date_time_filter\": {\"closed_at\": {\"start_at\": \"...\", \"end_at\": \"...\"}}}}",
+					"x-ui": {
+						"label": "Search query"
+					}
 				},
 				"limit": {
 					"type": "integer",
 					"minimum": 0,
 					"maximum": 500,
-					"description": "Maximum orders per page (1-500). 0 or omit to use Square's default."
+					"description": "Maximum orders per page (1-500). 0 or omit to use Square's default.",
+					"x-ui": {
+						"label": "Limit",
+						"placeholder": "100"
+					}
 				},
 				"cursor": {
 					"type": "string",
-					"description": "Pagination cursor from a previous search_orders response"
+					"description": "Pagination cursor from a previous search_orders response",
+					"x-ui": {
+						"label": "Pagination cursor",
+						"hidden": true
+					}
 				}
 			}
 		}`)),
@@ -413,12 +546,22 @@ func issueRefundManifest() connectors.ManifestAction {
 			"properties": {
 				"payment_id": {
 					"type": "string",
-					"description": "ID of the payment to refund (from square.create_payment or square.search_orders)"
+					"description": "ID of the payment to refund (from square.create_payment or square.search_orders)",
+					"x-ui": {
+						"label": "Payment ID",
+						"placeholder": "PAY1234ABCD",
+						"help_text": "Use square.create_payment or square.search_orders to find payment IDs"
+					}
 				},
 				"amount_money": %s,
 				"reason": {
 					"type": "string",
-					"description": "Reason for the refund (shown on the receipt)"
+					"description": "Reason for the refund (shown on the receipt)",
+					"x-ui": {
+						"label": "Reason",
+						"placeholder": "Customer requested refund...",
+						"widget": "textarea"
+					}
 				}
 			}
 		}`, moneySchema))),
@@ -438,19 +581,36 @@ func updateCatalogItemManifest() connectors.ManifestAction {
 			"properties": {
 				"object_id": {
 					"type": "string",
-					"description": "ID of the catalog item to update (from square.list_catalog)"
+					"description": "ID of the catalog item to update (from square.list_catalog)",
+					"x-ui": {
+						"label": "Object ID",
+						"placeholder": "OBJ1234ABCD",
+						"help_text": "Use square.list_catalog to find catalog object IDs"
+					}
 				},
 				"name": {
 					"type": "string",
-					"description": "New display name for the item"
+					"description": "New display name for the item",
+					"x-ui": {
+						"label": "Name",
+						"placeholder": "Coffee Mug"
+					}
 				},
 				"description": {
 					"type": "string",
-					"description": "New description for the item"
+					"description": "New description for the item",
+					"x-ui": {
+						"label": "Description",
+						"placeholder": "A detailed description of the item...",
+						"widget": "textarea"
+					}
 				},
 				"variations": {
 					"type": "array",
 					"description": "Item variations (sizes, colors, etc.) with pricing",
+					"x-ui": {
+						"label": "Variations"
+					},
 					"items": {
 						"type": "object",
 						"required": ["id"],
@@ -458,28 +618,49 @@ func updateCatalogItemManifest() connectors.ManifestAction {
 						"properties": {
 							"id": {
 								"type": "string",
-								"description": "Variation ID (use existing ID to update, or #new-variation-id for new)"
+								"description": "Variation ID (use existing ID to update, or #new-variation-id for new)",
+								"x-ui": {
+									"label": "Variation ID",
+									"placeholder": "VAR1234ABCD",
+									"help_text": "Use existing ID to update, or #new-variation-id for new variations"
+								}
 							},
 							"name": {
 								"type": "string",
-								"description": "Variation name (e.g. \"Small\", \"Regular\", \"Large\")"
+								"description": "Variation name (e.g. \"Small\", \"Regular\", \"Large\")",
+								"x-ui": {
+									"label": "Variation name",
+									"placeholder": "Regular"
+								}
 							},
 							"pricing_type": {
 								"type": "string",
 								"enum": ["FIXED_PRICING", "VARIABLE_PRICING"],
-								"description": "FIXED_PRICING for set price, VARIABLE_PRICING for open amount"
+								"description": "FIXED_PRICING for set price, VARIABLE_PRICING for open amount",
+								"x-ui": {
+									"label": "Pricing type",
+									"widget": "select"
+								}
 							},
 							"price_money": %s,
 							"version": {
 								"type": "integer",
-								"description": "Current version of this variation (for conflict detection)"
+								"description": "Current version of this variation (for conflict detection)",
+								"x-ui": {
+									"label": "Version",
+									"help_text": "Used for conflict detection. Get from square.list_catalog."
+								}
 							}
 						}
 					}
 				},
 				"version": {
 					"type": "integer",
-					"description": "Current version of the catalog object (for conflict detection). Get from list_catalog."
+					"description": "Current version of the catalog object (for conflict detection). Get from list_catalog.",
+					"x-ui": {
+						"label": "Version",
+						"help_text": "Used for conflict detection. Get from square.list_catalog."
+					}
 				}
 			}
 		}`, moneySchema))),
@@ -499,16 +680,29 @@ func sendInvoiceManifest() connectors.ManifestAction {
 			"properties": {
 				"customer_id": {
 					"type": "string",
-					"description": "Square customer ID for the invoice recipient (from square.create_customer)"
+					"description": "Square customer ID for the invoice recipient (from square.create_customer)",
+					"x-ui": {
+						"label": "Customer ID",
+						"placeholder": "CUST1234ABCD",
+						"help_text": "Use square.list_customers or square.create_customer"
+					}
 				},
 				"location_id": {
 					"type": "string",
-					"description": "Square location ID the invoice is issued from"
+					"description": "Square location ID the invoice is issued from",
+					"x-ui": {
+						"label": "Location ID",
+						"placeholder": "L1234ABCD",
+						"help_text": "Find via Square Dashboard or square.list_locations"
+					}
 				},
 				"line_items": {
 					"type": "array",
 					"minItems": 1,
 					"description": "Items to include on the invoice",
+					"x-ui": {
+						"label": "Line items"
+					},
 					"items": {
 						"type": "object",
 						"required": ["description", "quantity", "base_price_money"],
@@ -516,11 +710,19 @@ func sendInvoiceManifest() connectors.ManifestAction {
 						"properties": {
 							"description": {
 								"type": "string",
-								"description": "Line item description (e.g. \"Web Design Services\")"
+								"description": "Line item description (e.g. \"Web Design Services\")",
+								"x-ui": {
+									"label": "Description",
+									"placeholder": "Web Design Services"
+								}
 							},
 							"quantity": {
 								"type": "string",
-								"description": "Quantity as a string (Square API requirement). Example: \"1\", \"2\""
+								"description": "Quantity as a string (Square API requirement). Example: \"1\", \"2\"",
+								"x-ui": {
+									"label": "Quantity",
+									"placeholder": "1"
+								}
 							},
 							"base_price_money": %s
 						}
@@ -528,20 +730,37 @@ func sendInvoiceManifest() connectors.ManifestAction {
 				},
 				"due_date": {
 					"type": "string",
-					"description": "Payment due date in YYYY-MM-DD format (e.g. \"2024-12-31\")"
+					"description": "Payment due date in YYYY-MM-DD format (e.g. \"2024-12-31\")",
+					"x-ui": {
+						"label": "Due date",
+						"placeholder": "2024-12-31"
+					}
 				},
 				"delivery_method": {
 					"type": "string",
 					"enum": ["EMAIL", "SMS", "SHARE_MANUALLY"],
-					"description": "How to deliver the invoice. Default: EMAIL"
+					"description": "How to deliver the invoice. Default: EMAIL",
+					"x-ui": {
+						"label": "Delivery method",
+						"widget": "select"
+					}
 				},
 				"title": {
 					"type": "string",
-					"description": "Invoice title (e.g. \"March 2024 Services\")"
+					"description": "Invoice title (e.g. \"March 2024 Services\")",
+					"x-ui": {
+						"label": "Title",
+						"placeholder": "March 2024 Services"
+					}
 				},
 				"note": {
 					"type": "string",
-					"description": "Additional note included on the invoice"
+					"description": "Additional note included on the invoice",
+					"x-ui": {
+						"label": "Note",
+						"placeholder": "Thank you for your business...",
+						"widget": "textarea"
+					}
 				}
 			}
 		}`, moneySchema))),
@@ -563,12 +782,20 @@ func getInventoryManifest() connectors.ManifestAction {
 					"type": "array",
 					"minItems": 1,
 					"items": {"type": "string"},
-					"description": "One or more catalog object IDs to retrieve inventory counts for"
+					"description": "One or more catalog object IDs to retrieve inventory counts for",
+					"x-ui": {
+						"label": "Catalog object IDs",
+						"help_text": "Use square.list_catalog to find catalog object IDs"
+					}
 				},
 				"location_ids": {
 					"type": "array",
 					"items": {"type": "string"},
-					"description": "Filter counts to specific locations. Omit to get counts across all locations."
+					"description": "Filter counts to specific locations. Omit to get counts across all locations.",
+					"x-ui": {
+						"label": "Location IDs",
+						"help_text": "Find via Square Dashboard or square.list_locations"
+					}
 				}
 			}
 		}`)),
@@ -588,25 +815,47 @@ func adjustInventoryManifest() connectors.ManifestAction {
 			"properties": {
 				"catalog_object_id": {
 					"type": "string",
-					"description": "ID of the catalog item to adjust inventory for"
+					"description": "ID of the catalog item to adjust inventory for",
+					"x-ui": {
+						"label": "Catalog object ID",
+						"placeholder": "OBJ1234ABCD",
+						"help_text": "Use square.list_catalog to find catalog object IDs"
+					}
 				},
 				"location_id": {
 					"type": "string",
-					"description": "Square location ID where the inventory change occurs"
+					"description": "Square location ID where the inventory change occurs",
+					"x-ui": {
+						"label": "Location ID",
+						"placeholder": "L1234ABCD",
+						"help_text": "Find via Square Dashboard or square.list_locations"
+					}
 				},
 				"quantity": {
 					"type": "string",
-					"description": "Quantity to adjust as a string (e.g. \"10\", \"5\")"
+					"description": "Quantity to adjust as a string (e.g. \"10\", \"5\")",
+					"x-ui": {
+						"label": "Quantity",
+						"placeholder": "10"
+					}
 				},
 				"from_state": {
 					"type": "string",
 					"enum": ["NONE", "IN_STOCK", "SOLD", "RETURNED_BY_CUSTOMER", "RESERVED_FOR_SALE", "SOLD_ONLINE", "ORDERED_FROM_VENDOR", "RECEIVED_FROM_VENDOR", "IN_TRANSIT_TO", "WASTE", "UNLINKED_RETURN", "COMPOSED", "DECOMPOSED", "SUPPORTED_BY_NEWER_VERSION"],
-					"description": "Current inventory state"
+					"description": "Current inventory state",
+					"x-ui": {
+						"label": "From state",
+						"widget": "select"
+					}
 				},
 				"to_state": {
 					"type": "string",
 					"enum": ["NONE", "IN_STOCK", "SOLD", "RETURNED_BY_CUSTOMER", "RESERVED_FOR_SALE", "SOLD_ONLINE", "ORDERED_FROM_VENDOR", "RECEIVED_FROM_VENDOR", "IN_TRANSIT_TO", "WASTE", "UNLINKED_RETURN", "COMPOSED", "DECOMPOSED", "SUPPORTED_BY_NEWER_VERSION"],
-					"description": "Target inventory state"
+					"description": "Target inventory state",
+					"x-ui": {
+						"label": "To state",
+						"widget": "select"
+					}
 				}
 			}
 		}`)),
@@ -624,17 +873,29 @@ func listCustomersManifest() connectors.ManifestAction {
 			"properties": {
 				"query": {
 					"type": "string",
-					"description": "Search customers by email address (fuzzy match)"
+					"description": "Search customers by email address (fuzzy match)",
+					"x-ui": {
+						"label": "Search query",
+						"placeholder": "jane@example.com"
+					}
 				},
 				"limit": {
 					"type": "integer",
 					"minimum": 1,
 					"maximum": 100,
-					"description": "Maximum number of customers to return (max 100)"
+					"description": "Maximum number of customers to return (max 100)",
+					"x-ui": {
+						"label": "Limit",
+						"placeholder": "25"
+					}
 				},
 				"cursor": {
 					"type": "string",
-					"description": "Pagination cursor from a previous response"
+					"description": "Pagination cursor from a previous response",
+					"x-ui": {
+						"label": "Pagination cursor",
+						"hidden": true
+					}
 				}
 			}
 		}`)),
@@ -654,7 +915,12 @@ func getCustomerManifest() connectors.ManifestAction {
 			"properties": {
 				"customer_id": {
 					"type": "string",
-					"description": "Square customer ID"
+					"description": "Square customer ID",
+					"x-ui": {
+						"label": "Customer ID",
+						"placeholder": "CUST1234ABCD",
+						"help_text": "Use square.list_customers or square.create_customer"
+					}
 				}
 			}
 		}`)),
@@ -688,15 +954,30 @@ func createLoyaltyRewardManifest() connectors.ManifestAction {
 			"properties": {
 				"loyalty_account_id": {
 					"type": "string",
-					"description": "Square loyalty account ID for the customer"
+					"description": "Square loyalty account ID for the customer",
+					"x-ui": {
+						"label": "Loyalty account ID",
+						"placeholder": "LOY1234ABCD",
+						"help_text": "Square loyalty account ID for the customer"
+					}
 				},
 				"reward_tier_id": {
 					"type": "string",
-					"description": "ID of the reward tier to redeem"
+					"description": "ID of the reward tier to redeem",
+					"x-ui": {
+						"label": "Reward tier ID",
+						"placeholder": "TIER1234ABCD",
+						"help_text": "ID of the reward tier to redeem from the loyalty program"
+					}
 				},
 				"order_id": {
 					"type": "string",
-					"description": "Order ID to associate the reward with (optional)"
+					"description": "Order ID to associate the reward with (optional)",
+					"x-ui": {
+						"label": "Order ID",
+						"placeholder": "ORD1234ABCD",
+						"help_text": "Use square.create_order or square.search_orders to find order IDs"
+					}
 				}
 			}
 		}`)),

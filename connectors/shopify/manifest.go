@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -31,12 +32,20 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"enum": ["open", "closed", "cancelled", "any"],
 							"default": "open",
-							"description": "Filter orders by status"
+							"description": "Filter orders by status",
+							"x-ui": {
+								"widget": "select",
+								"label": "Status"
+							}
 						},
 						"financial_status": {
 							"type": "string",
 							"enum": ["paid", "unpaid", "partially_paid", "refunded", "authorized", "pending", "any"],
-							"description": "Filter orders by financial status"
+							"description": "Filter orders by financial status",
+							"x-ui": {
+								"widget": "select",
+								"label": "Financial status"
+							}
 						},
 						"created_at_min": {
 							"type": "string",
@@ -44,6 +53,8 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Show orders created at or after this date (ISO 8601, e.g. 2024-01-01T00:00:00Z)",
 							"x-ui": {
 								"widget": "datetime",
+								"label": "Created after",
+								"help_text": "Only include orders created on or after this date and time",
 								"datetime_range_pair": "created_at_max",
 								"datetime_range_role": "lower"
 							}
@@ -54,6 +65,8 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Show orders created at or before this date (ISO 8601, e.g. 2024-12-31T23:59:59Z)",
 							"x-ui": {
 								"widget": "datetime",
+								"label": "Created before",
+								"help_text": "Only include orders created on or before this date and time",
 								"datetime_range_pair": "created_at_min",
 								"datetime_range_role": "upper"
 							}
@@ -64,6 +77,8 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Show orders updated at or after this date (ISO 8601)",
 							"x-ui": {
 								"widget": "datetime",
+								"label": "Updated after",
+								"help_text": "Only include orders updated on or after this date and time",
 								"datetime_range_pair": "updated_at_max",
 								"datetime_range_role": "lower"
 							}
@@ -74,20 +89,29 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Show orders updated at or before this date (ISO 8601)",
 							"x-ui": {
 								"widget": "datetime",
+								"label": "Updated before",
+								"help_text": "Only include orders updated on or before this date and time",
 								"datetime_range_pair": "updated_at_min",
 								"datetime_range_role": "upper"
 							}
 						},
 						"fields": {
 							"type": "string",
-							"description": "Comma-separated list of fields to return (e.g. id,name,total_price). Omit to return all fields."
+							"description": "Comma-separated list of fields to return (e.g. id,name,total_price). Omit to return all fields.",
+							"x-ui": {
+								"label": "Fields",
+								"help_text": "Comma-separated field names to include"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"minimum": 1,
 							"maximum": 250,
 							"default": 50,
-							"description": "Maximum number of orders to return"
+							"description": "Maximum number of orders to return",
+							"x-ui": {
+								"label": "Max results"
+							}
 						}
 					},
 					"additionalProperties": false
@@ -104,7 +128,11 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"order_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "The Shopify order ID"
+							"description": "The Shopify order ID",
+							"x-ui": {
+								"label": "Order ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						}
 					},
 					"required": ["order_id"],
@@ -122,33 +150,99 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"order_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "The Shopify order ID"
+							"description": "The Shopify order ID",
+							"x-ui": {
+								"label": "Order ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						},
 						"note": {
 							"type": "string",
-							"description": "Internal order note visible to staff"
+							"description": "Internal order note visible to staff",
+							"x-ui": {
+								"widget": "textarea",
+								"label": "Note"
+							}
 						},
 						"tags": {
 							"type": "string",
-							"description": "Comma-separated list of tags (e.g. \"vip,priority,reviewed\")"
+							"description": "Comma-separated list of tags (e.g. \"vip,priority,reviewed\")",
+							"x-ui": {
+								"label": "Tags",
+								"help_text": "Comma-separated tags"
+							}
 						},
 						"email": {
 							"type": "string",
 							"format": "email",
-							"description": "Customer email address"
+							"description": "Customer email address",
+							"x-ui": {
+								"label": "Email",
+								"placeholder": "jane@example.com"
+							}
 						},
 						"shipping_address": {
 							"type": "object",
 							"properties": {
-								"address1": {"type": "string", "description": "Street address"},
-								"address2": {"type": "string", "description": "Apartment, suite, etc."},
-								"city": {"type": "string"},
-								"province_code": {"type": "string", "description": "State/province code (e.g. NY, ON)"},
-								"country_code": {"type": "string", "description": "ISO 3166-1 alpha-2 country code (e.g. US, CA)"},
-								"zip": {"type": "string", "description": "Postal/ZIP code"},
-								"phone": {"type": "string"}
+								"address1": {
+									"type": "string",
+									"description": "Street address",
+									"x-ui": {
+										"label": "Address line 1",
+										"placeholder": "123 Main St"
+									}
+								},
+								"address2": {
+									"type": "string",
+									"description": "Apartment, suite, etc.",
+									"x-ui": {
+										"label": "Address line 2",
+										"placeholder": "Apt 4B"
+									}
+								},
+								"city": {
+									"type": "string",
+									"x-ui": {
+										"label": "City",
+										"placeholder": "New York"
+									}
+								},
+								"province_code": {
+									"type": "string",
+									"description": "State/province code (e.g. NY, ON)",
+									"x-ui": {
+										"label": "State/province code",
+										"placeholder": "NY"
+									}
+								},
+								"country_code": {
+									"type": "string",
+									"description": "ISO 3166-1 alpha-2 country code (e.g. US, CA)",
+									"x-ui": {
+										"label": "Country code",
+										"placeholder": "US"
+									}
+								},
+								"zip": {
+									"type": "string",
+									"description": "Postal/ZIP code",
+									"x-ui": {
+										"label": "ZIP/Postal code",
+										"placeholder": "10001"
+									}
+								},
+								"phone": {
+									"type": "string",
+									"x-ui": {
+										"label": "Phone",
+										"placeholder": "+15551234567"
+									}
+								}
 							},
-							"description": "Shipping address fields to update"
+							"description": "Shipping address fields to update",
+							"x-ui": {
+								"label": "Shipping address"
+							}
 						}
 					},
 					"required": ["order_id"],
@@ -165,43 +259,112 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"title": {
 							"type": "string",
-							"description": "Product title"
+							"description": "Product title",
+							"x-ui": {
+								"label": "Title",
+								"placeholder": "Classic Cotton T-Shirt"
+							}
 						},
 						"body_html": {
 							"type": "string",
-							"description": "Product description in HTML"
+							"description": "Product description in HTML",
+							"x-ui": {
+								"widget": "textarea",
+								"label": "Description (HTML)"
+							}
 						},
 						"vendor": {
 							"type": "string",
-							"description": "Product vendor"
+							"description": "Product vendor",
+							"x-ui": {
+								"label": "Vendor",
+								"placeholder": "Acme Corp"
+							}
 						},
 						"product_type": {
 							"type": "string",
-							"description": "Product type for categorization"
+							"description": "Product type for categorization",
+							"x-ui": {
+								"label": "Product type",
+								"placeholder": "Apparel"
+							}
 						},
 						"tags": {
 							"type": "string",
-							"description": "Comma-separated list of tags"
+							"description": "Comma-separated list of tags",
+							"x-ui": {
+								"label": "Tags",
+								"help_text": "Comma-separated tags"
+							}
 						},
 						"status": {
 							"type": "string",
 							"enum": ["active", "draft", "archived"],
-							"description": "Product status (defaults to active if omitted)"
+							"description": "Product status (defaults to active if omitted)",
+							"x-ui": {
+								"widget": "select",
+								"label": "Status"
+							}
 						},
 						"variants": {
 							"type": "array",
 							"items": {
 								"type": "object",
 								"properties": {
-									"price": {"type": "string", "description": "Variant price as decimal string (e.g. \"19.99\")"},
-									"sku": {"type": "string", "description": "Unique SKU code"},
-									"inventory_quantity": {"type": "integer", "description": "Initial inventory count"},
-									"option1": {"type": "string", "description": "First option value (e.g. \"Small\")"},
-									"option2": {"type": "string", "description": "Second option value (e.g. \"Red\")"},
-									"option3": {"type": "string", "description": "Third option value"}
+									"price": {
+										"type": "string",
+										"description": "Variant price as decimal string (e.g. \"19.99\")",
+										"x-ui": {
+											"label": "Price",
+											"placeholder": "29.99",
+											"help_text": "Price in store currency (e.g. 29.99 for $29.99)"
+										}
+									},
+									"sku": {
+										"type": "string",
+										"description": "Unique SKU code",
+										"x-ui": {
+											"label": "SKU",
+											"placeholder": "WIDGET-001"
+										}
+									},
+									"inventory_quantity": {
+										"type": "integer",
+										"description": "Initial inventory count",
+										"x-ui": {
+											"label": "Quantity"
+										}
+									},
+									"option1": {
+										"type": "string",
+										"description": "First option value (e.g. \"Small\")",
+										"x-ui": {
+											"label": "Option 1",
+											"placeholder": "Small"
+										}
+									},
+									"option2": {
+										"type": "string",
+										"description": "Second option value (e.g. \"Red\")",
+										"x-ui": {
+											"label": "Option 2",
+											"placeholder": "Red"
+										}
+									},
+									"option3": {
+										"type": "string",
+										"description": "Third option value",
+										"x-ui": {
+											"label": "Option 3",
+											"placeholder": "Cotton"
+										}
+									}
 								}
 							},
-							"description": "Product variants — each variant can have up to 3 options (e.g. size, color)"
+							"description": "Product variants — each variant can have up to 3 options (e.g. size, color)",
+							"x-ui": {
+								"label": "Variants"
+							}
 						}
 					},
 					"required": ["title"],
@@ -219,16 +382,28 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"inventory_item_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "The inventory item ID (from product variant)"
+							"description": "The inventory item ID (from product variant)",
+							"x-ui": {
+								"label": "Inventory item ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						},
 						"location_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "The location ID where inventory is stored"
+							"description": "The location ID where inventory is stored",
+							"x-ui": {
+								"label": "Location ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						},
 						"available_adjustment": {
 							"type": "integer",
-							"description": "Inventory adjustment: positive to add, negative to subtract (e.g. -5 or +10; must be non-zero)"
+							"description": "Inventory adjustment: positive to add, negative to subtract (e.g. -5 or +10; must be non-zero)",
+							"x-ui": {
+								"label": "Adjustment",
+								"help_text": "Positive to add stock, negative to remove"
+							}
 						}
 					},
 					"required": ["inventory_item_id", "location_id", "available_adjustment"],
@@ -245,39 +420,72 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"code": {
 							"type": "string",
-							"description": "The discount code customers will enter (e.g. SUMMER10)"
+							"description": "The discount code customers will enter (e.g. SUMMER10)",
+							"x-ui": {
+								"label": "Discount code",
+								"placeholder": "SUMMER25"
+							}
 						},
 						"value_type": {
 							"type": "string",
 							"enum": ["percentage", "fixed_amount"],
-							"description": "Type of discount: percentage or fixed_amount"
+							"description": "Type of discount: percentage or fixed_amount",
+							"x-ui": {
+								"widget": "select",
+								"label": "Discount type"
+							}
 						},
 						"value": {
 							"type": "string",
-							"description": "Discount value as a negative decimal string (e.g. \"-10.0\" for 10% off, or \"-5.00\" for $5 off in shop currency)"
+							"description": "Discount value as a negative decimal string (e.g. \"-10.0\" for 10% off, or \"-5.00\" for $5 off in shop currency)",
+							"x-ui": {
+								"label": "Discount value",
+								"help_text": "Negative decimal string — e.g. '-10.0' for 10% or $10 off"
+							}
 						},
 						"target_type": {
 							"type": "string",
 							"enum": ["line_item", "shipping_line"],
-							"description": "What the discount applies to (defaults to line_item)"
+							"description": "What the discount applies to (defaults to line_item)",
+							"x-ui": {
+								"widget": "select",
+								"label": "Target type"
+							}
 						},
 						"starts_at": {
 							"type": "string",
 							"format": "date-time",
-							"description": "When the discount becomes active (ISO 8601, e.g. 2024-06-01T00:00:00Z)"
+							"description": "When the discount becomes active (ISO 8601, e.g. 2024-06-01T00:00:00Z)",
+							"x-ui": {
+								"widget": "datetime",
+								"label": "Starts at",
+								"help_text": "Date and time the discount becomes active"
+							}
 						},
 						"ends_at": {
 							"type": "string",
 							"format": "date-time",
-							"description": "When the discount expires (ISO 8601). Omit for no expiration."
+							"description": "When the discount expires (ISO 8601). Omit for no expiration.",
+							"x-ui": {
+								"widget": "datetime",
+								"label": "Ends at",
+								"help_text": "Date and time the discount expires. Leave blank for no expiration."
+							}
 						},
 						"usage_limit": {
 							"type": "integer",
-							"description": "Maximum total uses across all customers. Omit for unlimited."
+							"description": "Maximum total uses across all customers. Omit for unlimited.",
+							"x-ui": {
+								"label": "Usage limit"
+							}
 						},
 						"applies_once_per_customer": {
 							"type": "boolean",
-							"description": "If true, each customer can use the code only once"
+							"description": "If true, each customer can use the code only once",
+							"x-ui": {
+								"widget": "toggle",
+								"label": "Once per customer"
+							}
 						}
 					},
 					"required": ["code", "value_type", "value", "starts_at"],
@@ -295,24 +503,44 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"order_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "The Shopify order ID to fulfill"
+							"description": "The Shopify order ID to fulfill",
+							"x-ui": {
+								"label": "Order ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						},
 						"tracking_number": {
 							"type": "string",
-							"description": "Shipment tracking number"
+							"description": "Shipment tracking number",
+							"x-ui": {
+								"label": "Tracking number",
+								"placeholder": "1Z999AA10123456784"
+							}
 						},
 						"tracking_company": {
 							"type": "string",
-							"description": "Shipping carrier name (e.g. UPS, FedEx, USPS)"
+							"description": "Shipping carrier name (e.g. UPS, FedEx, USPS)",
+							"x-ui": {
+								"label": "Tracking company",
+								"placeholder": "UPS"
+							}
 						},
 						"tracking_url": {
 							"type": "string",
 							"format": "uri",
-							"description": "URL for tracking the shipment"
+							"description": "URL for tracking the shipment",
+							"x-ui": {
+								"label": "Tracking URL",
+								"placeholder": "https://www.ups.com/track?tracknum=1Z999AA10123456784"
+							}
 						},
 						"notify_customer": {
 							"type": "boolean",
-							"description": "Whether to send a shipment notification email to the customer"
+							"description": "Whether to send a shipment notification email to the customer",
+							"x-ui": {
+								"widget": "toggle",
+								"label": "Notify customer"
+							}
 						}
 					},
 					"required": ["order_id"],
@@ -330,20 +558,36 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"order_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "The Shopify order ID to cancel"
+							"description": "The Shopify order ID to cancel",
+							"x-ui": {
+								"label": "Order ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						},
 						"reason": {
 							"type": "string",
 							"enum": ["customer", "fraud", "inventory", "declined", "other"],
-							"description": "Reason for cancellation"
+							"description": "Reason for cancellation",
+							"x-ui": {
+								"widget": "select",
+								"label": "Reason"
+							}
 						},
 						"restock": {
 							"type": "boolean",
-							"description": "Whether to restock the order's line items"
+							"description": "Whether to restock the order's line items",
+							"x-ui": {
+								"widget": "toggle",
+								"label": "Restock items"
+							}
 						},
 						"email": {
 							"type": "boolean",
-							"description": "Whether to send a cancellation email to the customer"
+							"description": "Whether to send a cancellation email to the customer",
+							"x-ui": {
+								"widget": "toggle",
+								"label": "Send cancellation email"
+							}
 						}
 					},
 					"required": ["order_id"],
@@ -361,44 +605,120 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"product_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "The Shopify product ID to update"
+							"description": "The Shopify product ID to update",
+							"x-ui": {
+								"label": "Product ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						},
 						"title": {
 							"type": "string",
-							"description": "Product title"
+							"description": "Product title",
+							"x-ui": {
+								"label": "Title",
+								"placeholder": "Classic Cotton T-Shirt"
+							}
 						},
 						"body_html": {
 							"type": "string",
-							"description": "Product description in HTML"
+							"description": "Product description in HTML",
+							"x-ui": {
+								"widget": "textarea",
+								"label": "Description (HTML)"
+							}
 						},
 						"vendor": {
 							"type": "string",
-							"description": "Product vendor"
+							"description": "Product vendor",
+							"x-ui": {
+								"label": "Vendor",
+								"placeholder": "Acme Corp"
+							}
 						},
 						"tags": {
 							"type": "string",
-							"description": "Comma-separated list of tags"
+							"description": "Comma-separated list of tags",
+							"x-ui": {
+								"label": "Tags",
+								"help_text": "Comma-separated tags"
+							}
 						},
 						"status": {
 							"type": "string",
 							"enum": ["active", "draft", "archived"],
-							"description": "Product status"
+							"description": "Product status",
+							"x-ui": {
+								"widget": "select",
+								"label": "Status"
+							}
 						},
 						"variants": {
 							"type": "array",
 							"items": {
 								"type": "object",
 								"properties": {
-									"id": {"type": "integer", "description": "Variant ID (required for updating existing variants)"},
-									"price": {"type": "string", "description": "Variant price as decimal string"},
-									"sku": {"type": "string", "description": "Unique SKU code"},
-									"inventory_quantity": {"type": "integer", "description": "Inventory count"},
-									"option1": {"type": "string", "description": "First option value"},
-									"option2": {"type": "string", "description": "Second option value"},
-									"option3": {"type": "string", "description": "Third option value"}
+									"id": {
+										"type": "integer",
+										"description": "Variant ID (required for updating existing variants)",
+										"x-ui": {
+											"label": "Variant ID",
+											"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+										}
+									},
+									"price": {
+										"type": "string",
+										"description": "Variant price as decimal string",
+										"x-ui": {
+											"label": "Price",
+											"placeholder": "29.99",
+											"help_text": "Price in store currency (e.g. 29.99 for $29.99)"
+										}
+									},
+									"sku": {
+										"type": "string",
+										"description": "Unique SKU code",
+										"x-ui": {
+											"label": "SKU",
+											"placeholder": "WIDGET-001"
+										}
+									},
+									"inventory_quantity": {
+										"type": "integer",
+										"description": "Inventory count",
+										"x-ui": {
+											"label": "Quantity"
+										}
+									},
+									"option1": {
+										"type": "string",
+										"description": "First option value",
+										"x-ui": {
+											"label": "Option 1",
+											"placeholder": "Small"
+										}
+									},
+									"option2": {
+										"type": "string",
+										"description": "Second option value",
+										"x-ui": {
+											"label": "Option 2",
+											"placeholder": "Red"
+										}
+									},
+									"option3": {
+										"type": "string",
+										"description": "Third option value",
+										"x-ui": {
+											"label": "Option 3",
+											"placeholder": "Cotton"
+										}
+									}
 								}
 							},
-							"description": "Product variants to update or add"
+							"description": "Product variants to update or add",
+							"x-ui": {
+								"label": "Variants"
+							}
 						}
 					},
 					"required": ["product_id"],
@@ -415,28 +735,62 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"title": {
 							"type": "string",
-							"description": "Collection title"
+							"description": "Collection title",
+							"x-ui": {
+								"label": "Title",
+								"placeholder": "Summer Collection"
+							}
 						},
 						"body_html": {
 							"type": "string",
-							"description": "Collection description in HTML"
+							"description": "Collection description in HTML",
+							"x-ui": {
+								"widget": "textarea",
+								"label": "Description (HTML)"
+							}
 						},
 						"published": {
 							"type": "boolean",
-							"description": "Whether the collection is published to the storefront"
+							"description": "Whether the collection is published to the storefront",
+							"x-ui": {
+								"widget": "toggle",
+								"label": "Published"
+							}
 						},
 						"sort_order": {
 							"type": "string",
 							"enum": ["alpha-asc", "alpha-desc", "best-selling", "created", "created-desc", "manual", "price-asc", "price-desc"],
-							"description": "Default sort order for products in the collection"
+							"description": "Default sort order for products in the collection",
+							"x-ui": {
+								"widget": "select",
+								"label": "Sort order"
+							}
 						},
 						"image": {
 							"type": "object",
 							"properties": {
-								"src": {"type": "string", "format": "uri", "description": "Image URL"},
-								"alt": {"type": "string", "description": "Image alt text"}
+								"src": {
+									"type": "string",
+									"format": "uri",
+									"description": "Image URL",
+									"x-ui": {
+										"label": "Image URL",
+										"placeholder": "https://example.com/image.png"
+									}
+								},
+								"alt": {
+									"type": "string",
+									"description": "Image alt text",
+									"x-ui": {
+										"label": "Alt text",
+										"placeholder": "Summer collection banner"
+									}
+								}
 							},
-							"description": "Collection image"
+							"description": "Collection image",
+							"x-ui": {
+								"label": "Image"
+							}
 						}
 					},
 					"required": ["title"],
@@ -454,16 +808,30 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"since": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Show reports created at or after this date (ISO 8601)"
+							"description": "Show reports created at or after this date (ISO 8601)",
+							"x-ui": {
+								"widget": "datetime",
+								"label": "Since",
+								"help_text": "Only include reports created on or after this date and time"
+							}
 						},
 						"until": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Show reports created at or before this date (ISO 8601)"
+							"description": "Show reports created at or before this date (ISO 8601)",
+							"x-ui": {
+								"widget": "datetime",
+								"label": "Until",
+								"help_text": "Only include reports created on or before this date and time"
+							}
 						},
 						"fields": {
 							"type": "string",
-							"description": "Comma-separated list of fields to return (e.g. id,name,shopify_ql)"
+							"description": "Comma-separated list of fields to return (e.g. id,name,shopify_ql)",
+							"x-ui": {
+								"label": "Fields",
+								"help_text": "Comma-separated field names to include"
+							}
 						}
 					},
 					"additionalProperties": false
@@ -479,18 +847,29 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search query to filter customers by name, email, phone, or other fields"
+							"description": "Search query to filter customers by name, email, phone, or other fields",
+							"x-ui": {
+								"label": "Search query",
+								"placeholder": "email:jane@example.com"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"minimum": 1,
 							"maximum": 250,
 							"default": 50,
-							"description": "Maximum number of customers to return"
+							"description": "Maximum number of customers to return",
+							"x-ui": {
+								"label": "Max results"
+							}
 						},
 						"fields": {
 							"type": "string",
-							"description": "Comma-separated list of fields to return. Omit for all fields."
+							"description": "Comma-separated list of fields to return. Omit for all fields.",
+							"x-ui": {
+								"label": "Fields",
+								"help_text": "Comma-separated field names to include"
+							}
 						}
 					},
 					"additionalProperties": false
@@ -507,7 +886,11 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"customer_id": {
 							"type": "integer",
-							"description": "The numeric Shopify customer ID"
+							"description": "The numeric Shopify customer ID",
+							"x-ui": {
+								"label": "Customer ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						}
 					},
 					"additionalProperties": false
@@ -524,27 +907,51 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"email": {
 							"type": "string",
 							"format": "email",
-							"description": "Customer email address"
+							"description": "Customer email address",
+							"x-ui": {
+								"label": "Email",
+								"placeholder": "jane@example.com"
+							}
 						},
 						"first_name": {
 							"type": "string",
-							"description": "Customer first name"
+							"description": "Customer first name",
+							"x-ui": {
+								"label": "First name",
+								"placeholder": "Jane"
+							}
 						},
 						"last_name": {
 							"type": "string",
-							"description": "Customer last name"
+							"description": "Customer last name",
+							"x-ui": {
+								"label": "Last name",
+								"placeholder": "Doe"
+							}
 						},
 						"phone": {
 							"type": "string",
-							"description": "Customer phone number in E.164 format (e.g. +15551234567)"
+							"description": "Customer phone number in E.164 format (e.g. +15551234567)",
+							"x-ui": {
+								"label": "Phone",
+								"placeholder": "+15551234567"
+							}
 						},
 						"note": {
 							"type": "string",
-							"description": "Internal note about the customer"
+							"description": "Internal note about the customer",
+							"x-ui": {
+								"widget": "textarea",
+								"label": "Note"
+							}
 						},
 						"tags": {
 							"type": "string",
-							"description": "Comma-separated tags to attach to the customer"
+							"description": "Comma-separated tags to attach to the customer",
+							"x-ui": {
+								"label": "Tags",
+								"help_text": "Comma-separated tags"
+							}
 						}
 					},
 					"additionalProperties": false
@@ -561,26 +968,45 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 						"status": {
 							"type": "string",
 							"enum": ["active", "draft", "archived"],
-							"description": "Filter by product status"
+							"description": "Filter by product status",
+							"x-ui": {
+								"widget": "select",
+								"label": "Status"
+							}
 						},
 						"product_type": {
 							"type": "string",
-							"description": "Filter by product type"
+							"description": "Filter by product type",
+							"x-ui": {
+								"label": "Product type",
+								"placeholder": "Apparel"
+							}
 						},
 						"vendor": {
 							"type": "string",
-							"description": "Filter by product vendor name"
+							"description": "Filter by product vendor name",
+							"x-ui": {
+								"label": "Vendor",
+								"placeholder": "Acme Corp"
+							}
 						},
 						"fields": {
 							"type": "string",
-							"description": "Comma-separated list of fields to return. Omit for all fields."
+							"description": "Comma-separated list of fields to return. Omit for all fields.",
+							"x-ui": {
+								"label": "Fields",
+								"help_text": "Comma-separated field names to include"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"minimum": 1,
 							"maximum": 250,
 							"default": 50,
-							"description": "Maximum number of products to return"
+							"description": "Maximum number of products to return",
+							"x-ui": {
+								"label": "Max results"
+							}
 						}
 					},
 					"additionalProperties": false
@@ -597,11 +1023,19 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"product_id": {
 							"type": "integer",
-							"description": "The numeric Shopify product ID"
+							"description": "The numeric Shopify product ID",
+							"x-ui": {
+								"label": "Product ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						},
 						"fields": {
 							"type": "string",
-							"description": "Comma-separated list of fields to return. Omit for all fields."
+							"description": "Comma-separated list of fields to return. Omit for all fields.",
+							"x-ui": {
+								"label": "Fields",
+								"help_text": "Comma-separated field names to include"
+							}
 						}
 					},
 					"additionalProperties": false
@@ -623,32 +1057,87 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "object",
 								"required": ["quantity"],
 								"properties": {
-									"variant_id": {"type": "integer", "description": "Shopify variant ID"},
-									"product_id": {"type": "integer", "description": "Shopify product ID"},
-									"title": {"type": "string", "description": "Custom line item title"},
-									"price": {"type": "string", "description": "Override price as decimal string"},
-									"quantity": {"type": "integer", "minimum": 1, "description": "Number of units"}
+									"variant_id": {
+										"type": "integer",
+										"description": "Shopify variant ID",
+										"x-ui": {
+											"label": "Variant ID",
+											"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+										}
+									},
+									"product_id": {
+										"type": "integer",
+										"description": "Shopify product ID",
+										"x-ui": {
+											"label": "Product ID",
+											"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+										}
+									},
+									"title": {
+										"type": "string",
+										"description": "Custom line item title",
+										"x-ui": {
+											"label": "Title",
+											"placeholder": "Custom item"
+										}
+									},
+									"price": {
+										"type": "string",
+										"description": "Override price as decimal string",
+										"x-ui": {
+											"label": "Price",
+											"placeholder": "29.99",
+											"help_text": "Price in store currency (e.g. 29.99 for $29.99)"
+										}
+									},
+									"quantity": {
+										"type": "integer",
+										"minimum": 1,
+										"description": "Number of units",
+										"x-ui": {
+											"label": "Quantity"
+										}
+									}
 								},
 								"additionalProperties": false
 							},
-							"description": "Line items for the draft order"
+							"description": "Line items for the draft order",
+							"x-ui": {
+								"label": "Line items"
+							}
 						},
 						"customer_id": {
 							"type": "integer",
-							"description": "Associate with an existing Shopify customer"
+							"description": "Associate with an existing Shopify customer",
+							"x-ui": {
+								"label": "Customer ID",
+								"help_text": "Numeric Shopify ID — find in the admin URL or API response"
+							}
 						},
 						"email": {
 							"type": "string",
 							"format": "email",
-							"description": "Customer email to associate with the draft order"
+							"description": "Customer email to associate with the draft order",
+							"x-ui": {
+								"label": "Email",
+								"placeholder": "jane@example.com"
+							}
 						},
 						"note": {
 							"type": "string",
-							"description": "Internal note about the draft order"
+							"description": "Internal note about the draft order",
+							"x-ui": {
+								"widget": "textarea",
+								"label": "Note"
+							}
 						},
 						"tags": {
 							"type": "string",
-							"description": "Comma-separated tags to attach to the draft order"
+							"description": "Comma-separated tags to attach to the draft order",
+							"x-ui": {
+								"label": "Tags",
+								"help_text": "Comma-separated tags"
+							}
 						}
 					},
 					"additionalProperties": false

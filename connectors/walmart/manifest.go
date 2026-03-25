@@ -29,21 +29,25 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search keyword (e.g. 'paper towels', 'laptop', 'organic milk')"
+							"description": "Search keyword (e.g. 'paper towels', 'laptop', 'organic milk')",
+							"x-ui": {"label": "Search query", "placeholder": "paper towels"}
 						},
 						"category_id": {
 							"type": "string",
-							"description": "Category ID to filter results (e.g. \"3944\" for Grocery — from walmart.get_taxonomy)"
+							"description": "Category ID to filter results (e.g. \"3944\" for Grocery — from walmart.get_taxonomy)",
+							"x-ui": {"label": "Category", "help_text": "Walmart category ID — use walmart.get_taxonomy to find category IDs"}
 						},
 						"sort": {
 							"type": "string",
 							"enum": ["relevance", "price", "title", "bestseller", "customerRating", "new"],
-							"description": "Sort field for results (defaults to relevance)"
+							"description": "Sort field for results (defaults to relevance)",
+							"x-ui": {"label": "Sort by", "widget": "select"}
 						},
 						"order": {
 							"type": "string",
 							"enum": ["asc", "desc"],
-							"description": "Sort order: ascending or descending (defaults to relevance order)"
+							"description": "Sort order: ascending or descending (defaults to relevance order)",
+							"x-ui": {"label": "Order", "widget": "select"}
 						},
 						"start": {
 							"type": "integer",
@@ -57,7 +61,8 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 1,
 							"maximum": 25,
 							"default": 10,
-							"description": "Maximum number of products to return"
+							"description": "Maximum number of products to return",
+							"x-ui": {"label": "Max results"}
 						}
 					},
 					"required": ["query"],
@@ -75,7 +80,8 @@ func (c *WalmartConnector) Manifest() *connectors.ConnectorManifest {
 						"item_id": {
 							"type": "string",
 							"pattern": "^\\d+$",
-							"description": "The Walmart item ID (numeric, e.g. \"12345678\")"
+							"description": "The Walmart item ID (numeric, e.g. \"12345678\")",
+							"x-ui": {"label": "Item ID", "help_text": "Walmart item ID — from search results"}
 						}
 					},
 					"required": ["item_id"],
