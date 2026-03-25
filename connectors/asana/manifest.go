@@ -30,40 +30,74 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"project_id": {
 							"type": "string",
-							"description": "Project GID to create the task in"
+							"description": "Project GID to create the task in",
+							"x-ui": {
+								"label": "Project",
+								"placeholder": "1234567890",
+								"help_text": "Project GID — use asana.list_projects to find project IDs"
+							}
 						},
 						"name": {
 							"type": "string",
-							"description": "Task name"
+							"description": "Task name",
+							"x-ui": {
+								"label": "Name",
+								"placeholder": "New task"
+							}
 						},
 						"notes": {
 							"type": "string",
-							"description": "Task description (supports rich text)"
+							"description": "Task description (supports rich text)",
+							"x-ui": {
+								"label": "Description",
+								"widget": "textarea"
+							}
 						},
 						"assignee": {
 							"type": "string",
-							"description": "Assignee user GID or email"
+							"description": "Assignee user GID or email",
+							"x-ui": {
+								"label": "Assignee",
+								"placeholder": "me@example.com",
+								"help_text": "User GID or email address"
+							}
 						},
 						"due_on": {
 							"type": "string",
 							"format": "date",
 							"description": "Due date (YYYY-MM-DD)",
-							"x-ui": {"widget": "date"}
+							"x-ui": {
+								"label": "Due date",
+								"widget": "date",
+								"help_text": "Date in YYYY-MM-DD format"
+							}
 						},
 						"due_at": {
 							"type": "string",
 							"format": "date-time",
 							"description": "Due date and time (ISO 8601)",
-							"x-ui": {"widget": "datetime"}
+							"x-ui": {
+								"label": "Due date & time",
+								"widget": "datetime",
+								"help_text": "Date and time in ISO 8601 format"
+							}
 						},
 						"tags": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Tag GIDs to apply"
+							"description": "Tag GIDs to apply",
+							"x-ui": {
+								"label": "Tags",
+								"help_text": "Tag GIDs — find via Asana tag settings"
+							}
 						},
 						"custom_fields": {
 							"type": "object",
-							"description": "Custom field GID to value mapping"
+							"description": "Custom field GID to value mapping",
+							"x-ui": {
+								"label": "Custom fields",
+								"help_text": "Map of custom field GIDs to values"
+							}
 						}
 					}
 				}`)),
@@ -79,39 +113,73 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"task_id": {
 							"type": "string",
-							"description": "Task GID to update"
+							"description": "Task GID to update",
+							"x-ui": {
+								"label": "Task",
+								"placeholder": "1234567890",
+								"help_text": "Task GID — visible in the task URL"
+							}
 						},
 						"name": {
 							"type": "string",
-							"description": "Updated task name"
+							"description": "Updated task name",
+							"x-ui": {
+								"label": "Name",
+								"placeholder": "New task"
+							}
 						},
 						"notes": {
 							"type": "string",
-							"description": "Updated description"
+							"description": "Updated description",
+							"x-ui": {
+								"label": "Description",
+								"widget": "textarea"
+							}
 						},
 						"assignee": {
 							"type": "string",
-							"description": "Assignee user GID or email"
+							"description": "Assignee user GID or email",
+							"x-ui": {
+								"label": "Assignee",
+								"placeholder": "me@example.com",
+								"help_text": "User GID or email address"
+							}
 						},
 						"due_on": {
 							"type": "string",
 							"format": "date",
 							"description": "Due date (YYYY-MM-DD)",
-							"x-ui": {"widget": "date"}
+							"x-ui": {
+								"label": "Due date",
+								"widget": "date",
+								"help_text": "Date in YYYY-MM-DD format"
+							}
 						},
 						"due_at": {
 							"type": "string",
 							"format": "date-time",
 							"description": "Due date and time (ISO 8601)",
-							"x-ui": {"widget": "datetime"}
+							"x-ui": {
+								"label": "Due date & time",
+								"widget": "datetime",
+								"help_text": "Date and time in ISO 8601 format"
+							}
 						},
 						"completed": {
 							"type": "boolean",
-							"description": "Whether the task is completed"
+							"description": "Whether the task is completed",
+							"x-ui": {
+								"label": "Completed",
+								"widget": "toggle"
+							}
 						},
 						"custom_fields": {
 							"type": "object",
-							"description": "Custom field GID to value mapping"
+							"description": "Custom field GID to value mapping",
+							"x-ui": {
+								"label": "Custom fields",
+								"help_text": "Map of custom field GIDs to values"
+							}
 						}
 					}
 				}`)),
@@ -127,15 +195,28 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"task_id": {
 							"type": "string",
-							"description": "Task GID to comment on"
+							"description": "Task GID to comment on",
+							"x-ui": {
+								"label": "Task",
+								"placeholder": "1234567890",
+								"help_text": "Task GID — visible in the task URL"
+							}
 						},
 						"text": {
 							"type": "string",
-							"description": "Plain text comment"
+							"description": "Plain text comment",
+							"x-ui": {
+								"label": "Comment",
+								"widget": "textarea"
+							}
 						},
 						"html_text": {
 							"type": "string",
-							"description": "Rich text comment (HTML)"
+							"description": "Rich text comment (HTML)",
+							"x-ui": {
+								"label": "Rich text comment",
+								"widget": "textarea"
+							}
 						}
 					}
 				}`)),
@@ -151,7 +232,12 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"task_id": {
 							"type": "string",
-							"description": "Task GID to complete"
+							"description": "Task GID to complete",
+							"x-ui": {
+								"label": "Task",
+								"placeholder": "1234567890",
+								"help_text": "Task GID — visible in the task URL"
+							}
 						}
 					}
 				}`)),
@@ -167,25 +253,47 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"parent_task_id": {
 							"type": "string",
-							"description": "Parent task GID"
+							"description": "Parent task GID",
+							"x-ui": {
+								"label": "Parent task",
+								"placeholder": "1234567890",
+								"help_text": "Parent task GID — visible in the task URL"
+							}
 						},
 						"name": {
 							"type": "string",
-							"description": "Subtask name"
+							"description": "Subtask name",
+							"x-ui": {
+								"label": "Name",
+								"placeholder": "New task"
+							}
 						},
 						"notes": {
 							"type": "string",
-							"description": "Subtask description"
+							"description": "Subtask description",
+							"x-ui": {
+								"label": "Description",
+								"widget": "textarea"
+							}
 						},
 						"assignee": {
 							"type": "string",
-							"description": "Assignee user GID or email"
+							"description": "Assignee user GID or email",
+							"x-ui": {
+								"label": "Assignee",
+								"placeholder": "me@example.com",
+								"help_text": "User GID or email address"
+							}
 						},
 						"due_on": {
 							"type": "string",
 							"format": "date",
 							"description": "Due date (YYYY-MM-DD)",
-							"x-ui": {"widget": "date"}
+							"x-ui": {
+								"label": "Due date",
+								"widget": "date",
+								"help_text": "Date in YYYY-MM-DD format"
+							}
 						}
 					}
 				}`)),
@@ -201,31 +309,55 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"workspace_id": {
 							"type": "string",
-							"description": "Workspace GID to search in"
+							"description": "Workspace GID to search in",
+							"x-ui": {
+								"label": "Workspace",
+								"placeholder": "1234567890",
+								"help_text": "Workspace GID — use asana.list_workspaces to find workspace IDs"
+							}
 						},
 						"text": {
 							"type": "string",
-							"description": "Full-text search query"
+							"description": "Full-text search query",
+							"x-ui": {
+								"label": "Search query",
+								"placeholder": "Search tasks..."
+							}
 						},
 						"assignee": {
 							"type": "string",
-							"description": "Filter by assignee GID or email"
+							"description": "Filter by assignee GID or email",
+							"x-ui": {
+								"label": "Assignee",
+								"placeholder": "me@example.com",
+								"help_text": "User GID or email address"
+							}
 						},
 						"projects": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Filter by project GIDs"
+							"description": "Filter by project GIDs",
+							"x-ui": {
+								"label": "Projects",
+								"help_text": "Project GIDs to filter by"
+							}
 						},
 						"completed": {
 							"type": "boolean",
-							"description": "Filter by completion status"
+							"description": "Filter by completion status",
+							"x-ui": {
+								"label": "Completed",
+								"widget": "toggle"
+							}
 						},
 						"due_on_before": {
 							"type": "string",
 							"format": "date",
 							"description": "Filter tasks due before this date (YYYY-MM-DD)",
 							"x-ui": {
+								"label": "Due before",
 								"widget": "date",
+								"help_text": "Date in YYYY-MM-DD format",
 								"datetime_range_pair": "due_on_after",
 								"datetime_range_role": "upper"
 							}
@@ -235,7 +367,9 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date",
 							"description": "Filter tasks due after this date (YYYY-MM-DD)",
 							"x-ui": {
+								"label": "Due after",
 								"widget": "date",
+								"help_text": "Date in YYYY-MM-DD format",
 								"datetime_range_pair": "due_on_before",
 								"datetime_range_role": "lower"
 							}
@@ -243,7 +377,10 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 						"limit": {
 							"type": "integer",
 							"default": 20,
-							"description": "Maximum number of results (default 20)"
+							"description": "Maximum number of results (default 20)",
+							"x-ui": {
+								"label": "Max results"
+							}
 						}
 					}
 				}`)),
@@ -269,7 +406,12 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"workspace_id": {
 							"type": "string",
-							"description": "Workspace GID to list projects for"
+							"description": "Workspace GID to list projects for",
+							"x-ui": {
+								"label": "Workspace",
+								"placeholder": "1234567890",
+								"help_text": "Workspace GID — use asana.list_workspaces to find workspace IDs"
+							}
 						}
 					}
 				}`)),
@@ -285,24 +427,45 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"workspace_id": {
 							"type": "string",
-							"description": "Workspace GID to create the project in"
+							"description": "Workspace GID to create the project in",
+							"x-ui": {
+								"label": "Workspace",
+								"placeholder": "1234567890",
+								"help_text": "Workspace GID — use asana.list_workspaces to find workspace IDs"
+							}
 						},
 						"name": {
 							"type": "string",
-							"description": "Project name"
+							"description": "Project name",
+							"x-ui": {
+								"label": "Name",
+								"placeholder": "My Project"
+							}
 						},
 						"notes": {
 							"type": "string",
-							"description": "Project description"
+							"description": "Project description",
+							"x-ui": {
+								"label": "Description",
+								"widget": "textarea"
+							}
 						},
 						"color": {
 							"type": "string",
-							"description": "Project color (e.g. light-green, light-red)"
+							"description": "Project color (e.g. light-green, light-red)",
+							"x-ui": {
+								"label": "Color",
+								"placeholder": "light-green"
+							}
 						},
 						"privacy": {
 							"type": "string",
 							"enum": ["public_to_workspace", "private"],
-							"description": "Privacy setting"
+							"description": "Privacy setting",
+							"x-ui": {
+								"label": "Privacy",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
@@ -318,7 +481,12 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"task_id": {
 							"type": "string",
-							"description": "Task GID to delete"
+							"description": "Task GID to delete",
+							"x-ui": {
+								"label": "Task",
+								"placeholder": "1234567890",
+								"help_text": "Task GID — visible in the task URL"
+							}
 						}
 					}
 				}`)),
@@ -334,7 +502,12 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"project_id": {
 							"type": "string",
-							"description": "Project GID to list sections for"
+							"description": "Project GID to list sections for",
+							"x-ui": {
+								"label": "Project",
+								"placeholder": "1234567890",
+								"help_text": "Project GID — use asana.list_projects to find project IDs"
+							}
 						}
 					}
 				}`)),
@@ -350,11 +523,20 @@ func (c *AsanaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"project_id": {
 							"type": "string",
-							"description": "Project GID to create the section in"
+							"description": "Project GID to create the section in",
+							"x-ui": {
+								"label": "Project",
+								"placeholder": "1234567890",
+								"help_text": "Project GID — use asana.list_projects to find project IDs"
+							}
 						},
 						"name": {
 							"type": "string",
-							"description": "Section name"
+							"description": "Section name",
+							"x-ui": {
+								"label": "Name",
+								"placeholder": "New task"
+							}
 						}
 					}
 				}`)),

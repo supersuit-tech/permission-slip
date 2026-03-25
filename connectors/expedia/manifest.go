@@ -39,6 +39,7 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date",
 							"description": "Check-in date (YYYY-MM-DD)",
 							"x-ui": {
+								"label": "Check-in date",
 								"widget": "date",
 								"datetime_range_pair": "checkout",
 								"datetime_range_role": "lower"
@@ -49,6 +50,7 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date",
 							"description": "Check-out date (YYYY-MM-DD)",
 							"x-ui": {
+								"label": "Check-out date",
 								"widget": "date",
 								"datetime_range_pair": "checkin",
 								"datetime_range_role": "upper"
@@ -56,42 +58,51 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"region_id": {
 							"type": "string",
-							"description": "Expedia region ID to search in"
+							"description": "Expedia region ID to search in",
+							"x-ui": {"label": "Region ID", "help_text": "Expedia region ID"}
 						},
 						"latitude": {
 							"type": "number",
-							"description": "Latitude for location-based search"
+							"description": "Latitude for location-based search",
+							"x-ui": {"label": "Latitude"}
 						},
 						"longitude": {
 							"type": "number",
-							"description": "Longitude for location-based search"
+							"description": "Longitude for location-based search",
+							"x-ui": {"label": "Longitude"}
 						},
 						"occupancy": {
 							"type": "string",
-							"description": "Occupancy string (e.g. '2' for 2 adults, '2-0,4' for 2 adults + 1 child age 4)"
+							"description": "Occupancy string (e.g. '2' for 2 adults, '2-0,4' for 2 adults + 1 child age 4)",
+							"x-ui": {"label": "Occupants", "help_text": "Format: adults=2 or adults=2,children_ages=5,7"}
 						},
 						"currency": {
 							"type": "string",
-							"description": "Currency code (e.g. USD, EUR)"
+							"description": "Currency code (e.g. USD, EUR)",
+							"x-ui": {"label": "Currency", "placeholder": "USD"}
 						},
 						"language": {
 							"type": "string",
-							"description": "Language code (e.g. en-US)"
+							"description": "Language code (e.g. en-US)",
+							"x-ui": {"label": "Language", "placeholder": "en-US"}
 						},
 						"sort_by": {
 							"type": "string",
 							"enum": ["price", "distance", "rating"],
-							"description": "Sort results by price, distance, or rating"
+							"description": "Sort results by price, distance, or rating",
+							"x-ui": {"label": "Sort by", "widget": "select"}
 						},
 						"star_rating": {
 							"type": "array",
 							"items": {"type": "integer"},
-							"description": "Filter by star rating(s)"
+							"description": "Filter by star rating(s)",
+							"x-ui": {"label": "Star rating"}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 20,
-							"description": "Maximum number of results to return"
+							"description": "Maximum number of results to return",
+							"x-ui": {"label": "Max results"}
 						}
 					}
 				}`)),
@@ -107,13 +118,15 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"property_id": {
 							"type": "string",
-							"description": "Expedia property ID"
+							"description": "Expedia property ID",
+							"x-ui": {"label": "Property ID", "help_text": "Expedia property ID — from search results"}
 						},
 						"checkin": {
 							"type": "string",
 							"format": "date",
 							"description": "Check-in date (YYYY-MM-DD) for rate information",
 							"x-ui": {
+								"label": "Check-in date",
 								"widget": "date",
 								"datetime_range_pair": "checkout",
 								"datetime_range_role": "lower"
@@ -124,6 +137,7 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date",
 							"description": "Check-out date (YYYY-MM-DD) for rate information",
 							"x-ui": {
+								"label": "Check-out date",
 								"widget": "date",
 								"datetime_range_pair": "checkin",
 								"datetime_range_role": "upper"
@@ -131,7 +145,8 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"occupancy": {
 							"type": "string",
-							"description": "Occupancy string for rate information"
+							"description": "Occupancy string for rate information",
+							"x-ui": {"label": "Occupants", "help_text": "Format: adults=2 or adults=2,children_ages=5,7"}
 						}
 					}
 				}`)),
@@ -147,7 +162,8 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"room_id": {
 							"type": "string",
-							"description": "Room ID from search results"
+							"description": "Room ID from search results",
+							"x-ui": {"label": "Room ID", "help_text": "From expedia.get_hotel or expedia.price_check"}
 						}
 					}
 				}`)),
@@ -163,31 +179,38 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"room_id": {
 							"type": "string",
-							"description": "Room ID from a successful price check"
+							"description": "Room ID from a successful price check",
+							"x-ui": {"label": "Room ID", "help_text": "From expedia.get_hotel or expedia.price_check"}
 						},
 						"given_name": {
 							"type": "string",
-							"description": "Guest first name"
+							"description": "Guest first name",
+							"x-ui": {"label": "First name", "placeholder": "John"}
 						},
 						"family_name": {
 							"type": "string",
-							"description": "Guest last name"
+							"description": "Guest last name",
+							"x-ui": {"label": "Last name", "placeholder": "Doe"}
 						},
 						"email": {
 							"type": "string",
-							"description": "Guest email address"
+							"description": "Guest email address",
+							"x-ui": {"label": "Email", "placeholder": "guest@example.com"}
 						},
 						"phone": {
 							"type": "string",
-							"description": "Guest phone number"
+							"description": "Guest phone number",
+							"x-ui": {"label": "Phone", "placeholder": "+1-555-123-4567"}
 						},
 						"payment_method_id": {
 							"type": "string",
-							"description": "Stored payment method ID (resolved server-side)"
+							"description": "Stored payment method ID (resolved server-side)",
+							"x-ui": {"label": "Payment method", "help_text": "Stored payment method ID"}
 						},
 						"special_request": {
 							"type": "string",
-							"description": "Special requests for the hotel"
+							"description": "Special requests for the hotel",
+							"x-ui": {"label": "Special requests", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -203,11 +226,13 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"itinerary_id": {
 							"type": "string",
-							"description": "Itinerary ID from the booking"
+							"description": "Itinerary ID from the booking",
+							"x-ui": {"label": "Itinerary ID", "help_text": "From expedia.create_booking"}
 						},
 						"room_id": {
 							"type": "string",
-							"description": "Room ID within the itinerary to cancel"
+							"description": "Room ID within the itinerary to cancel",
+							"x-ui": {"label": "Room ID", "help_text": "From expedia.get_hotel or expedia.price_check"}
 						}
 					}
 				}`)),
@@ -223,11 +248,13 @@ func (c *ExpediaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"itinerary_id": {
 							"type": "string",
-							"description": "Itinerary ID from the booking"
+							"description": "Itinerary ID from the booking",
+							"x-ui": {"label": "Itinerary ID", "help_text": "From expedia.create_booking"}
 						},
 						"email": {
 							"type": "string",
-							"description": "Email address used for the booking"
+							"description": "Email address used for the booking",
+							"x-ui": {"label": "Email", "placeholder": "guest@example.com"}
 						}
 					}
 				}`)),

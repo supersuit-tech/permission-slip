@@ -30,20 +30,38 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "Facebook Page ID"
+							"description": "Facebook Page ID",
+							"x-ui": {
+								"label": "Page ID",
+								"placeholder": "123456789012345",
+								"help_text": "Find in Page Settings or URL"
+							}
 						},
 						"message": {
 							"type": "string",
-							"description": "Post text content"
+							"description": "Post text content",
+							"x-ui": {
+								"label": "Message",
+								"placeholder": "What's on your mind?",
+								"widget": "textarea"
+							}
 						},
 						"link": {
 							"type": "string",
-							"description": "URL to share with the post"
+							"description": "URL to share with the post",
+							"x-ui": {
+								"label": "Link",
+								"placeholder": "https://example.com"
+							}
 						},
 						"published": {
 							"type": "boolean",
 							"default": true,
-							"description": "Whether to publish immediately (default true)"
+							"description": "Whether to publish immediately (default true)",
+							"x-ui": {
+								"label": "Published",
+								"widget": "toggle"
+							}
 						}
 					}
 				}`)),
@@ -59,7 +77,12 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"post_id": {
 							"type": "string",
-							"description": "Post ID to delete (format: page_id_post_id)"
+							"description": "Post ID to delete (format: page_id_post_id)",
+							"x-ui": {
+								"label": "Post ID",
+								"placeholder": "123456789_987654321",
+								"help_text": "Format: page_id_post_id"
+							}
 						}
 					}
 				}`)),
@@ -75,11 +98,20 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"comment_id": {
 							"type": "string",
-							"description": "Comment ID to reply to"
+							"description": "Comment ID to reply to",
+							"x-ui": {
+								"label": "Comment ID",
+								"help_text": "From Graph API or post insights"
+							}
 						},
 						"message": {
 							"type": "string",
-							"description": "Reply text content"
+							"description": "Reply text content",
+							"x-ui": {
+								"label": "Message",
+								"placeholder": "Write a reply...",
+								"widget": "textarea"
+							}
 						}
 					}
 				}`)),
@@ -95,20 +127,38 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"instagram_account_id": {
 							"type": "string",
-							"description": "Instagram Business/Creator account ID"
+							"description": "Instagram Business/Creator account ID",
+							"x-ui": {
+								"label": "Instagram Account ID",
+								"placeholder": "17841400000000000",
+								"help_text": "Find via Facebook Page Settings > Instagram"
+							}
 						},
 						"image_url": {
 							"type": "string",
-							"description": "Public URL of the image to post"
+							"description": "Public URL of the image to post",
+							"x-ui": {
+								"label": "Image URL",
+								"placeholder": "https://example.com/image.jpg"
+							}
 						},
 						"caption": {
 							"type": "string",
 							"maxLength": 2200,
-							"description": "Post caption (max 2,200 characters)"
+							"description": "Post caption (max 2,200 characters)",
+							"x-ui": {
+								"label": "Caption",
+								"placeholder": "Write a caption...",
+								"widget": "textarea"
+							}
 						},
 						"hashtags": {
 							"type": "string",
-							"description": "Hashtags to append to caption (e.g. '#travel #photo')"
+							"description": "Hashtags to append to caption (e.g. '#travel #photo')",
+							"x-ui": {
+								"label": "Hashtags",
+								"placeholder": "#travel #photo"
+							}
 						}
 					}
 				}`)),
@@ -124,19 +174,32 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"instagram_account_id": {
 							"type": "string",
-							"description": "Instagram Business/Creator account ID"
+							"description": "Instagram Business/Creator account ID",
+							"x-ui": {
+								"label": "Instagram Account ID",
+								"placeholder": "17841400000000000",
+								"help_text": "Find via Facebook Page Settings > Instagram"
+							}
 						},
 						"metric": {
 							"type": "string",
 							"enum": ["impressions", "reach", "profile_views"],
 							"default": "impressions",
-							"description": "Metric to retrieve (default: impressions)"
+							"description": "Metric to retrieve (default: impressions)",
+							"x-ui": {
+								"label": "Metric",
+								"widget": "select"
+							}
 						},
 						"period": {
 							"type": "string",
 							"enum": ["day", "week", "days_28"],
 							"default": "day",
-							"description": "Time period for the metric (default: day)"
+							"description": "Time period for the metric (default: day)",
+							"x-ui": {
+								"label": "Period",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
@@ -152,20 +215,31 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "Facebook Page ID"
+							"description": "Facebook Page ID",
+							"x-ui": {
+								"label": "Page ID",
+								"placeholder": "123456789012345",
+								"help_text": "Find in Page Settings or URL"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 10,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Maximum number of posts to return (1-100, default 10)"
+							"description": "Maximum number of posts to return (1-100, default 10)",
+							"x-ui": {
+								"label": "Limit",
+								"placeholder": "10"
+							}
 						},
 						"since": {
 							"type": "string",
 							"format": "date-time",
 							"description": "Only return posts after this time. Unix seconds, epoch milliseconds, or RFC 3339 (e.g. 2024-03-01T00:00:00Z).",
 							"x-ui": {
+								"label": "From",
+								"help_text": "Only return posts after this time",
 								"widget": "datetime",
 								"datetime_range_pair": "until",
 								"datetime_range_role": "lower"
@@ -176,6 +250,8 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date-time",
 							"description": "Only return posts before this time. Unix seconds, epoch milliseconds, or RFC 3339.",
 							"x-ui": {
+								"label": "Until",
+								"help_text": "Only return posts before this time",
 								"widget": "datetime",
 								"datetime_range_pair": "since",
 								"datetime_range_role": "upper"
@@ -195,11 +271,20 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"instagram_account_id": {
 							"type": "string",
-							"description": "Instagram Business/Creator account ID"
+							"description": "Instagram Business/Creator account ID",
+							"x-ui": {
+								"label": "Instagram Account ID",
+								"placeholder": "17841400000000000",
+								"help_text": "Find via Facebook Page Settings > Instagram"
+							}
 						},
 						"image_url": {
 							"type": "string",
-							"description": "Public HTTPS URL of the image to publish as a story"
+							"description": "Public HTTPS URL of the image to publish as a story",
+							"x-ui": {
+								"label": "Image URL",
+								"placeholder": "https://example.com/story-image.jpg"
+							}
 						}
 					}
 				}`)),
@@ -215,25 +300,40 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"page_id": {
 							"type": "string",
-							"description": "Facebook Page ID"
+							"description": "Facebook Page ID",
+							"x-ui": {
+								"label": "Page ID",
+								"placeholder": "123456789012345",
+								"help_text": "Find in Page Settings or URL"
+							}
 						},
 						"metric": {
 							"type": "string",
 							"enum": ["page_impressions", "page_impressions_unique", "page_engaged_users", "page_post_engagements", "page_fan_adds", "page_fan_removes", "page_views_total", "page_reach"],
 							"default": "page_impressions",
-							"description": "Metric to retrieve (default: page_impressions)"
+							"description": "Metric to retrieve (default: page_impressions)",
+							"x-ui": {
+								"label": "Metric",
+								"widget": "select"
+							}
 						},
 						"period": {
 							"type": "string",
 							"enum": ["day", "week", "days_28", "month"],
 							"default": "day",
-							"description": "Time period for the metric (default: day)"
+							"description": "Time period for the metric (default: day)",
+							"x-ui": {
+								"label": "Period",
+								"widget": "select"
+							}
 						},
 						"since": {
 							"type": "string",
 							"format": "date-time",
 							"description": "Only return data after this time. Unix seconds, epoch milliseconds, or RFC 3339.",
 							"x-ui": {
+								"label": "From",
+								"help_text": "Only return data after this time",
 								"widget": "datetime",
 								"datetime_range_pair": "until",
 								"datetime_range_role": "lower"
@@ -244,6 +344,8 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date-time",
 							"description": "Only return data before this time. Unix seconds, epoch milliseconds, or RFC 3339.",
 							"x-ui": {
+								"label": "Until",
+								"help_text": "Only return data before this time",
 								"widget": "datetime",
 								"datetime_range_pair": "since",
 								"datetime_range_role": "upper"
@@ -263,14 +365,23 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"instagram_account_id": {
 							"type": "string",
-							"description": "Instagram Business/Creator account ID"
+							"description": "Instagram Business/Creator account ID",
+							"x-ui": {
+								"label": "Instagram Account ID",
+								"placeholder": "17841400000000000",
+								"help_text": "Find via Facebook Page Settings > Instagram"
+							}
 						},
 						"limit": {
 							"type": "integer",
 							"default": 10,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Maximum number of posts to return (1-100, default 10)"
+							"description": "Maximum number of posts to return (1-100, default 10)",
+							"x-ui": {
+								"label": "Limit",
+								"placeholder": "10"
+							}
 						}
 					}
 				}`)),
@@ -286,12 +397,21 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"comment_id": {
 							"type": "string",
-							"description": "Instagram comment ID to reply to"
+							"description": "Instagram comment ID to reply to",
+							"x-ui": {
+								"label": "Comment ID",
+								"help_text": "From Graph API or post insights"
+							}
 						},
 						"message": {
 							"type": "string",
 							"maxLength": 2200,
-							"description": "Reply text (max 2,200 characters)"
+							"description": "Reply text (max 2,200 characters)",
+							"x-ui": {
+								"label": "Message",
+								"placeholder": "Write a reply...",
+								"widget": "textarea"
+							}
 						}
 					}
 				}`)),
@@ -307,35 +427,66 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"ad_account_id": {
 							"type": "string",
-							"description": "Ad account ID (without 'act_' prefix)"
+							"description": "Ad account ID (without 'act_' prefix)",
+							"x-ui": {
+								"label": "Ad Account ID",
+								"placeholder": "123456789",
+								"help_text": "Without 'act_' prefix — find in Business Manager"
+							}
 						},
 						"name": {
 							"type": "string",
-							"description": "Campaign name"
+							"description": "Campaign name",
+							"x-ui": {
+								"label": "Campaign Name",
+								"placeholder": "My Campaign"
+							}
 						},
 						"objective": {
 							"type": "string",
 							"enum": ["OUTCOME_AWARENESS", "OUTCOME_ENGAGEMENT", "OUTCOME_LEADS", "OUTCOME_SALES", "OUTCOME_TRAFFIC", "OUTCOME_APP_PROMOTION"],
-							"description": "Campaign objective"
+							"description": "Campaign objective",
+							"x-ui": {
+								"label": "Objective",
+								"widget": "select"
+							}
 						},
 						"status": {
 							"type": "string",
 							"enum": ["ACTIVE", "PAUSED", "ARCHIVED"],
 							"default": "PAUSED",
-							"description": "Campaign status (default: PAUSED)"
+							"description": "Campaign status (default: PAUSED)",
+							"x-ui": {
+								"label": "Status",
+								"widget": "select"
+							}
 						},
 						"budget_type": {
 							"type": "string",
 							"enum": ["DAILY", "LIFETIME"],
-							"description": "Budget type — use with daily_budget or lifetime_budget respectively"
+							"description": "Budget type — use with daily_budget or lifetime_budget respectively",
+							"x-ui": {
+								"label": "Budget Type",
+								"widget": "select"
+							}
 						},
 						"daily_budget": {
 							"type": "integer",
-							"description": "Daily budget in account currency's smallest unit (e.g. cents) — mutually exclusive with lifetime_budget"
+							"description": "Daily budget in account currency's smallest unit (e.g. cents) — mutually exclusive with lifetime_budget",
+							"x-ui": {
+								"label": "Daily Budget",
+								"placeholder": "5000",
+								"help_text": "In smallest currency unit (e.g. 5000 = $50.00 for USD)"
+							}
 						},
 						"lifetime_budget": {
 							"type": "integer",
-							"description": "Lifetime budget in account currency's smallest unit — mutually exclusive with daily_budget"
+							"description": "Lifetime budget in account currency's smallest unit — mutually exclusive with daily_budget",
+							"x-ui": {
+								"label": "Lifetime Budget",
+								"placeholder": "50000",
+								"help_text": "In smallest currency unit (e.g. 5000 = $50.00 for USD)"
+							}
 						}
 					}
 				}`)),
@@ -351,25 +502,46 @@ func (c *MetaConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"ad_account_id": {
 							"type": "string",
-							"description": "Ad account ID (without 'act_' prefix)"
+							"description": "Ad account ID (without 'act_' prefix)",
+							"x-ui": {
+								"label": "Ad Account ID",
+								"placeholder": "123456789",
+								"help_text": "Without 'act_' prefix — find in Business Manager"
+							}
 						},
 						"name": {
 							"type": "string",
-							"description": "Ad name"
+							"description": "Ad name",
+							"x-ui": {
+								"label": "Ad Name",
+								"placeholder": "My Ad"
+							}
 						},
 						"adset_id": {
 							"type": "string",
-							"description": "ID of the ad set this ad belongs to"
+							"description": "ID of the ad set this ad belongs to",
+							"x-ui": {
+								"label": "Ad Set ID",
+								"help_text": "Find via Meta Ads Manager"
+							}
 						},
 						"creative_id": {
 							"type": "string",
-							"description": "ID of the ad creative to use"
+							"description": "ID of the ad creative to use",
+							"x-ui": {
+								"label": "Creative ID",
+								"help_text": "Find via Meta Ads Manager"
+							}
 						},
 						"status": {
 							"type": "string",
 							"enum": ["ACTIVE", "PAUSED", "ARCHIVED"],
 							"default": "PAUSED",
-							"description": "Ad status (default: PAUSED)"
+							"description": "Ad status (default: PAUSED)",
+							"x-ui": {
+								"label": "Status",
+								"widget": "select"
+							}
 						}
 					}
 				}`)),
