@@ -74,3 +74,21 @@ func TestUpdateTunnelConfig_MissingConfig(t *testing.T) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
 	}
 }
+
+func TestUpdateTunnelConfig_NullConfig(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateTunnelConfigAction{conn: conn}
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		Parameters:  json.RawMessage(`{"account_id":"acc1","tunnel_id":"tun1","config":null}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for null config, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

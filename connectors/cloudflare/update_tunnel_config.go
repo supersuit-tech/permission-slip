@@ -26,7 +26,7 @@ func (p *updateTunnelConfigParams) validate() error {
 	if err := requirePathParam("tunnel_id", p.TunnelID); err != nil {
 		return err
 	}
-	if len(p.Config) == 0 {
+	if len(p.Config) == 0 || string(p.Config) == "null" {
 		return &connectors.ValidationError{Message: "missing required parameter: config"}
 	}
 	return nil

@@ -16,7 +16,7 @@ type listTunnelsAction struct {
 type listTunnelsParams struct {
 	AccountID string `json:"account_id"`
 	Name      string `json:"name"`
-	IsDeleted bool   `json:"is_deleted"`
+	IsDeleted *bool  `json:"is_deleted"`
 }
 
 func (p *listTunnelsParams) validate() error {
@@ -36,8 +36,12 @@ func (a *listTunnelsAction) Execute(ctx context.Context, req connectors.ActionRe
 	if params.Name != "" {
 		q.Set("name", params.Name)
 	}
-	if params.IsDeleted {
-		q.Set("is_deleted", "true")
+	if params.IsDeleted != nil {
+		if *params.IsDeleted {
+			q.Set("is_deleted", "true")
+		} else {
+			q.Set("is_deleted", "false")
+		}
 	}
 
 	path := fmt.Sprintf("/accounts/%s/cfd_tunnel", params.AccountID)

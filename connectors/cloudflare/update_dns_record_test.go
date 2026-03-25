@@ -57,3 +57,21 @@ func TestUpdateDNSRecord_Execute(t *testing.T) {
 		t.Errorf("id = %v, want rec1", data["id"])
 	}
 }
+
+func TestUpdateDNSRecord_NoUpdateFields(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &updateDNSRecordAction{conn: conn}
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		Parameters:  json.RawMessage(`{"zone_id":"z1","record_id":"r1"}`),
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for no update fields, got nil")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}

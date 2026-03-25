@@ -27,7 +27,13 @@ func (p *updateDNSRecordParams) validate() error {
 	if err := requirePathParam("zone_id", p.ZoneID); err != nil {
 		return err
 	}
-	return requirePathParam("record_id", p.RecordID)
+	if err := requirePathParam("record_id", p.RecordID); err != nil {
+		return err
+	}
+	if p.Type == "" && p.Name == "" && p.Content == "" && p.TTL == 0 && p.Proxied == nil {
+		return &connectors.ValidationError{Message: "must specify at least one field to update (type, name, content, ttl, or proxied)"}
+	}
+	return nil
 }
 
 func (a *updateDNSRecordAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
