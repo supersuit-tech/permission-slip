@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -46,28 +47,34 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"base_id": {
 							"type": "string",
-							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/..."
+							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/...",
+							"x-ui": {"label": "Base ID", "placeholder": "appABC123def456", "help_text": "Starts with 'app' — find in your Airtable base URL"}
 						},
 						"table": {
 							"type": "string",
-							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base."
+							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base.",
+							"x-ui": {"label": "Table", "placeholder": "Tasks", "help_text": "Table name from the tab bar, or table ID starting with 'tbl'"}
 						},
 						"fields": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Only return these fields (column names). Omit to return all fields."
+							"description": "Only return these fields (column names). Omit to return all fields.",
+							"x-ui": {"label": "Fields", "help_text": "Column names to include"}
 						},
 						"filter_by_formula": {
 							"type": "string",
-							"description": "Airtable formula to filter records. Examples: \"{Status} = 'Active'\", \"AND({Priority} = 'High', {Assignee} != '')\". See https://support.airtable.com/docs/formula-field-reference"
+							"description": "Airtable formula to filter records. Examples: \"{Status} = 'Active'\", \"AND({Priority} = 'High', {Assignee} != '')\". See https://support.airtable.com/docs/formula-field-reference",
+							"x-ui": {"label": "Filter by formula", "placeholder": "{Status} = 'Active'", "help_text": "Airtable formula syntax — see https://support.airtable.com/docs/formula-field-reference", "widget": "textarea"}
 						},
 						"max_records": {
 							"type": "integer",
-							"description": "Maximum total records to return. Omit for Airtable's default (all matching records, paginated)."
+							"description": "Maximum total records to return. Omit for Airtable's default (all matching records, paginated).",
+							"x-ui": {"label": "Max records"}
 						},
 						"page_size": {
 							"type": "integer",
-							"description": "Records per page (1-100, default 100)"
+							"description": "Records per page (1-100, default 100)",
+							"x-ui": {"label": "Page size"}
 						},
 						"sort": {
 							"type": "array",
@@ -75,15 +82,17 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "object",
 								"required": ["field"],
 								"properties": {
-									"field": {"type": "string", "description": "Field name to sort by"},
-									"direction": {"type": "string", "enum": ["asc", "desc"], "description": "Sort direction (default: asc)"}
+									"field": {"type": "string", "description": "Field name to sort by", "x-ui": {"label": "Field", "placeholder": "Name"}},
+									"direction": {"type": "string", "enum": ["asc", "desc"], "description": "Sort direction (default: asc)", "x-ui": {"label": "Direction", "widget": "select"}}
 								}
 							},
-							"description": "Sort order for records"
+							"description": "Sort order for records",
+							"x-ui": {"label": "Sort"}
 						},
 						"view": {
 							"type": "string",
-							"description": "Name or ID of a view to filter/sort by. Applies the view's filters and sorts before any additional parameters."
+							"description": "Name or ID of a view to filter/sort by. Applies the view's filters and sorts before any additional parameters.",
+							"x-ui": {"label": "View", "placeholder": "Grid view"}
 						},
 						"offset": {
 							"type": "string",
@@ -104,15 +113,18 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"base_id": {
 							"type": "string",
-							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/..."
+							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/...",
+							"x-ui": {"label": "Base ID", "placeholder": "appABC123def456", "help_text": "Starts with 'app' — find in your Airtable base URL"}
 						},
 						"table": {
 							"type": "string",
-							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base."
+							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base.",
+							"x-ui": {"label": "Table", "placeholder": "Tasks", "help_text": "Table name from the tab bar, or table ID starting with 'tbl'"}
 						},
 						"record_id": {
 							"type": "string",
-							"description": "Record ID (starts with 'rec'). Visible when expanding a record in Airtable."
+							"description": "Record ID (starts with 'rec'). Visible when expanding a record in Airtable.",
+							"x-ui": {"label": "Record ID", "placeholder": "recABC123def456", "help_text": "Starts with 'rec' — visible in the expanded record URL"}
 						}
 					}
 				}`)),
@@ -128,11 +140,13 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"base_id": {
 							"type": "string",
-							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/..."
+							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/...",
+							"x-ui": {"label": "Base ID", "placeholder": "appABC123def456", "help_text": "Starts with 'app' — find in your Airtable base URL"}
 						},
 						"table": {
 							"type": "string",
-							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base."
+							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base.",
+							"x-ui": {"label": "Table", "placeholder": "Tasks", "help_text": "Table name from the tab bar, or table ID starting with 'tbl'"}
 						},
 						"records": {
 							"type": "array",
@@ -144,11 +158,13 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 								"properties": {
 									"fields": {
 										"type": "object",
-										"description": "Field name-value pairs for the record (e.g. {\"Name\": \"John\", \"Email\": \"john@example.com\"})"
+										"description": "Field name-value pairs for the record (e.g. {\"Name\": \"John\", \"Email\": \"john@example.com\"})",
+										"x-ui": {"label": "Fields"}
 									}
 								}
 							},
-							"description": "Records to create (1-10). Airtable limits batch operations to 10 records per request."
+							"description": "Records to create (1-10). Airtable limits batch operations to 10 records per request.",
+							"x-ui": {"label": "Records", "help_text": "Up to 10 records per batch request"}
 						}
 					}
 				}`)),
@@ -164,11 +180,13 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"base_id": {
 							"type": "string",
-							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/..."
+							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/...",
+							"x-ui": {"label": "Base ID", "placeholder": "appABC123def456", "help_text": "Starts with 'app' — find in your Airtable base URL"}
 						},
 						"table": {
 							"type": "string",
-							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base."
+							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base.",
+							"x-ui": {"label": "Table", "placeholder": "Tasks", "help_text": "Table name from the tab bar, or table ID starting with 'tbl'"}
 						},
 						"records": {
 							"type": "array",
@@ -180,15 +198,18 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 								"properties": {
 									"id": {
 										"type": "string",
-										"description": "Record ID to update (starts with 'rec')"
+										"description": "Record ID to update (starts with 'rec')",
+										"x-ui": {"label": "Record ID", "placeholder": "recABC123def456", "help_text": "Starts with 'rec' — visible in the expanded record URL"}
 									},
 									"fields": {
 										"type": "object",
-										"description": "Field name-value pairs to update. Only specified fields are changed."
+										"description": "Field name-value pairs to update. Only specified fields are changed.",
+										"x-ui": {"label": "Fields"}
 									}
 								}
 							},
-							"description": "Records to update (1-10). Airtable limits batch operations to 10 records per request."
+							"description": "Records to update (1-10). Airtable limits batch operations to 10 records per request.",
+							"x-ui": {"label": "Records", "help_text": "Up to 10 records per batch request"}
 						}
 					}
 				}`)),
@@ -204,18 +225,21 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"base_id": {
 							"type": "string",
-							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/..."
+							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/...",
+							"x-ui": {"label": "Base ID", "placeholder": "appABC123def456", "help_text": "Starts with 'app' — find in your Airtable base URL"}
 						},
 						"table": {
 							"type": "string",
-							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base."
+							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base.",
+							"x-ui": {"label": "Table", "placeholder": "Tasks", "help_text": "Table name from the tab bar, or table ID starting with 'tbl'"}
 						},
 						"record_ids": {
 							"type": "array",
 							"minItems": 1,
 							"maxItems": 10,
 							"items": {"type": "string"},
-							"description": "Record IDs to delete (each starts with 'rec'). Airtable limits batch operations to 10 records per request."
+							"description": "Record IDs to delete (each starts with 'rec'). Airtable limits batch operations to 10 records per request.",
+							"x-ui": {"label": "Record IDs", "help_text": "Up to 10 record IDs starting with 'rec'"}
 						}
 					}
 				}`)),
@@ -231,24 +255,29 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"base_id": {
 							"type": "string",
-							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/..."
+							"description": "Airtable base ID (starts with 'app'). Find this in your Airtable URL: airtable.com/appXXX/...",
+							"x-ui": {"label": "Base ID", "placeholder": "appABC123def456", "help_text": "Starts with 'app' — find in your Airtable base URL"}
 						},
 						"table": {
 							"type": "string",
-							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base."
+							"description": "Table name (e.g. 'Tasks') or table ID (starts with 'tbl'). Visible in the tab bar of your Airtable base.",
+							"x-ui": {"label": "Table", "placeholder": "Tasks", "help_text": "Table name from the tab bar, or table ID starting with 'tbl'"}
 						},
 						"formula": {
 							"type": "string",
-							"description": "Airtable formula to filter records. Examples: \"SEARCH('John', {Name})\", \"{Status} = 'Active'\", \"AND({Priority} = 'High', {Due} < TODAY())\". See https://support.airtable.com/docs/formula-field-reference"
+							"description": "Airtable formula to filter records. Examples: \"SEARCH('John', {Name})\", \"{Status} = 'Active'\", \"AND({Priority} = 'High', {Due} < TODAY())\". See https://support.airtable.com/docs/formula-field-reference",
+							"x-ui": {"label": "Formula", "placeholder": "{Status} = 'Active'", "help_text": "Airtable formula syntax — see https://support.airtable.com/docs/formula-field-reference", "widget": "textarea"}
 						},
 						"fields": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Only return these fields (column names). Omit to return all fields."
+							"description": "Only return these fields (column names). Omit to return all fields.",
+							"x-ui": {"label": "Fields", "help_text": "Column names to include"}
 						},
 						"max_records": {
 							"type": "integer",
-							"description": "Maximum total records to return (default: 100)"
+							"description": "Maximum total records to return (default: 100)",
+							"x-ui": {"label": "Max records"}
 						},
 						"sort": {
 							"type": "array",
@@ -256,11 +285,12 @@ func (c *AirtableConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "object",
 								"required": ["field"],
 								"properties": {
-									"field": {"type": "string", "description": "Field name to sort by"},
-									"direction": {"type": "string", "enum": ["asc", "desc"], "description": "Sort direction (default: asc)"}
+									"field": {"type": "string", "description": "Field name to sort by", "x-ui": {"label": "Field", "placeholder": "Name"}},
+									"direction": {"type": "string", "enum": ["asc", "desc"], "description": "Sort direction (default: asc)", "x-ui": {"label": "Direction", "widget": "select"}}
 								}
 							},
-							"description": "Sort order for results"
+							"description": "Sort order for results",
+							"x-ui": {"label": "Sort"}
 						},
 						"offset": {
 							"type": "string",

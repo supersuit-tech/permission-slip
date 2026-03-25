@@ -36,15 +36,18 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"to": {
 							"type": "string",
-							"description": "Recipient email address"
+							"description": "Recipient email address",
+							"x-ui": {"label": "To", "placeholder": "jane@example.com"}
 						},
 						"subject": {
 							"type": "string",
-							"description": "Email subject line"
+							"description": "Email subject line",
+							"x-ui": {"label": "Subject", "placeholder": "Meeting follow-up"}
 						},
 						"body": {
 							"type": "string",
-							"description": "Email body (plain text)"
+							"description": "Email body (plain text)",
+							"x-ui": {"label": "Body", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -67,7 +70,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"default": 10,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Maximum number of emails to return (1-100, default 10)"
+							"description": "Maximum number of emails to return (1-100, default 10)",
+							"x-ui": {"label": "Max results"}
 						}
 					}
 				}`)),
@@ -88,26 +92,31 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"summary": {
 							"type": "string",
-							"description": "Event title"
+							"description": "Event title",
+							"x-ui": {"label": "Title", "placeholder": "Team meeting"}
 						},
 						"description": {
 							"type": "string",
-							"description": "Event description"
+							"description": "Event description",
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						},
 						"start_time": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')"
+							"description": "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')",
+							"x-ui": {"label": "Start time", "widget": "datetime"}
 						},
 						"end_time": {
 							"type": "string",
 							"format": "date-time",
-							"description": "End time in RFC 3339 format (e.g. '2024-01-15T10:00:00-05:00')"
+							"description": "End time in RFC 3339 format (e.g. '2024-01-15T10:00:00-05:00')",
+							"x-ui": {"label": "End time", "widget": "datetime"}
 						},
 						"attendees": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "List of attendee email addresses"
+							"description": "List of attendee email addresses",
+							"x-ui": {"label": "Attendees", "help_text": "Email addresses of the people to invite"}
 						},
 						"calendar_id": {
 							"type": "string",
@@ -154,7 +163,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"default": 10,
 							"minimum": 1,
 							"maximum": 250,
-							"description": "Maximum number of events to return (1-250, default 10)"
+							"description": "Maximum number of events to return (1-250, default 10)",
+							"x-ui": {"label": "Max results"}
 						},
 						"time_min": {
 							"type": "string",
@@ -192,11 +202,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"spreadsheet_id": {
 							"type": "string",
-							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)",
+							"x-ui": {"label": "Spreadsheet ID", "placeholder": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms", "help_text": "From the Google Sheets URL between /d/ and /edit"}
 						},
 						"range": {
 							"type": "string",
-							"description": "A1 notation range including sheet name (e.g. 'Sheet1!A1:D10'). Use sheet name alone to read all data (e.g. 'Sheet1')."
+							"description": "A1 notation range including sheet name (e.g. 'Sheet1!A1:D10'). Use sheet name alone to read all data (e.g. 'Sheet1').",
+							"x-ui": {"label": "Range", "placeholder": "Sheet1!A1:D10", "help_text": "A1 notation — e.g. Sheet1!A1:D10 or just Sheet1"}
 						}
 					}
 				}`)),
@@ -213,11 +225,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"spreadsheet_id": {
 							"type": "string",
-							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)",
+							"x-ui": {"label": "Spreadsheet ID", "placeholder": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms", "help_text": "From the Google Sheets URL between /d/ and /edit"}
 						},
 						"range": {
 							"type": "string",
-							"description": "A1 notation range including sheet name (e.g. 'Sheet1!A1:C3'). Defines the top-left starting cell for the write."
+							"description": "A1 notation range including sheet name (e.g. 'Sheet1!A1:C3'). Defines the top-left starting cell for the write.",
+							"x-ui": {"label": "Range", "placeholder": "Sheet1!A1:D10", "help_text": "A1 notation — e.g. Sheet1!A1:D10 or just Sheet1"}
 						},
 						"values": {
 							"type": "array",
@@ -225,7 +239,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "array",
 								"items": {}
 							},
-							"description": "2D array of cell values (rows of columns). All rows must have the same number of columns. Values are parsed as if typed into the UI (formulas and formats applied)."
+							"description": "2D array of cell values (rows of columns). All rows must have the same number of columns. Values are parsed as if typed into the UI (formulas and formats applied).",
+							"x-ui": {"label": "Values", "help_text": "2D array of rows — e.g. [[\"Name\", \"Email\"], [\"John\", \"john@example.com\"]]"}
 						}
 					}
 				}`)),
@@ -242,11 +257,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"spreadsheet_id": {
 							"type": "string",
-							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)",
+							"x-ui": {"label": "Spreadsheet ID", "placeholder": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms", "help_text": "From the Google Sheets URL between /d/ and /edit"}
 						},
 						"range": {
 							"type": "string",
-							"description": "Sheet name or starting cell (e.g. 'Sheet1' or 'Sheet1!A1'). Rows are appended after the last row with data in this range."
+							"description": "Sheet name or starting cell (e.g. 'Sheet1' or 'Sheet1!A1'). Rows are appended after the last row with data in this range.",
+							"x-ui": {"label": "Range", "placeholder": "Sheet1", "help_text": "Sheet name or starting cell — rows append after existing data"}
 						},
 						"values": {
 							"type": "array",
@@ -254,7 +271,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 								"type": "array",
 								"items": {}
 							},
-							"description": "2D array of row values to append (rows of columns). All rows must have the same number of columns. Values are parsed as if typed into the UI."
+							"description": "2D array of row values to append (rows of columns). All rows must have the same number of columns. Values are parsed as if typed into the UI.",
+							"x-ui": {"label": "Values", "help_text": "2D array of rows to append"}
 						}
 					}
 				}`)),
@@ -271,7 +289,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"spreadsheet_id": {
 							"type": "string",
-							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)"
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)",
+							"x-ui": {"label": "Spreadsheet ID", "placeholder": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms", "help_text": "From the Google Sheets URL between /d/ and /edit"}
 						}
 					}
 				}`)),
@@ -289,11 +308,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"title": {
 							"type": "string",
-							"description": "Title of the new Google Doc"
+							"description": "Title of the new Google Doc",
+							"x-ui": {"label": "Title", "placeholder": "Meeting Notes"}
 						},
 						"body": {
 							"type": "string",
-							"description": "Optional initial body content (plain text)"
+							"description": "Optional initial body content (plain text)",
+							"x-ui": {"label": "Body", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -310,7 +331,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"document_id": {
 							"type": "string",
-							"description": "The ID of the Google Doc to retrieve (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')"
+							"description": "The ID of the Google Doc to retrieve (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')",
+							"x-ui": {"label": "Document ID", "help_text": "From the Google Docs URL between /d/ and /edit"}
 						}
 					}
 				}`)),
@@ -327,16 +349,19 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"document_id": {
 							"type": "string",
-							"description": "The ID of the Google Doc to update (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')"
+							"description": "The ID of the Google Doc to update (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')",
+							"x-ui": {"label": "Document ID", "help_text": "From the Google Docs URL between /d/ and /edit"}
 						},
 						"text": {
 							"type": "string",
-							"description": "Text to insert into the document"
+							"description": "Text to insert into the document",
+							"x-ui": {"label": "Text", "widget": "textarea"}
 						},
 						"index": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "Character index to insert at (1-based). Defaults to end of document."
+							"description": "Character index to insert at (1-based). Defaults to end of document.",
+							"x-ui": {"label": "Insert position", "help_text": "1-based character index — omit to append at end"}
 						}
 					}
 				}`)),
@@ -352,14 +377,16 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search query to filter documents by name"
+							"description": "Search query to filter documents by name",
+							"x-ui": {"label": "Search query", "placeholder": "meeting notes"}
 						},
 						"max_results": {
 							"type": "integer",
 							"default": 10,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Maximum number of documents to return (1-100, default 10)"
+							"description": "Maximum number of documents to return (1-100, default 10)",
+							"x-ui": {"label": "Max results"}
 						}
 					}
 				}`)),
@@ -377,7 +404,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"title": {
 							"type": "string",
-							"description": "Title of the new presentation"
+							"description": "Title of the new presentation",
+							"x-ui": {"label": "Title", "placeholder": "Q1 Review"}
 						}
 					}
 				}`)),
@@ -394,7 +422,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"presentation_id": {
 							"type": "string",
-							"description": "The ID of the presentation to retrieve"
+							"description": "The ID of the presentation to retrieve",
+							"x-ui": {"label": "Presentation ID", "help_text": "From the Google Slides URL between /d/ and /edit"}
 						}
 					}
 				}`)),
@@ -411,18 +440,21 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"presentation_id": {
 							"type": "string",
-							"description": "The ID of the presentation to add a slide to"
+							"description": "The ID of the presentation to add a slide to",
+							"x-ui": {"label": "Presentation ID", "help_text": "From the Google Slides URL between /d/ and /edit"}
 						},
 						"layout": {
 							"type": "string",
 							"enum": ["BLANK", "TITLE", "TITLE_AND_BODY", "TITLE_ONLY", "SECTION_HEADER", "SECTION_TITLE_AND_DESCRIPTION", "ONE_COLUMN_TEXT", "MAIN_POINT", "BIG_NUMBER", "CAPTION_ONLY", "TITLE_AND_TWO_COLUMNS"],
 							"default": "BLANK",
-							"description": "Predefined slide layout (defaults to BLANK)"
+							"description": "Predefined slide layout (defaults to BLANK)",
+							"x-ui": {"widget": "select", "label": "Layout"}
 						},
 						"insertion_index": {
 							"type": "integer",
 							"minimum": 0,
-							"description": "Position to insert the slide at (defaults to end)"
+							"description": "Position to insert the slide at (defaults to end)",
+							"x-ui": {"label": "Position", "help_text": "0-based slide index — 0 means first slide"}
 						}
 					}
 				}`)),
@@ -439,11 +471,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"space_name": {
 							"type": "string",
-							"description": "The resource name of the space (e.g. 'spaces/AAAA1234')"
+							"description": "The resource name of the space (e.g. 'spaces/AAAA1234')",
+							"x-ui": {"label": "Space", "placeholder": "spaces/AAAA1234", "help_text": "Chat space resource name — use google.list_chat_spaces to find IDs"}
 						},
 						"text": {
 							"type": "string",
-							"description": "The message text"
+							"description": "The message text",
+							"x-ui": {"label": "Message", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -461,11 +495,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"default": 20,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Maximum number of spaces to return (1-100, default 20)"
+							"description": "Maximum number of spaces to return (1-100, default 20)",
+							"x-ui": {"label": "Max results"}
 						},
 						"filter": {
 							"type": "string",
-							"description": "Optional filter query (e.g. 'spaceType = \"SPACE\"' to list only named spaces)"
+							"description": "Optional filter query (e.g. 'spaceType = \"SPACE\"' to list only named spaces)",
+							"x-ui": {"label": "Filter", "placeholder": "spaceType = \"SPACE\""}
 						}
 					}
 				}`)),
@@ -483,26 +519,31 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"summary": {
 							"type": "string",
-							"description": "Meeting title"
+							"description": "Meeting title",
+							"x-ui": {"label": "Title", "placeholder": "Weekly Standup"}
 						},
 						"description": {
 							"type": "string",
-							"description": "Meeting description"
+							"description": "Meeting description",
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						},
 						"start_time": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')"
+							"description": "Start time in RFC 3339 format (e.g. '2024-01-15T09:00:00-05:00')",
+							"x-ui": {"label": "Start time", "widget": "datetime"}
 						},
 						"end_time": {
 							"type": "string",
 							"format": "date-time",
-							"description": "End time in RFC 3339 format (e.g. '2024-01-15T10:00:00-05:00')"
+							"description": "End time in RFC 3339 format (e.g. '2024-01-15T10:00:00-05:00')",
+							"x-ui": {"label": "End time", "widget": "datetime"}
 						},
 						"attendees": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "List of attendee email addresses"
+							"description": "List of attendee email addresses",
+							"x-ui": {"label": "Attendees", "help_text": "Email addresses of the people to invite"}
 						},
 						"calendar_id": {
 							"type": "string",
@@ -540,15 +581,18 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"default": 10,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Maximum number of files to return (1-100, default 10)"
+							"description": "Maximum number of files to return (1-100, default 10)",
+							"x-ui": {"label": "Max results"}
 						},
 						"folder_id": {
 							"type": "string",
-							"description": "Folder ID to list files from (defaults to all accessible files)"
+							"description": "Folder ID to list files from (defaults to all accessible files)",
+							"x-ui": {"label": "Folder", "help_text": "Google Drive folder ID — from the folder URL"}
 						},
 						"order_by": {
 							"type": "string",
-							"description": "Sort order (e.g. 'modifiedTime desc', 'name'). Defaults to Drive's relevance ordering."
+							"description": "Sort order (e.g. 'modifiedTime desc', 'name'). Defaults to Drive's relevance ordering.",
+							"x-ui": {"label": "Sort by", "placeholder": "modifiedTime desc"}
 						}
 					}
 				}`)),
@@ -565,12 +609,14 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"file_id": {
 							"type": "string",
-							"description": "The ID of the file to retrieve"
+							"description": "The ID of the file to retrieve",
+							"x-ui": {"label": "File ID", "help_text": "Google Drive file ID — from the file URL or API response"}
 						},
 						"include_content": {
 							"type": "boolean",
 							"default": false,
-							"description": "Whether to include file content (exports Google Docs/Sheets/Slides as plain text)"
+							"description": "Whether to include file content (exports Google Docs/Sheets/Slides as plain text)",
+							"x-ui": {"widget": "toggle", "label": "Include content"}
 						}
 					}
 				}`)),
@@ -587,20 +633,24 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"name": {
 							"type": "string",
-							"description": "File name"
+							"description": "File name",
+							"x-ui": {"label": "File name", "placeholder": "report.txt"}
 						},
 						"content": {
 							"type": "string",
-							"description": "File content (text)"
+							"description": "File content (text)",
+							"x-ui": {"label": "Content", "widget": "textarea"}
 						},
 						"mime_type": {
 							"type": "string",
 							"default": "text/plain",
-							"description": "MIME type of the file (default: text/plain)"
+							"description": "MIME type of the file (default: text/plain)",
+							"x-ui": {"label": "MIME type", "placeholder": "text/plain"}
 						},
 						"folder_id": {
 							"type": "string",
-							"description": "Parent folder ID (optional)"
+							"description": "Parent folder ID (optional)",
+							"x-ui": {"label": "Folder", "help_text": "Google Drive folder ID — omit to upload to root"}
 						}
 					}
 				}`)),
@@ -617,7 +667,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"file_id": {
 							"type": "string",
-							"description": "The ID of the file to move to trash"
+							"description": "The ID of the file to move to trash",
+							"x-ui": {"label": "File ID", "help_text": "Google Drive file ID — from the file URL or API response"}
 						}
 					}
 				}`)),
@@ -634,7 +685,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"event_id": {
 							"type": "string",
-							"description": "The ID of the calendar event to update"
+							"description": "The ID of the calendar event to update",
+							"x-ui": {"label": "Event ID", "help_text": "Calendar event ID — from google.list_calendar_events"}
 						},
 						"calendar_id": {
 							"type": "string",
@@ -652,34 +704,41 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"summary": {
 							"type": "string",
-							"description": "New event title"
+							"description": "New event title",
+							"x-ui": {"label": "Title"}
 						},
 						"description": {
 							"type": "string",
-							"description": "New event description"
+							"description": "New event description",
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						},
 						"start_time": {
 							"type": "string",
 							"format": "date-time",
-							"description": "New start time in RFC 3339 format. Must be provided together with end_time."
+							"description": "New start time in RFC 3339 format. Must be provided together with end_time.",
+							"x-ui": {"label": "Start time", "widget": "datetime"}
 						},
 						"end_time": {
 							"type": "string",
 							"format": "date-time",
-							"description": "New end time in RFC 3339 format. Must be provided together with start_time."
+							"description": "New end time in RFC 3339 format. Must be provided together with start_time.",
+							"x-ui": {"label": "End time", "widget": "datetime"}
 						},
 						"attendees": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Replacement list of attendee email addresses. Cannot be used together with clear_attendees."
+							"description": "Replacement list of attendee email addresses. Cannot be used together with clear_attendees.",
+							"x-ui": {"label": "Attendees", "help_text": "Email addresses — replaces all existing attendees"}
 						},
 						"clear_attendees": {
 							"type": "boolean",
-							"description": "Set to true to remove all attendees from the event. Cannot be used together with attendees."
+							"description": "Set to true to remove all attendees from the event. Cannot be used together with attendees.",
+							"x-ui": {"widget": "toggle", "label": "Clear attendees"}
 						},
 						"location": {
 							"type": "string",
-							"description": "Event location"
+							"description": "Event location",
+							"x-ui": {"label": "Location", "placeholder": "Conference Room A"}
 						}
 					}
 				}`)),
@@ -696,7 +755,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"event_id": {
 							"type": "string",
-							"description": "The ID of the calendar event to delete"
+							"description": "The ID of the calendar event to delete",
+							"x-ui": {"label": "Event ID", "help_text": "Calendar event ID — from google.list_calendar_events"}
 						},
 						"calendar_id": {
 							"type": "string",
@@ -726,23 +786,27 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search term to match against file names and content"
+							"description": "Search term to match against file names and content",
+							"x-ui": {"label": "Search query", "placeholder": "quarterly report"}
 						},
 						"file_type": {
 							"type": "string",
 							"enum": ["document", "spreadsheet", "presentation", "folder", "pdf", "image", "video", "audio"],
-							"description": "Filter by file type"
+							"description": "Filter by file type",
+							"x-ui": {"widget": "select", "label": "File type"}
 						},
 						"folder_id": {
 							"type": "string",
-							"description": "Limit search to files within this folder ID"
+							"description": "Limit search to files within this folder ID",
+							"x-ui": {"label": "Folder", "help_text": "Google Drive folder ID — omit to search all files"}
 						},
 						"max_results": {
 							"type": "integer",
 							"default": 10,
 							"minimum": 1,
 							"maximum": 100,
-							"description": "Maximum number of results to return (1-100, default 10)"
+							"description": "Maximum number of results to return (1-100, default 10)",
+							"x-ui": {"label": "Max results"}
 						}
 					}
 				}`)),
@@ -759,11 +823,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"name": {
 							"type": "string",
-							"description": "Name of the new folder"
+							"description": "Name of the new folder",
+							"x-ui": {"label": "Folder name", "placeholder": "Project Files"}
 						},
 						"parent_id": {
 							"type": "string",
-							"description": "Parent folder ID (optional, defaults to Drive root)"
+							"description": "Parent folder ID (optional, defaults to Drive root)",
+							"x-ui": {"label": "Parent folder", "help_text": "Google Drive folder ID — omit to create in root"}
 						}
 					}
 				}`)),
@@ -780,13 +846,15 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"message_id": {
 							"type": "string",
-							"description": "The Gmail message ID to read (from list_emails results)"
+							"description": "The Gmail message ID to read (from list_emails results)",
+							"x-ui": {"label": "Message ID", "help_text": "Gmail message ID — from google.list_emails results"}
 						},
 						"format": {
 							"type": "string",
 							"enum": ["full", "metadata", "minimal"],
 							"default": "full",
-							"description": "Controls how much of the message is returned. 'full' (default) returns headers, body, and attachment metadata. 'metadata' returns headers only (no body). 'minimal' returns only ID, labels, and snippet."
+							"description": "Controls how much of the message is returned. 'full' (default) returns headers, body, and attachment metadata. 'metadata' returns headers only (no body). 'minimal' returns only ID, labels, and snippet.",
+							"x-ui": {"widget": "select", "label": "Format"}
 						}
 					}
 				}`)),
@@ -803,15 +871,18 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"thread_id": {
 							"type": "string",
-							"description": "The Gmail thread ID to reply to"
+							"description": "The Gmail thread ID to reply to",
+							"x-ui": {"label": "Thread ID", "help_text": "Gmail thread ID — from google.list_emails results"}
 						},
 						"message_id": {
 							"type": "string",
-							"description": "The ID of the specific message to reply to (used to fetch subject and recipient)"
+							"description": "The ID of the specific message to reply to (used to fetch subject and recipient)",
+							"x-ui": {"label": "Message ID", "help_text": "ID of the message to reply to"}
 						},
 						"body": {
 							"type": "string",
-							"description": "Reply body (plain text)"
+							"description": "Reply body (plain text)",
+							"x-ui": {"label": "Reply", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -828,7 +899,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"thread_id": {
 							"type": "string",
-							"description": "The Gmail thread ID to archive (obtained from list_emails thread_id field)"
+							"description": "The Gmail thread ID to archive (obtained from list_emails thread_id field)",
+							"x-ui": {"label": "Thread ID", "help_text": "Gmail thread ID — from google.list_emails results"}
 						}
 					}
 				}`)),

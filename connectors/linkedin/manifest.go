@@ -31,25 +31,30 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 						"text": {
 							"type": "string",
 							"maxLength": 3000,
-							"description": "Post text content (max 3,000 characters)"
+							"description": "Post text content (max 3,000 characters)",
+							"x-ui": {"label": "Post text", "widget": "textarea"}
 						},
 						"visibility": {
 							"type": "string",
 							"enum": ["PUBLIC", "CONNECTIONS"],
 							"default": "PUBLIC",
-							"description": "Post visibility (PUBLIC or CONNECTIONS, defaults to PUBLIC)"
+							"description": "Post visibility (PUBLIC or CONNECTIONS, defaults to PUBLIC)",
+							"x-ui": {"label": "Visibility", "widget": "select"}
 						},
 						"article_url": {
 							"type": "string",
-							"description": "URL for a link share attachment"
+							"description": "URL for a link share attachment",
+							"x-ui": {"label": "Article URL", "placeholder": "https://example.com/article"}
 						},
 						"article_title": {
 							"type": "string",
-							"description": "Title for the link share attachment"
+							"description": "Title for the link share attachment",
+							"x-ui": {"label": "Article title", "placeholder": "My article title"}
 						},
 						"article_description": {
 							"type": "string",
-							"description": "Description for the link share attachment"
+							"description": "Description for the link share attachment",
+							"x-ui": {"label": "Article description", "placeholder": "Brief description of the article"}
 						}
 					}
 				}`)),
@@ -65,7 +70,8 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"post_urn": {
 							"type": "string",
-							"description": "The post URN (e.g. 'urn:li:share:123456')"
+							"description": "The post URN (e.g. 'urn:li:share:123456')",
+							"x-ui": {"label": "Post URN", "placeholder": "urn:li:share:1234567890", "help_text": "LinkedIn URN — find in the post URL or API response"}
 						}
 					}
 				}`)),
@@ -81,12 +87,14 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"post_urn": {
 							"type": "string",
-							"description": "The post URN to comment on (e.g. 'urn:li:share:123456')"
+							"description": "The post URN to comment on (e.g. 'urn:li:share:123456')",
+							"x-ui": {"label": "Post URN", "placeholder": "urn:li:share:1234567890", "help_text": "LinkedIn URN — find in the post URL or API response"}
 						},
 						"text": {
 							"type": "string",
 							"maxLength": 1250,
-							"description": "Comment text (max 1,250 characters)"
+							"description": "Comment text (max 1,250 characters)",
+							"x-ui": {"label": "Comment", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -112,7 +120,8 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"post_urn": {
 							"type": "string",
-							"description": "The post URN to get analytics for (e.g. 'urn:li:share:123456')"
+							"description": "The post URN to get analytics for (e.g. 'urn:li:share:123456')",
+							"x-ui": {"label": "Post URN", "placeholder": "urn:li:share:1234567890", "help_text": "LinkedIn URN — find in the post URL or API response"}
 						}
 					}
 				}`)),
@@ -128,26 +137,31 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"organization_id": {
 							"type": "string",
-							"description": "The LinkedIn organization ID (numeric, e.g. '12345')"
+							"description": "The LinkedIn organization ID (numeric, e.g. '12345')",
+							"x-ui": {"label": "Organization ID", "help_text": "Numeric LinkedIn organization ID — find in your Company Page admin URL"}
 						},
 						"text": {
 							"type": "string",
 							"maxLength": 3000,
-							"description": "Post text content (max 3,000 characters)"
+							"description": "Post text content (max 3,000 characters)",
+							"x-ui": {"label": "Post text", "widget": "textarea"}
 						},
 						"visibility": {
 							"type": "string",
 							"enum": ["PUBLIC"],
 							"default": "PUBLIC",
-							"description": "Post visibility (company posts are always PUBLIC)"
+							"description": "Post visibility (company posts are always PUBLIC)",
+							"x-ui": {"label": "Visibility", "widget": "select"}
 						},
 						"article_url": {
 							"type": "string",
-							"description": "URL for a link share attachment"
+							"description": "URL for a link share attachment",
+							"x-ui": {"label": "Article URL", "placeholder": "https://example.com/article"}
 						},
 						"article_title": {
 							"type": "string",
-							"description": "Title for the link share attachment"
+							"description": "Title for the link share attachment",
+							"x-ui": {"label": "Article title", "placeholder": "My article title"}
 						}
 					}
 				}`)),
@@ -163,17 +177,20 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"recipient_urn": {
 							"type": "string",
-							"description": "LinkedIn person URN of the recipient (e.g. 'urn:li:person:123456')"
+							"description": "LinkedIn person URN of the recipient (e.g. 'urn:li:person:123456')",
+							"x-ui": {"label": "Recipient", "placeholder": "urn:li:person:abc123", "help_text": "LinkedIn member URN"}
 						},
 						"subject": {
 							"type": "string",
 							"maxLength": 200,
-							"description": "Message subject line (optional, max 200 characters)"
+							"description": "Message subject line (optional, max 200 characters)",
+							"x-ui": {"label": "Subject", "placeholder": "Message subject"}
 						},
 						"body": {
 							"type": "string",
 							"maxLength": 8000,
-							"description": "Message body text (max 8,000 characters)"
+							"description": "Message body text (max 8,000 characters)",
+							"x-ui": {"label": "Message", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -188,22 +205,26 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"keywords": {
 							"type": "string",
-							"description": "Name or general keywords to search for"
+							"description": "Name or general keywords to search for",
+							"x-ui": {"label": "Keywords", "placeholder": "software engineer"}
 						},
 						"company": {
 							"type": "string",
-							"description": "Filter by current company name or ID"
+							"description": "Filter by current company name or ID",
+							"x-ui": {"label": "Company", "placeholder": "Acme Corp"}
 						},
 						"title": {
 							"type": "string",
-							"description": "Filter by job title"
+							"description": "Filter by job title",
+							"x-ui": {"label": "Job title", "placeholder": "Engineering Manager"}
 						},
 						"count": {
 							"type": "integer",
 							"minimum": 0,
 							"maximum": 50,
 							"default": 10,
-							"description": "Number of results to return (max 50, default 10, 0 = use default)"
+							"description": "Number of results to return (max 50, default 10, 0 = use default)",
+							"x-ui": {"label": "Max results"}
 						},
 						"start": {
 							"type": "integer",
@@ -226,14 +247,16 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"keywords": {
 							"type": "string",
-							"description": "Company name or keywords to search for"
+							"description": "Company name or keywords to search for",
+							"x-ui": {"label": "Keywords", "placeholder": "software engineer"}
 						},
 						"count": {
 							"type": "integer",
 							"minimum": 0,
 							"maximum": 50,
 							"default": 10,
-							"description": "Number of results to return (max 50, default 10, 0 = use default)"
+							"description": "Number of results to return (max 50, default 10, 0 = use default)",
+							"x-ui": {"label": "Max results"}
 						},
 						"start": {
 							"type": "integer",
@@ -256,7 +279,8 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"organization_id": {
 							"type": "string",
-							"description": "The LinkedIn organization ID (numeric, e.g. '12345')"
+							"description": "The LinkedIn organization ID (numeric, e.g. '12345')",
+							"x-ui": {"label": "Organization ID", "help_text": "Numeric LinkedIn organization ID — find in your Company Page admin URL"}
 						}
 					}
 				}`)),
@@ -274,7 +298,8 @@ func (c *LinkedInConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 0,
 							"maximum": 500,
 							"default": 20,
-							"description": "Number of connections to return (max 500, default 20, 0 = use default)"
+							"description": "Number of connections to return (max 500, default 20, 0 = use default)",
+							"x-ui": {"label": "Max results"}
 						},
 						"start": {
 							"type": "integer",

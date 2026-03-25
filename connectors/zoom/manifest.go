@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -31,14 +32,16 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"enum": ["scheduled", "live", "upcoming"],
 							"default": "upcoming",
-							"description": "Meeting type filter: scheduled, live, or upcoming"
+							"description": "Meeting type filter: scheduled, live, or upcoming",
+							"x-ui": {"widget": "select", "label": "Meeting type"}
 						},
 						"page_size": {
 							"type": "integer",
 							"default": 30,
 							"minimum": 1,
 							"maximum": 300,
-							"description": "Number of meetings to return per page (1-300, default 30)"
+							"description": "Number of meetings to return per page (1-300, default 30)",
+							"x-ui": {"label": "Results per page", "placeholder": "30"}
 						}
 					}
 				}`)),
@@ -54,45 +57,53 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"topic": {
 							"type": "string",
-							"description": "Meeting topic/title"
+							"description": "Meeting topic/title",
+							"x-ui": {"label": "Topic", "placeholder": "Weekly Team Standup"}
 						},
 						"type": {
 							"type": "integer",
 							"enum": [1, 2],
 							"default": 2,
-							"description": "Meeting type: 1 (instant) or 2 (scheduled)"
+							"description": "Meeting type: 1 (instant) or 2 (scheduled)",
+							"x-ui": {"widget": "select", "label": "Meeting type", "help_text": "1 = instant, 2 = scheduled, 3 = recurring (no fixed time), 8 = recurring (fixed time)"}
 						},
 						"start_time": {
 							"type": "string",
 							"format": "date-time",
 							"description": "Start time in ISO 8601 format (e.g. '2024-01-15T09:00:00Z')",
-							"x-ui": {"widget": "datetime"}
+							"x-ui": {"widget": "datetime", "label": "Start time", "help_text": "Start time in ISO 8601 format"}
 						},
 						"duration": {
 							"type": "integer",
-							"description": "Meeting duration in minutes"
+							"description": "Meeting duration in minutes",
+							"x-ui": {"label": "Duration (minutes)", "placeholder": "60"}
 						},
 						"timezone": {
 							"type": "string",
-							"description": "Timezone (e.g. 'America/New_York')"
+							"description": "Timezone (e.g. 'America/New_York')",
+							"x-ui": {"label": "Timezone", "placeholder": "America/New_York"}
 						},
 						"agenda": {
 							"type": "string",
-							"description": "Meeting agenda/description"
+							"description": "Meeting agenda/description",
+							"x-ui": {"widget": "textarea", "label": "Agenda"}
 						},
 						"settings": {
 							"type": "object",
 							"properties": {
 								"join_before_host": {
 									"type": "boolean",
-									"description": "Allow participants to join before host"
+									"description": "Allow participants to join before host",
+									"x-ui": {"widget": "toggle", "label": "Join before host"}
 								},
 								"waiting_room": {
 									"type": "boolean",
-									"description": "Enable waiting room"
+									"description": "Enable waiting room",
+									"x-ui": {"widget": "toggle", "label": "Waiting room"}
 								}
 							},
-							"description": "Meeting settings"
+							"description": "Meeting settings",
+							"x-ui": {"label": "Settings"}
 						}
 					}
 				}`)),
@@ -108,7 +119,8 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"meeting_id": {
 							"type": "string",
-							"description": "The meeting ID to retrieve"
+							"description": "The meeting ID to retrieve",
+							"x-ui": {"label": "Meeting ID", "help_text": "Numeric meeting ID from the Zoom URL or API"}
 						}
 					}
 				}`)),
@@ -124,43 +136,51 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"meeting_id": {
 							"type": "string",
-							"description": "The meeting ID to update"
+							"description": "The meeting ID to update",
+							"x-ui": {"label": "Meeting ID", "help_text": "Numeric meeting ID from the Zoom URL or API"}
 						},
 						"topic": {
 							"type": "string",
-							"description": "Updated meeting topic"
+							"description": "Updated meeting topic",
+							"x-ui": {"label": "Topic", "placeholder": "Weekly Team Standup"}
 						},
 						"start_time": {
 							"type": "string",
 							"format": "date-time",
 							"description": "Updated start time in ISO 8601 format",
-							"x-ui": {"widget": "datetime"}
+							"x-ui": {"widget": "datetime", "label": "Start time", "help_text": "Start time in ISO 8601 format"}
 						},
 						"duration": {
 							"type": "integer",
-							"description": "Updated duration in minutes"
+							"description": "Updated duration in minutes",
+							"x-ui": {"label": "Duration (minutes)", "placeholder": "60"}
 						},
 						"timezone": {
 							"type": "string",
-							"description": "Updated timezone"
+							"description": "Updated timezone",
+							"x-ui": {"label": "Timezone", "placeholder": "America/New_York"}
 						},
 						"agenda": {
 							"type": "string",
-							"description": "Updated agenda"
+							"description": "Updated agenda",
+							"x-ui": {"widget": "textarea", "label": "Agenda"}
 						},
 						"settings": {
 							"type": "object",
 							"properties": {
 								"join_before_host": {
 									"type": "boolean",
-									"description": "Allow participants to join before host"
+									"description": "Allow participants to join before host",
+									"x-ui": {"widget": "toggle", "label": "Join before host"}
 								},
 								"waiting_room": {
 									"type": "boolean",
-									"description": "Enable waiting room"
+									"description": "Enable waiting room",
+									"x-ui": {"widget": "toggle", "label": "Waiting room"}
 								}
 							},
-							"description": "Updated meeting settings"
+							"description": "Updated meeting settings",
+							"x-ui": {"label": "Settings"}
 						}
 					}
 				}`)),
@@ -176,11 +196,13 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"meeting_id": {
 							"type": "string",
-							"description": "The meeting ID to delete"
+							"description": "The meeting ID to delete",
+							"x-ui": {"label": "Meeting ID", "help_text": "Numeric meeting ID from the Zoom URL or API"}
 						},
 						"schedule_for_reminder": {
 							"type": "boolean",
-							"description": "Send a cancellation reminder to participants"
+							"description": "Send a cancellation reminder to participants",
+							"x-ui": {"widget": "toggle", "label": "Send cancellation reminder"}
 						}
 					}
 				}`)),
@@ -196,18 +218,21 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"from": {
 							"type": "string",
-							"description": "Start date in YYYY-MM-DD format"
+							"description": "Start date in YYYY-MM-DD format",
+							"x-ui": {"widget": "date", "label": "From date"}
 						},
 						"to": {
 							"type": "string",
-							"description": "End date in YYYY-MM-DD format"
+							"description": "End date in YYYY-MM-DD format",
+							"x-ui": {"widget": "date", "label": "To date"}
 						},
 						"page_size": {
 							"type": "integer",
 							"default": 30,
 							"minimum": 1,
 							"maximum": 300,
-							"description": "Number of recordings to return per page (1-300, default 30)"
+							"description": "Number of recordings to return per page (1-300, default 30)",
+							"x-ui": {"label": "Results per page", "placeholder": "30"}
 						}
 					}
 				}`)),
@@ -223,7 +248,8 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"meeting_id": {
 							"type": "string",
-							"description": "The meeting ID to get participants for"
+							"description": "The meeting ID to get participants for",
+							"x-ui": {"label": "Meeting ID", "help_text": "Numeric meeting ID from the Zoom URL or API"}
 						}
 					}
 				}`)),
@@ -239,19 +265,23 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"meeting_id": {
 							"type": "string",
-							"description": "The meeting ID to register the attendee for"
+							"description": "The meeting ID to register the attendee for",
+							"x-ui": {"label": "Meeting ID", "help_text": "Numeric meeting ID from the Zoom URL or API"}
 						},
 						"email": {
 							"type": "string",
-							"description": "Attendee email address"
+							"description": "Attendee email address",
+							"x-ui": {"label": "Email", "placeholder": "attendee@example.com"}
 						},
 						"first_name": {
 							"type": "string",
-							"description": "Attendee first name"
+							"description": "Attendee first name",
+							"x-ui": {"label": "First name", "placeholder": "Jane"}
 						},
 						"last_name": {
 							"type": "string",
-							"description": "Attendee last name (optional)"
+							"description": "Attendee last name (optional)",
+							"x-ui": {"label": "Last name", "placeholder": "Doe"}
 						}
 					}
 				}`)),
@@ -267,7 +297,8 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"meeting_id": {
 							"type": "string",
-							"description": "The meeting ID to get the transcript for"
+							"description": "The meeting ID to get the transcript for",
+							"x-ui": {"label": "Meeting ID", "help_text": "Numeric meeting ID from the Zoom URL or API"}
 						}
 					}
 				}`)),
@@ -283,15 +314,18 @@ func (c *ZoomConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"message": {
 							"type": "string",
-							"description": "Message text to send"
+							"description": "Message text to send",
+							"x-ui": {"widget": "textarea", "label": "Message"}
 						},
 						"to_jid": {
 							"type": "string",
-							"description": "JID of the user or channel to send the message to (use this OR to_channel)"
+							"description": "JID of the user or channel to send the message to (use this OR to_channel)",
+							"x-ui": {"label": "Recipient JID", "help_text": "Zoom JID of the recipient — use one of to_jid or to_channel"}
 						},
 						"to_channel": {
 							"type": "string",
-							"description": "Channel ID to send the message to (use this OR to_jid)"
+							"description": "Channel ID to send the message to (use this OR to_jid)",
+							"x-ui": {"label": "Channel ID", "help_text": "Zoom channel ID — use one of to_jid or to_channel"}
 						}
 					}
 				}`)),

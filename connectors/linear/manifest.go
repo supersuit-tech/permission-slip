@@ -31,39 +31,46 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"team_id": {
 							"type": "string",
-							"description": "The team ID to create the issue in"
+							"description": "The team ID to create the issue in",
+							"x-ui": {"label": "Team", "help_text": "Team ID — use linear.list_teams to find team IDs"}
 						},
 						"title": {
 							"type": "string",
-							"description": "Issue title"
+							"description": "Issue title",
+							"x-ui": {"label": "Title", "placeholder": "Enter issue title"}
 						},
 						"description": {
 							"type": "string",
 							"description": "Issue description (markdown)",
-							"x-ui": {"widget": "textarea"}
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						},
 						"assignee_id": {
 							"type": "string",
-							"description": "User ID to assign the issue to"
+							"description": "User ID to assign the issue to",
+							"x-ui": {"label": "Assignee", "help_text": "User ID — find in team member settings"}
 						},
 						"priority": {
 							"type": "integer",
 							"minimum": 0,
 							"maximum": 4,
-							"description": "Priority: 0=none, 1=urgent, 2=high, 3=medium, 4=low"
+							"description": "Priority: 0=none, 1=urgent, 2=high, 3=medium, 4=low",
+							"x-ui": {"label": "Priority", "help_text": "0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low", "widget": "select"}
 						},
 						"state_id": {
 							"type": "string",
-							"description": "Workflow state ID"
+							"description": "Workflow state ID",
+							"x-ui": {"label": "State", "help_text": "Workflow state ID — use linear.list_states or linear.search_issues to find state IDs"}
 						},
 						"label_ids": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Label IDs to apply"
+							"description": "Label IDs to apply",
+							"x-ui": {"label": "Labels", "help_text": "Use linear.list_labels to find label IDs"}
 						},
 						"project_id": {
 							"type": "string",
-							"description": "Project ID to associate with"
+							"description": "Project ID to associate with",
+							"x-ui": {"label": "Project", "help_text": "Project ID — use linear.list_projects to find IDs"}
 						}
 					}
 				}`)),
@@ -79,35 +86,41 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"issue_id": {
 							"type": "string",
-							"description": "The issue ID to update"
+							"description": "The issue ID to update",
+							"x-ui": {"label": "Issue", "help_text": "Linear issue ID (UUID format)"}
 						},
 						"title": {
 							"type": "string",
-							"description": "New issue title"
+							"description": "New issue title",
+							"x-ui": {"label": "Title", "placeholder": "Enter new issue title"}
 						},
 						"description": {
 							"type": "string",
 							"description": "New issue description (markdown)",
-							"x-ui": {"widget": "textarea"}
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						},
 						"assignee_id": {
 							"type": "string",
-							"description": "User ID to assign the issue to"
+							"description": "User ID to assign the issue to",
+							"x-ui": {"label": "Assignee", "help_text": "User ID — find in team member settings"}
 						},
 						"priority": {
 							"type": "integer",
 							"minimum": 0,
 							"maximum": 4,
-							"description": "Priority: 0=none, 1=urgent, 2=high, 3=medium, 4=low"
+							"description": "Priority: 0=none, 1=urgent, 2=high, 3=medium, 4=low",
+							"x-ui": {"label": "Priority", "help_text": "0 = No priority, 1 = Urgent, 2 = High, 3 = Medium, 4 = Low", "widget": "select"}
 						},
 						"state_id": {
 							"type": "string",
-							"description": "Workflow state ID"
+							"description": "Workflow state ID",
+							"x-ui": {"label": "State", "help_text": "Workflow state ID — use linear.list_states or linear.search_issues to find state IDs"}
 						},
 						"label_ids": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Label IDs to apply"
+							"description": "Label IDs to apply",
+							"x-ui": {"label": "Labels", "help_text": "Use linear.list_labels to find label IDs"}
 						}
 					}
 				}`)),
@@ -123,12 +136,13 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"issue_id": {
 							"type": "string",
-							"description": "The issue ID to comment on"
+							"description": "The issue ID to comment on",
+							"x-ui": {"label": "Issue", "help_text": "Linear issue ID (UUID format)"}
 						},
 						"body": {
 							"type": "string",
 							"description": "Comment body (markdown)",
-							"x-ui": {"widget": "textarea"}
+							"x-ui": {"label": "Comment", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -145,20 +159,24 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 						"team_ids": {
 							"type": "array",
 							"items": {"type": "string"},
-							"description": "Team IDs to associate with the project"
+							"description": "Team IDs to associate with the project",
+							"x-ui": {"label": "Teams", "help_text": "Team IDs — use linear.list_teams to find team IDs"}
 						},
 						"name": {
 							"type": "string",
-							"description": "Project name"
+							"description": "Project name",
+							"x-ui": {"label": "Name", "placeholder": "Enter project name"}
 						},
 						"description": {
 							"type": "string",
-							"description": "Project description"
+							"description": "Project description",
+							"x-ui": {"label": "Description", "widget": "textarea"}
 						},
 						"state": {
 							"type": "string",
 							"enum": ["planned", "started", "paused", "completed", "cancelled"],
-							"description": "Project state"
+							"description": "Project state",
+							"x-ui": {"label": "State", "widget": "select", "help_text": "Valid values: planned, started, paused, completed, cancelled"}
 						}
 					}
 				}`)),
@@ -174,26 +192,31 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"query": {
 							"type": "string",
-							"description": "Search query (full-text across titles, descriptions, and comments when no filters are specified; matched against titles when filters are used)"
+							"description": "Search query (full-text across titles, descriptions, and comments when no filters are specified; matched against titles when filters are used)",
+							"x-ui": {"label": "Query", "placeholder": "Search issues..."}
 						},
 						"team_id": {
 							"type": "string",
-							"description": "Filter by team ID"
+							"description": "Filter by team ID",
+							"x-ui": {"label": "Team", "help_text": "Team ID — use linear.list_teams to find team IDs"}
 						},
 						"assignee_id": {
 							"type": "string",
-							"description": "Filter by assignee user ID"
+							"description": "Filter by assignee user ID",
+							"x-ui": {"label": "Assignee", "help_text": "User ID — find in team member settings"}
 						},
 						"state": {
 							"type": "string",
-							"description": "Filter by workflow state name"
+							"description": "Filter by workflow state name",
+							"x-ui": {"label": "State", "placeholder": "e.g. In Progress, Done", "help_text": "Workflow state name (not ID) — e.g. Backlog, Todo, In Progress, Done"}
 						},
 						"limit": {
 							"type": "integer",
 							"minimum": 1,
 							"maximum": 100,
 							"default": 50,
-							"description": "Maximum number of results (default 50, max 100)"
+							"description": "Maximum number of results (default 50, max 100)",
+							"x-ui": {"label": "Max results"}
 						}
 					}
 				}`)),
@@ -219,7 +242,8 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				"properties": {
 					"issue_id": {
 						"type": "string",
-						"description": "The issue ID to retrieve"
+						"description": "The issue ID to retrieve",
+						"x-ui": {"label": "Issue", "help_text": "Linear issue ID (UUID format)"}
 					}
 				}
 			}`)),
@@ -235,11 +259,13 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				"properties": {
 					"issue_id": {
 						"type": "string",
-						"description": "The issue ID to assign"
+						"description": "The issue ID to assign",
+						"x-ui": {"label": "Issue", "help_text": "Linear issue ID (UUID format)"}
 					},
 					"assignee_id": {
 						"type": "string",
-						"description": "User ID to assign (empty to unassign)"
+						"description": "User ID to assign (empty to unassign)",
+						"x-ui": {"label": "Assignee", "help_text": "User ID — find in team member settings"}
 					}
 				}
 			}`)),
@@ -255,11 +281,13 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				"properties": {
 					"issue_id": {
 						"type": "string",
-						"description": "The issue ID to update"
+						"description": "The issue ID to update",
+						"x-ui": {"label": "Issue", "help_text": "Linear issue ID (UUID format)"}
 					},
 					"state_id": {
 						"type": "string",
-						"description": "The target workflow state ID"
+						"description": "The target workflow state ID",
+						"x-ui": {"label": "State", "help_text": "Workflow state ID — use linear.list_states or linear.search_issues to find state IDs"}
 					}
 				}
 			}`)),
@@ -274,7 +302,8 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				"properties": {
 					"team_id": {
 						"type": "string",
-						"description": "Filter labels by team ID (optional)"
+						"description": "Filter labels by team ID (optional)",
+						"x-ui": {"label": "Team", "help_text": "Team ID — use linear.list_teams to find team IDs"}
 					}
 				}
 			}`)),
@@ -290,11 +319,13 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				"properties": {
 					"issue_id": {
 						"type": "string",
-						"description": "The issue ID to label"
+						"description": "The issue ID to label",
+						"x-ui": {"label": "Issue", "help_text": "Linear issue ID (UUID format)"}
 					},
 					"label_id": {
 						"type": "string",
-						"description": "The label ID to add"
+						"description": "The label ID to add",
+						"x-ui": {"label": "Label", "help_text": "Use linear.list_labels to find label IDs"}
 					}
 				}
 			}`)),
@@ -310,7 +341,8 @@ func (c *LinearConnector) Manifest() *connectors.ConnectorManifest {
 				"properties": {
 					"team_id": {
 						"type": "string",
-						"description": "Team ID to list cycles for"
+						"description": "Team ID to list cycles for",
+						"x-ui": {"label": "Team", "help_text": "Team ID — use linear.list_teams to find team IDs"}
 					}
 				}
 			}`)),

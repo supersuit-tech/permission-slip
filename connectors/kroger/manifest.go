@@ -30,18 +30,21 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"term": {
 							"type": "string",
-							"description": "Search term for products (e.g., \"organic milk\", \"sourdough bread\")"
+							"description": "Search term for products (e.g., \"organic milk\", \"sourdough bread\")",
+							"x-ui": {"label": "Search term", "placeholder": "organic milk"}
 						},
 						"location_id": {
 							"type": "string",
-							"description": "Kroger location ID for store-specific pricing and availability. Get IDs from kroger.search_locations (e.g., \"01400376\")"
+							"description": "Kroger location ID for store-specific pricing and availability. Get IDs from kroger.search_locations (e.g., \"01400376\")",
+							"x-ui": {"label": "Store location", "help_text": "Kroger location ID — use kroger.search_locations to find IDs"}
 						},
 						"limit": {
 							"type": "integer",
 							"minimum": 1,
 							"maximum": 50,
 							"default": 10,
-							"description": "Maximum number of results (1-50, default 10)"
+							"description": "Maximum number of results (1-50, default 10)",
+							"x-ui": {"label": "Max results"}
 						},
 						"start": {
 							"type": "integer",
@@ -63,11 +66,13 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"product_id": {
 							"type": "string",
-							"description": "Kroger product ID — a UPC barcode (e.g., \"0001111041700\"). Found in search results as productId"
+							"description": "Kroger product ID — a UPC barcode (e.g., \"0001111041700\"). Found in search results as productId",
+							"x-ui": {"label": "Product", "help_text": "UPC barcode or Kroger product ID"}
 						},
 						"location_id": {
 							"type": "string",
-							"description": "Kroger location ID for store-specific pricing and availability. Get IDs from kroger.search_locations (e.g., \"01400376\")"
+							"description": "Kroger location ID for store-specific pricing and availability. Get IDs from kroger.search_locations (e.g., \"01400376\")",
+							"x-ui": {"label": "Store location", "help_text": "Kroger location ID — use kroger.search_locations to find IDs"}
 						}
 					}
 				}`)),
@@ -82,37 +87,43 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"zip_code": {
 							"type": "string",
-							"description": "US ZIP code to search near (e.g., \"45202\"). Provide zip_code or lat/lon"
+							"description": "US ZIP code to search near (e.g., \"45202\"). Provide zip_code or lat/lon",
+							"x-ui": {"label": "ZIP code", "placeholder": "45202"}
 						},
 						"lat": {
 							"type": "number",
 							"minimum": -90,
 							"maximum": 90,
-							"description": "Latitude for location search (e.g., 39.1031). Use with lon"
+							"description": "Latitude for location search (e.g., 39.1031). Use with lon",
+							"x-ui": {"label": "Latitude"}
 						},
 						"lon": {
 							"type": "number",
 							"minimum": -180,
 							"maximum": 180,
-							"description": "Longitude for location search (e.g., -84.5120). Use with lat"
+							"description": "Longitude for location search (e.g., -84.5120). Use with lat",
+							"x-ui": {"label": "Longitude"}
 						},
 						"radius_miles": {
 							"type": "integer",
 							"minimum": 1,
 							"maximum": 100,
 							"default": 10,
-							"description": "Search radius in miles (1-100, default 10)"
+							"description": "Search radius in miles (1-100, default 10)",
+							"x-ui": {"label": "Radius (miles)"}
 						},
 						"chain": {
 							"type": "string",
-							"description": "Filter by store banner (e.g., \"Kroger\", \"Ralphs\", \"Fred Meyer\", \"Harris Teeter\")"
+							"description": "Filter by store banner (e.g., \"Kroger\", \"Ralphs\", \"Fred Meyer\", \"Harris Teeter\")",
+							"x-ui": {"label": "Store chain", "help_text": "e.g. Kroger, Ralphs, Fred Meyer"}
 						},
 						"limit": {
 							"type": "integer",
 							"minimum": 1,
 							"maximum": 200,
 							"default": 10,
-							"description": "Maximum number of results (1-200, default 10)"
+							"description": "Maximum number of results (1-200, default 10)",
+							"x-ui": {"label": "Max results"}
 						}
 					}
 				}`)),
@@ -136,21 +147,25 @@ func (c *KrogerConnector) Manifest() *connectors.ConnectorManifest {
 								"properties": {
 									"upc": {
 										"type": "string",
-										"description": "Product UPC code from search results (e.g., \"0001111041700\")"
+										"description": "Product UPC code from search results (e.g., \"0001111041700\")",
+										"x-ui": {"label": "UPC", "help_text": "Product UPC barcode"}
 									},
 									"quantity": {
 										"type": "integer",
 										"minimum": 1,
-										"description": "Quantity to add to cart"
+										"description": "Quantity to add to cart",
+										"x-ui": {"label": "Quantity"}
 									}
 								}
 							},
-							"description": "Items to add to the cart (max 25 per request)"
+							"description": "Items to add to the cart (max 25 per request)",
+							"x-ui": {"label": "Items"}
 						},
 						"modality": {
 							"type": "string",
 							"enum": ["PICKUP", "DELIVERY"],
-							"description": "Fulfillment method — PICKUP for in-store pickup, DELIVERY for home delivery. Omit to use the user's default"
+							"description": "Fulfillment method — PICKUP for in-store pickup, DELIVERY for home delivery. Omit to use the user's default",
+							"x-ui": {"label": "Fulfillment", "widget": "select"}
 						}
 					}
 				}`)),
