@@ -8,6 +8,7 @@ import { inferWidgetFromProperty } from "@/lib/parameterSchema";
 import { isConcreteDatetimeString } from "@/lib/datetime";
 import { CalendarRemoteSelectWidget } from "./CalendarRemoteSelectWidget";
 import { SlackChannelRemoteSelectWidget } from "./SlackChannelRemoteSelectWidget";
+import { SlackUserRemoteSelectWidget } from "./SlackUserRemoteSelectWidget";
 
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
@@ -149,6 +150,21 @@ function RemoteSelectField({
   if (connectorId === "slack" && path.endsWith("/channels")) {
     return (
       <SlackChannelRemoteSelectWidget
+        inputId={inputId}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder={placeholder}
+        className={className}
+        agentId={agentId}
+        connectorId={connectorId}
+        ui={propertyUI}
+      />
+    );
+  }
+  if (connectorId === "slack" && path.endsWith("/users")) {
+    return (
+      <SlackUserRemoteSelectWidget
         inputId={inputId}
         value={value}
         onChange={onChange}

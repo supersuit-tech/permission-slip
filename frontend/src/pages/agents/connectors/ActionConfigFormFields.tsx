@@ -199,13 +199,18 @@ export function ActionSelect({
  * Returns the names of required parameters that have empty (non-wildcard) values.
  * Used to prevent submitting a form with required params accidentally omitted
  * (e.g. after toggling from wildcard to fixed without entering a value).
+ *
+ * Hidden fields (x-ui.hidden) are excluded — they are auto-wildcarded at
+ * submission time and should never block the user.
  */
 export function getEmptyRequiredParams(
   paramValues: Record<string, string>,
   requiredFields?: string[],
+  schemaProperties?: Record<string, { "x-ui"?: { hidden?: boolean } }>,
 ): string[] {
   if (!requiredFields?.length) return [];
   return requiredFields.filter((key) => {
+    if (schemaProperties?.[key]?.["x-ui"]?.hidden) return false;
     const value = paramValues[key];
     return value === undefined || value === "";
   });
@@ -222,13 +227,26 @@ export type ParamMode = "fixed" | "pattern" | "wildcard";
  * Wildcard parameters (mode === "wildcard") are stored as "*".
  * Values containing "*" are auto-detected as patterns and wrapped as
  * {"$pattern": "<glob>"} for backend pattern matching.
+ *
+ * Hidden fields (x-ui.hidden) are automatically included as wildcards so the
+ * backend config allows the agent to pass any value for those parameters.
  */
 export function buildParametersFromForm(
   paramValues: Record<string, string>,
-  schemaProperties?: Record<string, { type?: string }>,
+  schemaProperties?: Record<string, { type?: string; "x-ui"?: { hidden?: boolean } }>,
   paramModes?: Record<string, ParamMode>,
 ): Record<string, unknown> {
   const parameters: Record<string, unknown> = {};
+
+  // Auto-wildcard hidden fields not already in paramValues.
+  if (schemaProperties) {
+    for (const [key, prop] of Object.entries(schemaProperties)) {
+      if (prop["x-ui"]?.hidden && !(key in paramValues)) {
+        parameters[key] = "*";
+      }
+    }
+  }
+
   for (const [key, value] of Object.entries(paramValues)) {
     if (value === "") continue;
 

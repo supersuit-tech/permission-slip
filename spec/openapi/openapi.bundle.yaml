@@ -1727,6 +1727,45 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/users:
+    get:
+      operationId: listAgentConnectorUsers
+      summary: List users for agent connector
+      description: |
+        Returns workspace users visible to the OAuth credential assigned to this agent–connector pair.
+        Used by the dashboard to populate user pickers for Slack actions.
+
+        Requires session authentication (Supabase JWT). The agent must belong to the current user.
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      responses:
+        '200':
+          description: Users listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorUserListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent, connector, or user listing not supported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/registration-invites:
     post:
       operationId: createRegistrationInvite
@@ -11472,6 +11511,42 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ChannelListItem'
+    UserListItem:
+      type: object
+      required:
+        - id
+        - display_label
+      properties:
+        id:
+          type: string
+          description: Slack user ID (U…).
+        name:
+          type: string
+          description: Slack username.
+        real_name:
+          type: string
+          description: User's real name.
+        display_name:
+          type: string
+          description: User's display name.
+        email:
+          type: string
+          description: User's email address when available.
+        is_bot:
+          type: boolean
+          description: True for bot users.
+        display_label:
+          type: string
+          description: Human-readable label for pickers (real name with email).
+    AgentConnectorUserListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserListItem'
     RetentionMeta:
       type: object
       description: |

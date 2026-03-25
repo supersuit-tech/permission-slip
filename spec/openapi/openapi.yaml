@@ -162,6 +162,9 @@ paths:
   /v1/agents/{agent_id}/connectors/{connector_id}/channels:
     $ref: './components/paths/agent_connectors.yaml#/agentConnectorChannels'
 
+  /v1/agents/{agent_id}/connectors/{connector_id}/users:
+    $ref: './components/paths/agent_connectors.yaml#/agentConnectorUsers'
+
   /v1/registration-invites:
     $ref: './components/paths/registration_invites.yaml#/createRegistrationInvite'
 
