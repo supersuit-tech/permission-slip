@@ -22,13 +22,10 @@ type createTunnelParams struct {
 }
 
 func (p *createTunnelParams) validate() error {
-	if p.AccountID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: account_id"}
+	if err := requirePathParam("account_id", p.AccountID); err != nil {
+		return err
 	}
-	if p.Name == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: name"}
-	}
-	if err := validatePathParam("account_id", p.AccountID); err != nil {
+	if err := requireParam("name", p.Name); err != nil {
 		return err
 	}
 	return nil

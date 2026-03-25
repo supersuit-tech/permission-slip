@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -19,16 +18,10 @@ type deleteTunnelParams struct {
 }
 
 func (p *deleteTunnelParams) validate() error {
-	if p.AccountID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: account_id"}
-	}
-	if p.TunnelID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: tunnel_id"}
-	}
-	if err := validatePathParam("account_id", p.AccountID); err != nil {
+	if err := requirePathParam("account_id", p.AccountID); err != nil {
 		return err
 	}
-	if err := validatePathParam("tunnel_id", p.TunnelID); err != nil {
+	if err := requirePathParam("tunnel_id", p.TunnelID); err != nil {
 		return err
 	}
 	return nil
@@ -44,7 +37,7 @@ func (a *deleteTunnelAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 
 	path := fmt.Sprintf("/accounts/%s/cfd_tunnel/%s", params.AccountID, params.TunnelID)
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodDelete, path, nil, nil); err != nil {
+	if err := a.conn.doDelete(ctx, req.Credentials, path); err != nil {
 		return nil, err
 	}
 

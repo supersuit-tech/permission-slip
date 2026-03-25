@@ -18,19 +18,10 @@ type getTunnelParams struct {
 }
 
 func (p *getTunnelParams) validate() error {
-	if p.AccountID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: account_id"}
-	}
-	if p.TunnelID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: tunnel_id"}
-	}
-	if err := validatePathParam("account_id", p.AccountID); err != nil {
+	if err := requirePathParam("account_id", p.AccountID); err != nil {
 		return err
 	}
-	if err := validatePathParam("tunnel_id", p.TunnelID); err != nil {
-		return err
-	}
-	return nil
+	return requirePathParam("tunnel_id", p.TunnelID)
 }
 
 func (a *getTunnelAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {

@@ -165,3 +165,8 @@ func (c *CloudflareConnector) doJSON(ctx context.Context, creds connectors.Crede
 func (c *CloudflareConnector) doGet(ctx context.Context, creds connectors.Credentials, path string, respBody any) error {
 	return c.doJSON(ctx, creds, http.MethodGet, path, nil, respBody)
 }
+
+// doDelete is a convenience for DELETE requests (no request/response body).
+func (c *CloudflareConnector) doDelete(ctx context.Context, creds connectors.Credentials, path string) error {
+	return c.doJSON(ctx, creds, http.MethodDelete, path, nil, nil)
+}

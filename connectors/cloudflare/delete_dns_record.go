@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
@@ -19,16 +18,10 @@ type deleteDNSRecordParams struct {
 }
 
 func (p *deleteDNSRecordParams) validate() error {
-	if p.ZoneID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: zone_id"}
-	}
-	if p.RecordID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: record_id"}
-	}
-	if err := validatePathParam("zone_id", p.ZoneID); err != nil {
+	if err := requirePathParam("zone_id", p.ZoneID); err != nil {
 		return err
 	}
-	if err := validatePathParam("record_id", p.RecordID); err != nil {
+	if err := requirePathParam("record_id", p.RecordID); err != nil {
 		return err
 	}
 	return nil
@@ -44,7 +37,7 @@ func (a *deleteDNSRecordAction) Execute(ctx context.Context, req connectors.Acti
 	}
 
 	path := fmt.Sprintf("/zones/%s/dns_records/%s", params.ZoneID, params.RecordID)
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodDelete, path, nil, nil); err != nil {
+	if err := a.conn.doDelete(ctx, req.Credentials, path); err != nil {
 		return nil, err
 	}
 

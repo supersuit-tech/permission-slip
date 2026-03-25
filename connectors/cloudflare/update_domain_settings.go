@@ -20,19 +20,10 @@ type updateDomainSettingsParams struct {
 }
 
 func (p *updateDomainSettingsParams) validate() error {
-	if p.AccountID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: account_id"}
-	}
-	if p.Domain == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: domain"}
-	}
-	if err := validatePathParam("account_id", p.AccountID); err != nil {
+	if err := requirePathParam("account_id", p.AccountID); err != nil {
 		return err
 	}
-	if err := validatePathParam("domain", p.Domain); err != nil {
-		return err
-	}
-	return nil
+	return requirePathParam("domain", p.Domain)
 }
 
 func (a *updateDomainSettingsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {

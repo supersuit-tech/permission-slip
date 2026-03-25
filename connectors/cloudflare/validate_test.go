@@ -41,6 +41,41 @@ func TestValidatePathParam(t *testing.T) {
 	}
 }
 
+func TestRequirePathParam(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		value   string
+		wantErr bool
+	}{
+		{"valid", "abc123", false},
+		{"empty", "", true},
+		{"slash", "a/b", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := requirePathParam("test", tt.value)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("requirePathParam(%q) error = %v, wantErr %v", tt.value, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestRequireParam(t *testing.T) {
+	t.Parallel()
+
+	if err := requireParam("x", "val"); err != nil {
+		t.Errorf("requireParam(non-empty) unexpected error: %v", err)
+	}
+	if err := requireParam("x", ""); err == nil {
+		t.Error("requireParam(empty) expected error, got nil")
+	}
+}
+
 func TestPathParamValidation_RejectsInjection(t *testing.T) {
 	t.Parallel()
 

@@ -21,13 +21,7 @@ type listDNSRecordsParams struct {
 }
 
 func (p *listDNSRecordsParams) validate() error {
-	if p.ZoneID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: zone_id"}
-	}
-	if err := validatePathParam("zone_id", p.ZoneID); err != nil {
-		return err
-	}
-	return nil
+	return requirePathParam("zone_id", p.ZoneID)
 }
 
 func (a *listDNSRecordsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {

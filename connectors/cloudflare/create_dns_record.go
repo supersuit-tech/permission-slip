@@ -23,19 +23,16 @@ type createDNSRecordParams struct {
 }
 
 func (p *createDNSRecordParams) validate() error {
-	if p.ZoneID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: zone_id"}
+	if err := requirePathParam("zone_id", p.ZoneID); err != nil {
+		return err
 	}
-	if p.Type == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: type"}
+	if err := requireParam("type", p.Type); err != nil {
+		return err
 	}
-	if p.Name == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: name"}
+	if err := requireParam("name", p.Name); err != nil {
+		return err
 	}
-	if p.Content == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: content"}
-	}
-	if err := validatePathParam("zone_id", p.ZoneID); err != nil {
+	if err := requireParam("content", p.Content); err != nil {
 		return err
 	}
 	return nil

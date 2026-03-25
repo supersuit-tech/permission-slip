@@ -24,19 +24,10 @@ type updateDNSRecordParams struct {
 }
 
 func (p *updateDNSRecordParams) validate() error {
-	if p.ZoneID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: zone_id"}
-	}
-	if p.RecordID == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: record_id"}
-	}
-	if err := validatePathParam("zone_id", p.ZoneID); err != nil {
+	if err := requirePathParam("zone_id", p.ZoneID); err != nil {
 		return err
 	}
-	if err := validatePathParam("record_id", p.RecordID); err != nil {
-		return err
-	}
-	return nil
+	return requirePathParam("record_id", p.RecordID)
 }
 
 func (a *updateDNSRecordAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
