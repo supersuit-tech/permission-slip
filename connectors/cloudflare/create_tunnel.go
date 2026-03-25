@@ -44,7 +44,15 @@ func (a *createTunnelAction) Execute(ctx context.Context, req connectors.ActionR
 	// didn't supply one. This avoids requiring users to pass a sensitive
 	// secret through the approval system as a plain-text parameter.
 	tunnelSecret := params.TunnelSecret
-	if tunnelSecret == "" {
+	if tunnelSecret != "" {
+		decoded, err := base64.StdEncoding.DecodeString(tunnelSecret)
+		if err != nil {
+			return nil, &connectors.ValidationError{Message: "tunnel_secret must be valid base64"}
+		}
+		if len(decoded) != 32 {
+			return nil, &connectors.ValidationError{Message: fmt.Sprintf("tunnel_secret must be exactly 32 bytes (got %d)", len(decoded))}
+		}
+	} else {
 		secret := make([]byte, 32)
 		if _, err := rand.Read(secret); err != nil {
 			return nil, &connectors.ExternalError{Message: fmt.Sprintf("generating tunnel secret: %v", err)}

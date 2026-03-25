@@ -50,8 +50,8 @@ func TestPurgeCache_Execute(t *testing.T) {
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("unmarshal result: %v", err)
 	}
-	if data["status"] != "purged" {
-		t.Errorf("status = %v, want purged", data["status"])
+	if data["id"] != "purge1" {
+		t.Errorf("id = %v, want purge1", data["id"])
 	}
 }
 

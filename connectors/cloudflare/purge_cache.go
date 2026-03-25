@@ -64,5 +64,5 @@ func (a *purgeCacheAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{"status": "purged", "zone_id": params.ZoneID})
+	return connectors.JSONResult(result)
 }

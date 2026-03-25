@@ -61,6 +61,37 @@ func TestCreateTunnel_Execute(t *testing.T) {
 	}
 }
 
+func TestCreateTunnel_InvalidSecret(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createTunnelAction{conn: conn}
+
+	tests := []struct {
+		name   string
+		params string
+	}{
+		{"not base64", `{"account_id":"acc1","name":"t","tunnel_secret":"not-valid-base64!!!"}`},
+		{"wrong length", `{"account_id":"acc1","name":"t","tunnel_secret":"dG9vc2hvcnQ="}`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := action.Execute(t.Context(), connectors.ActionRequest{
+				Parameters:  json.RawMessage(tt.params),
+				Credentials: validCreds(),
+			})
+			if err == nil {
+				t.Fatal("expected validation error, got nil")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T: %v", err, err)
+			}
+		})
+	}
+}
+
 func TestCreateTunnel_AutoGeneratesSecret(t *testing.T) {
 	t.Parallel()
 
