@@ -155,3 +155,82 @@ export const GenericNoSchema: Story = {
     actionName: null,
   },
 };
+
+// --- Regression: verbose descriptions should not appear as labels (#862) ---
+
+export const GenericVerboseDescriptions: Story = {
+  name: "Generic fallback (verbose descriptions — #862 regression)",
+  args: {
+    actionType: "slack.read_channel_messages",
+    parameters: { channel: "C0AMRGKRTA4", limit: 100 },
+    schema: {
+      type: "object",
+      required: ["channel"],
+      properties: {
+        channel: {
+          type: "string",
+          description: "Channel ID: C… (channel), D… (DM), or G… (group DM)",
+          "x-ui": {
+            widget: "remote-select" as const,
+            label: "Channel",
+          },
+        },
+        limit: {
+          type: "integer",
+          description: "Max messages to return (1-1000)",
+          "x-ui": { label: "Max messages" },
+        },
+      },
+    },
+    actionName: "Read Channel Messages",
+  },
+};
+
+export const GenericVerboseDescriptionsNoUILabel: Story = {
+  name: "Generic fallback (verbose descriptions, no x-ui label)",
+  args: {
+    actionType: "mcp.tool_call",
+    parameters: { channel: "C0AMRGKRTA4", limit: 100 },
+    schema: {
+      type: "object",
+      required: ["channel"],
+      properties: {
+        channel: {
+          type: "string",
+          description: "Channel ID: C… (channel), D… (DM), or G… (group DM). This is a very long description that should never appear as a UI label.",
+        },
+        limit: {
+          type: "integer",
+          description: "Max messages to return (1-1000). Another verbose description field.",
+        },
+      },
+    },
+    actionName: null,
+  },
+};
+
+// --- Template with resourceDetails ---
+
+export const SlackReadChannelWithResourceDetails: Story = {
+  name: "slack.read_channel_messages (template + resourceDetails)",
+  args: {
+    actionType: "slack.read_channel_messages",
+    parameters: { channel: "C0AMRGKRTA4", limit: 100 },
+    schema: null,
+    actionName: "Read Channel Messages",
+    displayTemplate: "Read messages from {{channel_name}}",
+    resourceDetails: { channel_name: "#all-supersuit" },
+  },
+};
+
+export const SlackScheduleMessageWithResourceDetails: Story = {
+  name: "slack.schedule_message (template + resourceDetails)",
+  args: {
+    actionType: "slack.schedule_message",
+    parameters: { channel: "C0AMRGKRTA4", message: "Reminder: standup in 5 min", post_at: "2026-03-25T09:00:00Z" },
+    schema: null,
+    actionName: "Schedule Message",
+    displayTemplate: "Schedule message to {{channel_name}}",
+    resourceDetails: { channel_name: "#engineering" },
+  },
+};

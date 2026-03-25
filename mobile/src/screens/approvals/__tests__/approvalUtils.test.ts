@@ -124,7 +124,7 @@ describe("buildActionSummary", () => {
       target: "prod",
     });
     expect(result).toContain("Do thing");
-    expect(result).toContain("target");
+    expect(result).toContain("Target");
     expect(result).toContain("prod");
   });
 

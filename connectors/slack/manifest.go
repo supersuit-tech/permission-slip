@@ -26,6 +26,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Send Message",
 				Description: "Send a message to a Slack channel as the authorizing user.",
 				RiskLevel:   "low",
+				DisplayTemplate: "Send message to {{channel_name}}",
 				Preview: &connectors.ActionPreview{
 					Layout: "message",
 					Fields: map[string]string{"to": "channel", "body": "message"},
@@ -59,6 +60,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create Channel",
 				Description: "Create a new Slack channel",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Create channel #{{name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["name"],
@@ -82,6 +84,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List Channels",
 				Description: "List Slack channels via conversations.list, merged with the authorizing user's DMs and private conversations from users.conversations when a matching profile email is available. Returns all channel types (public, private, group DMs, DMs) by default when email is set.",
 				RiskLevel:   "low",
+				DisplayTemplate: "List Slack channels",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -117,6 +120,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Read Channel Messages",
 				Description: "Read recent messages from a Slack channel, DM (D…), or group DM (G…).",
 				RiskLevel:   "low",
+				DisplayTemplate: "Read messages from {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel"],
@@ -164,6 +168,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Read Thread",
 				Description: "Read replies in a Slack thread. For threads in DMs or group DMs, uses the authorizing user's OAuth token when available.",
 				RiskLevel:   "low",
+				DisplayTemplate: "Read thread in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel"],
@@ -204,6 +209,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Schedule Message",
 				Description: "Schedule a message for future delivery to a Slack channel as the authorizing user.",
 				RiskLevel:   "low",
+				DisplayTemplate: "Schedule message to {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "message", "post_at"],
@@ -239,6 +245,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Set Topic",
 				Description: "Update a Slack channel's topic",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Set topic in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "topic"],
@@ -268,6 +275,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Invite to Channel",
 				Description: "Invite one or more users to a Slack channel",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Invite users to {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "users"],
@@ -305,6 +313,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Upload File",
 				Description: "Upload a file to a Slack channel",
 				RiskLevel:   "low",
+				DisplayTemplate: "Upload file to {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "filename", "content"],
@@ -344,6 +353,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Add Reaction",
 				Description: "Add an emoji reaction to a Slack message",
 				RiskLevel:   "low",
+				DisplayTemplate: "Add reaction in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "name"],
@@ -378,6 +388,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Send Direct Message",
 				Description: "Send a direct message to a Slack user as the authorizing user.",
 				RiskLevel:   "low",
+				DisplayTemplate: "Send DM to {{user_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["user_id", "message"],
@@ -408,6 +419,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Update Message",
 				Description: "Edit an existing message you are allowed to change.",
 				RiskLevel:   "medium",
+				DisplayTemplate: "Edit message in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel", "message"],
@@ -442,6 +454,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Delete Message",
 				Description: "Delete a message you are allowed to remove.",
 				RiskLevel:   "high",
+				DisplayTemplate: "Delete message in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["channel"],
@@ -471,6 +484,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List Users",
 				Description: "List workspace users visible to the authorizing user",
 				RiskLevel:   "low",
+				DisplayTemplate: "List Slack users",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -493,6 +507,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search Messages",
 				Description: "Search messages across Slack channels (requires search:read)",
 				RiskLevel:   "low",
+				DisplayTemplate: "Search Slack for {{query}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["query"],

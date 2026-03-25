@@ -487,6 +487,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "List Chat Spaces",
 				Description: "List Google Chat spaces accessible to the user",
 				RiskLevel:   "low",
+				DisplayTemplate: "List Google Chat spaces",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
