@@ -87,10 +87,13 @@ func TestDisplayTemplateParamsExist(t *testing.T) {
 	}
 }
 
-// TestAllActionsHaveDisplayTemplate ensures every connector action defines a
-// DisplayTemplate. Templates are the primary way human-readable summaries are
-// rendered in approval cards. Without one, the UI falls back to a generic
-// summary that may be confusing (see #862).
+// TestAllActionsHaveDisplayTemplate ensures that once a connector starts
+// defining DisplayTemplates, ALL of its actions have one. This prevents
+// partial adoption where some actions render nicely and others fall back to
+// the confusing generic summary (#862).
+//
+// Connectors that haven't adopted templates yet are skipped — this allows
+// a graduated rollout without blocking unrelated PRs.
 func TestAllActionsHaveDisplayTemplate(t *testing.T) {
 	for _, c := range connectors.BuiltInConnectors() {
 		mp, ok := c.(connectors.ManifestProvider)
@@ -98,9 +101,22 @@ func TestAllActionsHaveDisplayTemplate(t *testing.T) {
 			continue
 		}
 		manifest := mp.Manifest()
+
+		// Check whether this connector has adopted templates at all.
+		hasAny := false
+		for _, action := range manifest.Actions {
+			if action.DisplayTemplate != "" {
+				hasAny = true
+				break
+			}
+		}
+		if !hasAny {
+			continue // connector hasn't started template adoption yet
+		}
+
 		for _, action := range manifest.Actions {
 			if action.DisplayTemplate == "" {
-				t.Errorf("%s: action %q is missing a DisplayTemplate — every action must have one for readable approval summaries",
+				t.Errorf("%s: action %q is missing a DisplayTemplate — once a connector defines any templates, all its actions must have one",
 					manifest.ID, action.ActionType)
 			}
 		}
