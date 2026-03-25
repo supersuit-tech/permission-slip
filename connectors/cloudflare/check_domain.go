@@ -24,6 +24,12 @@ func (p *checkDomainParams) validate() error {
 	if p.Domain == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: domain"}
 	}
+	if err := validatePathParam("account_id", p.AccountID); err != nil {
+		return err
+	}
+	if err := validatePathParam("domain", p.Domain); err != nil {
+		return err
+	}
 	return nil
 }
 

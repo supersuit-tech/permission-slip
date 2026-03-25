@@ -65,7 +65,7 @@ func (c *CloudflareConnector) Actions() map[string]connectors.Action {
 		"cloudflare.list_tunnel_configs":  &listTunnelConfigsAction{conn: c},
 		"cloudflare.update_tunnel_config": &updateTunnelConfigAction{conn: c},
 		"cloudflare.check_domain":        &checkDomainAction{conn: c},
-		"cloudflare.register_domain":     &registerDomainAction{conn: c},
+		"cloudflare.update_domain_settings": &updateDomainSettingsAction{conn: c},
 		"cloudflare.purge_cache":         &purgeCacheAction{conn: c},
 	}
 }
@@ -136,11 +136,21 @@ func (c *CloudflareConnector) doJSON(ctx context.Context, creds connectors.Crede
 		return err
 	}
 
-	if respBody != nil {
-		var envelope cfEnvelope
-		if err := json.Unmarshal(respBytes, &envelope); err != nil {
-			return &connectors.ExternalError{Message: fmt.Sprintf("parsing Cloudflare response: %v", err)}
+	// Always parse the envelope to check the success field — Cloudflare can
+	// return HTTP 200 with success:false and a populated errors array.
+	var envelope cfEnvelope
+	if err := json.Unmarshal(respBytes, &envelope); err != nil {
+		return &connectors.ExternalError{Message: fmt.Sprintf("parsing Cloudflare response: %v", err)}
+	}
+	if !envelope.Success && len(envelope.Errors) > 0 {
+		msg := truncateErrorMessage(envelope.Errors[0].Message)
+		for _, e := range envelope.Errors[1:] {
+			msg += "; " + truncateErrorMessage(e.Message)
 		}
+		return &connectors.ExternalError{Message: fmt.Sprintf("Cloudflare API error: %s", msg)}
+	}
+
+	if respBody != nil {
 		if err := json.Unmarshal(envelope.Result, respBody); err != nil {
 			return &connectors.ExternalError{Message: fmt.Sprintf("parsing Cloudflare result: %v", err)}
 		}

@@ -24,6 +24,12 @@ func (p *listTunnelConfigsParams) validate() error {
 	if p.TunnelID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: tunnel_id"}
 	}
+	if err := validatePathParam("account_id", p.AccountID); err != nil {
+		return err
+	}
+	if err := validatePathParam("tunnel_id", p.TunnelID); err != nil {
+		return err
+	}
 	return nil
 }
 

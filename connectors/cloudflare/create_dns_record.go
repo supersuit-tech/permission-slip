@@ -35,6 +35,9 @@ func (p *createDNSRecordParams) validate() error {
 	if p.Content == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content"}
 	}
+	if err := validatePathParam("zone_id", p.ZoneID); err != nil {
+		return err
+	}
 	return nil
 }
 

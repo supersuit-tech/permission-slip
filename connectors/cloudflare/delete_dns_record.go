@@ -25,6 +25,12 @@ func (p *deleteDNSRecordParams) validate() error {
 	if p.RecordID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: record_id"}
 	}
+	if err := validatePathParam("zone_id", p.ZoneID); err != nil {
+		return err
+	}
+	if err := validatePathParam("record_id", p.RecordID); err != nil {
+		return err
+	}
 	return nil
 }
 

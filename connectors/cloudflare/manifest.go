@@ -212,11 +212,11 @@ func (c *CloudflareConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "cloudflare.create_tunnel",
 				Name:        "Create Tunnel",
-				Description: "Create a new Cloudflare Tunnel",
+				Description: "Create a new Cloudflare Tunnel. A tunnel secret is auto-generated if not provided.",
 				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["account_id", "name", "tunnel_secret"],
+					"required": ["account_id", "name"],
 					"properties": {
 						"account_id": {
 							"type": "string",
@@ -228,7 +228,7 @@ func (c *CloudflareConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"tunnel_secret": {
 							"type": "string",
-							"description": "Base64-encoded 32-byte random secret for the tunnel"
+							"description": "Optional base64-encoded 32-byte secret. Auto-generated if omitted. WARNING: sensitive value — avoid passing through approval systems when possible."
 						}
 					}
 				}`)),
@@ -338,10 +338,10 @@ func (c *CloudflareConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "cloudflare.register_domain",
-				Name:        "Register/Update Domain",
-				Description: "Register or update a domain via Cloudflare Registrar",
-				RiskLevel:   "high",
+				ActionType:  "cloudflare.update_domain_settings",
+				Name:        "Update Domain Settings",
+				Description: "Update settings (e.g. auto-renewal) for a domain already registered in Cloudflare Registrar",
+				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["account_id", "domain"],
@@ -352,7 +352,7 @@ func (c *CloudflareConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"domain": {
 							"type": "string",
-							"description": "Domain name to register or update (e.g. example.com)"
+							"description": "Domain name already registered in your account (e.g. example.com)"
 						},
 						"auto_renew": {
 							"type": "boolean",
@@ -465,10 +465,10 @@ func (c *CloudflareConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:  json.RawMessage(`{"account_id":"*","domain":"*"}`),
 			},
 			{
-				ID:          "tpl_cloudflare_register_domain",
-				ActionType:  "cloudflare.register_domain",
-				Name:        "Register/update a domain",
-				Description: "Agent can register or update domains via Cloudflare Registrar.",
+				ID:          "tpl_cloudflare_update_domain_settings",
+				ActionType:  "cloudflare.update_domain_settings",
+				Name:        "Update domain settings",
+				Description: "Agent can update settings for domains already registered in Cloudflare Registrar.",
 				Parameters:  json.RawMessage(`{"account_id":"*","domain":"*","auto_renew":"*"}`),
 			},
 		},

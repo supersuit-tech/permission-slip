@@ -9,28 +9,34 @@ import (
 	"github.com/supersuit-tech/permission-slip-web/connectors"
 )
 
-type registerDomainAction struct {
+type updateDomainSettingsAction struct {
 	conn *CloudflareConnector
 }
 
-type registerDomainParams struct {
+type updateDomainSettingsParams struct {
 	AccountID string `json:"account_id"`
 	Domain    string `json:"domain"`
 	AutoRenew bool   `json:"auto_renew"`
 }
 
-func (p *registerDomainParams) validate() error {
+func (p *updateDomainSettingsParams) validate() error {
 	if p.AccountID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: account_id"}
 	}
 	if p.Domain == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: domain"}
 	}
+	if err := validatePathParam("account_id", p.AccountID); err != nil {
+		return err
+	}
+	if err := validatePathParam("domain", p.Domain); err != nil {
+		return err
+	}
 	return nil
 }
 
-func (a *registerDomainAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
-	var params registerDomainParams
+func (a *updateDomainSettingsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
+	var params updateDomainSettingsParams
 	if err := json.Unmarshal(req.Parameters, &params); err != nil {
 		return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid parameters: %v", err)}
 	}

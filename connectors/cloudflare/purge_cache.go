@@ -28,6 +28,9 @@ func (p *purgeCacheParams) validate() error {
 	if !p.PurgeAll && len(p.Files) == 0 && len(p.Tags) == 0 && len(p.Hosts) == 0 {
 		return &connectors.ValidationError{Message: "must specify purge_everything, files, tags, or hosts"}
 	}
+	if err := validatePathParam("zone_id", p.ZoneID); err != nil {
+		return err
+	}
 	return nil
 }
 

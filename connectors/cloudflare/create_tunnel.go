@@ -2,6 +2,8 @@ package cloudflare
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -26,8 +28,8 @@ func (p *createTunnelParams) validate() error {
 	if p.Name == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: name"}
 	}
-	if p.TunnelSecret == "" {
-		return &connectors.ValidationError{Message: "missing required parameter: tunnel_secret"}
+	if err := validatePathParam("account_id", p.AccountID); err != nil {
+		return err
 	}
 	return nil
 }
@@ -41,9 +43,21 @@ func (a *createTunnelAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
+	// Auto-generate a cryptographically random tunnel secret if the caller
+	// didn't supply one. This avoids requiring users to pass a sensitive
+	// secret through the approval system as a plain-text parameter.
+	tunnelSecret := params.TunnelSecret
+	if tunnelSecret == "" {
+		secret := make([]byte, 32)
+		if _, err := rand.Read(secret); err != nil {
+			return nil, &connectors.ExternalError{Message: fmt.Sprintf("generating tunnel secret: %v", err)}
+		}
+		tunnelSecret = base64.StdEncoding.EncodeToString(secret)
+	}
+
 	body := map[string]any{
 		"name":          params.Name,
-		"tunnel_secret": params.TunnelSecret,
+		"tunnel_secret": tunnelSecret,
 	}
 
 	var tunnel json.RawMessage

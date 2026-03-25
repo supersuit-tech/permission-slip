@@ -37,7 +37,7 @@ func TestCloudflareConnector_Actions(t *testing.T) {
 		"cloudflare.list_tunnel_configs",
 		"cloudflare.update_tunnel_config",
 		"cloudflare.check_domain",
-		"cloudflare.register_domain",
+		"cloudflare.update_domain_settings",
 		"cloudflare.purge_cache",
 	}
 	for _, at := range want {
