@@ -59,7 +59,7 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/mailpit/, ""),
       },
     },
-    allowedHosts: [".ngrok-free.dev"],
+    allowedHosts: [".ngrok-free.dev", ".chiedobot.com"],
   },
   build: {
     outDir: "dist",
