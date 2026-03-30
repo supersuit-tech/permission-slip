@@ -1,5 +1,4 @@
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -11,8 +10,7 @@ import {
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import type { AuthStatus, AuthState } from "./types";
-
-const AuthContext = createContext<AuthState | undefined>(undefined);
+import { AuthContext } from "./authContext";
 
 /**
  * Decode a JWT payload without verification (we trust the token — it came
