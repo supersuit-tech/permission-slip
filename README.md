@@ -287,7 +287,6 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy and develop
 
 ### 🚀 Deployment
 - [Fly.io Deployment](docs/deployment.md) — Dockerfile, fly.toml, DNS setup
-- [Production Deployment (internal)](docs/deployment-production.md) — infrastructure for app.permissionslip.dev
 - [Mobile Builds](docs/mobile-builds.md) — EAS builds, OTA updates, App Store submission
 
 ### 🧪 Contributing & Testing

@@ -11,6 +11,7 @@ import { useAuth } from "@/auth/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useSignOut } from "@/hooks/useSignOut";
 import { useTheme } from "@/components/ThemeContext";
+import { isSaas } from "@/lib/saas";
 import { Avatar } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -70,11 +71,15 @@ export function UserMenu() {
               <span>Billing</span>
             </DropdownMenuItem>
           </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => navigate("/support")}>
-            <LifeBuoy />
-            <span>Support</span>
-          </DropdownMenuItem>
+          {isSaas && (
+            <>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onSelect={() => navigate("/support")}>
+                <LifeBuoy />
+                <span>Support</span>
+              </DropdownMenuItem>
+            </>
+          )}
           <DropdownMenuSeparator />
           <DropdownMenuCheckboxItem
             checked={theme === "dark"}

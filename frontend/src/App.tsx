@@ -14,6 +14,7 @@ import { CookiePolicyPage } from "./pages/policy/CookiePolicyPage";
 import { SupportPage } from "./pages/support/SupportPage";
 import { useProfile } from "./hooks/useProfile";
 import { appRoutes } from "./routes";
+import { isSaas } from "./lib/saas";
 
 const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
 
@@ -63,7 +64,8 @@ function App() {
   }, [authStatus, user]);
 
   // Policy and support pages are public — render without auth.
-  if (pathname.startsWith("/policy/") || pathname === "/support") {
+  // These are SaaS-only: self-hosted deployments have their own legal pages.
+  if (isSaas && (pathname.startsWith("/policy/") || pathname === "/support")) {
     return (
       <SentryRoutes>
         <Route path="/policy/privacy" element={<PrivacyPolicyPage />} />
