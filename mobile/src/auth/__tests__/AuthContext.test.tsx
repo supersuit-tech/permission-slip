@@ -19,6 +19,7 @@ const mocks = {
   signInWithOtp: jest.fn(),
   verifyOtp: jest.fn(),
   signOut: jest.fn(),
+  challengeAndVerify: jest.fn(),
 };
 
 jest.mock("../../lib/supabaseClient", () => ({
@@ -42,6 +43,8 @@ jest.mock("../../lib/supabaseClient", () => ({
           data: { currentLevel: "aal1", nextLevel: "aal1" },
           error: null,
         }),
+        challengeAndVerify: (...args: unknown[]) =>
+          mocks.challengeAndVerify(...args),
       },
     },
   },
@@ -288,5 +291,99 @@ describe("AuthProvider", () => {
     });
 
     expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
+  });
+
+  it("verifyMfa calls challengeAndVerify with the correct factor ID", async () => {
+    mocks.challengeAndVerify.mockResolvedValue({ data: {}, error: null });
+
+    let verifyMfa: ((code: string) => Promise<unknown>) | undefined;
+
+    function CaptureVerifyMfa() {
+      const auth = useAuth();
+      verifyMfa = auth.verifyMfa;
+      return null;
+    }
+
+    await act(async () => {
+      create(
+        createElement(AuthProvider, null, createElement(CaptureVerifyMfa))
+      );
+    });
+
+    await act(async () => {
+      jest.runAllTimers();
+    });
+
+    // Sign in with a session that has a verified TOTP factor.
+    const session = mockSession({
+      user: {
+        id: "user-mfa",
+        email: "mfa@example.com",
+        app_metadata: {},
+        user_metadata: {},
+        aud: "authenticated",
+        created_at: new Date().toISOString(),
+        factors: [
+          {
+            id: "factor-123",
+            friendly_name: "TOTP",
+            factor_type: "totp",
+            status: "verified",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          },
+        ],
+      } as Session["user"],
+    });
+
+    await act(async () => {
+      mocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
+    });
+
+    let result: unknown;
+    await act(async () => {
+      result = await verifyMfa!("654321");
+    });
+
+    expect(mocks.challengeAndVerify).toHaveBeenCalledWith({
+      factorId: "factor-123",
+      code: "654321",
+    });
+    expect(result).toEqual({ error: null });
+  });
+
+  it("verifyMfa returns error when no TOTP factor exists", async () => {
+    let verifyMfa: ((code: string) => Promise<unknown>) | undefined;
+
+    function CaptureVerifyMfa() {
+      const auth = useAuth();
+      verifyMfa = auth.verifyMfa;
+      return null;
+    }
+
+    await act(async () => {
+      create(
+        createElement(AuthProvider, null, createElement(CaptureVerifyMfa))
+      );
+    });
+
+    await act(async () => {
+      jest.runAllTimers();
+    });
+
+    // Sign in with no TOTP factors.
+    const session = mockSession();
+    await act(async () => {
+      mocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
+    });
+
+    let result: { error: { code: string } | null };
+    await act(async () => {
+      result = (await verifyMfa!("123456")) as typeof result;
+    });
+
+    expect(result!.error).not.toBeNull();
+    expect(result!.error!.code).toBe("mfa_factor_not_found");
+    expect(mocks.challengeAndVerify).not.toHaveBeenCalled();
   });
 });

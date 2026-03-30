@@ -11,6 +11,10 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
     "Too many attempts. Please wait a moment and try again.",
   over_email_send_rate_limit:
     "Too many requests. Please wait a moment and try again.",
+  mfa_factor_not_found: "No authenticator found. Please re-enroll.",
+  mfa_verification_failed:
+    "Invalid code. Please check your authenticator app and try again.",
+  mfa_challenge_expired: "Verification timed out. Please try again.",
 };
 
 /** Returns a user-safe message for a Supabase AuthError by matching its code
