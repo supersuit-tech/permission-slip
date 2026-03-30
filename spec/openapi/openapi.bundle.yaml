@@ -3,10 +3,9 @@ info:
   title: Permission Slip API
   version: 0.1.0
   description: |
-    Permission Slip is a centralized middle-man service that sits between AI agents and external 
-    APIs. Agents submit pre-defined **actions** for human approval, and Permission Slip executes 
-    them using the user's stored credentials. Agents never see user credentials and can never 
-    make arbitrary API calls.
+    Permission Slip is the approval layer for Openclaw. Openclaw submits pre-defined **actions**
+    for human approval, and Permission Slip executes them using the user's stored credentials.
+    Openclaw never sees user credentials and can never make arbitrary API calls.
 
     **Base URL**: `http://localhost:8080`
 

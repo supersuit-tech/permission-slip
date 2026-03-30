@@ -1,21 +1,21 @@
 # Permission Slip — Protocol Overview
 
-**A protocol for human-approved AI agent actions, mediated by a centralized service. Actions are the core primitive.**
+**The approval layer for [Openclaw](https://openclaw.org). Every action Openclaw takes goes through human approval first. Actions are the core primitive.**
 
 ---
 
 ## The Problem
 
-AI agents need to perform actions on behalf of users — making purchases, accessing accounts, sending emails — but current options are broken:
+Openclaw needs to perform actions on behalf of users — making purchases, accessing accounts, sending emails — but current options are broken:
 
-- **Give the agent full access** to your credentials → security nightmare
-- **Do everything manually** → defeats the purpose of having an agent
-- **No standard approval flow** → every agent invents its own (or skips it entirely)
-- **No structured request format** → agents make arbitrary API calls or describe intentions in free text
+- **Give Openclaw full access** to your credentials → security nightmare
+- **Do everything manually** → defeats the purpose of having Openclaw
+- **No standard approval flow** → no structured way to review what Openclaw wants to do before it does it
+- **No structured request format** → arbitrary API calls or free-text intentions with no validation
 
 ## The Solution
 
-Permission Slip is a middle-man service that mediates between AI agents and external APIs. Agents submit **structured, pre-defined actions** — they never touch user credentials or make arbitrary API calls. Actions require explicit human approval before execution — either **per-request** (one-off approval with push notification and confirmation code) or **pre-approved** via a standing approval that the user creates in advance for repetitive, trusted actions.
+Permission Slip is an approval layer that sits between Openclaw and external APIs. Openclaw submits **structured, pre-defined actions** — it never touches user credentials or makes arbitrary API calls. Actions require explicit human approval before execution — either **per-request** (one-off approval with push notification and confirmation code) or **pre-approved** via a standing approval that the user creates in advance for repetitive, trusted actions.
 
 Think of it as a **secure proxy with human-in-the-loop approval, where "actions" are the core primitive**.
 
@@ -33,13 +33,13 @@ Agents can *only* request pre-defined actions, never arbitrary API calls. This i
 ## Architecture
 
 ```
-Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, etc.)
-               │
-               ▼
-          User (approve/deny)
+Openclaw ──→ Permission Slip ──→ External Service (Gmail, Stripe, etc.)
+                    │
+                    ▼
+               User (approve/deny)
 ```
 
-**Key insight:** Permission Slip is the only party that holds user credentials. The agent never sees them. The external service never knows an agent is involved — it just sees a normal API call from Permission Slip on the user's behalf.
+**Key insight:** Permission Slip is the only party that holds user credentials. Openclaw never sees them. The external service never knows Openclaw is involved — it just sees a normal API call from Permission Slip on the user's behalf.
 
 ### Why a Middle-Man (Not a Protocol for Services)
 
@@ -116,17 +116,17 @@ The middle-man architecture eliminates all of that:
 
 | Principle | Description |
 |---|---|
-| **Actions as the core primitive** | Agents submit structured, pre-defined actions — never arbitrary API calls |
+| **Actions as the core primitive** | Openclaw submits structured, pre-defined actions — never arbitrary API calls |
 | **Middle-man, not a protocol** | Permission Slip is the service — no adoption required from external APIs |
 | **Cryptographic trust** | Agents prove identity with public/private keys |
-| **Agent-agnostic** | Any AI agent can integrate (one API to learn) |
-| **Zero credentials exposure** | Agents never see user credentials |
+| **Built for Openclaw** | Purpose-built approval layer for Openclaw |
+| **Zero credentials exposure** | Openclaw never sees user credentials |
 | **User always in control** | Every action requires approval — per-request or pre-approved via standing approvals |
 | **Self-hostable** | Run your own instance for full control |
 
-## Agent Integration
+## Openclaw Integration
 
-The agent SDK provides a simple interface for submitting actions:
+The SDK provides a simple interface for submitting actions:
 
 ```javascript
 import { PermissionSlip } from '@permissionslip/sdk';

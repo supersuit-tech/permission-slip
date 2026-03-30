@@ -3,17 +3,17 @@
 [![CI](https://github.com/supersuit-tech/permission-slip/actions/workflows/ci.yml/badge.svg)](https://github.com/supersuit-tech/permission-slip/actions/workflows/ci.yml)
 [![Deploy](https://github.com/supersuit-tech/permission-slip/actions/workflows/deploy.yml/badge.svg)](https://github.com/supersuit-tech/permission-slip/actions/workflows/deploy.yml)
 
-**The authorization layer between your AI and everything it touches.**
+**Approve what [Openclaw](https://openclaw.org) does before it does it.**
 
-Give your agents the power to act — without giving them the keys to the kingdom. Permission Slip is an open-source secure proxy that sits between your AI agents and the outside world, routing every action through human-in-the-loop approval.
+Permission Slip is an open-source approval layer for [Openclaw](https://openclaw.org). Every action Openclaw wants to take — sending emails, merging PRs, booking flights — goes through you first. Nothing happens without your say-so.
 
 ```
-┌─────────┐         ┌─────────────────┐         ┌──────────────┐
-│ Your AI │ ──────→ │ Permission Slip │ ──────→ │   Gmail,     │
-│  Agent  │ ←────── │   (middle-man)  │ ←────── │   Stripe,    │
-└─────────┘         └─────────────────┘         │   Notion,    │
-                                                │   Expedia…   │
-                           │                    └──────────────┘
+┌──────────┐         ┌─────────────────┐         ┌──────────────┐
+│ Openclaw │ ──────→ │ Permission Slip │ ──────→ │   Gmail,     │
+│          │ ←────── │   (approval     │ ←────── │   Stripe,    │
+└──────────┘         │    layer)       │         │   GitHub,    │
+                     └─────────────────┘         │   Slack…     │
+                           │                     └──────────────┘
                            │ push notification
                            ▼
                      ┌───────────┐
@@ -33,23 +33,23 @@ Or **[self-host it](docs/deployment-self-hosted.md)** on Docker, Fly.io, or bare
 
 ## ✨ Why Permission Slip?
 
-You want your agent to book flights, send emails, and order food. But you can't trust it with full access to your accounts. Your options today:
+You want Openclaw to book flights, send emails, and merge PRs. But you can't trust it with full access to your accounts. Your options today:
 
-- 😬 **Give the agent your passwords** — it can do anything, anytime, with no oversight
-- 😩 **Do everything manually** — defeats the purpose of having an agent
-- 🤞 **Hope the agent asks nicely** — it could lie, hallucinate, or get compromised
+- 😬 **Give Openclaw your passwords** — it can do anything, anytime, with no oversight
+- 😩 **Do everything manually** — defeats the purpose of having Openclaw
+- 🤞 **Hope it asks nicely** — it could hallucinate, misunderstand, or get compromised
 
-Permission Slip solves this with a **secure proxy + human-in-the-loop approval** model. Agents submit structured, schema-validated actions — never arbitrary API calls. Nothing executes without your explicit sign-off.
+Permission Slip solves this with a **secure proxy + human-in-the-loop approval** model. Openclaw submits structured, schema-validated actions — never arbitrary API calls. Nothing executes without your explicit sign-off.
 
 ---
 
 ## 🔑 Key Features
 
-- 🛡️ **Action-based security** — agents submit structured actions, not raw API calls
+- 🛡️ **Action-based security** — Openclaw submits structured actions, not raw API calls
 - 🔔 **Per-request approval** — push notifications with human-readable summaries
 - ✅ **Standing approvals** — pre-authorize trusted, repetitive actions with constraints
-- 🔐 **Cryptographic agent identity** — Ed25519 key pairs for tamper-proof request signing
-- 🙈 **Zero credential exposure** — agents never see your API keys or passwords
+- 🔐 **Cryptographic identity** — Ed25519 key pairs for tamper-proof request signing
+- 🙈 **Zero credential exposure** — Openclaw never sees your API keys or passwords
 - 📋 **Full audit trail** — every request, approval, and execution logged
 - 🔌 **OAuth 2.0 connections** — Google, Microsoft, Dropbox, and custom providers; PKCE where required; tokens encrypted at rest with automatic refresh
 - 🏠 **Self-hostable** — your data, your infrastructure
@@ -117,50 +117,13 @@ Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/p
 
 ---
 
-## 🤖 Agent Compatibility
+## 🤖 Built for Openclaw
 
-Permission Slip needs agents that can **(1) make HTTP requests to arbitrary URLs** and **(2) generate Ed25519 key pairs**. If it runs locally with a real shell, it will work. Cloud-hosted agents need case-by-case verification.
-
-### ✅ Supported
-
-| Agent | Notes |
-|---|---|
-| [OpenClaw](https://openclaw.org) | Full local shell + unrestricted network |
-| [Manis](https://manis.dev) | Full local shell + unrestricted network |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) (Desktop) | Local CLI with full shell access |
-| [Claude Cowork](https://docs.anthropic.com/en/docs/claude-code/overview) (Desktop) | Local IDE integration with full shell access |
-| [Cursor](https://cursor.com) | Local IDE with terminal access |
-| [Windsurf](https://windsurf.com) | Local IDE with terminal access |
-| [Cline](https://github.com/cline/cline) | VS Code extension, runs commands locally |
-| [Aider](https://aider.chat) | Local CLI with full shell access |
-| [Continue](https://continue.dev) | Local IDE extension with terminal access |
-| [Codex CLI](https://github.com/openai/codex) (OpenAI) | Local CLI with full shell access |
-| [Devin](https://devin.ai) | Cloud VM with unrestricted network |
-| [GitHub Copilot Coding Agent](https://github.com/features/copilot) | GitHub Actions VMs with network access |
-
-### ❌ Not Supported
-
-| Agent | Reason |
-|---|---|
-| Claude Code (Mobile) | Egress proxy restricts outbound URLs to an allowlist |
-| ChatGPT / Code Interpreter | Sandboxed environment with restricted network |
-| Claude.ai (web chat) | No shell access |
-| Gemini (web) | No shell access |
-| GitHub Copilot Chat (inline) | Code suggestions only — no shell execution |
-| [v0](https://v0.dev) (Vercel) | Sandboxed, focused on UI generation |
-| [Bolt](https://bolt.new) | Sandboxed WebContainer with limited network |
+Permission Slip is purpose-built for [Openclaw](https://openclaw.org). Openclaw has full local shell access and unrestricted networking — everything it needs to register, sign requests, and submit actions through Permission Slip.
 
 ### Claude Code skills
 
 This repo includes [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) skills under [`.claude/skills/`](.claude/skills/). For example, **`/fix-ci`** (see [`fix-ci/SKILL.md`](.claude/skills/fix-ci/SKILL.md)) triggers **CI + audit** on the current branch, pulls failure logs, and loops on fix → push → re-run until green (with a round cap).
-
-### ❓ Uncertain (needs testing)
-
-| Agent | Concern |
-|---|---|
-| [Replit Agent](https://replit.com) | Cloud-hosted — may have network restrictions |
-| [Google Jules](https://jules.google) | Cloud dev agent — network policy unclear |
-| [Amazon Q Developer](https://aws.amazon.com/q/developer/) | Terminal access varies by context |
 
 ---
 
@@ -197,7 +160,7 @@ For the full walkthrough including PostgreSQL setup and test database configurat
 
 ## 📱 Mobile App
 
-The approval app lives in `mobile/` (React Native / Expo). Approve or deny requests from your phone with push notifications, biometric lock, and deep linking.
+The approval app lives in `mobile/` (React Native / Expo). Approve or deny Openclaw's requests from your phone with push notifications, biometric lock, and deep linking.
 
 ```bash
 make mobile-install  # install dependencies
@@ -273,7 +236,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy and develop
 - [SPEC.md](SPEC.md) — protocol design, security model, and full spec
 
 ### 🔌 Integrations & Connectors
-- [Agent Integration Guide](docs/agents.md) — how to wire up an autonomous agent
+- [Openclaw Integration Guide](docs/agents.md) — how Openclaw connects to Permission Slip
 - [Creating Connectors](docs/creating-connectors.md) — build new built-in connectors
 - [Custom Connectors](docs/custom-connectors.md) — add connectors from external Git repos
 - [Community Connectors](docs/community-connectors.md) — third-party connector directory
