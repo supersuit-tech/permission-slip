@@ -13,6 +13,10 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { focusManager, QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
+import { MockAuthProvider } from "./src/auth/MockAuthProvider";
+
+const useMockAuth = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
+const ActiveAuthProvider = useMockAuth ? MockAuthProvider : AuthProvider;
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { usePushSetup } from "./src/hooks/usePushSetup";
@@ -149,10 +153,10 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <AuthProvider key={authKey}>
+        <ActiveAuthProvider key={authKey}>
           <AppContent onRetry={handleRetry} />
           <StatusBar style="auto" />
-        </AuthProvider>
+        </ActiveAuthProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
