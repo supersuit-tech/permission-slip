@@ -35,7 +35,6 @@ function mockApiFetch() {
         data: {
           preferences: [
             { channel: "email", enabled: true },
-            { channel: "web-push", enabled: true },
             { channel: "sms", enabled: false },
           ],
         },

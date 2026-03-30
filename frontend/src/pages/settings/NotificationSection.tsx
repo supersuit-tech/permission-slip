@@ -21,11 +21,6 @@ const CHANNEL_LABELS: Record<string, { name: string; description: string }> = {
     name: "Email",
     description: "Receive notifications via email when actions need approval.",
   },
-  "web-push": {
-    name: "Web Push",
-    description:
-      "Browser push notifications for real-time approval alerts.",
-  },
   sms: {
     name: "SMS",
     description: "Text message notifications for urgent approval requests.",
@@ -105,7 +100,9 @@ export function NotificationSection() {
           <p className="text-destructive text-sm">{error}</p>
         ) : (
           <div className="space-y-4">
-            {preferences.map((pref) => {
+            {preferences
+              .filter((pref) => pref.channel !== "web-push")
+              .map((pref) => {
               const label = CHANNEL_LABELS[pref.channel];
               const warning = missingContact[pref.channel];
               const planGated = pref.available === false;
