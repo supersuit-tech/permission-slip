@@ -1,5 +1,6 @@
 import createClient from "openapi-fetch";
 import type { paths } from "./schema";
+import mockClient from "./mockClient";
 
 /**
  * Returns the API base URL for the mobile app.
@@ -25,11 +26,22 @@ function resolveBaseUrl(): string {
   return envUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
 }
 
+const useMockApi = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
+
 /**
  * Typed API client generated from the OpenAPI spec.
  * Uses the same `openapi-fetch` library as the web frontend.
  * Spec paths already include the "/v1" prefix, so the base URL is version-free.
+ *
+ * When EXPO_PUBLIC_MOCK_AUTH=true in dev mode, a mock client is used instead
+ * so the app works without a running backend.
  */
-const client = createClient<paths>({ baseUrl: resolveBaseUrl() });
+// Safe: mockClient implements only GET/POST — the subset the mobile app uses.
+// TypeScript enforcement is bypassed because the mock doesn't expose the full
+// openapi-fetch interface. resolveBaseUrl() is only called when mock is off.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const client = useMockApi
+  ? (mockClient as any)
+  : createClient<paths>({ baseUrl: resolveBaseUrl() });
 
 export default client;

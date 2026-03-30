@@ -1,5 +1,4 @@
 import {
-  createContext,
   useCallback,
   useContext,
   useEffect,
@@ -11,6 +10,7 @@ import {
 import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import type { AuthStatus, AuthState } from "./types";
+import { AuthContext } from "./authContext";
 
 /**
  * Constructs a synthetic AuthError for cases where we need to generate an
@@ -47,8 +47,6 @@ async function withTimeout<T>(request: Promise<T>, ms: number): Promise<T> {
     clearTimeout(timerId);
   }
 }
-
-const AuthContext = createContext<AuthState | undefined>(undefined);
 
 /**
  * Decode a JWT payload without verification (we trust the token — it came

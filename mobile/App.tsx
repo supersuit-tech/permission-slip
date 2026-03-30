@@ -13,12 +13,16 @@ import { StatusBar } from "expo-status-bar";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { focusManager, QueryClient, QueryClientProvider, useQueryClient } from "@tanstack/react-query";
 import { AuthProvider, useAuth } from "./src/auth/AuthContext";
+import { MockAuthProvider } from "./src/auth/MockAuthProvider";
 import RootNavigator from "./src/navigation/RootNavigator";
 import { ErrorBoundary } from "./src/components/ErrorBoundary";
 import { usePushSetup } from "./src/hooks/usePushSetup";
 import { useBiometricAuth } from "./src/hooks/useBiometricAuth";
 import { BiometricLockScreen } from "./src/screens/BiometricLockScreen";
 import { colors } from "./src/theme/colors";
+
+const useMockAuth = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
+const ActiveAuthProvider = useMockAuth ? MockAuthProvider : AuthProvider;
 
 // Tell React Query when the app returns to the foreground so queries with
 // refetchOnWindowFocus automatically re-fetch (AppState is the RN equivalent
@@ -149,10 +153,10 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <AuthProvider key={authKey}>
+        <ActiveAuthProvider key={authKey}>
           <AppContent onRetry={handleRetry} />
           <StatusBar style="auto" />
-        </AuthProvider>
+        </ActiveAuthProvider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
