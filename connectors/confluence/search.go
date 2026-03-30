@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // maxSearchLimit caps the limit parameter to prevent unbounded result sets.

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createRecordsAction implements connectors.Action for airtable.create_records.

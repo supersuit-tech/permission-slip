@@ -3,7 +3,7 @@ package trello
 import (
 	"encoding/json"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // trelloActions returns the JSON Schema definitions for all Trello actions.

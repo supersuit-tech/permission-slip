@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"net/textproto"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // maxUploadBytes is the maximum content size for file uploads (4 MB).

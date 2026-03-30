@@ -1,6 +1,6 @@
 package twilio
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 const testAccountSID = "AC12345678901234567890123456789012"
 const testAuthToken = "test_auth_token_abc123"

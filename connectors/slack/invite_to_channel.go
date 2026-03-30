@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // inviteToChannelAction implements connectors.Action for slack.invite_to_channel.

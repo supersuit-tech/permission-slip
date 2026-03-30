@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgconn"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 const (

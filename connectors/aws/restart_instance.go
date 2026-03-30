@@ -3,7 +3,7 @@ package aws
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // restartInstanceAction implements connectors.Action for aws.restart_instance.

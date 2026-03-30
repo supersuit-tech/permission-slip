@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/oauth"
-	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
+	"github.com/supersuit-tech/permission-slip/oauth"
+	_ "github.com/supersuit-tech/permission-slip/oauth/providers"
 )
 
 func TestBuiltInProviders(t *testing.T) {

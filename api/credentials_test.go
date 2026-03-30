@@ -9,9 +9,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
-	"github.com/supersuit-tech/permission-slip-web/vault"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 // --- Decode helpers ---

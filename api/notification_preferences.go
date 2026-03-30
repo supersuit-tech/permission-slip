@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"sort"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // notificationPreferenceResponse is a single channel preference.

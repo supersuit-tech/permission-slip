@@ -21,8 +21,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/pkg/sqldb"
 
 	_ "github.com/go-sql-driver/mysql"
 )

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func mapSnowflakeError(err error, action string) error {

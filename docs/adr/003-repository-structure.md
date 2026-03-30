@@ -6,7 +6,7 @@
 
 ## Context
 
-We originally decided on three separate repositories (`permission-slip`, `permission-slip-api`, `permission-slip-web`) based on the assumption that separate deploy targets and incompatible toolchains justified repo separation (see [original decision](#original-decision-three-separate-repositories) below).
+We originally decided on three separate repositories (`permission-slip`, `permission-slip-api`, `permission-slip`) based on the assumption that separate deploy targets and incompatible toolchains justified repo separation (see [original decision](#original-decision-three-separate-repositories) below).
 
 After further evaluation, we've concluded the complexity costs of multi-repo outweigh the benefits for a small team building a tightly coupled product.
 
@@ -91,6 +91,6 @@ The original ADR-003 recommended three repos:
 |---|---|---|
 | `permission-slip` | Markdown, OpenAPI | Spec, protocol docs, ADRs |
 | `permission-slip-api` | Go | Backend API service |
-| `permission-slip-web` | React | Frontend web app |
+| `permission-slip` | React | Frontend web app |
 
 With a CI-fetch approach for syncing the spec. This was superseded after evaluating the coordination overhead for a small team building a tightly coupled product.

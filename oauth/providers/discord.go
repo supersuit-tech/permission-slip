@@ -3,8 +3,8 @@ package providers
 import (
 	"os"
 
-	discordconnector "github.com/supersuit-tech/permission-slip-web/connectors/discord"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
+	discordconnector "github.com/supersuit-tech/permission-slip/connectors/discord"
+	"github.com/supersuit-tech/permission-slip/oauth"
 )
 
 func init() {

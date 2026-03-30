@@ -170,8 +170,8 @@ This repo includes [Claude Code](https://docs.anthropic.com/en/docs/claude-code/
 
 ```bash
 # 1. Clone and install
-git clone https://github.com/supersuit-tech/permission-slip-web.git
-cd permission-slip-web
+git clone https://github.com/supersuit-tech/permission-slip.git
+cd permission-slip
 make install
 
 # 2. Configure environment
@@ -299,7 +299,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy and develop
 
 ## 🤝 Contributing
 
-Contributions are welcome! Check [CONTRIBUTING.md](CONTRIBUTING.md) to get started, or browse [open issues](https://github.com/supersuit-tech/permission-slip-web/issues).
+Contributions are welcome! Check [CONTRIBUTING.md](CONTRIBUTING.md) to get started, or browse [open issues](https://github.com/supersuit-tech/permission-slip/issues).
 
 ---
 

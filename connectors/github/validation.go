@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // ptrValidatable constrains PT to be a pointer to T that implements validate().

@@ -7,7 +7,7 @@ import (
 	"net/http"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // SentryTraceIDMiddleware enriches the Sentry scope with request-level context:

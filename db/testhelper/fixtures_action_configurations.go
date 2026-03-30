@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // InsertActionConfig creates an active action configuration with minimal defaults.

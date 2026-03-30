@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // paypalError is a common error shape from PayPal REST APIs.

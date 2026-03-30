@@ -3,7 +3,7 @@ package paypal
 import (
 	"encoding/json"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func paypalTemplates() []connectors.ManifestTemplate {

@@ -6,7 +6,7 @@ import (
 	neturl "net/url"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 type userLookupByEmailResponse struct {

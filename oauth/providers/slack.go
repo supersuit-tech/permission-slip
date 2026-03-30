@@ -6,8 +6,8 @@ import (
 
 	"golang.org/x/oauth2"
 
-	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
+	slackconnector "github.com/supersuit-tech/permission-slip/connectors/slack"
+	"github.com/supersuit-tech/permission-slip/oauth"
 )
 
 func init() {

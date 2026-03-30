@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createIssueAction implements connectors.Action for jira.create_issue.

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // instacartSingleError is the Instacart Connect single-error shape.

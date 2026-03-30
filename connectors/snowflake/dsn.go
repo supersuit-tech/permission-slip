@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	"github.com/snowflakedb/gosnowflake"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // buildSnowflakeConfig parses the vault DSN and optional PEM private key into a

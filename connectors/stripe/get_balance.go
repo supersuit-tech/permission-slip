@@ -3,7 +3,7 @@ package stripe
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // getBalanceAction implements connectors.Action for stripe.get_balance.

@@ -22,7 +22,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 const (

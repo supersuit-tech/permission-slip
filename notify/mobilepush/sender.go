@@ -12,8 +12,8 @@ import (
 
 	"github.com/getsentry/sentry-go"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/notify"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/notify"
 )
 
 // defaultExpoAPIURL is the production Expo Push Service endpoint.

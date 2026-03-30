@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // maxSlackEventBodyBytes limits the event request body to 64 KB.

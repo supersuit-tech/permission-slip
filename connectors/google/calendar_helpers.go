@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // normalizeCalendarTimeParams rewrites common time-parameter aliases in the raw

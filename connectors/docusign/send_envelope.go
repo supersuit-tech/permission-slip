@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // sendEnvelopeAction implements connectors.Action for docusign.send_envelope.

@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/vault"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 // supabaseDatabaseURL returns the Supabase local Postgres URL.

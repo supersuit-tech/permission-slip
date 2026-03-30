@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // ResolveResourceDetails fetches human-readable metadata for resources

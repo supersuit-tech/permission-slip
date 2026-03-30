@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 //go:embed logo.svg

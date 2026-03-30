@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // handleIMMessage processes message.im events from Slack DMs.

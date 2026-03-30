@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // validateActionParameters checks the supplied parameters against the

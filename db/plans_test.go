@@ -3,7 +3,7 @@ package db_test
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 func TestGetPlan_Free(t *testing.T) {

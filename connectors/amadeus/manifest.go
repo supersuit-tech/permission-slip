@@ -4,7 +4,7 @@ import (
 	_ "embed"
 	"encoding/json"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // Manifest returns the connector's metadata manifest. Used by the server to

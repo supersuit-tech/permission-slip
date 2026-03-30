@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // validBucketName matches S3 bucket naming rules: 3-63 lowercase alphanumeric

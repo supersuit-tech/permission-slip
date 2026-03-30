@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // sfIDPattern matches Salesforce 15 or 18-character alphanumeric record IDs.

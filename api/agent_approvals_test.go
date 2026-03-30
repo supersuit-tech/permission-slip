@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/connectors/slack"
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors/slack"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 // testDepsForDB creates a Deps suitable for tests that only need a DB and JWT secret.

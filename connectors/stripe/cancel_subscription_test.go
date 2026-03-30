@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestCancelSubscription_Immediate(t *testing.T) {

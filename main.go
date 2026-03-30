@@ -18,17 +18,17 @@ import (
 
 	"github.com/getsentry/sentry-go"
 	"github.com/joho/godotenv"
-	"github.com/supersuit-tech/permission-slip-web/api"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/all"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/notify"
-	_ "github.com/supersuit-tech/permission-slip-web/notify/all"
-	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
-	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
-	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
-	"github.com/supersuit-tech/permission-slip-web/vault"
+	"github.com/supersuit-tech/permission-slip/api"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	_ "github.com/supersuit-tech/permission-slip/connectors/all"
+	_ "github.com/supersuit-tech/permission-slip/connectors/providers"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/notify"
+	_ "github.com/supersuit-tech/permission-slip/notify/all"
+	poauth "github.com/supersuit-tech/permission-slip/oauth"
+	_ "github.com/supersuit-tech/permission-slip/oauth/providers"
+	pstripe "github.com/supersuit-tech/permission-slip/stripe"
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 //go:embed all:frontend/dist

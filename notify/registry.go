@@ -8,7 +8,7 @@ import (
 
 	"github.com/getsentry/sentry-go"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // BuildContext holds the runtime dependencies available to sender factories

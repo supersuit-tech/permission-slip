@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 // setupInviteTest creates a test DB transaction, inserts a user, and builds a

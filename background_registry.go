@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/supersuit-tech/permission-slip-web/api"
+	"github.com/supersuit-tech/permission-slip/api"
 )
 
 // BackgroundJob describes a self-registering background job.

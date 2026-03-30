@@ -44,7 +44,7 @@ New to the project? Look for issues labeled:
 - **`help wanted`** — issues where we'd especially appreciate community help
 - **`documentation`** — docs improvements that don't require deep codebase knowledge
 
-Browse open issues: [github.com/supersuit-tech/permission-slip-web/issues](https://github.com/supersuit-tech/permission-slip-web/issues)
+Browse open issues: [github.com/supersuit-tech/permission-slip/issues](https://github.com/supersuit-tech/permission-slip/issues)
 
 Before starting work on an issue, leave a comment to let others know you're working on it. This avoids duplicate effort. If an issue is already assigned or has a recent comment claiming it, consider picking a different one or asking if help is still needed.
 
@@ -66,11 +66,11 @@ If you want to work on something that doesn't have an issue yet, open one first 
 
 ```bash
 # 1. Fork the repo on GitHub, then clone your fork
-git clone https://github.com/<your-username>/permission-slip-web.git
-cd permission-slip-web
+git clone https://github.com/<your-username>/permission-slip.git
+cd permission-slip
 
 # 2. Add the upstream remote
-git remote add upstream https://github.com/supersuit-tech/permission-slip-web.git
+git remote add upstream https://github.com/supersuit-tech/permission-slip.git
 
 # 3. Install dependencies
 make install
@@ -461,7 +461,7 @@ Keep the summary line under 72 characters. Use the body to explain the **why** b
 
 ## Reporting Bugs
 
-Use [GitHub Issues](https://github.com/supersuit-tech/permission-slip-web/issues) to report bugs. A good bug report includes:
+Use [GitHub Issues](https://github.com/supersuit-tech/permission-slip/issues) to report bugs. A good bug report includes:
 
 - **Summary** — a clear, concise description of the problem
 - **Steps to reproduce** — numbered steps someone else can follow
@@ -532,7 +532,7 @@ Notification channels self-register via Go's `init()` mechanism — no changes t
    ```go
    package slack
 
-   import "github.com/supersuit-tech/permission-slip-web/notify"
+   import "github.com/supersuit-tech/permission-slip/notify"
 
    func init() {
        notify.RegisterSenderFactory("slack", func(ctx context.Context, bc notify.BuildContext) ([]notify.Sender, error) {
@@ -547,7 +547,7 @@ Notification channels self-register via Go's `init()` mechanism — no changes t
 4. **Add a blank import** to `notify/all/all.go`:
 
    ```go
-   import _ "github.com/supersuit-tech/permission-slip-web/notify/slack"
+   import _ "github.com/supersuit-tech/permission-slip/notify/slack"
    ```
 
 5. **Write tests** in `notify/slack/` and optionally add registry-level tests in `notify/registry_test.go`.
@@ -619,7 +619,7 @@ CI runs against a clean environment. Common causes:
 
 ## Getting Help
 
-- **Issues:** [github.com/supersuit-tech/permission-slip-web/issues](https://github.com/supersuit-tech/permission-slip-web/issues) — ask questions, report problems, or suggest ideas
+- **Issues:** [github.com/supersuit-tech/permission-slip/issues](https://github.com/supersuit-tech/permission-slip/issues) — ask questions, report problems, or suggest ideas
 - **Documentation:** Browse the [docs/](docs/) directory for architecture guides, ADRs, and detailed references
 - **Docs site:** Run `npx mintlify dev` from `docs-site/` to preview the user-facing documentation locally
 

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // replyTestHandler returns an httptest.HandlerFunc that serves the message

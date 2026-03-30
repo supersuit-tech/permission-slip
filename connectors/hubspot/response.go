@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // maxErrorBodyPreview limits how much of a raw (non-JSON) response body

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/coupon"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/coupon"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 type redeemCouponRequest struct {

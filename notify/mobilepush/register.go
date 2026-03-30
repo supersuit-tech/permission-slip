@@ -4,7 +4,7 @@ import (
 	"context"
 	"log"
 
-	"github.com/supersuit-tech/permission-slip-web/notify"
+	"github.com/supersuit-tech/permission-slip/notify"
 )
 
 func init() {

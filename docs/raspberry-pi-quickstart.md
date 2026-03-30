@@ -207,8 +207,8 @@ curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
 
 # Clone and build
-git clone https://github.com/supersuit-tech/permission-slip-web.git
-cd permission-slip-web
+git clone https://github.com/supersuit-tech/permission-slip.git
+cd permission-slip
 make install
 
 export VITE_SUPABASE_URL=https://abcdefgh.supabase.co
@@ -252,9 +252,9 @@ After=network.target postgresql.service
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/permission-slip-web
-ExecStart=/home/pi/permission-slip-web/bin/server
-EnvironmentFile=/home/pi/permission-slip-web/.env
+WorkingDirectory=/home/pi/permission-slip
+ExecStart=/home/pi/permission-slip/bin/server
+EnvironmentFile=/home/pi/permission-slip/.env
 Restart=on-failure
 RestartSec=5
 
@@ -266,7 +266,7 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now permission-slip
 ```
 
-Create `/home/pi/permission-slip-web/.env` with your environment variables (one per line, `KEY=value` format).
+Create `/home/pi/permission-slip/.env` with your environment variables (one per line, `KEY=value` format).
 
 ## Optional: Expose to the Internet
 

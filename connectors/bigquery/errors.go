@@ -7,7 +7,7 @@ import (
 
 	"google.golang.org/api/googleapi"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func mapBQError(err error, action string) error {

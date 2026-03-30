@@ -3,8 +3,8 @@ package providers
 import (
 	"os"
 
-	datadogconnector "github.com/supersuit-tech/permission-slip-web/connectors/datadog"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
+	datadogconnector "github.com/supersuit-tech/permission-slip/connectors/datadog"
+	"github.com/supersuit-tech/permission-slip/oauth"
 )
 
 func init() {

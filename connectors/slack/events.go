@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // Slack Events API envelope types.

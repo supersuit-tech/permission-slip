@@ -3,7 +3,7 @@ package testhelper
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // InsertUser creates an auth.users row and a corresponding profiles row.

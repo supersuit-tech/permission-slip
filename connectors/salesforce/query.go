@@ -7,7 +7,7 @@ import (
 	"net/http"
 	neturl "net/url"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // queryAction implements connectors.Action for salesforce.query.

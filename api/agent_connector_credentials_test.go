@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 // ── PUT /agents/{agent_id}/connectors/{connector_id}/credential ─────────────

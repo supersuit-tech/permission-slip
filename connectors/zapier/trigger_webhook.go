@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // triggerWebhookAction implements connectors.Action for zapier.trigger_webhook.

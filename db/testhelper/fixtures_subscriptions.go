@@ -3,7 +3,7 @@ package testhelper
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // InsertSubscription creates a subscription row linking a user to a plan.

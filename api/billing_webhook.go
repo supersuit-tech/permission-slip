@@ -8,9 +8,9 @@ import (
 
 	gostripe "github.com/stripe/stripe-go/v82"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/notify"
-	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/notify"
+	pstripe "github.com/supersuit-tech/permission-slip/stripe"
 )
 
 // maxWebhookBodyBytes limits the webhook request body to 64 KB.

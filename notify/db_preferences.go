@@ -3,7 +3,7 @@ package notify
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // DBPreferenceChecker adapts db.IsNotificationChannelEnabled to the

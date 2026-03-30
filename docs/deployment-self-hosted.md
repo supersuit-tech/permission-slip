@@ -338,8 +338,8 @@ If you prefer running the binary directly (e.g., on a VM or bare metal):
 
 ```bash
 # Clone and build
-git clone https://github.com/supersuit-tech/permission-slip-web.git
-cd permission-slip-web
+git clone https://github.com/supersuit-tech/permission-slip.git
+cd permission-slip
 make install
 
 # Set build-time vars for the frontend

@@ -1,6 +1,6 @@
 package quickbooks
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 // validCreds returns a Credentials value with valid test credentials.
 func validCreds() connectors.Credentials {

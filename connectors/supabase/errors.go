@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // postgrestErrorResponse is the error envelope from PostgREST.

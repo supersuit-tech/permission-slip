@@ -3,7 +3,7 @@ package slack
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 var _ connectors.UserLister = (*SlackConnector)(nil)

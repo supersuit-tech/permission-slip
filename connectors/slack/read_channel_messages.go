@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // readChannelMessagesAction implements connectors.Action for slack.read_channel_messages.

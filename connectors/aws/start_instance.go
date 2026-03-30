@@ -3,7 +3,7 @@ package aws
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // startInstanceAction implements connectors.Action for aws.start_instance.

@@ -3,7 +3,7 @@ package providers
 import (
 	"os"
 
-	"github.com/supersuit-tech/permission-slip-web/oauth"
+	"github.com/supersuit-tech/permission-slip/oauth"
 )
 
 func init() {

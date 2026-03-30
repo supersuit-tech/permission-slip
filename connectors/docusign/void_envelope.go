@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // voidEnvelopeAction implements connectors.Action for docusign.void_envelope.

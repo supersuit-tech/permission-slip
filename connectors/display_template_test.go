@@ -5,10 +5,10 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 
 	// Blank-import to trigger init() self-registration.
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/all"
+	_ "github.com/supersuit-tech/permission-slip/connectors/all"
 )
 
 // templateParamPattern matches {{param}} and {{param:directive}} placeholders.

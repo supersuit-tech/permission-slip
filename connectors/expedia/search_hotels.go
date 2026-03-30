@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // searchHotelsAction implements connectors.Action for expedia.search_hotels.

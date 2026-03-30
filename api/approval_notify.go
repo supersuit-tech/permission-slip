@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/notify"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/notify"
 )
 
 // NotifyApprovalRequest dispatches a notification to the approver for a newly

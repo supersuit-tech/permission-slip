@@ -1,6 +1,6 @@
 package oauth
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 // IsBuiltInOAuthProviderDisabled reports whether the built-in OAuth provider
 // with this id is turned off alongside its connector (marker file at

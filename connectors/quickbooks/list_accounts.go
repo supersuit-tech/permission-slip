@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // validAccountTypes is an allowlist of QuickBooks account types accepted for

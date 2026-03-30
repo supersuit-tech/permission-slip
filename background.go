@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // startAuditPurge runs db.PurgeExpiredAuditEvents on a recurring ticker,

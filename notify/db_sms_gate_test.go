@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
-	"github.com/supersuit-tech/permission-slip-web/notify"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/notify"
 )
 
 func TestDBSMSGate_FreeTier_Blocked(t *testing.T) {

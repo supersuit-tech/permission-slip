@@ -6,7 +6,7 @@ import (
 	"regexp"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // safeIdentifier matches valid SQL identifiers (lowercase letters, digits, underscores, dots).

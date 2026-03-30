@@ -263,13 +263,13 @@ make docker-build
 docker build \
   --build-arg VITE_SUPABASE_URL=https://your-project.supabase.co \
   --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=your-publishable-key \
-  -t permission-slip-web .
+  -t permission-slip .
 
 # Run
 docker run -p 8080:8080 \
   -e DATABASE_URL="postgres://..." \
   -e SUPABASE_URL="https://your-project.supabase.co" \
-  permission-slip-web
+  permission-slip
 ```
 
 ## Troubleshooting

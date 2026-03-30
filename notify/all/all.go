@@ -3,7 +3,7 @@
 //
 // Usage in main.go:
 //
-//	import _ "github.com/supersuit-tech/permission-slip-web/notify/all"
+//	import _ "github.com/supersuit-tech/permission-slip/notify/all"
 //
 // To add a new sender, create notify/<channel>/register.go with an init() that
 // calls notify.RegisterSenderFactory(...), then add a blank import here.
@@ -13,6 +13,6 @@
 package all
 
 import (
-	_ "github.com/supersuit-tech/permission-slip-web/notify/mobilepush"
-	_ "github.com/supersuit-tech/permission-slip-web/notify/webpush"
+	_ "github.com/supersuit-tech/permission-slip/notify/mobilepush"
+	_ "github.com/supersuit-tech/permission-slip/notify/webpush"
 )

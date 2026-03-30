@@ -20,7 +20,7 @@ import (
 	"github.com/stripe/stripe-go/v82/setupintent"
 	"github.com/stripe/stripe-go/v82/subscription"
 
-	"github.com/supersuit-tech/permission-slip-web/config"
+	"github.com/supersuit-tech/permission-slip/config"
 )
 
 // Config holds Stripe configuration from environment variables.

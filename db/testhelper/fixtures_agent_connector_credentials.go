@@ -3,7 +3,7 @@ package testhelper
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // InsertAgentConnectorCredential binds a static credential to an agent+connector pair.

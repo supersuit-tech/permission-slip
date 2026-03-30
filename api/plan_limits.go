@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // resourceLimitConfig holds the parameters for a single resource limit check.

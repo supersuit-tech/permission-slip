@@ -7,7 +7,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createBranchAction implements connectors.Action for github.create_branch.

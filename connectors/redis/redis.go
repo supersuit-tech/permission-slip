@@ -14,7 +14,7 @@ import (
 	"time"
 
 	goredis "github.com/redis/go-redis/v9"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 const (

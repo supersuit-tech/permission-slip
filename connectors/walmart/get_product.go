@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"regexp"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // itemIDPattern validates that Walmart item IDs contain only digits.

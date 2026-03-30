@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/shared"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/shared"
 )
 
 // --- Request / response types ---

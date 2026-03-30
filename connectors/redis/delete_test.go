@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestDelete_Success(t *testing.T) {

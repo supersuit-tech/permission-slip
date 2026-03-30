@@ -77,7 +77,7 @@ docker-build:
 	docker build \
 		--build-arg VITE_SUPABASE_URL=$${VITE_SUPABASE_URL} \
 		--build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$${VITE_SUPABASE_PUBLISHABLE_KEY} \
-		-t permission-slip-web .
+		-t permission-slip .
 
 # Deploy to Fly.io. Reads Supabase build args from the environment.
 # Alternatively, configure [build.args] in fly.toml and just run: fly deploy

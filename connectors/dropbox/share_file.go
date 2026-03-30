@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // shareFileAction implements connectors.Action for dropbox.share_file.

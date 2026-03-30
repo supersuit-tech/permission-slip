@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/getsentry/sentry-go"
-	"github.com/supersuit-tech/permission-slip-web/api"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/api"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 func init() {

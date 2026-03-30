@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // listEmailsAction implements connectors.Action for google.list_emails.

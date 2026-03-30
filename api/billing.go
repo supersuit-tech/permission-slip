@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
+	"github.com/supersuit-tech/permission-slip/db"
+	pstripe "github.com/supersuit-tech/permission-slip/stripe"
 )
 
 // ── Response types ──────────────────────────────────────────────────────────

@@ -7,7 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 // ── POST /agents/{agent_id}/register ──────────────────────────────────────────

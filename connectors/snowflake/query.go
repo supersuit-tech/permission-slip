@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/snowflakedb/gosnowflake"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/pkg/sqldb"
 )
 
 type queryAction struct {

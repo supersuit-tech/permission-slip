@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // mapPgError maps PostgreSQL errors to typed connector errors.

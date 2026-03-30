@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestCheckResponse_Success(t *testing.T) {

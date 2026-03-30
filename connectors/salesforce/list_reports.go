@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // listReportsAction implements connectors.Action for salesforce.list_reports.

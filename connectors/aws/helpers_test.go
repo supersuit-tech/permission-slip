@@ -3,7 +3,7 @@ package aws
 import (
 	"net/http"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // validCreds returns a Credentials value with valid AWS credentials for tests.

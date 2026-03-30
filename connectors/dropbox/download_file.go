@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // downloadFileAction implements connectors.Action for dropbox.download_file.

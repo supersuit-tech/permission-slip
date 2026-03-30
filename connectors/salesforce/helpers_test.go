@@ -1,6 +1,6 @@
 package salesforce
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 // validCreds returns a Credentials value with a valid access token and
 // instance URL for tests.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 func TestStandingApprovalsSchema(t *testing.T) {

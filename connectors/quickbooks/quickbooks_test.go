@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
+	_ "github.com/supersuit-tech/permission-slip/connectors/providers"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // ---------------------------------------------------------------------------

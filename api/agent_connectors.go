@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/vault"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 // --- Response types ---

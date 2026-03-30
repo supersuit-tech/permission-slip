@@ -3,7 +3,7 @@ package sendgrid
 import (
 	"fmt"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // campaignFields holds the common fields shared between send_campaign and

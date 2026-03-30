@@ -3,7 +3,7 @@ package linkedin
 import (
 	"fmt"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // searchPaging is the LinkedIn paging envelope returned by list and search

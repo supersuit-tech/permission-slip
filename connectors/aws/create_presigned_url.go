@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createPresignedURLAction implements connectors.Action for aws.create_presigned_url.

@@ -3,7 +3,7 @@ package aws
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // stopInstanceAction implements connectors.Action for aws.stop_instance.

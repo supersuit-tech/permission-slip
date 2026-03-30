@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestCreateInvoice_FullFlow(t *testing.T) {

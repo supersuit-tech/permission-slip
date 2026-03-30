@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/coinbase/cdp-sdk/go/openapi"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 type listTokenBalancesParams struct {

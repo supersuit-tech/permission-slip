@@ -7,8 +7,8 @@ import (
 	"log"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/notify"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/notify"
 )
 
 // NotifyStandingApprovalExecution dispatches an informational notification to

@@ -8,11 +8,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
-	"github.com/supersuit-tech/permission-slip-web/vault"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/oauth"
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 type stubCalendarConnector struct {

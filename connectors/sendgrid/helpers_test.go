@@ -1,6 +1,6 @@
 package sendgrid
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 const (
 	testAPIKey      = "SG.test_api_key_for_unit_tests_1234567890"

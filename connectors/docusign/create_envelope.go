@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createEnvelopeAction implements connectors.Action for docusign.create_envelope.

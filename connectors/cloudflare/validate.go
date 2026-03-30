@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // validatePathParam rejects values containing characters that could alter URL

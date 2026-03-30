@@ -230,7 +230,7 @@ fly secrets set \
 
 ### PostHog (Product Analytics)
 
-> **Status:** Planned — see [#352](https://github.com/supersuit-tech/permission-slip-web/issues/352)
+> **Status:** Planned — see [#352](https://github.com/supersuit-tech/permission-slip/issues/352)
 
 Product analytics for understanding user behavior, feature adoption, and funnel drop-off.
 
@@ -299,7 +299,7 @@ If Cloudflare Web Analytics is disabled in the Cloudflare dashboard, this settin
 
 ### UptimeRobot (Uptime Monitoring)
 
-> **Status:** Planned — see [#332](https://github.com/supersuit-tech/permission-slip-web/issues/332)
+> **Status:** Planned — see [#332](https://github.com/supersuit-tech/permission-slip/issues/332)
 
 External uptime monitoring — catches issues that Fly's internal health checks miss (DNS, TLS cert expiry, CDN/proxy problems).
 
@@ -510,9 +510,9 @@ Or hardcode in `fly.toml` for simpler deploys:
 | `STRIPE_PRICE_ID_REQUEST` | Runtime secret | **Set if billing** | Metered Stripe Price ID |
 | `VITE_STRIPE_PUBLISHABLE_KEY` | Build arg | **Set if billing** | Stripe publishable key (frontend) |
 
-[#352]: https://github.com/supersuit-tech/permission-slip-web/issues/352
-[#364]: https://github.com/supersuit-tech/permission-slip-web/issues/364
-[#341]: https://github.com/supersuit-tech/permission-slip-web/issues/341
+[#352]: https://github.com/supersuit-tech/permission-slip/issues/352
+[#364]: https://github.com/supersuit-tech/permission-slip/issues/364
+[#341]: https://github.com/supersuit-tech/permission-slip/issues/341
 
 ## Deployment Process
 
@@ -598,7 +598,7 @@ A separate `audit.yml` workflow runs dependency vulnerability scans:
 
 ### CD (Deployment)
 
-> **Status:** Planned — see [#328](https://github.com/supersuit-tech/permission-slip-web/issues/328)
+> **Status:** Planned — see [#328](https://github.com/supersuit-tech/permission-slip/issues/328)
 
 Currently, deploys are **manual** via `fly deploy`. The planned CD workflow:
 
@@ -848,19 +848,19 @@ Quick reference for what's live vs. planned.
 | **Fly.io** | Compute / hosting | Live | — |
 | **Cloudflare** | DNS proxy + Web Analytics | Live | — |
 | **Supabase** | Auth + Postgres + Vault | Live | — |
-| **Sentry** | Error tracking (backend + frontend) | Live | [#329](https://github.com/supersuit-tech/permission-slip-web/issues/329), [#330](https://github.com/supersuit-tech/permission-slip-web/issues/330) |
+| **Sentry** | Error tracking (backend + frontend) | Live | [#329](https://github.com/supersuit-tech/permission-slip/issues/329), [#330](https://github.com/supersuit-tech/permission-slip/issues/330) |
 | **SendGrid** | Email notifications | Live | — |
 | **Amazon SNS** | SMS notifications | Live | — |
 | **VAPID / Web Push** | Browser push notifications | Live | — |
 | **Expo Push Service** | Mobile push notifications (iOS + Android) | Live | — |
-| **PostHog** | Product analytics + session replay | Planned | [#352](https://github.com/supersuit-tech/permission-slip-web/issues/352) |
-| **UptimeRobot** | Uptime monitoring + status page | Planned | [#332](https://github.com/supersuit-tech/permission-slip-web/issues/332) |
+| **PostHog** | Product analytics + session replay | Planned | [#352](https://github.com/supersuit-tech/permission-slip/issues/352) |
+| **UptimeRobot** | Uptime monitoring + status page | Planned | [#332](https://github.com/supersuit-tech/permission-slip/issues/332) |
 | **Stripe** | Billing + payments | Live | [#168](https://github.com/supersuit-tech/permission-slip/issues/168) |
-| **GitHub Actions CD** | Auto-deploy on push to main | Planned | [#328](https://github.com/supersuit-tech/permission-slip-web/issues/328) |
+| **GitHub Actions CD** | Auto-deploy on push to main | Planned | [#328](https://github.com/supersuit-tech/permission-slip/issues/328) |
 
 ### Future Hardening (Phase 3)
 
-These are tracked under [#321](https://github.com/supersuit-tech/permission-slip-web/issues/321) Phase 3 and should be addressed when the app has real users:
+These are tracked under [#321](https://github.com/supersuit-tech/permission-slip/issues/321) Phase 3 and should be addressed when the app has real users:
 
 - Prometheus metrics or Grafana Cloud for infrastructure metrics
 - Define SLOs and alerting thresholds

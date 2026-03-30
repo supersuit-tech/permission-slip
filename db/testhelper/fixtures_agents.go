@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // InsertUserWithAgent creates a user (profile + auth.users) and an agent

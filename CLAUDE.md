@@ -295,5 +295,5 @@ fi
 When using gh, the local git remote uses a proxy, so always set the repo explicitly:
 
 ```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip-web gh <command>
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh <command>
 ```

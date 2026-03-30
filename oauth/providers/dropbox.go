@@ -3,8 +3,8 @@ package providers
 import (
 	"os"
 
-	dropboxconnector "github.com/supersuit-tech/permission-slip-web/connectors/dropbox"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
+	dropboxconnector "github.com/supersuit-tech/permission-slip/connectors/dropbox"
+	"github.com/supersuit-tech/permission-slip/oauth"
 )
 
 func init() {

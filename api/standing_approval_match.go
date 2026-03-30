@@ -6,7 +6,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // tryStandingApprovalAutoApprove checks if an active standing approval matches

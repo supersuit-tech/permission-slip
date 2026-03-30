@@ -7,7 +7,7 @@ package vault
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // VaultStore manages encrypted secrets in the credential vault.

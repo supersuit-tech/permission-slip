@@ -9,7 +9,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 type agentContextKey struct{}

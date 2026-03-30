@@ -1,6 +1,6 @@
 package plaid
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 const testClientID = "test_client_id_1234567890"
 const testSecret = "test_secret_abcdefghijkl"

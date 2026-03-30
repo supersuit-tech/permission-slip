@@ -4,7 +4,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestCheckTableAllowed(t *testing.T) {

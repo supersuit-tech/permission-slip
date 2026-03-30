@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // listChannelsAction implements connectors.Action for slack.list_channels.

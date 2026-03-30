@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 func decodeApprovalList(t *testing.T, body []byte) approvalListResponse {
