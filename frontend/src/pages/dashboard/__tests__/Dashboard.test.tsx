@@ -112,11 +112,11 @@ describe("Dashboard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText("Control what your AI agents can do"),
+        screen.getByText("Control what Openclaw can do"),
       ).toBeInTheDocument();
     });
     expect(
-      screen.getByRole("button", { name: "Register Your First Agent" }),
+      screen.getByRole("button", { name: "Connect Openclaw" }),
     ).toBeInTheDocument();
 
     // Normal dashboard cards should NOT appear
@@ -138,7 +138,7 @@ describe("Dashboard", () => {
 
     // Onboarding hero should NOT appear
     expect(
-      screen.queryByText("Control what your AI agents can do"),
+      screen.queryByText("Control what Openclaw can do"),
     ).not.toBeInTheDocument();
   });
 
@@ -151,16 +151,18 @@ describe("Dashboard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Register Your First Agent" }),
+        screen.getByRole("button", { name: "Connect Openclaw" }),
       ).toBeInTheDocument();
     });
 
     await user.click(
-      screen.getByRole("button", { name: "Register Your First Agent" }),
+      screen.getByRole("button", { name: "Connect Openclaw" }),
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Add an Agent")).toBeInTheDocument();
+      expect(
+        screen.getByText(/Generate a one-time invite command/),
+      ).toBeInTheDocument();
     });
   });
 

@@ -77,14 +77,14 @@ function EmptyState({ onAddAgent }: { onAddAgent: () => void }) {
     <div className="flex flex-col items-center justify-center py-8 text-center">
       <Bot className="text-muted-foreground mb-3 size-10" />
       <p className="text-muted-foreground mb-1 text-sm font-medium">
-        No registered agents yet
+        Openclaw not connected yet
       </p>
       <p className="text-muted-foreground mb-4 max-w-xs text-xs">
-        Register an agent to start controlling what it can do. You&apos;ll get
-        an invite code to share with the agent.
+        Connect Openclaw to start controlling what it can do. You&apos;ll get
+        an invite code to share with Openclaw.
       </p>
       <Button size="sm" onClick={onAddAgent}>
-        Add an Agent
+        Connect Openclaw
       </Button>
     </div>
   );
@@ -235,7 +235,7 @@ export function RegisteredAgentsCard() {
       </CardContent>
       {atLimit ? (
         <CardFooter>
-          <UpgradePrompt feature="Upgrade to add more agents." />
+          <UpgradePrompt feature="Upgrade to connect more Openclaw instances." />
         </CardFooter>
       ) : agents.length > 0 ? (
         <CardFooter>
@@ -243,7 +243,7 @@ export function RegisteredAgentsCard() {
             className="w-full sm:w-auto"
             onClick={() => setInviteDialogOpen(true)}
           >
-            Add an Agent
+            Connect Openclaw
           </Button>
         </CardFooter>
       ) : null}

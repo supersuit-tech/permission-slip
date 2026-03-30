@@ -146,14 +146,14 @@ describe("RegisteredAgentsCard", () => {
     expect(screen.queryByText("Agent 2")).not.toBeInTheDocument();
   });
 
-  it("renders Add an Agent button when agents exist", async () => {
+  it("renders Connect Openclaw button when agents exist", async () => {
     mockAgentsFetch();
 
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Add an Agent" })
+        screen.getByRole("button", { name: "Connect Openclaw" })
       ).toBeInTheDocument();
     });
   });
@@ -164,13 +164,13 @@ describe("RegisteredAgentsCard", () => {
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("No registered agents yet")).toBeInTheDocument();
+      expect(screen.getByText("Openclaw not connected yet")).toBeInTheDocument();
     });
     expect(
-      screen.getByText(/Register an agent to start controlling what it can do/)
+      screen.getByText(/Connect Openclaw to start controlling what it can do/)
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Add an Agent" })
+      screen.getByRole("button", { name: "Connect Openclaw" })
     ).toBeInTheDocument();
   });
 
@@ -273,7 +273,7 @@ describe("RegisteredAgentsCard", () => {
     expect(screen.getByText("Agent 1")).toBeInTheDocument();
   });
 
-  it("opens invite dialog when Add an Agent is clicked", async () => {
+  it("opens invite dialog when Connect Openclaw is clicked", async () => {
     mockAgentsFetch();
 
     const user = userEvent.setup();
@@ -281,11 +281,11 @@ describe("RegisteredAgentsCard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Add an Agent" })
+        screen.getByRole("button", { name: "Connect Openclaw" })
       ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Add an Agent" }));
+    await user.click(screen.getByRole("button", { name: "Connect Openclaw" }));
 
     await waitFor(() => {
       expect(
@@ -414,12 +414,12 @@ describe("RegisteredAgentsCard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Upgrade to add more agents/),
+        screen.getByText(/Upgrade to connect more Openclaw instances/),
       ).toBeInTheDocument();
     });
-    // "Add an Agent" button should not be present when at limit
+    // "Connect Openclaw" button should not be present when at limit
     expect(
-      screen.queryByRole("button", { name: "Add an Agent" }),
+      screen.queryByRole("button", { name: "Connect Openclaw" }),
     ).not.toBeInTheDocument();
   });
 

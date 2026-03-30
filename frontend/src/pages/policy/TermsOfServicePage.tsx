@@ -39,10 +39,10 @@ export function TermsOfServicePage() {
       {/* ------------------------------------------------------------------ */}
       <h2>3. Service Description</h2>
       <p>
-        Permission Slip is an AI agent authorization platform. It acts as an
-        approval proxy between your AI agents and external third-party services,
+        Permission Slip is the approval layer for Openclaw. It acts as an
+        approval proxy between Openclaw and external third-party services,
         allowing you to review, approve, deny, or pre-authorize actions that
-        agents request on your behalf.
+        Openclaw requests on your behalf.
       </p>
 
       {/* ------------------------------------------------------------------ */}

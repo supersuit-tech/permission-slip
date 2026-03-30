@@ -273,7 +273,7 @@ function EmptyState({ tab }: { tab: StatusTab }) {
   const messages: Record<StatusTab, { title: string; body: string }> = {
     pending: {
       title: "No pending requests",
-      body: "New approval requests from your agents will appear here.",
+      body: "New approval requests from Openclaw will appear here.",
     },
     approved: {
       title: "No approved requests",
