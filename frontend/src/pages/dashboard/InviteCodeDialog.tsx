@@ -46,11 +46,11 @@ export function InviteCodeDialog({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Add an Agent</DialogTitle>
+          <DialogTitle>Connect Openclaw</DialogTitle>
           <DialogDescription>
             {invite
-              ? "Tell your agent to run this command. It handles key generation and registration automatically."
-              : "Generate a one-time invite command to share with your AI agent. Expires in 15 minutes."}
+              ? "Tell Openclaw to run this command. It handles key generation and registration automatically."
+              : "Generate a one-time invite command to share with Openclaw. Expires in 15 minutes."}
           </DialogDescription>
         </DialogHeader>
 

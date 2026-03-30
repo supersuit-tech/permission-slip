@@ -1,6 +1,6 @@
-# Permission Slip Agent Guide
+# Permission Slip — Openclaw Integration Guide
 
-How to integrate your autonomous agent with Permission Slip.
+How Openclaw connects to Permission Slip.
 
 **Base URL**: `https://app.permissionslip.dev/api/v1`
 
@@ -10,13 +10,13 @@ How to integrate your autonomous agent with Permission Slip.
 
 ## Overview
 
-Permission Slip sits between your agent and external services (Gmail, Stripe, GitHub, etc.). Your agent submits structured **actions** for human approval, and Permission Slip executes them using the user's stored credentials. Your agent never sees credentials and can never make arbitrary API calls.
+Permission Slip sits between Openclaw and external services (Gmail, Stripe, GitHub, etc.). Openclaw submits structured **actions** for human approval, and Permission Slip executes them using the user's stored credentials. Openclaw never sees credentials and can never make arbitrary API calls.
 
 ```
-Agent ──→ Permission Slip ──→ External Service
-               │
-               ▼
-          User (approve/deny)
+Openclaw ──→ Permission Slip ──→ External Service
+                    │
+                    ▼
+               User (approve/deny)
 ```
 
 ## Quick Start (CLI — recommended)

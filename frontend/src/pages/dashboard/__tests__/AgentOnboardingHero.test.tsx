@@ -8,17 +8,17 @@ describe("AgentOnboardingHero", () => {
     render(<AgentOnboardingHero onRegisterAgent={vi.fn()} />);
 
     expect(
-      screen.getByText("Control what your AI agents can do"),
+      screen.getByText("Control what Openclaw can do"),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Register your first agent to get started/),
+      screen.getByText(/Connect Openclaw to get started/),
     ).toBeInTheDocument();
   });
 
   it("renders three onboarding steps", () => {
     render(<AgentOnboardingHero onRegisterAgent={vi.fn()} />);
 
-    expect(screen.getByText("Register an agent")).toBeInTheDocument();
+    expect(screen.getAllByText("Connect Openclaw").length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText("Set permissions")).toBeInTheDocument();
     expect(screen.getByText("Monitor activity")).toBeInTheDocument();
   });
@@ -29,7 +29,7 @@ describe("AgentOnboardingHero", () => {
     render(<AgentOnboardingHero onRegisterAgent={onRegisterAgent} />);
 
     await user.click(
-      screen.getByRole("button", { name: "Register Your First Agent" }),
+      screen.getByRole("button", { name: "Connect Openclaw" }),
     );
 
     expect(onRegisterAgent).toHaveBeenCalledOnce();

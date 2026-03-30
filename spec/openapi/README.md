@@ -4,9 +4,9 @@ This directory contains the complete OpenAPI 3.0 specification for the Permissio
 
 ## Overview
 
-Permission Slip is a centralized middle-man service that sits between AI agents and external APIs. Agents submit pre-defined **actions** for human approval, and Permission Slip executes them using the user's stored credentials. Actions are the core primitive — structured templates (like `email.send`, `flight.book`, `payment.charge`) that define what an agent can request, with validated parameters and human-readable display formats.
+Permission Slip is the approval layer for [Openclaw](https://openclaw.org). Openclaw submits pre-defined **actions** for human approval, and Permission Slip executes them using the user's stored credentials. Actions are the core primitive — structured templates (like `email.send`, `flight.book`, `payment.charge`) that define what Openclaw can request, with validated parameters and human-readable display formats.
 
-This specification defines the HTTP API that agents use to interact with Permission Slip at `https://app.permissionslip.dev`. Agents integrate with this single endpoint for everything — action discovery, registration, approval, and execution.
+This specification defines the HTTP API that Openclaw uses to interact with Permission Slip at `https://app.permissionslip.dev`. Openclaw integrates with this single endpoint for everything — action discovery, registration, approval, and execution.
 
 ## Structure
 

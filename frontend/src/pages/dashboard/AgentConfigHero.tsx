@@ -71,7 +71,7 @@ export function AgentConfigHero({ agentId, agentName }: AgentConfigHeroProps) {
           {displayName} is ready &mdash; now give it superpowers
         </h1>
         <p className="text-muted-foreground mb-12 max-w-md text-sm">
-          Connect services like GitHub, Gmail, or Slack so your agent can take
+          Connect services like GitHub, Gmail, or Slack so Openclaw can take
           actions on your behalf. You&rsquo;ll approve every action before it
           happens.
         </p>
@@ -89,7 +89,7 @@ export function AgentConfigHero({ agentId, agentName }: AgentConfigHeroProps) {
             step={2}
             icon={<Plug className="size-6" />}
             title="Add a connector"
-            description="Choose which services your agent can interact with"
+            description="Choose which services Openclaw can interact with"
           />
           <StepConnector />
           <ConfigStep

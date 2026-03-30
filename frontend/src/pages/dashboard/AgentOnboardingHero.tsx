@@ -37,19 +37,19 @@ export function AgentOnboardingHero({ onRegisterAgent }: AgentOnboardingHeroProp
         </div>
 
         <h1 className="mb-3 text-2xl font-bold tracking-tight">
-          Control what your AI agents can do
+          Control what Openclaw can do
         </h1>
         <p className="text-muted-foreground mb-12 max-w-md text-sm">
           Permission Slip lets you approve, deny, and set standing rules for the
-          actions your AI agents take. Register your first agent to get started.
+          actions Openclaw takes. Connect Openclaw to get started.
         </p>
 
         <div className="mb-12 grid w-full max-w-2xl grid-cols-1 gap-8 md:grid-cols-3">
           <OnboardingStep
             step={1}
             icon={<Bot className="size-6" />}
-            title="Register an agent"
-            description="Connect your AI agent with a simple invite code"
+            title="Connect Openclaw"
+            description="Link Openclaw with a simple invite code"
           />
           <OnboardingStep
             step={2}
@@ -61,12 +61,12 @@ export function AgentOnboardingHero({ onRegisterAgent }: AgentOnboardingHeroProp
             step={3}
             icon={<Activity className="size-6" />}
             title="Monitor activity"
-            description="Track every action your agents take in real time"
+            description="Track every action Openclaw takes in real time"
           />
         </div>
 
         <Button size="lg" onClick={onRegisterAgent}>
-          Register Your First Agent
+          Connect Openclaw
         </Button>
       </CardContent>
     </Card>

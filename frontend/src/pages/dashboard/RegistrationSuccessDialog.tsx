@@ -35,9 +35,9 @@ export function RegistrationSuccessDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Agent Registered Successfully</DialogTitle>
+          <DialogTitle>Openclaw Connected Successfully</DialogTitle>
           <DialogDescription>
-            Your agent is ready. Tell it to run this command to discover what it can do.
+            Openclaw is ready. Tell it to run this command to discover what it can do.
           </DialogDescription>
         </DialogHeader>
 
