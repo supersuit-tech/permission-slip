@@ -1006,7 +1006,7 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		"oauth-google-work", userHasEverything, "google",
 		"00000000-0000-0000-0000-000000000080",
 		`{https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/drive}`,
-		`{"email": "alice@supersuit.com", "name": "Alice (Work)"}`)
+		`{"email": "alice@example.com", "name": "Alice (Work)"}`)
 
 	exec(ctx, tx,
 		`INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, scopes, status, extra_data)
@@ -1014,7 +1014,7 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		"oauth-google-personal", userHasEverything, "google",
 		"00000000-0000-0000-0000-000000000081",
 		`{https://www.googleapis.com/auth/gmail.send,https://www.googleapis.com/auth/calendar.events,https://www.googleapis.com/auth/drive}`,
-		`{"email": "alice.personal@gmail.com", "name": "Alice (Personal)"}`)
+		`{"email": "alice.personal@example.com", "name": "Alice (Personal)"}`)
 
 	// ---------------------------------------------------------------
 	// Agent-connector credentials — bind one Google OAuth per agent

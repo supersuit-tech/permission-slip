@@ -1,6 +1,7 @@
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useCookieConsent } from "./CookieConsentContext";
+import { isSaas } from "@/lib/saas";
 
 interface FooterProps {
   className?: string;
@@ -19,11 +20,15 @@ export function Footer({ className }: FooterProps) {
   return (
     <footer className={cn("text-xs text-muted-foreground", className)}>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
-        <Link to="/policy/privacy" className={linkClass}>Privacy Policy</Link>
-        <Link to="/policy/terms" className={linkClass}>Terms of Service</Link>
-        <Link to="/policy/cookies" className={linkClass}>Cookie Policy</Link>
-        <Link to="/support" className={linkClass}>Support</Link>
-        <button type="button" onClick={resetConsent} className={linkClass}>Manage Cookies</button>
+        {isSaas && (
+          <>
+            <Link to="/policy/privacy" className={linkClass}>Privacy Policy</Link>
+            <Link to="/policy/terms" className={linkClass}>Terms of Service</Link>
+            <Link to="/policy/cookies" className={linkClass}>Cookie Policy</Link>
+            <Link to="/support" className={linkClass}>Support</Link>
+            <button type="button" onClick={resetConsent} className={linkClass}>Manage Cookies</button>
+          </>
+        )}
       </div>
     </footer>
   );

@@ -7,7 +7,7 @@ info:
     for human approval, and Permission Slip executes them using the user's stored credentials.
     Openclaw never sees user credentials and can never make arbitrary API calls.
 
-    **Base URL**: `https://app.permissionslip.dev`
+    **Base URL**: `http://localhost:8080`
 
     ## Key Concepts
 
@@ -59,7 +59,7 @@ info:
     ```
 
     Permission Slip is the **single integration point** for agents. Agents talk to 
-    `https://app.permissionslip.dev` for everything — they never need to know about individual 
+    `http://localhost:8080` for everything — they never need to know about individual 
     service URLs or APIs.
 
     ## Related Documentation
@@ -71,10 +71,8 @@ info:
     name: Permission Slip
     url: https://github.com/supersuit-tech/permission-slip
 servers:
-  - url: https://app.permissionslip.dev
-    description: Production server
-  - url: https://staging.app.permissionslip.dev
-    description: Staging server
+  - url: http://localhost:8080
+    description: Local development server
 tags:
   - name: Connectors
     description: Discover available service integrations and actions

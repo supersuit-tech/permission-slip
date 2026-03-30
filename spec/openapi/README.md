@@ -6,7 +6,7 @@ This directory contains the complete OpenAPI 3.0 specification for the Permissio
 
 Permission Slip is the approval layer for [Openclaw](https://openclaw.org). Openclaw submits pre-defined **actions** for human approval, and Permission Slip executes them using the user's stored credentials. Actions are the core primitive — structured templates (like `email.send`, `flight.book`, `payment.charge`) that define what Openclaw can request, with validated parameters and human-readable display formats.
 
-This specification defines the HTTP API that Openclaw uses to interact with Permission Slip at `https://app.permissionslip.dev`. Openclaw integrates with this single endpoint for everything — action discovery, registration, approval, and execution.
+This specification defines the HTTP API that Openclaw uses to interact with Permission Slip at `http://localhost:8080` (the local dev default). Openclaw integrates with this single endpoint for everything — action discovery, registration, approval, and execution.
 
 ## Structure
 
