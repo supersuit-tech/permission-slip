@@ -140,14 +140,14 @@ const mockClient = {
   POST: async (url: string) => {
     await delay();
 
-    if (url.includes("/approve")) {
-      return {
-        data: { confirmation_code: "ABC-123" },
-        error: undefined,
-      };
-    }
-    if (url.includes("/deny")) {
-      return { data: {}, error: undefined };
+    const match = url.match(/\/v1\/approvals\/([^/]+)\/(approve|deny)/);
+    if (match) {
+      const [, id, action] = match;
+      const entry = MOCK_APPROVALS.find((a) => a.approval_id === id);
+      if (entry) entry.status = action === "approve" ? "approved" : "denied";
+      return action === "approve"
+        ? { data: { confirmation_code: "ABC-123" }, error: undefined }
+        : { data: {}, error: undefined };
     }
 
     return { data: undefined, error: { message: `Mock: unhandled POST ${url}` } };

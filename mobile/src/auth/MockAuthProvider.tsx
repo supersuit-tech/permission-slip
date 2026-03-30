@@ -20,7 +20,7 @@ const MOCK_USER: User = {
   aud: "authenticated",
   created_at: new Date().toISOString(),
   factors: [],
-} as User;
+} as User; // Safe: mock object — Supabase required fields unused in this app
 
 const MOCK_SESSION: Session = {
   access_token: "mock-access-token",
@@ -29,7 +29,7 @@ const MOCK_SESSION: Session = {
   expires_at: Date.now() / 1000 + 86400,
   token_type: "bearer",
   user: MOCK_USER,
-} as Session;
+} as Session; // Safe: mock object — only access_token and user are read by the app
 
 export function MockAuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
