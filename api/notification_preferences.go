@@ -1,14 +1,9 @@
 package api
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"sort"
-	"strings"
-
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 
 	"github.com/supersuit-tech/permission-slip-web/db"
 )
@@ -18,6 +13,7 @@ import (
 // when false, the frontend shows a "coming soon" badge instead of a toggle.
 // Note: SMS is excluded from the response entirely (not just marked unavailable)
 // when the server has no SMS sender configured.
+// Web push is excluded from the response entirely so it is not configurable in the product UI.
 type notificationPreferenceResponse struct {
 	Channel   string `json:"channel"`
 	Enabled   bool   `json:"enabled"`
@@ -57,12 +53,6 @@ var allChannels = func() []string {
 	sort.Strings(channels) // deterministic order: email, mobile-push, sms, web-push
 	return channels
 }()
-
-// betaDisabledChannels lists channels that are disabled during the beta period.
-// These channels are always unavailable regardless of plan.
-var betaDisabledChannels = map[string]bool{
-	"web-push": true,
-}
 
 func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -110,12 +100,11 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			seen[p.Channel] = true
 		}
 
-		// Gate beta-disabled channels: reject enabling any channel disabled during beta.
+		// Web push preferences are not exposed in the API (no in-product UI). Reject any
+		// update so stale clients cannot write preference rows.
 		for _, p := range req.Preferences {
-			if p.Enabled && betaDisabledChannels[p.Channel] {
-				label := cases.Title(language.English).String(strings.NewReplacer("-", " ").Replace(p.Channel))
-				msg := fmt.Sprintf("%s notifications are not yet available. They will be enabled after the beta period.", label)
-				RespondError(w, r, http.StatusForbidden, Forbidden(ErrChannelUnavailableBeta, msg))
+			if p.Channel == "web-push" {
+				RespondError(w, r, http.StatusForbidden, Forbidden(ErrChannelNotConfigured, "Web push notification preferences are not available."))
 				return
 			}
 		}
@@ -170,15 +159,15 @@ func buildPreferencesResponse(prefs []db.NotificationPreference, smsEnabled bool
 		if ch == "sms" && !smsEnabled {
 			continue
 		}
+		// Web push is not user-configurable in the product; omit from the list.
+		if ch == "web-push" {
+			continue
+		}
 		enabled, exists := channelMap[ch]
 		if !exists {
-			if betaDisabledChannels[ch] {
-				enabled = false // beta-disabled channels default to off
-			} else {
-				enabled = true // missing rows default to enabled
-			}
+			enabled = true // missing rows default to enabled
 		}
-		available := !betaDisabledChannels[ch]
+		available := true
 		result = append(result, notificationPreferenceResponse{
 			Channel:   ch,
 			Enabled:   enabled,

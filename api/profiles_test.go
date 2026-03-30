@@ -324,10 +324,10 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	// SMS is excluded when SMSEnabled=false.
-	expectedChannels := len(allChannels) - 1
+	// SMS and web-push are excluded when SMSEnabled=false (SMS) and web-push is not exposed in the API.
+	expectedChannels := len(allChannels) - 2
 	if len(resp.Preferences) != expectedChannels {
-		t.Fatalf("expected %d preferences (SMS excluded), got %d", expectedChannels, len(resp.Preferences))
+		t.Fatalf("expected %d preferences (SMS and web-push excluded), got %d", expectedChannels, len(resp.Preferences))
 	}
 
 	// Index preferences by channel for explicit assertions.
@@ -336,33 +336,26 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 		prefsByChannel[p.Channel] = p
 	}
 
-	// All non-beta channels default to enabled. web-push is unavailable during beta.
-	// SMS is excluded entirely when SMSEnabled=false.
-	requiredChannels := []string{"email", "web-push", "mobile-push"}
+	// All returned channels default to enabled. SMS and web-push are excluded when SMSEnabled=false.
+	requiredChannels := []string{"email", "mobile-push"}
 	for _, ch := range requiredChannels {
 		p, ok := prefsByChannel[ch]
 		if !ok {
 			t.Errorf("expected preference for channel %q", ch)
 			continue
 		}
-		if ch == "web-push" {
-			if p.Enabled {
-				t.Errorf("expected %q to default to disabled during beta", ch)
-			}
-			if p.Available {
-				t.Errorf("expected %q to be unavailable during beta", ch)
-			}
-		} else if !p.Enabled {
+		if !p.Enabled {
 			t.Errorf("expected channel %q to default to enabled", ch)
 		}
-		if ch != "web-push" {
-			if !p.Available {
-				t.Errorf("expected channel %q to be available", ch)
-			}
+		if !p.Available {
+			t.Errorf("expected channel %q to be available", ch)
 		}
 	}
 	if _, ok := prefsByChannel["sms"]; ok {
 		t.Error("expected SMS to be excluded when SMSEnabled=false")
+	}
+	if _, ok := prefsByChannel["web-push"]; ok {
+		t.Error("expected web-push to be excluded from notification preferences API")
 	}
 }
 
@@ -396,10 +389,6 @@ func TestUpdateNotificationPreferences_Toggle(t *testing.T) {
 		case "email":
 			if p.Enabled {
 				t.Error("expected email to be disabled")
-			}
-		case "web-push":
-			if p.Enabled {
-				t.Errorf("expected %q to default to disabled during beta", p.Channel)
 			}
 		case "sms":
 			if p.Enabled {

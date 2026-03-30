@@ -187,16 +187,13 @@ func TestGetNotificationPreferences_SMSExcluded_WhenNotConfigured(t *testing.T) 
 		t.Fatalf("unmarshal: %v", err)
 	}
 
-	// SMS should be excluded entirely when not configured on the server.
-	// web-push is still present but unavailable (beta-disabled).
+	// SMS and web-push should be excluded entirely when SMS is not configured on the server.
 	for _, p := range resp.Preferences {
 		if p.Channel == "sms" {
 			t.Error("expected SMS to be excluded from response when not configured")
 		}
 		if p.Channel == "web-push" {
-			if p.Available {
-				t.Error("expected web-push unavailable during beta")
-			}
+			t.Error("expected web-push to be excluded from notification preferences API")
 		}
 	}
 }
@@ -302,7 +299,7 @@ func TestGetNotificationPreferences_IncludesMobilePush(t *testing.T) {
 	}
 }
 
-func TestUpdateNotificationPreferences_EnableWebPush_RejectedDuringBeta(t *testing.T) {
+func TestUpdateNotificationPreferences_WebPush_Rejected(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -317,7 +314,7 @@ func TestUpdateNotificationPreferences_EnableWebPush_RejectedDuringBeta(t *testi
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	// web-push is disabled during beta regardless of plan.
+	// web-push is not exposed in the notification preferences API.
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
 	}
@@ -326,7 +323,7 @@ func TestUpdateNotificationPreferences_EnableWebPush_RejectedDuringBeta(t *testi
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("unmarshal error response: %v", err)
 	}
-	if resp.Error.Code != ErrChannelUnavailableBeta {
-		t.Errorf("expected error code %q, got %q", ErrChannelUnavailableBeta, resp.Error.Code)
+	if resp.Error.Code != ErrChannelNotConfigured {
+		t.Errorf("expected error code %q, got %q", ErrChannelNotConfigured, resp.Error.Code)
 	}
 }

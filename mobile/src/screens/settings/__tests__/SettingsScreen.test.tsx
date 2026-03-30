@@ -37,7 +37,6 @@ jest.mock("react-native-safe-area-context", () => ({
 
 const mockPreferences: NotificationPreference[] = [
   { channel: "email", enabled: true, available: true },
-  { channel: "web-push", enabled: true, available: true },
   { channel: "mobile-push", enabled: true, available: true },
 ];
 

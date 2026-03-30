@@ -17,7 +17,6 @@ vi.mock("../../../api/client");
 // Default fixture: SMS not configured on server, so excluded from response.
 const allEnabled = [
   { channel: "email", enabled: true, available: true },
-  { channel: "web-push", enabled: true, available: true },
   { channel: "mobile-push", enabled: true, available: true },
 ];
 
@@ -26,7 +25,6 @@ const withSmsEnabled = [
   { channel: "email", enabled: true, available: true },
   { channel: "mobile-push", enabled: true, available: true },
   { channel: "sms", enabled: true, available: true },
-  { channel: "web-push", enabled: true, available: true },
 ];
 
 interface MockProfile {
@@ -97,7 +95,7 @@ describe("NotificationSection", () => {
     await waitFor(() => {
       expect(screen.getByText("Email")).toBeInTheDocument();
     });
-    expect(screen.getByText("Web Push")).toBeInTheDocument();
+    expect(screen.queryByText("Web Push")).not.toBeInTheDocument();
     expect(screen.getByText("Mobile Push")).toBeInTheDocument();
     expect(screen.queryByText("SMS")).not.toBeInTheDocument();
   });
@@ -129,7 +127,6 @@ describe("NotificationSection", () => {
   it("shows enabled/disabled state for each channel", async () => {
     const prefs = [
       { channel: "email", enabled: true, available: true },
-      { channel: "web-push", enabled: false, available: true },
       { channel: "mobile-push", enabled: true, available: true },
     ];
     mockApiFetch(profileWithContact, prefs);
@@ -144,9 +141,9 @@ describe("NotificationSection", () => {
       const unchecked = switches.filter(
         (s) => s.getAttribute("data-state") === "unchecked",
       );
-      // 2 channels enabled (email, mobile-push) + 2 unchecked (web-push, product updates)
+      // email + mobile-push enabled + product updates unchecked
       expect(checked).toHaveLength(2);
-      expect(unchecked).toHaveLength(2);
+      expect(unchecked).toHaveLength(1);
     });
   });
 
@@ -211,7 +208,6 @@ describe("NotificationSection", () => {
   it("does not show warning for disabled channel even if contact is missing", async () => {
     const prefs = [
       { channel: "email", enabled: false, available: true },
-      { channel: "web-push", enabled: true, available: true },
       { channel: "mobile-push", enabled: true, available: true },
     ];
     mockApiFetch(profileNoContact, prefs);
@@ -235,7 +231,6 @@ describe("NotificationSection", () => {
       data: {
         preferences: [
           { channel: "email", enabled: false },
-          { channel: "web-push", enabled: true },
           { channel: "sms", enabled: true },
           { channel: "mobile-push", enabled: true },
         ],
