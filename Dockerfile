@@ -1,8 +1,8 @@
 # Multi-stage Dockerfile for Permission Slip.
 # Produces a minimal (~30MB) runtime image containing only the static binary.
 #
-# Build: docker build --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=... -t permission-slip-web .
-# Run:   docker run -p 8080:8080 -e DATABASE_URL=... -e SUPABASE_URL=... permission-slip-web
+# Build: docker build --build-arg VITE_SUPABASE_URL=... --build-arg VITE_SUPABASE_PUBLISHABLE_KEY=... -t permission-slip .
+# Run:   docker run -p 8080:8080 -e DATABASE_URL=... -e SUPABASE_URL=... permission-slip
 
 # ── Stage 1: Build frontend ──────────────────────────────────────────────────
 FROM node:22-alpine AS frontend

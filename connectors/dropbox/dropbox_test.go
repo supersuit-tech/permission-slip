@@ -3,7 +3,7 @@ package dropbox
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestDropboxConnector_ID(t *testing.T) {

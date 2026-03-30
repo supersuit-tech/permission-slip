@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
-	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
+	pstripe "github.com/supersuit-tech/permission-slip/stripe"
 )
 
 // ── GET /billing/plan ──────────────────────────────────────────────────────

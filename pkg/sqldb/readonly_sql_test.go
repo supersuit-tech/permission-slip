@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestValidateReadOnlyWarehouseSQL_withDeleteRejected(t *testing.T) {

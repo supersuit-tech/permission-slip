@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // resolveBaseURL returns the base URL to use for API requests. If the user

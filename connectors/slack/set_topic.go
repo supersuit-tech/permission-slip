@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // setTopicAction implements connectors.Action for slack.set_topic.

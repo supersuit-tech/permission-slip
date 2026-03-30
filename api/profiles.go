@@ -9,7 +9,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // profileResponse is the JSON shape returned by GET /profile.

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/config"
+	"github.com/supersuit-tech/permission-slip/config"
 )
 
 // PurgeExpiredAuditEvents deletes audit events older than the retention period

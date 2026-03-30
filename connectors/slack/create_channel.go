@@ -3,7 +3,7 @@ package slack
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createChannelAction implements connectors.Action for slack.create_channel.

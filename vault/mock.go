@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // MockVaultStore is an in-memory VaultStore for tests. Secrets are stored as

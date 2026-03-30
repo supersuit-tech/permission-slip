@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // getBouncesAction implements connectors.Action for sendgrid.get_bounces.

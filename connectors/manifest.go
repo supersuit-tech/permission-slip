@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // ConnectorManifest represents the connector.json manifest file that external

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // scheduleMessageAction implements connectors.Action for slack.schedule_message.

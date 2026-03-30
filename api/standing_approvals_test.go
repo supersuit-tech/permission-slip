@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 func decodeStandingApprovalList(t *testing.T, body []byte) standingApprovalListResponse {

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // DBSMSGate implements SMSGate by checking the user's subscription plan

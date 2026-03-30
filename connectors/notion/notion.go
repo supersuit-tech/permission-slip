@@ -25,7 +25,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // validatable is implemented by all action parameter structs. It enables the

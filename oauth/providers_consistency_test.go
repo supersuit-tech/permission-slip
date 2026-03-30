@@ -3,10 +3,10 @@ package oauth_test
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
-	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	_ "github.com/supersuit-tech/permission-slip/connectors/providers"
+	"github.com/supersuit-tech/permission-slip/oauth"
+	_ "github.com/supersuit-tech/permission-slip/oauth/providers"
 )
 
 // TestProviderRegistryConsistency verifies that every provider registered in

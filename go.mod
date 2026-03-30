@@ -1,4 +1,4 @@
-module github.com/supersuit-tech/permission-slip-web
+module github.com/supersuit-tech/permission-slip
 
 go 1.25.8
 

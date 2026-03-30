@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // InsertOAuthConnection creates an OAuth connection for the given user and provider.

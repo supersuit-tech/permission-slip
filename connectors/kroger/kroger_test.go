@@ -3,7 +3,7 @@ package kroger
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestID(t *testing.T) {

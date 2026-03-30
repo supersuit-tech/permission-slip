@@ -3,7 +3,7 @@ package google
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestValidateValues_TooManyRows(t *testing.T) {

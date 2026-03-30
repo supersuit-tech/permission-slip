@@ -1,6 +1,6 @@
 package docusign
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 // validCreds returns a Credentials value with valid access token and account ID for tests.
 func validCreds() connectors.Credentials {

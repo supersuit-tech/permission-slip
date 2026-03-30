@@ -61,7 +61,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 const (
@@ -203,7 +203,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createIssueAction implements connectors.Action for jira.create_issue.
@@ -459,7 +459,7 @@ Create `connectors/jira/register.go` so the connector registers itself at startu
 ```go
 package jira
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 func init() {
 	connectors.RegisterBuiltIn(New())
@@ -473,7 +473,7 @@ Add one line to `connectors/all/all.go` so the import triggers the `init()` abov
 ```go
 import (
 	// ...existing imports...
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/jira"
+	_ "github.com/supersuit-tech/permission-slip/connectors/jira"
 )
 ```
 
@@ -489,7 +489,7 @@ package jira
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestJiraConnector_ID(t *testing.T) {
@@ -563,7 +563,7 @@ Create `connectors/jira/helpers_test.go` for shared test utilities:
 ```go
 package jira
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 func validCreds() connectors.Credentials {
 	return connectors.NewCredentials(map[string]string{
@@ -585,7 +585,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestCreateIssue_Success(t *testing.T) {
@@ -708,7 +708,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 type closeIssueAction struct {

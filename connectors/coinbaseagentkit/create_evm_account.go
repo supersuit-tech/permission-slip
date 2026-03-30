@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"github.com/coinbase/cdp-sdk/go/openapi"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 var evmAccountNameRE = regexp.MustCompile(`^[a-zA-Z0-9-]{2,36}$`)

@@ -1,6 +1,6 @@
 package confluence
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 // pageResponse is the common response structure returned by the Confluence v2
 // pages API (create, update, get). Shared across actions to avoid duplication.

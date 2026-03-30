@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createTaskAction implements connectors.Action for salesforce.create_task.

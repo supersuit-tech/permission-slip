@@ -1,7 +1,7 @@
 package db
 
 import (
-	"github.com/supersuit-tech/permission-slip-web/config"
+	"github.com/supersuit-tech/permission-slip/config"
 )
 
 // Plan ID constants — re-exported from config for backward compatibility.

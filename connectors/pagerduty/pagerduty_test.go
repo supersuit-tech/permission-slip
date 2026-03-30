@@ -3,7 +3,7 @@ package pagerduty
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestPagerDutyConnector_ID(t *testing.T) {

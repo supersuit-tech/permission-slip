@@ -3,7 +3,7 @@ package testhelper
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // InsertRegistrationInvite creates an active registration invite for the given user.

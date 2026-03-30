@@ -17,8 +17,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/all"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	_ "github.com/supersuit-tech/permission-slip/connectors/all"
 )
 
 const testSlackSecret = "test-signing-secret-abc123"

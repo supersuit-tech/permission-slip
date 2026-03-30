@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/url"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // checkStatusAction implements connectors.Action for docusign.check_status.

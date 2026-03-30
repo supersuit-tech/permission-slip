@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // validatePayPalPathID ensures id is safe to embed in a URL path segment.

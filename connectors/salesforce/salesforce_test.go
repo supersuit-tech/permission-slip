@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestSalesforceConnector_ID(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 
 	cdp "github.com/coinbase/cdp-sdk/go"
 	"github.com/coinbase/cdp-sdk/go/openapi"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 const (

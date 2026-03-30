@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/pkg/sqldb"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/pkg/sqldb"
 )
 
 // txEnv bundles a prepared transaction with its context and cancel function.

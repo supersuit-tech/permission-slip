@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // ListCalendars returns the user's calendars (Microsoft Graph GET /me/calendars).

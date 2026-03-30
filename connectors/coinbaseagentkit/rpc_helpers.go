@@ -10,7 +10,7 @@ import (
 	"github.com/coinbase/cdp-sdk/go/openapi"
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/ethclient"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // Minimal ERC-20 transfer ABI for encoding calldata (send_crypto).

@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestNotionConnector_ID(t *testing.T) {

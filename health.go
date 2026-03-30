@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/api"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/api"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // handleHealth returns a handler that reports server health, including

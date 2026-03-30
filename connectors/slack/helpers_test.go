@@ -1,6 +1,6 @@
 package slack
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 // validCreds returns a Credentials value with a valid user OAuth token for tests.
 func validCreds() connectors.Credentials {

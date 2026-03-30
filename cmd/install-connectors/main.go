@@ -14,8 +14,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	_ "github.com/supersuit-tech/permission-slip/connectors/providers"
 )
 
 // configFile is the name of the configuration file in the repo root.

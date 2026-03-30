@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // maxLabelLength is the maximum length of a payment method label.

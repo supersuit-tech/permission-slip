@@ -15,7 +15,7 @@ import (
 	"strings"
 
 	wplib "github.com/SherClockHolmes/webpush-go"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // VAPID key storage keys in the server_config table.

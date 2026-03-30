@@ -3,12 +3,12 @@ package connectors_test
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 
 	// Blank-import connectors/all to trigger init() self-registration of all
 	// built-in connectors. This also transitively imports connectors/providers.
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/all"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
+	_ "github.com/supersuit-tech/permission-slip/connectors/all"
+	_ "github.com/supersuit-tech/permission-slip/connectors/providers"
 )
 
 // TestBuiltInProvidersAreRegistered verifies that the blank import of

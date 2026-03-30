@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	ghconnector "github.com/supersuit-tech/permission-slip-web/connectors/github"
-	googleconnector "github.com/supersuit-tech/permission-slip-web/connectors/google"
-	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	ghconnector "github.com/supersuit-tech/permission-slip/connectors/github"
+	googleconnector "github.com/supersuit-tech/permission-slip/connectors/google"
+	slackconnector "github.com/supersuit-tech/permission-slip/connectors/slack"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // runCmd runs a shell command and returns its combined output.
@@ -1296,8 +1296,8 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
 		"ac-claude-create-issue", claude, userHasEverything,
 		connectorGitHub, "github.create_issue",
-		`{"repo": "supersuit-tech/permission-slip-web", "title": "*", "body": "*", "label": "bug"}`,
-		"Create bug issues in permission-slip-web",
+		`{"repo": "supersuit-tech/permission-slip", "title": "*", "body": "*", "label": "bug"}`,
+		"Create bug issues in permission-slip",
 		"Agent can create issues labeled 'bug' in the main repo. Title and body are freeform.")
 
 	// Claude Code → github.merge_pr (locked repo, wildcard PR number)
@@ -1306,8 +1306,8 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
 		"ac-claude-merge-pr", claude, userHasEverything,
 		connectorGitHub, "github.merge_pr",
-		`{"repo": "supersuit-tech/permission-slip-web", "pr": "*"}`,
-		"Merge PRs in permission-slip-web",
+		`{"repo": "supersuit-tech/permission-slip", "pr": "*"}`,
+		"Merge PRs in permission-slip",
 		"Agent can merge any PR in the main repo.")
 
 	// Slack Notifier → slack.send_message (locked channel, wildcard message)

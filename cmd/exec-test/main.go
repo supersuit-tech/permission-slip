@@ -35,12 +35,12 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/all"
-	"github.com/supersuit-tech/permission-slip-web/db"
-	poauth "github.com/supersuit-tech/permission-slip-web/oauth"
-	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
-	"github.com/supersuit-tech/permission-slip-web/vault"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	_ "github.com/supersuit-tech/permission-slip/connectors/all"
+	"github.com/supersuit-tech/permission-slip/db"
+	poauth "github.com/supersuit-tech/permission-slip/oauth"
+	_ "github.com/supersuit-tech/permission-slip/oauth/providers"
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 // credFlag collects multiple -cred key=value flags.

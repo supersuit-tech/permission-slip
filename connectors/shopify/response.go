@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // checkResponse inspects the HTTP status code and returns an appropriate

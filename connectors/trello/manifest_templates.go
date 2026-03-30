@@ -3,7 +3,7 @@ package trello
 import (
 	"encoding/json"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // trelloTemplates returns the pre-built permission templates for common Trello

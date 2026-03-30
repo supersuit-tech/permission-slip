@@ -3,7 +3,7 @@ package microsoft
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestValidateGraphID(t *testing.T) {

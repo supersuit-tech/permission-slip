@@ -15,10 +15,10 @@ import (
 	gostripe "github.com/stripe/stripe-go/v82"
 	"github.com/stripe/stripe-go/v82/webhook"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
-	"github.com/supersuit-tech/permission-slip-web/notify"
-	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/notify"
+	pstripe "github.com/supersuit-tech/permission-slip/stripe"
 )
 
 const testWebhookSecret = "whsec_test_secret_for_webhook_testing"

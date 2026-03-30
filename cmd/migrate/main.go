@@ -7,7 +7,7 @@ import (
 	"os"
 
 	"github.com/pressly/goose/v3"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 func main() {

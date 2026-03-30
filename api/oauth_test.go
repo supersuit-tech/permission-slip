@@ -12,11 +12,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	slackconnector "github.com/supersuit-tech/permission-slip-web/connectors/slack"
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
-	"github.com/supersuit-tech/permission-slip-web/vault"
+	slackconnector "github.com/supersuit-tech/permission-slip/connectors/slack"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/oauth"
+	"github.com/supersuit-tech/permission-slip/vault"
 	"golang.org/x/oauth2"
 )
 

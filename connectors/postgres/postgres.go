@@ -20,7 +20,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib" // pgx driver for database/sql
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 const (

@@ -1,6 +1,6 @@
 package trello
 
-import "github.com/supersuit-tech/permission-slip-web/connectors"
+import "github.com/supersuit-tech/permission-slip/connectors"
 
 // Test IDs that pass Trello ID validation (24-char hex strings).
 const (

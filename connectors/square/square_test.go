@@ -9,9 +9,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
-	_ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/oauth"
+	_ "github.com/supersuit-tech/permission-slip/oauth/providers"
 )
 
 func TestSquareConnector_ID(t *testing.T) {

@@ -3,7 +3,7 @@ package dropbox
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // createFolderAction implements connectors.Action for dropbox.create_folder.

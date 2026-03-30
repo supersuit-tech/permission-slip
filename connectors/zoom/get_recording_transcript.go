@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // getRecordingTranscriptAction implements connectors.Action for zoom.get_recording_transcript.

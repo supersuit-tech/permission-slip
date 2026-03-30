@@ -10,7 +10,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // signedJSONRequest creates an HTTP request with a JSON body and an Ed25519

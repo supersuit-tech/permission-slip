@@ -6,7 +6,7 @@
 
 ## Context
 
-Permission Slip uses Supabase as its hosted Postgres provider and relies on Supabase client libraries for Auth, Storage, and Realtime in the web app (`permission-slip-web`). The Go API (`permission-slip-api`) connects to Postgres directly.
+Permission Slip uses Supabase as its hosted Postgres provider and relies on Supabase client libraries for Auth, Storage, and Realtime in the web app (`permission-slip`). The Go API (`permission-slip-api`) connects to Postgres directly.
 
 We need a local testing strategy that:
 
@@ -71,7 +71,7 @@ go test ./...
 - Use `t.Cleanup()` to truncate tables between tests
 - Test RLS policies by connecting as different Postgres roles
 
-### React Web App (`permission-slip-web`)
+### React Web App (`permission-slip`)
 
 Mock the Supabase client at the module boundary:
 

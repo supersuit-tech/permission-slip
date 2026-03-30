@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func (c *FirestoreConnector) withTimeout(ctx context.Context) (context.Context, context.CancelFunc) {

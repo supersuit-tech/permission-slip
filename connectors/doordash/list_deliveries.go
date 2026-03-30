@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // listDeliveriesAction implements connectors.Action for doordash.list_deliveries.

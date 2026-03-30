@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // deleteRecordsAction implements connectors.Action for airtable.delete_records.

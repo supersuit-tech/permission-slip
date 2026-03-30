@@ -4,8 +4,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 type calendarListResponse struct {

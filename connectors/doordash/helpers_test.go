@@ -3,7 +3,7 @@ package doordash
 import (
 	"encoding/base64"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // validCreds returns Credentials with valid DoorDash Drive API credentials for tests.

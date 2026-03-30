@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // emailPattern is a basic email validation regex. It does not cover all

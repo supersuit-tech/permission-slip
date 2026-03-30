@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // dateLayout is the expected date format for Expedia Rapid API parameters.

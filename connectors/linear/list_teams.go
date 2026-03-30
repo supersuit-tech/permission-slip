@@ -3,7 +3,7 @@ package linear
 import (
 	"context"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // listTeamsAction implements connectors.Action for linear.list_teams.

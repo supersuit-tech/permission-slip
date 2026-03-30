@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 // TestRLSEnabledOnAllTables verifies that every application table in the public

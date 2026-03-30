@@ -3,8 +3,8 @@ package providers
 import (
 	"os"
 
-	paypalconnector "github.com/supersuit-tech/permission-slip-web/connectors/paypal"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
+	paypalconnector "github.com/supersuit-tech/permission-slip/connectors/paypal"
+	"github.com/supersuit-tech/permission-slip/oauth"
 )
 
 func init() {

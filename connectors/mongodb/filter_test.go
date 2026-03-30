@@ -3,7 +3,7 @@ package mongodb
 import (
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestValidateFilter_AllowedOperators(t *testing.T) {

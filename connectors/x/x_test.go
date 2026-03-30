@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	_ "github.com/supersuit-tech/permission-slip-web/connectors/providers"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	_ "github.com/supersuit-tech/permission-slip/connectors/providers"
 )
 
 func TestXConnector_ID(t *testing.T) {

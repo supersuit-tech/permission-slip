@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestQuery_Success(t *testing.T) {

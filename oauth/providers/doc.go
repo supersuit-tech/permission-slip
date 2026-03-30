@@ -3,7 +3,7 @@
 // package must be blank-imported by the binary entrypoint to activate all
 // registrations:
 //
-//	import _ "github.com/supersuit-tech/permission-slip-web/oauth/providers"
+//	import _ "github.com/supersuit-tech/permission-slip/oauth/providers"
 //
 // # Adding a New Provider
 //
@@ -22,7 +22,7 @@
 //	import (
 //		"os"
 //
-//		"github.com/supersuit-tech/permission-slip-web/oauth"
+//		"github.com/supersuit-tech/permission-slip/oauth"
 //	)
 //
 //	func init() {

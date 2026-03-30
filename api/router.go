@@ -5,12 +5,12 @@ import (
 	"net/http"
 
 	sentryhttp "github.com/getsentry/sentry-go/http"
-	"github.com/supersuit-tech/permission-slip-web/connectors"
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/notify"
-	"github.com/supersuit-tech/permission-slip-web/oauth"
-	pstripe "github.com/supersuit-tech/permission-slip-web/stripe"
-	"github.com/supersuit-tech/permission-slip-web/vault"
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/notify"
+	"github.com/supersuit-tech/permission-slip/oauth"
+	pstripe "github.com/supersuit-tech/permission-slip/stripe"
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 // Deps holds shared dependencies for API route handlers.

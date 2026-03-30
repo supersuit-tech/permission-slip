@@ -70,7 +70,7 @@ info:
     - Terminology: Definitions of core concepts
   contact:
     name: Permission Slip
-    url: https://github.com/supersuit-tech/permission-slip-web
+    url: https://github.com/supersuit-tech/permission-slip
 servers:
   - url: https://app.permissionslip.dev
     description: Production server

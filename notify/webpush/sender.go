@@ -12,8 +12,8 @@ import (
 	"github.com/getsentry/sentry-go"
 
 	wplib "github.com/SherClockHolmes/webpush-go"
-	"github.com/supersuit-tech/permission-slip-web/db"
-	"github.com/supersuit-tech/permission-slip-web/notify"
+	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/notify"
 )
 
 // Sender implements notify.Sender for the Web Push channel. It sends push

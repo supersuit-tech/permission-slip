@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 // capabilitiesRequest creates a signed GET request for the capabilities endpoint.

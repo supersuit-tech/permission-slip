@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/supersuit-tech/permission-slip-web/db"
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 // SourceTypeForEvent returns the correct source_type for the given event type.

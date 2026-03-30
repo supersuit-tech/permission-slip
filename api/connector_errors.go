@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/supersuit-tech/permission-slip-web/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // handleConnectorError maps typed connector errors to HTTP responses and
