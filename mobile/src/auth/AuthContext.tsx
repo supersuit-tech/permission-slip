@@ -8,9 +8,45 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import type { AuthStatus, AuthState } from "./types";
+
+/**
+ * Constructs a synthetic AuthError for cases where we need to generate an
+ * error client-side (e.g. missing factors). Uses `as AuthError` because
+ * Supabase doesn't export the AuthApiError class from @supabase/supabase-js.
+ */
+function createAuthError(
+  code: string,
+  message: string,
+  status: number
+): AuthError {
+  return {
+    message,
+    name: "AuthApiError",
+    status,
+    code,
+  } as AuthError;
+}
+
+/**
+ * Races `request` against a timeout. Rejects with an AuthError on timeout.
+ */
+async function withTimeout<T>(request: Promise<T>, ms: number): Promise<T> {
+  let timerId: ReturnType<typeof setTimeout> | undefined;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timerId = setTimeout(
+      () => reject(new Error("Request timed out")),
+      ms
+    );
+  });
+  try {
+    return await Promise.race([request, timeoutPromise]);
+  } finally {
+    clearTimeout(timerId);
+  }
+}
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
@@ -107,6 +143,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
+  /**
+   * Calls challengeAndVerify and promotes authStatus to "authenticated" on
+   * success. We eagerly set "authenticated" rather than waiting for
+   * onAuthStateChange because Supabase may not re-fire the event for an
+   * AAL promotion within the same session.
+   */
+  const challengeAndVerifyTotp = useCallback(
+    async (factorId: string, code: string) => {
+      const { error } = await withTimeout(
+        supabase.auth.mfa.challengeAndVerify({ factorId, code }),
+        10000
+      ).catch((err) => ({
+        error: createAuthError(
+          "unknown",
+          err instanceof Error ? err.message : String(err),
+          500
+        ),
+      }));
+      if (!error) {
+        setAuthStatus("authenticated");
+      }
+      return { error: error ?? null };
+    },
+    []
+  );
+
   const sendOtp = useCallback(async (email: string) => {
     const { error } = await supabase.auth.signInWithOtp({ email });
     return { error: error ?? null };
@@ -128,6 +190,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: error ?? null };
   }, []);
 
+  const verifyMfa = useCallback(
+    async (code: string) => {
+      const totpFactor = (user?.factors ?? []).find(
+        (f) => f.factor_type === "totp" && f.status === "verified"
+      );
+      if (!totpFactor) {
+        return {
+          error: createAuthError(
+            "mfa_factor_not_found",
+            "No authenticator found. Please re-enroll.",
+            400
+          ),
+        };
+      }
+      return challengeAndVerifyTotp(totpFactor.id, code);
+    },
+    [challengeAndVerifyTotp, user]
+  );
+
   const value = useMemo<AuthState>(
     () => ({
       session,
@@ -135,9 +216,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       authStatus,
       sendOtp,
       verifyOtp,
+      verifyMfa,
       signOut,
     }),
-    [session, user, authStatus, sendOtp, verifyOtp, signOut]
+    [session, user, authStatus, sendOtp, verifyOtp, verifyMfa, signOut]
   );
 
   return (

@@ -1,9 +1,9 @@
-import { useEffect } from "react";
-import { ActivityIndicator, Alert, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useAuth } from "../auth/AuthContext";
 import LoginScreen from "../screens/LoginScreen";
+import MfaChallengeScreen from "../auth/MfaChallengeScreen";
 import ApprovalListScreen from "../screens/approvals/ApprovalListScreen";
 import ApprovalDetailScreen from "../screens/approvals/ApprovalDetailScreen";
 import DeepLinkDetailScreen from "../screens/approvals/DeepLinkDetailScreen";
@@ -15,6 +15,7 @@ import { colors } from "../theme/colors";
 
 export type RootStackParamList = {
   Login: undefined;
+  MfaChallenge: undefined;
   ApprovalList: undefined;
   ApprovalDetail: {
     approvalId: string;
@@ -29,20 +30,7 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function RootNavigator() {
-  const { authStatus, signOut } = useAuth();
-
-  // MFA challenge is not yet supported on mobile. If the user's account
-  // requires MFA, sign them out and show a message. A proper MFA challenge
-  // screen will be added in a future phase.
-  useEffect(() => {
-    if (authStatus === "mfa_required") {
-      Alert.alert(
-        "MFA required",
-        "Multi-factor authentication is not yet supported in the mobile app. Please sign in via the web app.",
-        [{ text: "OK", onPress: () => signOut() }]
-      );
-    }
-  }, [authStatus, signOut]);
+  const { authStatus } = useAuth();
 
   return (
     <NavigationContainer
@@ -87,6 +75,8 @@ export default function RootNavigator() {
               }}
             />
           </>
+        ) : authStatus === "mfa_required" ? (
+          <Stack.Screen name="MfaChallenge" component={MfaChallengeScreen} />
         ) : (
           <Stack.Screen
             name="Login"
