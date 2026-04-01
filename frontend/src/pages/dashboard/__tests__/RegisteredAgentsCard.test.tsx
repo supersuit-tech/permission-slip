@@ -146,14 +146,14 @@ describe("RegisteredAgentsCard", () => {
     expect(screen.queryByText("Agent 2")).not.toBeInTheDocument();
   });
 
-  it("renders Add an OpenClaw machine button when agents exist", async () => {
+  it("renders Add an Openclaw machine button when agents exist", async () => {
     mockAgentsFetch();
 
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Add an OpenClaw machine" })
+        screen.getByRole("button", { name: "Add an Openclaw machine" })
       ).toBeInTheDocument();
     });
   });
@@ -170,7 +170,7 @@ describe("RegisteredAgentsCard", () => {
       screen.getByText(/Connect Openclaw to start controlling what it can do/)
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Add an OpenClaw machine" })
+      screen.getByRole("button", { name: "Add an Openclaw machine" })
     ).toBeInTheDocument();
   });
 
@@ -273,7 +273,7 @@ describe("RegisteredAgentsCard", () => {
     expect(screen.getByText("Agent 1")).toBeInTheDocument();
   });
 
-  it("opens invite dialog when Add an OpenClaw machine is clicked", async () => {
+  it("opens invite dialog when Add an Openclaw machine is clicked", async () => {
     mockAgentsFetch();
 
     const user = userEvent.setup();
@@ -281,11 +281,11 @@ describe("RegisteredAgentsCard", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Add an OpenClaw machine" })
+        screen.getByRole("button", { name: "Add an Openclaw machine" })
       ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByRole("button", { name: "Add an OpenClaw machine" }));
+    await user.click(screen.getByRole("button", { name: "Add an Openclaw machine" }));
 
     await waitFor(() => {
       expect(
@@ -417,9 +417,9 @@ describe("RegisteredAgentsCard", () => {
         screen.getByText(/Upgrade to connect more Openclaw instances/),
       ).toBeInTheDocument();
     });
-    // "Add an OpenClaw machine" button should not be present when at limit
+    // "Add an Openclaw machine" button should not be present when at limit
     expect(
-      screen.queryByRole("button", { name: "Add an OpenClaw machine" }),
+      screen.queryByRole("button", { name: "Add an Openclaw machine" }),
     ).not.toBeInTheDocument();
   });
 
