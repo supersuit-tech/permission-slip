@@ -9,21 +9,14 @@ interface CheckEmailStepProps {
   email: string;
   onBack: () => void;
   onResend: () => Promise<{ error: AuthError | null }>;
-  resendCooldownSeconds: number;
 }
 
 export default function CheckEmailStep({
   email,
   onBack,
   onResend,
-  resendCooldownSeconds,
 }: CheckEmailStepProps) {
-  const resend = useResend({
-    onResend,
-    cooldownSeconds: resendCooldownSeconds,
-    rateLimitMessage:
-      "Too many sign-in emails sent. If you already received a link, you can still use it — otherwise wait a few minutes and try again.",
-  });
+  const resend = useResend({ onResend });
 
   return (
     <AuthLayout>
@@ -48,7 +41,6 @@ export default function CheckEmailStep({
         </Button>
       </div>
       <ResendButton
-        cooldownSeconds={resendCooldownSeconds}
         isResending={resend.isResending}
         error={resend.error}
         success={resend.success}

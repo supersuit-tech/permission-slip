@@ -1,6 +1,5 @@
 import { useState, useCallback, lazy, Suspense } from "react";
 import { useAuth } from "./AuthContext";
-import { useCooldown } from "./useCooldown";
 import EmailStep from "./EmailStep";
 import CheckEmailStep from "./CheckEmailStep";
 import AuthLayout from "./AuthLayout";
@@ -16,21 +15,15 @@ export default function LoginPage() {
   const { sendOtp, verifyOtp } = useAuth();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
-  const cooldown = useCooldown();
 
   const handleSendSuccess = (inputEmail: string) => {
     setEmail(inputEmail);
     setStep(import.meta.env.DEV ? "otp" : "check-email");
-    cooldown.start();
   };
 
   const handleResend = useCallback(async () => {
-    const result = await sendOtp(email);
-    if (!result.error || result.error.code === "over_email_send_rate_limit") {
-      cooldown.start();
-    }
-    return result;
-  }, [sendOtp, email, cooldown.start]);
+    return sendOtp(email);
+  }, [sendOtp, email]);
 
   if (step === "otp") {
     return (
@@ -40,7 +33,6 @@ export default function LoginPage() {
           onVerify={(code) => verifyOtp(email, code)}
           onBack={() => setStep("email")}
           onResend={handleResend}
-          resendCooldownSeconds={cooldown.secondsLeft}
         />
       </Suspense>
     );
@@ -52,7 +44,6 @@ export default function LoginPage() {
         email={email}
         onBack={() => setStep("email")}
         onResend={handleResend}
-        resendCooldownSeconds={cooldown.secondsLeft}
       />
     );
   }
@@ -61,8 +52,15 @@ export default function LoginPage() {
     <EmailStep
       onSubmit={async (inputEmail) => {
         const result = await sendOtp(inputEmail);
-        if (!result.error) {
+        // Advance even on over_email_send_rate_limit — the first email was
+        // already sent. Blocking here just tempts users to retry and dig
+        // deeper into Supabase's per-email cooldown.
+        if (
+          !result.error ||
+          result.error.code === "over_email_send_rate_limit"
+        ) {
           handleSendSuccess(inputEmail);
+          return { error: null };
         }
         return result;
       }}

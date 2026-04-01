@@ -10,7 +10,6 @@ const defaultProps = {
   email: "test@example.com",
   onBack: vi.fn(),
   onResend: vi.fn().mockResolvedValue({ error: null }),
-  resendCooldownSeconds: 0,
 };
 
 function renderCheckEmailStep(props = defaultProps) {
@@ -52,19 +51,11 @@ describe("CheckEmailStep", () => {
     expect(onBack).toHaveBeenCalled();
   });
 
-  it("shows resend email button when cooldown is 0", () => {
-    renderCheckEmailStep({ ...defaultProps, resendCooldownSeconds: 0 });
+  it("shows resend email button", () => {
+    renderCheckEmailStep();
     const btn = screen.getByRole("button", { name: "Resend email" });
     expect(btn).toBeInTheDocument();
     expect(btn).not.toBeDisabled();
-  });
-
-  it("disables resend button and shows countdown during cooldown", () => {
-    renderCheckEmailStep({ ...defaultProps, resendCooldownSeconds: 30 });
-    const btn = screen.getByRole("button", { name: "Resend email in 30s (on cooldown)" });
-    expect(btn).toBeInTheDocument();
-    expect(btn).toBeDisabled();
-    expect(btn).toHaveTextContent("30s");
   });
 
   it("calls onResend when resend button is clicked", async () => {
@@ -87,7 +78,7 @@ describe("CheckEmailStep", () => {
     });
   });
 
-  it("shows context-specific error when rate-limited", async () => {
+  it("treats email rate limit as success on resend", async () => {
     const onResend = vi.fn().mockResolvedValue({
       error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
     });
@@ -96,72 +87,21 @@ describe("CheckEmailStep", () => {
     await userEvent.click(screen.getByRole("button", { name: "Resend email" }));
 
     await waitFor(() => {
-      expect(
-        screen.getByText("Too many sign-in emails sent.", { exact: false })
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("already received a link", { exact: false })
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("clears error banner when cooldown expires", async () => {
-    const onResend = vi.fn().mockResolvedValue({
-      error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
-    });
-    const { rerender } = renderCheckEmailStep({ ...defaultProps, onResend, resendCooldownSeconds: 0 });
-
-    await userEvent.click(screen.getByRole("button", { name: "Resend email" }));
-    await waitFor(() => {
-      expect(screen.getByText("Too many sign-in emails sent.", { exact: false })).toBeInTheDocument();
-    });
-
-    rerender(
-      <MemoryRouter>
-        <CookieConsentProvider>
-          <CheckEmailStep {...defaultProps} onResend={onResend} resendCooldownSeconds={5} />
-        </CookieConsentProvider>
-      </MemoryRouter>
-    );
-    rerender(
-      <MemoryRouter>
-        <CookieConsentProvider>
-          <CheckEmailStep {...defaultProps} onResend={onResend} resendCooldownSeconds={0} />
-        </CookieConsentProvider>
-      </MemoryRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    });
-  });
-
-  it("clears success banner when cooldown expires", async () => {
-    const onResend = vi.fn().mockResolvedValue({ error: null });
-    const { rerender } = renderCheckEmailStep({ ...defaultProps, onResend, resendCooldownSeconds: 0 });
-
-    await userEvent.click(screen.getByRole("button", { name: "Resend email" }));
-    await waitFor(() => {
       expect(screen.getByText("Email resent.")).toBeInTheDocument();
     });
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
 
-    rerender(
-      <MemoryRouter>
-        <CookieConsentProvider>
-          <CheckEmailStep {...defaultProps} onResend={onResend} resendCooldownSeconds={5} />
-        </CookieConsentProvider>
-      </MemoryRouter>
-    );
-    rerender(
-      <MemoryRouter>
-        <CookieConsentProvider>
-          <CheckEmailStep {...defaultProps} onResend={onResend} resendCooldownSeconds={0} />
-        </CookieConsentProvider>
-      </MemoryRouter>
-    );
+  it("shows error for non-rate-limit resend failures", async () => {
+    const onResend = vi.fn().mockResolvedValue({
+      error: new AuthError("Server error", 500, "unexpected_failure"),
+    });
+    renderCheckEmailStep({ ...defaultProps, onResend });
+
+    await userEvent.click(screen.getByRole("button", { name: "Resend email" }));
 
     await waitFor(() => {
-      expect(screen.queryByText("Email resent.")).not.toBeInTheDocument();
+      expect(screen.getByRole("alert")).toBeInTheDocument();
     });
   });
 });
