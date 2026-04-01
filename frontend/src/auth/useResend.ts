@@ -1,12 +1,9 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useCallback } from "react";
 import type { AuthError } from "@supabase/supabase-js";
 import { safeErrorMessage } from "./errors";
 
 interface UseResendOptions {
   onResend: () => Promise<{ error: AuthError | null }>;
-  cooldownSeconds: number;
-  /** Context-specific error override for `over_email_send_rate_limit`. */
-  rateLimitMessage: string;
 }
 
 interface UseResendResult {
@@ -18,25 +15,16 @@ interface UseResendResult {
 
 /**
  * Encapsulates the resend state machine shared by OtpStep and CheckEmailStep:
- * loading flag, success/error banners, and auto-clearing when the cooldown expires.
+ * loading flag and success/error banners. Supabase enforces per-email rate
+ * limits server-side so we treat `over_email_send_rate_limit` as success
+ * (the previous email was already delivered).
  */
 export function useResend({
   onResend,
-  cooldownSeconds,
-  rateLimitMessage,
 }: UseResendOptions): UseResendResult {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isResending, setIsResending] = useState(false);
-
-  // Clear banners when the cooldown expires so they don't linger
-  // alongside an active resend button.
-  useEffect(() => {
-    if (cooldownSeconds === 0) {
-      setSuccess(false);
-      setError(null);
-    }
-  }, [cooldownSeconds]);
 
   const handleResend = useCallback(async () => {
     setError(null);
@@ -44,12 +32,10 @@ export function useResend({
     setIsResending(true);
     try {
       const { error: resendError } = await onResend();
-      if (resendError) {
-        setError(
-          safeErrorMessage(resendError, {
-            over_email_send_rate_limit: rateLimitMessage,
-          })
-        );
+      // Treat rate limit as success — the previous email was already sent.
+      // Supabase enforces the real cooldown server-side.
+      if (resendError && resendError.code !== "over_email_send_rate_limit") {
+        setError(safeErrorMessage(resendError));
       } else {
         setSuccess(true);
       }
@@ -58,7 +44,7 @@ export function useResend({
     } finally {
       setIsResending(false);
     }
-  }, [onResend, rateLimitMessage]);
+  }, [onResend]);
 
   return { error, success, isResending, handleResend };
 }

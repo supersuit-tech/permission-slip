@@ -23,7 +23,13 @@ export default function LoginScreen() {
     <EmailStep
       onSubmit={async (inputEmail) => {
         const result = await sendOtp(inputEmail);
-        if (!result.error) {
+        // Advance even on over_email_send_rate_limit — the first email was
+        // already sent. Blocking here just tempts users to retry and dig
+        // deeper into Supabase's per-email cooldown.
+        if (
+          !result.error ||
+          result.error.code === "over_email_send_rate_limit"
+        ) {
           setEmail(inputEmail);
           setStep("otp");
         }

@@ -48,6 +48,22 @@ describe("LoginPage", () => {
       expect(screen.getByText("test@example.com")).toBeInTheDocument();
     });
 
+    it("transitions to OTP step even on email rate limit", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+      });
+
+      renderWithProviders(<LoginPage />);
+
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
+
+      await waitFor(() => {
+        expect(screen.getByLabelText("Code")).toBeInTheDocument();
+      });
+    });
+
     it("returns to email step when back is clicked", async () => {
       mockAuth.signInWithOtp.mockResolvedValue({
         data: { user: null, session: null },
@@ -99,10 +115,10 @@ describe("LoginPage", () => {
       });
     });
 
-    it("stays on email step when send fails", async () => {
+    it("stays on email step when send fails with non-rate-limit error", async () => {
       mockAuth.signInWithOtp.mockResolvedValue({
         data: { user: null, session: null },
-        error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+        error: new AuthError("Server error", 500, "unexpected_failure"),
       });
 
       renderWithProviders(<LoginPage />);
@@ -140,6 +156,22 @@ describe("LoginPage", () => {
       expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
     });
 
+    it("shows check-email step even on email rate limit", async () => {
+      mockAuth.signInWithOtp.mockResolvedValue({
+        data: { user: null, session: null },
+        error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+      });
+
+      renderWithProviders(<LoginPage />);
+
+      await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+      await userEvent.click(screen.getByText("Continue"));
+
+      await waitFor(() => {
+        expect(screen.getByText("Check your email")).toBeInTheDocument();
+      });
+    });
+
     it("returns to email step when back is clicked from check-email", async () => {
       mockAuth.signInWithOtp.mockResolvedValue({
         data: { user: null, session: null },
@@ -162,10 +194,10 @@ describe("LoginPage", () => {
       });
     });
 
-    it("stays on email step when send fails", async () => {
+    it("stays on email step when send fails with non-rate-limit error", async () => {
       mockAuth.signInWithOtp.mockResolvedValue({
         data: { user: null, session: null },
-        error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+        error: new AuthError("Server error", 500, "unexpected_failure"),
       });
 
       renderWithProviders(<LoginPage />);

@@ -14,7 +14,6 @@ interface OtpStepProps {
   onVerify: (code: string) => Promise<{ error: AuthError | null }>;
   onBack: () => void;
   onResend: () => Promise<{ error: AuthError | null }>;
-  resendCooldownSeconds: number;
 }
 
 export default function OtpStep({
@@ -22,16 +21,10 @@ export default function OtpStep({
   onVerify,
   onBack,
   onResend,
-  resendCooldownSeconds,
 }: OtpStepProps) {
   const [otpCode, setOtpCode] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
-  const resend = useResend({
-    onResend,
-    cooldownSeconds: resendCooldownSeconds,
-    rateLimitMessage:
-      "Too many login emails sent. If you already received a code, you can still use it — otherwise wait a few minutes and try again.",
-  });
+  const resend = useResend({ onResend });
 
   const handleAutoFill = async () => {
     // Dynamic import keeps dev-only Mailpit code out of the production bundle
@@ -74,7 +67,6 @@ export default function OtpStep({
         </div>
       </form>
       <ResendButton
-        cooldownSeconds={resendCooldownSeconds}
         isResending={resend.isResending}
         error={resend.error}
         success={resend.success}

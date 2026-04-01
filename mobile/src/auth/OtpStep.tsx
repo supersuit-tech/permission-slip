@@ -22,8 +22,6 @@ interface OtpStepProps {
   onBack: () => void;
 }
 
-const RESEND_COOLDOWN_SECONDS = 30;
-
 type ResendStatus = "idle" | "sent" | "failed";
 
 export default function OtpStep({
@@ -35,7 +33,7 @@ export default function OtpStep({
   const [otpCode, setOtpCode] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
   const inputRef = useRef<TextInput>(null);
-  const [resendCooldown, setResendCooldown] = useState(0);
+  const [isResending, setIsResending] = useState(false);
   const [resendStatus, setResendStatus] = useState<ResendStatus>("idle");
   const resendTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
 
@@ -44,26 +42,6 @@ export default function OtpStep({
     const timer = setTimeout(() => inputRef.current?.focus(), 100);
     return () => clearTimeout(timer);
   }, []);
-
-  // Countdown timer for resend cooldown. Only re-creates when cooldown
-  // transitions between active/inactive (not on every tick) to avoid
-  // tearing down and re-creating the interval each second.
-  const isCooldownActive = resendCooldown > 0;
-  useEffect(() => {
-    if (!isCooldownActive) return;
-    const interval = setInterval(
-      () =>
-        setResendCooldown((prev) => {
-          if (prev <= 1) {
-            clearInterval(interval);
-            return 0;
-          }
-          return prev - 1;
-        }),
-      1000
-    );
-    return () => clearInterval(interval);
-  }, [isCooldownActive]);
 
   // Clean up the resend feedback timeout on unmount.
   useEffect(() => {
@@ -76,18 +54,25 @@ export default function OtpStep({
 
   const handleResend = useCallback(async () => {
     setResendStatus("idle");
-    const { error: resendError } = await onResend();
-    if (resendError) {
-      setResendStatus("failed");
-    } else {
-      setResendStatus("sent");
-      setResendCooldown(RESEND_COOLDOWN_SECONDS);
-      // Clear the success message after a few seconds.
-      if (resendTimerRef.current) clearTimeout(resendTimerRef.current);
-      resendTimerRef.current = setTimeout(
-        () => setResendStatus("idle"),
-        3000
-      );
+    setIsResending(true);
+    try {
+      const { error: resendError } = await onResend();
+      // Treat rate limit as success — the previous email was already sent,
+      // so telling the user "code sent" is accurate. Supabase enforces the
+      // real cooldown server-side; no need to duplicate it client-side.
+      if (resendError && resendError.code !== "over_email_send_rate_limit") {
+        setResendStatus("failed");
+      } else {
+        setResendStatus("sent");
+        // Clear the success message after a few seconds.
+        if (resendTimerRef.current) clearTimeout(resendTimerRef.current);
+        resendTimerRef.current = setTimeout(
+          () => setResendStatus("idle"),
+          3000
+        );
+      }
+    } finally {
+      setIsResending(false);
     }
   }, [onResend]);
 
@@ -167,18 +152,16 @@ export default function OtpStep({
             accessibilityLabel="Resend verification code"
             accessibilityRole="button"
             onPress={handleResend}
-            disabled={resendCooldown > 0 || isSubmitting}
+            disabled={isResending || isSubmitting}
           >
             <Text
               style={[
                 localStyles.resendText,
-                (resendCooldown > 0 || isSubmitting) &&
+                (isResending || isSubmitting) &&
                   localStyles.resendDisabled,
               ]}
             >
-              {resendCooldown > 0
-                ? `Resend code (${resendCooldown}s)`
-                : "Resend code"}
+              {isResending ? "Resending..." : "Resend code"}
             </Text>
           </TouchableOpacity>
           {resendStatus !== "idle" ? (

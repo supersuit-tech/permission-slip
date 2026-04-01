@@ -1,7 +1,6 @@
 import { Button } from "@/components/ui/button";
 
 interface ResendButtonProps {
-  cooldownSeconds: number;
   isResending: boolean;
   error: string | null;
   success: boolean;
@@ -13,7 +12,6 @@ interface ResendButtonProps {
 }
 
 export function ResendButton({
-  cooldownSeconds,
   isResending,
   error,
   success,
@@ -28,25 +26,11 @@ export function ResendButton({
         variant="ghost"
         size="sm"
         onClick={onResend}
-        disabled={cooldownSeconds > 0 || isResending}
-        aria-label={
-          cooldownSeconds > 0
-            ? `${label} in ${cooldownSeconds}s (on cooldown)`
-            : isResending
-              ? "Resending…"
-              : label
-        }
+        disabled={isResending}
+        aria-label={isResending ? "Resending…" : label}
         className="opacity-70"
       >
-        {cooldownSeconds > 0 ? (
-          <>
-            Resend in <span aria-hidden="true">{cooldownSeconds}s</span>
-          </>
-        ) : isResending ? (
-          "Resending…"
-        ) : (
-          label
-        )}
+        {isResending ? "Resending…" : label}
       </Button>
       {error && (
         <p role="alert" className="text-xs text-destructive">{error}</p>
