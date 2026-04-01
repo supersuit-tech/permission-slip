@@ -84,7 +84,7 @@ function EmptyState({ onAddAgent }: { onAddAgent: () => void }) {
         an invite code to share with Openclaw.
       </p>
       <Button size="sm" onClick={onAddAgent}>
-        Connect Openclaw
+        Add an Openclaw machine
       </Button>
     </div>
   );
@@ -243,7 +243,7 @@ export function RegisteredAgentsCard() {
             className="w-full sm:w-auto"
             onClick={() => setInviteDialogOpen(true)}
           >
-            Connect Openclaw
+            Add an Openclaw machine
           </Button>
         </CardFooter>
       ) : null}
