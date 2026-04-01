@@ -60,6 +60,7 @@ export default function LoginPage() {
           result.error.code === "over_email_send_rate_limit"
         ) {
           handleSendSuccess(inputEmail);
+          return { error: null };
         }
         return result;
       }}

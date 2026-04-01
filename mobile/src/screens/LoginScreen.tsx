@@ -32,6 +32,7 @@ export default function LoginScreen() {
         ) {
           setEmail(inputEmail);
           setStep("otp");
+          return { error: null };
         }
         return result;
       }}
