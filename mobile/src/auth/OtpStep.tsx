@@ -22,7 +22,7 @@ interface OtpStepProps {
   onBack: () => void;
 }
 
-const RESEND_COOLDOWN_SECONDS = 30;
+const RESEND_COOLDOWN_SECONDS = 60;
 
 type ResendStatus = "idle" | "sent" | "failed";
 
@@ -116,7 +116,7 @@ export default function OtpStep({
             placeholderTextColor={colors.gray400}
             keyboardType="number-pad"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={32}
             editable={!isSubmitting}
             onSubmitEditing={submit}
             returnKeyType="go"
@@ -138,11 +138,11 @@ export default function OtpStep({
               authStyles.button,
               authStyles.primaryButton,
               localStyles.flexButton,
-              (isSubmitting || otpCode.length < 6) &&
+              (isSubmitting || otpCode.length < 6 || otpCode.length > 32) &&
                 authStyles.buttonDisabled,
             ]}
             onPress={submit}
-            disabled={isSubmitting || otpCode.length < 6}
+            disabled={isSubmitting || otpCode.length < 6 || otpCode.length > 32}
           >
             <Text style={authStyles.primaryButtonText}>
               {isSubmitting ? "Verifying..." : "Verify"}
@@ -206,9 +206,9 @@ const localStyles = StyleSheet.create({
     color: colors.gray900,
   },
   otpInput: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: "600",
-    letterSpacing: 8,
+    letterSpacing: 4,
     textAlign: "center",
   },
   buttonRow: {
