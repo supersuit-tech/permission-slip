@@ -40,10 +40,9 @@ const useMockApi = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
 export const jsonSafeMiddleware: Middleware = {
   async onResponse({ response }) {
     // Let bodyless responses through (204 No Content, 304 Not Modified, etc.)
-    // Cancel the original body stream to release the connection before
-    // returning the replacement response.
-    void response.body?.cancel();
-    return new Response(errorBody, {
+    if (!response.body) {
+      return response;
+    }
 
     const contentType = response.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
@@ -52,6 +51,9 @@ export const jsonSafeMiddleware: Middleware = {
 
     // Non-JSON body (HTML from SPA handler, proxy error page, plain text, etc.)
     // Convert to a structured JSON error so hook-level `if (error)` handling works.
+    // Cancel the original body stream to release the connection before
+    // returning the replacement response.
+    void response.body?.cancel();
     const status = response.status >= 400 ? response.status : 502;
     const errorBody = JSON.stringify({
       error: {
