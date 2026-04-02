@@ -40,9 +40,10 @@ const useMockApi = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
 export const jsonSafeMiddleware: Middleware = {
   async onResponse({ response }) {
     // Let bodyless responses through (204 No Content, 304 Not Modified, etc.)
-    if (!response.body || response.status === 204 || response.status === 304) {
-      return response;
-    }
+    // Cancel the original body stream to release the connection before
+    // returning the replacement response.
+    void response.body?.cancel();
+    return new Response(errorBody, {
 
     const contentType = response.headers.get("content-type") ?? "";
     if (contentType.includes("application/json")) {
