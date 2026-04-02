@@ -24,6 +24,7 @@ import { colors } from "../../theme/colors";
 import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime, formatLastUpdated } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
+import { BrandBadge } from "../../components/BrandBadge";
 
 type StatusTab = "pending" | "approved" | "denied";
 
@@ -104,7 +105,10 @@ export default function ApprovalListScreen({ navigation }: Props) {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.title}>Approvals</Text>
+        <View style={styles.headerLeft}>
+          <BrandBadge size={28} />
+          <Text style={styles.title}>Approvals</Text>
+        </View>
         <TouchableOpacity
           testID="settings-button"
           accessibilityLabel="Settings"
@@ -164,7 +168,7 @@ export default function ApprovalListScreen({ navigation }: Props) {
         <View style={styles.center}>
           <ActivityIndicator
             size="large"
-            color={colors.gray900}
+            color={colors.primary}
             testID="loading-indicator"
           />
         </View>
@@ -306,6 +310,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingVertical: 12,
   },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
   title: {
     fontSize: 28,
     fontWeight: "700",
@@ -334,7 +343,7 @@ const styles = StyleSheet.create({
     borderBottomColor: "transparent",
   },
   tabActive: {
-    borderBottomColor: colors.gray900,
+    borderBottomColor: colors.secondary,
   },
   tabText: {
     fontSize: 14,
@@ -350,7 +359,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   tabBadge: {
-    backgroundColor: colors.gray900,
+    backgroundColor: colors.primary,
     borderRadius: 10,
     minWidth: 20,
     height: 20,

@@ -321,7 +321,7 @@ const RISK_DESCRIPTIONS: Record<string, string> = {
 const styles = StyleSheet.create({
   outerContainer: {
     flex: 1,
-    backgroundColor: colors.gray50,
+    backgroundColor: colors.primaryBg,
   },
   container: {
     flex: 1,
@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
   // --- Done button ---
   doneButton: {
     marginTop: 16,
-    backgroundColor: colors.gray900,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: "center",

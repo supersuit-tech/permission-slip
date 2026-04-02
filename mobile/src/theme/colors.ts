@@ -33,8 +33,10 @@ export const colors = {
   deniedText: "#991B1B",
 
   // Primary / accent
-  primary: "#2563EB",
-  primaryBg: "#EFF6FF",
+  primary: "#6A2C91",
+  primaryBg: "#F5F0FA",
+  primaryBorder: "#DDD5E5",
+  secondary: "#D4A843",
 
   // Cancelled / expired status
   cancelledBg: "#F3F4F6",

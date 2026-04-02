@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -13,6 +14,7 @@ import type { AuthError } from "@supabase/supabase-js";
 import { useFormSubmit } from "./useFormSubmit";
 import { authStyles } from "./styles";
 import { colors } from "../theme/colors";
+import { BrandBadge } from "../components/BrandBadge";
 
 interface EmailStepProps {
   onSubmit: (email: string) => Promise<{ error: AuthError | null }>;
@@ -42,7 +44,10 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <Pressable style={authStyles.content} onPress={Keyboard.dismiss}>
-        <Text style={authStyles.title}>Permission Slip</Text>
+        <View style={styles.brandRow}>
+          <BrandBadge size={32} />
+          <Text style={[authStyles.title, { marginBottom: 0 }]}>Permission Slip</Text>
+        </View>
         <Text style={authStyles.subtitle}>
           Enter your email to sign in or create an account.
         </Text>
@@ -94,3 +99,12 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
     </KeyboardAvoidingView>
   );
 }
+
+const styles = StyleSheet.create({
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+});

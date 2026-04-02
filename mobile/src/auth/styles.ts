@@ -53,7 +53,7 @@ export const authStyles = StyleSheet.create({
     alignItems: "center" as const,
   },
   primaryButton: {
-    backgroundColor: colors.gray900,
+    backgroundColor: colors.primary,
   },
   primaryButtonText: {
     color: colors.white,

@@ -35,7 +35,7 @@ export function BiometricLockScreen({ onUnlock }: BiometricLockScreenProps) {
   return (
     <View style={styles.container}>
       <View style={styles.lockIcon}>
-        <Text style={styles.lockIconText}>PS</Text>
+        <Text style={styles.lockIconText}>P</Text>
       </View>
       <Text style={styles.title}>Permission Slip</Text>
       <Text style={styles.subtitle}>
@@ -65,16 +65,16 @@ const styles = StyleSheet.create({
   lockIcon: {
     width: 72,
     height: 72,
-    borderRadius: 36,
-    backgroundColor: colors.gray100,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 16,
   },
   lockIconText: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "700",
-    color: colors.gray900,
+    color: colors.white,
   },
   title: {
     fontSize: 22,
@@ -89,7 +89,7 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   button: {
-    backgroundColor: colors.gray900,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     paddingHorizontal: 48,

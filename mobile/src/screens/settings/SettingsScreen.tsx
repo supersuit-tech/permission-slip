@@ -151,7 +151,7 @@ export default function SettingsScreen(_props: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.gray50,
+    backgroundColor: colors.primaryBg,
   },
   section: {
     paddingHorizontal: 20,
