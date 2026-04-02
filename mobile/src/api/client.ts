@@ -57,7 +57,8 @@ export const jsonSafeMiddleware: Middleware = {
         code: "non_json_response",
         message:
           "Unable to reach the server. Please check your connection and try again.",
-        retryable: true,
+        // Treat 502/503/504 (and rewritten 2xx→502) as transient; 4xx are not.
+        retryable: status >= 500,
       },
     });
     return new Response(errorBody, {
