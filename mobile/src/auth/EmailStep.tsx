@@ -43,12 +43,13 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <Pressable style={authStyles.content} onPress={Keyboard.dismiss}>
-        <View style={brandBadgeStyles.row}>
-          <View style={brandBadgeStyles.badge}>
+          <View
+            style={brandBadgeStyles.badge}
+            accessibilityElementsHidden={true}
+            importantForAccessibility="no-hide-descendants"
+          >
             <Text style={brandBadgeStyles.badgeText}>P</Text>
           </View>
-          <Text style={[authStyles.title, { marginBottom: 0 }]}>Permission Slip</Text>
-        </View>
         <Text style={authStyles.subtitle}>
           Enter your email to sign in or create an account.
         </Text>
