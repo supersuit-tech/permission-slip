@@ -3,6 +3,7 @@ import { ExpoConfig, ConfigContext } from "expo/config";
 export default (_config: ConfigContext): ExpoConfig => ({
   name: "Permission Slip",
   slug: "permission-slip",
+  owner: "supersuit-tech",
   version: "1.0.0",
   // Only include runtimeVersion during EAS builds — Expo Go doesn't support it
   ...(process.env.EAS_BUILD
