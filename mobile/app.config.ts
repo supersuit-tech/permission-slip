@@ -70,4 +70,9 @@ export default (_config: ConfigContext): ExpoConfig => ({
     enabled: true,
     fallbackToCacheTimeout: 0,
   },
+  extra: {
+    eas: {
+      projectId: "6bbabfc7-f70d-45f7-bdc2-4f8387d14006",
+    },
+  },
 });
