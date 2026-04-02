@@ -56,7 +56,7 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: "center",
     borderWidth: 1,
-    borderColor: "#DDD5E5",
+    borderColor: colors.primaryBorder,
   },
   label: {
     fontSize: 12,
