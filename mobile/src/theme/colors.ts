@@ -35,8 +35,8 @@ export const colors = {
   // Primary / accent
   primary: "#6A2C91",
   primaryBg: "#F5F0FA",
+  primaryBorder: "#DDD5E5",
   secondary: "#D4A843",
-  secondaryBg: "#FBF6EB",
 
   // Cancelled / expired status
   cancelledBg: "#F3F4F6",

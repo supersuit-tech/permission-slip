@@ -14,6 +14,7 @@ import type { AuthError } from "@supabase/supabase-js";
 import { useFormSubmit } from "./useFormSubmit";
 import { authStyles } from "./styles";
 import { colors } from "../theme/colors";
+import { BrandBadge } from "../components/BrandBadge";
 
 interface EmailStepProps {
   onSubmit: (email: string) => Promise<{ error: AuthError | null }>;
@@ -43,13 +44,10 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <Pressable style={authStyles.content} onPress={Keyboard.dismiss}>
-          <View
-            style={brandBadgeStyles.badge}
-            accessibilityElementsHidden={true}
-            importantForAccessibility="no-hide-descendants"
-          >
-            <Text style={brandBadgeStyles.badgeText}>P</Text>
-          </View>
+        <View style={styles.brandRow}>
+          <BrandBadge size={32} />
+          <Text style={[authStyles.title, { marginBottom: 0 }]}>Permission Slip</Text>
+        </View>
         <Text style={authStyles.subtitle}>
           Enter your email to sign in or create an account.
         </Text>
@@ -102,24 +100,11 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
   );
 }
 
-const brandBadgeStyles = StyleSheet.create({
-  row: {
+const styles = StyleSheet.create({
+  brandRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     marginBottom: 8,
-  },
-  badge: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  badgeText: {
-    color: colors.white,
-    fontSize: 16,
-    fontWeight: "700",
   },
 });

@@ -24,6 +24,7 @@ import { colors } from "../../theme/colors";
 import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime, formatLastUpdated } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
+import { BrandBadge } from "../../components/BrandBadge";
 
 type StatusTab = "pending" | "approved" | "denied";
 
@@ -105,9 +106,7 @@ export default function ApprovalListScreen({ navigation }: Props) {
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <View style={styles.headerLeft}>
-          <View style={styles.brandBadge}>
-            <Text style={styles.brandBadgeText}>P</Text>
-          </View>
+          <BrandBadge size={28} />
           <Text style={styles.title}>Approvals</Text>
         </View>
         <TouchableOpacity
@@ -315,19 +314,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-  },
-  brandBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  brandBadgeText: {
-    color: colors.white,
-    fontSize: 14,
-    fontWeight: "700",
   },
   title: {
     fontSize: 28,
