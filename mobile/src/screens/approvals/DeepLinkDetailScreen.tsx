@@ -40,7 +40,7 @@ export default function DeepLinkDetailScreen({ route, navigation }: Props) {
   if (isLoading || approval) {
     return (
       <View style={styles.container}>
-        <ActivityIndicator size="large" color={colors.gray900} />
+        <ActivityIndicator size="large" color={colors.primary} />
         <Text style={styles.text}>Loading approval...</Text>
       </View>
     );
@@ -107,18 +107,18 @@ const styles = StyleSheet.create({
   },
   retryButton: {
     borderWidth: 1,
-    borderColor: colors.gray900,
+    borderColor: colors.primary,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,
   },
   retryButtonText: {
-    color: colors.gray900,
+    color: colors.primary,
     fontSize: 16,
     fontWeight: "600",
   },
   button: {
-    backgroundColor: colors.gray900,
+    backgroundColor: colors.primary,
     borderRadius: 8,
     paddingVertical: 12,
     paddingHorizontal: 24,

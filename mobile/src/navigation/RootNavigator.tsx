@@ -38,7 +38,7 @@ export default function RootNavigator() {
       linking={linking}
       fallback={
         <View style={styles.fallback}>
-          <ActivityIndicator size="large" color={colors.gray900} />
+          <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.fallbackText}>Loading...</Text>
         </View>
       }

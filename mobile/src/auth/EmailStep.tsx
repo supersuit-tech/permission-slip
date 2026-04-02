@@ -4,6 +4,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -42,7 +43,12 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <Pressable style={authStyles.content} onPress={Keyboard.dismiss}>
-        <Text style={authStyles.title}>Permission Slip</Text>
+        <View style={brandBadgeStyles.row}>
+          <View style={brandBadgeStyles.badge}>
+            <Text style={brandBadgeStyles.badgeText}>P</Text>
+          </View>
+          <Text style={[authStyles.title, { marginBottom: 0 }]}>Permission Slip</Text>
+        </View>
         <Text style={authStyles.subtitle}>
           Enter your email to sign in or create an account.
         </Text>
@@ -94,3 +100,25 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
     </KeyboardAvoidingView>
   );
 }
+
+const brandBadgeStyles = StyleSheet.create({
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginBottom: 8,
+  },
+  badge: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: {
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+});
