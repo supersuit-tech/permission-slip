@@ -1,4 +1,4 @@
-import createClient from "openapi-fetch";
+import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./schema";
 import mockClient from "./mockClient";
 
@@ -29,6 +29,46 @@ function resolveBaseUrl(): string {
 const useMockApi = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
 
 /**
+ * Middleware that converts non-JSON responses into structured JSON errors.
+ *
+ * When a reverse proxy, CDN, or the server's SPA handler returns HTML instead
+ * of JSON, openapi-fetch tries to JSON.parse() the body and throws a raw
+ * SyntaxError ("JSON Parse error: Unexpected character: <"). This middleware
+ * intercepts those responses and replaces them with a well-formed JSON error
+ * body that the existing hook error handling can process.
+ */
+export const jsonSafeMiddleware: Middleware = {
+  async onResponse({ response }) {
+    // Let bodyless responses through (204 No Content, 304 Not Modified, etc.)
+    if (!response.body || response.status === 204 || response.status === 304) {
+      return response;
+    }
+
+    const contentType = response.headers.get("content-type") ?? "";
+    if (contentType.includes("application/json")) {
+      return response;
+    }
+
+    // Non-JSON body (HTML from SPA handler, proxy error page, plain text, etc.)
+    // Convert to a structured JSON error so hook-level `if (error)` handling works.
+    const status = response.status >= 400 ? response.status : 502;
+    const errorBody = JSON.stringify({
+      error: {
+        code: "non_json_response",
+        message:
+          "Unable to reach the server. Please check your connection and try again.",
+        retryable: true,
+      },
+    });
+    return new Response(errorBody, {
+      status,
+      statusText: response.statusText,
+      headers: { "Content-Type": "application/json" },
+    });
+  },
+};
+
+/**
  * Typed API client generated from the OpenAPI spec.
  * Uses the same `openapi-fetch` library as the web frontend.
  * Spec paths already include the "/v1" prefix, so the base URL is version-free.
@@ -43,5 +83,9 @@ const useMockApi = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
 const client = useMockApi
   ? (mockClient as any)
   : createClient<paths>({ baseUrl: resolveBaseUrl() });
+
+if (!useMockApi) {
+  client.use(jsonSafeMiddleware);
+}
 
 export default client;
