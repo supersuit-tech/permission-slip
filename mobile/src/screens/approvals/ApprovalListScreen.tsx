@@ -107,7 +107,7 @@ export default function ApprovalListScreen({ navigation }: Props) {
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <BrandBadge size={28} />
-          <Text style={styles.title}>Approvals</Text>
+          <Text style={styles.title}>Permission Slip</Text>
         </View>
         <TouchableOpacity
           testID="settings-button"

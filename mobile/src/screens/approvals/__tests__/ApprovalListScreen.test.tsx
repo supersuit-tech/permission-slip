@@ -153,7 +153,7 @@ describe("ApprovalListScreen", () => {
       renderer = renderList();
     });
     const allText = getAllText(renderer);
-    expect(allText).toContain("Approvals");
+    expect(allText).toContain("Permission Slip");
   });
 
   it("shows loading indicator when loading", async () => {
