@@ -14,8 +14,9 @@ import (
 // Supabase identity gets a new UUID for the same email — allowing us to
 // find their existing profile and re-link it.
 //
-// Returns nil, nil if no matching profile exists or if the auth.users table
-// lacks an email column (e.g. minimal local-dev stub before migration).
+// Returns nil, nil if no matching profile exists, if the auth.users table
+// lacks an email column (e.g. minimal local-dev stub before migration),
+// or if the auth schema is inaccessible (e.g. Supabase reset permissions).
 func FindProfileByAuthEmail(ctx context.Context, db DBTX, email string) (*Profile, error) {
 	if email == "" {
 		return nil, nil
@@ -35,8 +36,10 @@ func FindProfileByAuthEmail(ctx context.Context, db DBTX, email string) (*Profil
 	if err != nil {
 		// 42703 = undefined_column: the auth.users table lacks an email
 		// column in environments that haven't run the migration yet.
+		// 42501 = insufficient_privilege: the auth schema is not accessible
+		// (e.g. Supabase reset permissions). Safe to degrade gracefully.
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "42703" {
+		if errors.As(err, &pgErr) && (pgErr.Code == "42703" || pgErr.Code == "42501") {
 			return nil, nil
 		}
 		return nil, err
