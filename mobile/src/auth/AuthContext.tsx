@@ -11,6 +11,7 @@ import type { AuthError, Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabaseClient";
 import type { AuthStatus, AuthState } from "./types";
 import { AuthContext } from "./authContext";
+import { tryAppReviewLogin } from "./appReviewAuth";
 
 /**
  * Constructs a synthetic AuthError for cases where we need to generate an
@@ -178,7 +179,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       type: "email",
     });
-    return { error: error ?? null };
+    if (!error) return { error: null };
+
+    // If Supabase OTP verification failed, try the backend's app-review-login
+    // endpoint as a fallback. This allows App Store reviewers to sign in with
+    // a pre-configured static OTP code.
+    const reviewResult = await tryAppReviewLogin(email, token);
+    if (!reviewResult.error) return { error: null };
+
+    // Return the original Supabase error, not the review fallback error,
+    // since most users won't have review credentials configured.
+    return { error };
   }, []);
 
   const signOut = useCallback(async () => {
