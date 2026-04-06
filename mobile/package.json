@@ -10,11 +10,11 @@
     "generate:api": "openapi-typescript ../spec/openapi/openapi.bundle.yaml -o src/api/schema.d.ts",
     "postinstall": "npm run generate:api",
     "test": "jest",
-    "eas-build:dev": "eas-cli build --profile development --platform all",
-    "eas-build:preview": "eas-cli build --profile preview --platform all",
-    "eas-build:prod": "eas-cli build --profile production --platform all",
-    "eas-submit": "eas-cli submit --profile production --platform all",
-    "eas-update": "eas-cli update --channel production"
+    "eas-build:dev": "npx eas-cli@latest build --profile development --platform all",
+    "eas-build:preview": "npx eas-cli@latest build --profile preview --platform all",
+    "eas-build:prod": "npx eas-cli@latest build --profile production --platform all",
+    "eas-submit": "npx eas-cli@latest submit --profile production --platform all",
+    "eas-update": "npx eas-cli@latest update --channel production"
   },
   "jest": {
     "preset": "jest-expo",
@@ -48,19 +48,10 @@
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
     "@types/react-test-renderer": "^19.1.0",
-    "eas-cli": "^18.1.0",
-    "jest-expo": "^55.0.9",
+"jest-expo": "^55.0.9",
     "openapi-typescript": "^7.13.0",
     "react-test-renderer": "^19.2.0",
     "typescript": "~5.9.2"
   },
-  "overrides": {
-    "eas-cli": {
-      "tar": "7.5.11",
-      "ajv": "8.18.0",
-      "minimatch": "5.1.9",
-      "node-forge": "1.3.3"
-    }
-  },
-  "private": true
+"private": true
 }
