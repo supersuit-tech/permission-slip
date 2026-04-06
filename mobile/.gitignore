@@ -17,6 +17,9 @@ expo-env.d.ts
 *.p12
 *.key
 *.mobileprovision
+*.ipa
+*.apk
+*.aab
 
 # Google Play service account keys (used by EAS Submit)
 google-services.json
