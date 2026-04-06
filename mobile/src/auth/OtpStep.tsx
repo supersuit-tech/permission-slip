@@ -97,9 +97,9 @@ export default function OtpStep({
             style={[authStyles.input, localStyles.otpInput]}
             value={otpCode}
             onChangeText={setOtpCode}
-            placeholder="000000"
+            placeholder="Enter code"
             placeholderTextColor={colors.gray400}
-            keyboardType="number-pad"
+            keyboardType="default"
             autoComplete="one-time-code"
             maxLength={32}
             editable={!isSubmitting}
