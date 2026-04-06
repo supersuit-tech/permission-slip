@@ -16,6 +16,8 @@ interface OtpCodeInputProps {
   required?: boolean;
   /** When true, restricts input to digits only and shows a numeric keyboard. */
   numericOnly?: boolean;
+  /** Maximum number of characters allowed. Defaults to validation.confirmationCode.length (6). */
+  maxLength?: number;
 }
 
 /**
@@ -31,6 +33,7 @@ export function OtpCodeInput({
   disabled,
   required,
   numericOnly,
+  maxLength = validation.confirmationCode.length,
 }: OtpCodeInputProps) {
   return (
     <div className="space-y-2">
@@ -39,7 +42,7 @@ export function OtpCodeInput({
         id={id}
         type="text"
         inputMode={numericOnly ? "numeric" : undefined}
-        maxLength={validation.confirmationCode.length}
+        maxLength={maxLength}
         value={value}
         onChange={(e) =>
           onChange(

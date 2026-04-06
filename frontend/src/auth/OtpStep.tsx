@@ -49,6 +49,7 @@ export default function OtpStep({
           label="Code"
           value={otpCode}
           onChange={setOtpCode}
+          maxLength={32}
           required
         />
         <FormError error={error} prefix />
