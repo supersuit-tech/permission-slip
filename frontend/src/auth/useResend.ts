@@ -14,7 +14,7 @@ interface UseResendResult {
 }
 
 /**
- * Encapsulates the resend state machine shared by OtpStep and CheckEmailStep:
+ * Encapsulates the resend state machine used by OtpStep:
  * loading flag and success/error banners. Supabase enforces per-email rate
  * limits server-side so we treat `over_email_send_rate_limit` as success
  * (the previous email was already delivered).

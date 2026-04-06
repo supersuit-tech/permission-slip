@@ -1,15 +1,9 @@
-import { useState, useCallback, lazy, Suspense } from "react";
+import { useState, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import EmailStep from "./EmailStep";
-import CheckEmailStep from "./CheckEmailStep";
-import AuthLayout from "./AuthLayout";
+import OtpStep from "./OtpStep";
 
-// Lazy-load OtpStep so it (and its dev-only dependencies like OtpCodeInput,
-// DevOnly, Mailpit auto-fill) are tree-shaken from the production bundle.
-// In production, the "otp" step is never reached.
-const OtpStep = lazy(() => import("./OtpStep"));
-
-type Step = "email" | "otp" | "check-email";
+type Step = "email" | "otp";
 
 export default function LoginPage() {
   const { sendOtp, verifyOtp } = useAuth();
@@ -18,7 +12,7 @@ export default function LoginPage() {
 
   const handleSendSuccess = (inputEmail: string) => {
     setEmail(inputEmail);
-    setStep(import.meta.env.DEV ? "otp" : "check-email");
+    setStep("otp");
   };
 
   const handleResend = useCallback(async () => {
@@ -27,21 +21,9 @@ export default function LoginPage() {
 
   if (step === "otp") {
     return (
-      <Suspense fallback={<AuthLayout>{null}</AuthLayout>}>
-        <OtpStep
-          email={email}
-          onVerify={(code) => verifyOtp(email, code)}
-          onBack={() => setStep("email")}
-          onResend={handleResend}
-        />
-      </Suspense>
-    );
-  }
-
-  if (step === "check-email") {
-    return (
-      <CheckEmailStep
+      <OtpStep
         email={email}
+        onVerify={(code) => verifyOtp(email, code)}
         onBack={() => setStep("email")}
         onResend={handleResend}
       />
