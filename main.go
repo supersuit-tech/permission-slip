@@ -419,6 +419,14 @@ func main() {
 	// versioned API resource.
 	mux.Handle("/invite/", api.InviteHandler(&deps))
 
+	// Apple App Site Association — required for iOS universal links.
+	// Must be served at /.well-known/apple-app-site-association with
+	// content-type application/json (no file extension).
+	mux.HandleFunc("/.well-known/apple-app-site-association", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"applinks":{"apps":[],"details":[{"appID":"AWUV887E3B.dev.permissionslip.app","paths":["*"]}]}}`))
+	})
+
 	// In production, serve the built React app.
 	// In development, use Vite's dev server (port 5173) instead.
 	if os.Getenv("MODE") != "development" {
