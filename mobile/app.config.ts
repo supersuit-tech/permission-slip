@@ -26,6 +26,7 @@ export default (_config: ConfigContext): ExpoConfig => ({
       UIBackgroundModes: ["remote-notification"],
       NSFaceIDUsageDescription:
         "Authenticate with Face ID to access Permission Slip",
+      ITSAppUsesNonExemptEncryption: false,
     },
   },
   plugins: [
