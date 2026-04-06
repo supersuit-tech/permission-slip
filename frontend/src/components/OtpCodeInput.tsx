@@ -7,21 +7,20 @@ interface OtpCodeInputProps {
   id: string;
   /** Visible label text above the input. */
   label: string;
-  /** Current input value (digits only). */
+  /** Current input value. */
   value: string;
-  /** Called with the new value after non-digit characters are stripped. */
+  /** Called with the new value. */
   onChange: (value: string) => void;
   autoFocus?: boolean;
   disabled?: boolean;
   required?: boolean;
+  /** When true, restricts input to digits only and shows a numeric keyboard. */
+  numericOnly?: boolean;
 }
 
 /**
- * A 6-digit one-time-code input with numeric keyboard, digit-only filtering,
- * and browser autofill support. Used for both email OTP and TOTP MFA flows.
- *
- * Digit filtering happens on every keystroke via `.replace(/\D/g, "")` so
- * non-numeric characters can never appear in the value — even on paste.
+ * A one-time-code text input with browser autofill support.
+ * Used for both email OTP and TOTP MFA flows.
  */
 export function OtpCodeInput({
   id,
@@ -31,6 +30,7 @@ export function OtpCodeInput({
   autoFocus,
   disabled,
   required,
+  numericOnly,
 }: OtpCodeInputProps) {
   return (
     <div className="space-y-2">
@@ -38,10 +38,16 @@ export function OtpCodeInput({
       <Input
         id={id}
         type="text"
-        inputMode="numeric"
+        inputMode={numericOnly ? "numeric" : undefined}
         maxLength={validation.confirmationCode.length}
         value={value}
-        onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
+        onChange={(e) =>
+          onChange(
+            numericOnly
+              ? e.target.value.replace(/\D/g, "")
+              : e.target.value,
+          )
+        }
         autoComplete="one-time-code"
         autoFocus={autoFocus}
         disabled={disabled}

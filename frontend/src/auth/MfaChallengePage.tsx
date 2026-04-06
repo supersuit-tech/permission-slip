@@ -29,6 +29,7 @@ export default function MfaChallengePage() {
           value={code}
           onChange={setCode}
           autoFocus
+          numericOnly
         />
         <FormError error={error} prefix />
         <div className="flex gap-2">
