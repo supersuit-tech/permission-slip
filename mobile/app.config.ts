@@ -43,7 +43,7 @@ export default (_config: ConfigContext): ExpoConfig => ({
   android: {
     package: "dev.permissionslip.app",
     adaptiveIcon: {
-      backgroundColor: "#E6F4FE",
+      backgroundColor: "#6A2C91",
       foregroundImage: "./assets/android-icon-foreground.png",
       backgroundImage: "./assets/android-icon-background.png",
       monochromeImage: "./assets/android-icon-monochrome.png",
