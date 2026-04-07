@@ -1,6 +1,6 @@
-import { ExpoConfig, ConfigContext } from "expo/config";
+import { ExpoConfig } from "expo/config";
 
-export default (_config: ConfigContext): ExpoConfig => ({
+const config: ExpoConfig = {
   name: "Permission Slip",
   slug: "permission-slip",
   owner: "supersuit-tech",
@@ -65,7 +65,7 @@ export default (_config: ConfigContext): ExpoConfig => ({
     favicon: "./assets/favicon.png",
   },
   updates: {
-    url: `https://u.expo.dev/${process.env.EXPO_PROJECT_ID}`,
+    url: "https://u.expo.dev/6bbabfc7-f70d-45f7-bdc2-4f8387d14006",
     enabled: true,
     fallbackToCacheTimeout: 0,
   },
@@ -74,4 +74,6 @@ export default (_config: ConfigContext): ExpoConfig => ({
       projectId: "6bbabfc7-f70d-45f7-bdc2-4f8387d14006",
     },
   },
-});
+};
+
+export default config;
