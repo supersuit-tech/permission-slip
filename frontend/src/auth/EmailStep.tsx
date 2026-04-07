@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 
 interface EmailStepProps {
   onSubmit: (email: string) => Promise<{ error: AuthError | null }>;
+  onUsePassword?: (email: string) => void;
 }
 
-export default function EmailStep({ onSubmit }: EmailStepProps) {
+export default function EmailStep({ onSubmit, onUsePassword }: EmailStepProps) {
   const [email, setEmail] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
 
@@ -39,6 +40,16 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
           Continue
         </Button>
       </form>
+      {onUsePassword ? (
+        <button
+          type="button"
+          className="text-sm text-muted-foreground underline hover:text-foreground"
+          onClick={() => onUsePassword(email.trim())}
+          disabled={!email.trim()}
+        >
+          Sign in with password instead
+        </button>
+      ) : null}
     </AuthLayout>
   );
 }

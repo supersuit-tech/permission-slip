@@ -6,7 +6,7 @@ describe("safeErrorMessage", () => {
   it("maps otp_expired code", () => {
     const error = new AuthError("Token expired", 401, "otp_expired");
     expect(safeErrorMessage(error)).toBe(
-      "Invalid or expired code. Please check your code or request a new one."
+      "Your code has expired. Please request a new one."
     );
   });
 

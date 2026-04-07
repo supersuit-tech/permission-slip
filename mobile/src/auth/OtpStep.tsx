@@ -97,11 +97,11 @@ export default function OtpStep({
             style={[authStyles.input, localStyles.otpInput]}
             value={otpCode}
             onChangeText={setOtpCode}
-            placeholder="Enter code"
+            placeholder="000000"
             placeholderTextColor={colors.gray400}
-            keyboardType="default"
+            keyboardType="number-pad"
             autoComplete="one-time-code"
-            maxLength={32}
+            maxLength={6}
             editable={!isSubmitting}
             onSubmitEditing={submit}
             returnKeyType="go"
@@ -123,11 +123,11 @@ export default function OtpStep({
               authStyles.button,
               authStyles.primaryButton,
               localStyles.flexButton,
-              (isSubmitting || otpCode.length < 6 || otpCode.length > 32) &&
+              (isSubmitting || otpCode.length < 6) &&
                 authStyles.buttonDisabled,
             ]}
             onPress={submit}
-            disabled={isSubmitting || otpCode.length < 6 || otpCode.length > 32}
+            disabled={isSubmitting || otpCode.length < 6}
           >
             <Text style={authStyles.primaryButtonText}>
               {isSubmitting ? "Verifying..." : "Verify"}
@@ -189,9 +189,9 @@ const localStyles = StyleSheet.create({
     color: colors.gray900,
   },
   otpInput: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: "600",
-    letterSpacing: 4,
+    letterSpacing: 8,
     textAlign: "center",
   },
   buttonRow: {

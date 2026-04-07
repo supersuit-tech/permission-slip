@@ -2,11 +2,24 @@ import { useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 import EmailStep from "../auth/EmailStep";
 import OtpStep from "../auth/OtpStep";
+import PasswordStep from "../auth/PasswordStep";
+
+type Step = "email" | "otp" | "password";
 
 export default function LoginScreen() {
-  const { sendOtp, verifyOtp } = useAuth();
-  const [step, setStep] = useState<"email" | "otp">("email");
+  const { sendOtp, verifyOtp, signInWithPassword } = useAuth();
+  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
+
+  if (step === "password") {
+    return (
+      <PasswordStep
+        email={email}
+        onSubmit={(password) => signInWithPassword(email, password)}
+        onBack={() => setStep("email")}
+      />
+    );
+  }
 
   if (step === "otp") {
     return (
@@ -35,6 +48,10 @@ export default function LoginScreen() {
           return { error: null };
         }
         return result;
+      }}
+      onUsePassword={(inputEmail) => {
+        setEmail(inputEmail);
+        setStep("password");
       }}
     />
   );

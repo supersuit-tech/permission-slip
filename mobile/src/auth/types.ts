@@ -26,6 +26,8 @@ export interface AuthState {
   sendOtp: (email: string) => Promise<AuthResult>;
   /** Verify an email OTP token to complete sign-in. */
   verifyOtp: (email: string, token: string) => Promise<AuthResult>;
+  /** Sign in with email and password. */
+  signInWithPassword: (email: string, password: string) => Promise<AuthResult>;
   /** Verify a TOTP code to complete the MFA challenge. */
   verifyMfa: (code: string) => Promise<AuthResult>;
   /** Sign the user out of this device only (local scope). */
