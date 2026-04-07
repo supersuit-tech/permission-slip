@@ -7,6 +7,7 @@ import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Switch,
@@ -20,7 +21,11 @@ import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAuth } from "../../auth/AuthContext";
 import { useNotificationPreferences } from "../../hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "../../hooks/useUpdateNotificationPreferences";
+import { useDeleteAccount } from "../../hooks/useDeleteAccount";
 import { colors } from "../../theme/colors";
+
+const PRIVACY_POLICY_URL = "https://permissionslip.dev/privacy";
+const TERMS_OF_SERVICE_URL = "https://permissionslip.dev/terms";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
 
@@ -31,6 +36,7 @@ export default function SettingsScreen(_props: Props) {
     useNotificationPreferences();
   const { updatePreferences, isUpdating } =
     useUpdateNotificationPreferences();
+  const { deleteAccount, isDeleting } = useDeleteAccount();
 
   const contentContainerStyle = useMemo(
     () => ({ paddingBottom: insets.bottom + 24 }),
@@ -59,6 +65,28 @@ export default function SettingsScreen(_props: Props) {
       { text: "Sign Out", style: "destructive", onPress: () => signOut() },
     ]);
   }, [signOut]);
+
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(
+      "Delete Account",
+      "This will permanently delete your account and all associated data including agents, approvals, and credentials. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Account",
+          style: "destructive",
+          onPress: () => {
+            deleteAccount().catch(() => {
+              Alert.alert(
+                "Error",
+                "Failed to delete account. Please try again.",
+              );
+            });
+          },
+        },
+      ],
+    );
+  }, [deleteAccount]);
 
   return (
     <ScrollView
@@ -136,13 +164,62 @@ export default function SettingsScreen(_props: Props) {
         ) : null}
         <TouchableOpacity
           testID="sign-out-button"
-          style={[styles.signOutButton, user?.email ? styles.signOutButtonSpaced : null]}
+          style={[styles.actionButton, user?.email ? styles.actionButtonSpaced : null]}
           accessibilityRole="button"
           accessibilityLabel="Sign out of your account"
           onPress={handleSignOut}
         >
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <Text style={styles.destructiveActionText}>Sign Out</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          testID="delete-account-button"
+          style={[styles.actionButton, styles.actionButtonSpaced]}
+          accessibilityRole="button"
+          accessibilityLabel="Permanently delete your account"
+          onPress={handleDeleteAccount}
+          disabled={isDeleting}
+        >
+          {isDeleting ? (
+            <ActivityIndicator size="small" color={colors.error} />
+          ) : (
+            <Text style={styles.destructiveActionText}>Delete Account</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Legal</Text>
+        <View style={styles.card}>
+          <TouchableOpacity
+            testID="privacy-policy-link"
+            style={styles.linkRow}
+            accessibilityRole="link"
+            accessibilityLabel="Privacy Policy"
+            onPress={() => {
+              Linking.openURL(PRIVACY_POLICY_URL).catch(() => {
+                Alert.alert("Error", "Could not open Privacy Policy.");
+              });
+            }}
+          >
+            <Text style={styles.linkText}>Privacy Policy</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+          <View style={styles.linkSeparator} />
+          <TouchableOpacity
+            testID="terms-link"
+            style={styles.linkRow}
+            accessibilityRole="link"
+            accessibilityLabel="Terms of Service"
+            onPress={() => {
+              Linking.openURL(TERMS_OF_SERVICE_URL).catch(() => {
+                Alert.alert("Error", "Could not open Terms of Service.");
+              });
+            }}
+          >
+            <Text style={styles.linkText}>Terms of Service</Text>
+            <Text style={styles.linkChevron}>›</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </ScrollView>
   );
@@ -242,7 +319,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     marginLeft: 12,
   },
-  signOutButton: {
+  actionButton: {
     backgroundColor: colors.white,
     borderRadius: 12,
     borderWidth: 1,
@@ -250,12 +327,32 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     alignItems: "center",
   },
-  signOutButtonSpaced: {
+  actionButtonSpaced: {
     marginTop: 12,
   },
-  signOutText: {
+  destructiveActionText: {
     color: colors.error,
     fontSize: 15,
     fontWeight: "600",
+  },
+  linkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  linkSeparator: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: colors.gray200,
+    marginLeft: 16,
+  },
+  linkText: {
+    fontSize: 15,
+    color: colors.gray900,
+  },
+  linkChevron: {
+    fontSize: 18,
+    color: colors.gray400,
   },
 });

@@ -1,4 +1,5 @@
 import React, { createElement } from "react";
+import { Alert, Linking } from "react-native";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
 import type { NotificationPreference } from "../../../hooks/useNotificationPreferences";
 
@@ -57,6 +58,16 @@ jest.mock("../../../hooks/useUpdateNotificationPreferences", () => ({
   useUpdateNotificationPreferences: () => ({
     updatePreferences: mockUpdatePreferences,
     isUpdating: false,
+    error: null,
+  }),
+}));
+
+const mockDeleteAccount = jest.fn().mockResolvedValue({});
+
+jest.mock("../../../hooks/useDeleteAccount", () => ({
+  useDeleteAccount: () => ({
+    deleteAccount: mockDeleteAccount,
+    isDeleting: false,
     error: null,
   }),
 }));
@@ -209,5 +220,93 @@ describe("SettingsScreen", () => {
     });
     const toggle = findByTestId(renderer, "mobile-push-toggle")[0];
     expect(toggle?.props.value).toBe(true);
+  });
+
+  it("renders the delete account button", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(findByTestId(renderer, "delete-account-button").length).toBeGreaterThanOrEqual(1);
+    expect(hasText(renderer, "Delete Account")).toBe(true);
+  });
+
+  it("renders the privacy policy link", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(findByTestId(renderer, "privacy-policy-link").length).toBeGreaterThanOrEqual(1);
+    expect(hasText(renderer, "Privacy Policy")).toBe(true);
+  });
+
+  it("renders the terms of service link", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(findByTestId(renderer, "terms-link").length).toBeGreaterThanOrEqual(1);
+    expect(hasText(renderer, "Terms of Service")).toBe(true);
+  });
+
+  it("calls deleteAccount after confirming the delete dialog", async () => {
+    const alertSpy = jest
+      .spyOn(Alert, "alert")
+      .mockImplementation((_title, _msg, buttons) => {
+        const confirm = buttons?.find(
+          (b) => typeof b === "object" && b.style === "destructive",
+        );
+        if (confirm && typeof confirm === "object" && confirm.onPress) {
+          confirm.onPress();
+        }
+      });
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    const btn = renderer.root.findAll(
+      (node) =>
+        node.props.testID === "delete-account-button" &&
+        typeof node.props.onPress === "function",
+    )[0];
+    await act(async () => {
+      btn?.props.onPress();
+    });
+    expect(mockDeleteAccount).toHaveBeenCalledTimes(1);
+    alertSpy.mockRestore();
+  });
+
+  it("opens privacy policy URL when tapped", async () => {
+    const openURLSpy = jest
+      .spyOn(Linking, "openURL")
+      .mockResolvedValue(undefined as never);
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    const link = renderer.root.findAll(
+      (node) =>
+        node.props.testID === "privacy-policy-link" &&
+        typeof node.props.onPress === "function",
+    )[0];
+    await act(async () => {
+      link?.props.onPress();
+    });
+    expect(openURLSpy).toHaveBeenCalledWith("https://permissionslip.dev/privacy");
+    openURLSpy.mockRestore();
+  });
+
+  it("opens terms of service URL when tapped", async () => {
+    const openURLSpy = jest
+      .spyOn(Linking, "openURL")
+      .mockResolvedValue(undefined as never);
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    const link = renderer.root.findAll(
+      (node) =>
+        node.props.testID === "terms-link" &&
+        typeof node.props.onPress === "function",
+    )[0];
+    await act(async () => {
+      link?.props.onPress();
+    });
+    expect(openURLSpy).toHaveBeenCalledWith("https://permissionslip.dev/terms");
+    openURLSpy.mockRestore();
   });
 });
