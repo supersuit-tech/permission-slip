@@ -80,8 +80,9 @@ export default function OtpStep({
       {onUsePassword ? (
         <button
           type="button"
-          className="text-sm text-muted-foreground underline hover:text-foreground"
+          className="text-sm text-muted-foreground underline hover:text-foreground disabled:opacity-40"
           onClick={onUsePassword}
+          disabled={isSubmitting}
         >
           or sign in with password
         </button>
