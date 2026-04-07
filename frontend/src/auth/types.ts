@@ -32,6 +32,8 @@ export interface AuthState {
   sendOtp: (email: string) => Promise<AuthResult>;
   /** Verify an email OTP token to complete sign-in. */
   verifyOtp: (email: string, token: string) => Promise<AuthResult>;
+  /** Sign in with email and password. */
+  signInWithPassword: (email: string, password: string) => Promise<AuthResult>;
   /** Request an email change for the current user. */
   updateEmail: (newEmail: string) => Promise<AuthResult>;
   /** Sign the user out of all sessions (global scope). */

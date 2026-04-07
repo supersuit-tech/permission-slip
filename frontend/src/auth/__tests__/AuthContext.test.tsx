@@ -11,13 +11,9 @@ import {
   verifiedFactor,
 } from "./fixtures";
 import { AuthProvider, useAuth } from "../AuthContext";
-import { tryAppReviewLogin } from "../appReviewAuth";
 import type { AuthState } from "../types";
 
 vi.mock("../../lib/supabaseClient");
-vi.mock("../appReviewAuth");
-
-const mockTryAppReviewLogin = vi.mocked(tryAppReviewLogin);
 
 /**
  * Waits for the auth provider to finish its async initialization (AAL check).
@@ -172,62 +168,49 @@ describe("AuthContext", () => {
         type: "email",
       });
       expect(response).toEqual({ error: null });
-      expect(mockTryAppReviewLogin).not.toHaveBeenCalled();
     });
+  });
 
-    it("falls back to tryAppReviewLogin when verifyOtp fails and review login succeeds", async () => {
-      const supabaseError = new AuthError("Invalid", 401, "otp_expired");
-      mockAuth.verifyOtp.mockResolvedValue({
-        data: { session: null, user: null },
-        error: supabaseError,
+  describe("signInWithPassword", () => {
+    it("calls supabase signInWithPassword and returns result", async () => {
+      mockAuth.signInWithPassword.mockResolvedValue({
+        data: { session: mockSession, user: mockSession.user },
+        error: null,
       });
-      mockTryAppReviewLogin.mockResolvedValue({ error: null });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: AuthProvider,
       });
 
-      const response = await result.current.verifyOtp(
-        "review@example.com",
-        "static-otp"
+      const response = await result.current.signInWithPassword(
+        "test@example.com",
+        "password123"
       );
 
-      expect(mockTryAppReviewLogin).toHaveBeenCalledWith(
-        "review@example.com",
-        "static-otp"
-      );
+      expect(mockAuth.signInWithPassword).toHaveBeenCalledWith({
+        email: "test@example.com",
+        password: "password123",
+      });
       expect(response).toEqual({ error: null });
     });
 
-    it("returns the original Supabase error when app review fallback also fails", async () => {
-      const supabaseError = new AuthError("Invalid", 401, "otp_expired");
-      mockAuth.verifyOtp.mockResolvedValue({
+    it("returns error from supabase", async () => {
+      const authError = new AuthError("Invalid credentials", 400);
+      mockAuth.signInWithPassword.mockResolvedValue({
         data: { session: null, user: null },
-        error: supabaseError,
-      });
-      mockTryAppReviewLogin.mockResolvedValue({
-        error: {
-          message: "Invalid credentials",
-          name: "AuthApiError",
-          status: 401,
-          code: "invalid_credentials",
-        } as AuthError,
+        error: authError,
       });
 
       const { result } = renderHook(() => useAuth(), {
         wrapper: AuthProvider,
       });
 
-      const response = await result.current.verifyOtp(
-        "user@example.com",
-        "wrong"
+      const response = await result.current.signInWithPassword(
+        "test@example.com",
+        "wrong-password"
       );
 
-      expect(mockTryAppReviewLogin).toHaveBeenCalledWith(
-        "user@example.com",
-        "wrong"
-      );
-      expect(response.error).toBe(supabaseError);
+      expect(response).toEqual({ error: authError });
     });
   });
 

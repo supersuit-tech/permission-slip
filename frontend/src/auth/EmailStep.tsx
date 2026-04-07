@@ -9,11 +9,16 @@ import { Label } from "@/components/ui/label";
 
 interface EmailStepProps {
   onSubmit: (email: string) => Promise<{ error: AuthError | null }>;
+  onUsePassword?: (email: string) => void;
 }
 
-export default function EmailStep({ onSubmit }: EmailStepProps) {
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export default function EmailStep({ onSubmit, onUsePassword }: EmailStepProps) {
   const [email, setEmail] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
+  const trimmedEmail = email.trim();
+  const isValidEmail = EMAIL_REGEX.test(trimmedEmail);
 
   return (
     <AuthLayout>
@@ -21,7 +26,7 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
         Enter your email to sign in or create an account.
       </p>
       <form
-        onSubmit={(e) => handleSubmit(e, () => onSubmit(email.trim()))}
+        onSubmit={(e) => handleSubmit(e, () => onSubmit(trimmedEmail))}
         className="space-y-4"
       >
         <div className="space-y-2">
@@ -39,6 +44,16 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
           Continue
         </Button>
       </form>
+      {onUsePassword ? (
+        <button
+          type="button"
+          className="text-sm text-muted-foreground underline hover:text-foreground"
+          onClick={() => onUsePassword(trimmedEmail)}
+          disabled={!isValidEmail}
+        >
+          Sign in with password instead
+        </button>
+      ) : null}
     </AuthLayout>
   );
 }

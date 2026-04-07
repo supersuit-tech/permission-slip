@@ -2,11 +2,12 @@ import { useState, useCallback } from "react";
 import { useAuth } from "./AuthContext";
 import EmailStep from "./EmailStep";
 import OtpStep from "./OtpStep";
+import PasswordStep from "./PasswordStep";
 
-type Step = "email" | "otp";
+type Step = "email" | "otp" | "password";
 
 export default function LoginPage() {
-  const { sendOtp, verifyOtp } = useAuth();
+  const { sendOtp, verifyOtp, signInWithPassword } = useAuth();
   const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
 
@@ -18,6 +19,16 @@ export default function LoginPage() {
   const handleResend = useCallback(async () => {
     return sendOtp(email);
   }, [sendOtp, email]);
+
+  if (step === "password") {
+    return (
+      <PasswordStep
+        email={email}
+        onSubmit={(password) => signInWithPassword(email, password)}
+        onBack={() => setStep("email")}
+      />
+    );
+  }
 
   if (step === "otp") {
     return (
@@ -45,6 +56,10 @@ export default function LoginPage() {
           return { error: null };
         }
         return result;
+      }}
+      onUsePassword={(inputEmail) => {
+        setEmail(inputEmail);
+        setStep("password");
       }}
     />
   );

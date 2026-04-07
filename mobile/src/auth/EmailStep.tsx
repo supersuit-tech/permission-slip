@@ -18,11 +18,12 @@ import { BrandBadge } from "../components/BrandBadge";
 
 interface EmailStepProps {
   onSubmit: (email: string) => Promise<{ error: AuthError | null }>;
+  onUsePassword?: (email: string) => void;
 }
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export default function EmailStep({ onSubmit }: EmailStepProps) {
+export default function EmailStep({ onSubmit, onUsePassword }: EmailStepProps) {
   const [email, setEmail] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
   const inputRef = useRef<TextInput>(null);
@@ -95,6 +96,26 @@ export default function EmailStep({ onSubmit }: EmailStepProps) {
             {isSubmitting ? "Sending..." : "Continue"}
           </Text>
         </TouchableOpacity>
+
+        {onUsePassword ? (
+          <TouchableOpacity
+            testID="use-password"
+            accessibilityLabel="Sign in with password instead"
+            accessibilityRole="button"
+            onPress={() => onUsePassword(trimmedEmail)}
+            disabled={!isValidEmail}
+            style={styles.passwordLink}
+          >
+            <Text
+              style={[
+                styles.passwordLinkText,
+                !isValidEmail && styles.passwordLinkDisabled,
+              ]}
+            >
+              Sign in with password instead
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </Pressable>
     </KeyboardAvoidingView>
   );
@@ -106,5 +127,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 10,
     marginBottom: 8,
+  },
+  passwordLink: {
+    marginTop: 16,
+    alignItems: "center",
+  },
+  passwordLinkText: {
+    color: colors.gray500,
+    fontSize: 14,
+    textDecorationLine: "underline",
+  },
+  passwordLinkDisabled: {
+    opacity: 0.4,
   },
 });

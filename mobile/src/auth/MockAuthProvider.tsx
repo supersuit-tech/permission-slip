@@ -51,6 +51,8 @@ export function MockAuthProvider({ children }: { children: ReactNode }) {
       authStatus: "authenticated",
       sendOtp: noOp,
       verifyOtp: async (_email: string, _token: string) => ({ error: null }),
+      signInWithPassword: async (_email: string, _password: string) => ({ error: null }),
+      verifyMfa: async (_code: string) => ({ error: null }),
       signOut: noOp,
     }),
     [noOp],
