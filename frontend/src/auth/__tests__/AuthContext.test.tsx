@@ -171,6 +171,49 @@ describe("AuthContext", () => {
     });
   });
 
+  describe("signInWithPassword", () => {
+    it("calls supabase signInWithPassword and returns result", async () => {
+      mockAuth.signInWithPassword.mockResolvedValue({
+        data: { session: mockSession, user: mockSession.user },
+        error: null,
+      });
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProvider,
+      });
+
+      const response = await result.current.signInWithPassword(
+        "test@example.com",
+        "password123"
+      );
+
+      expect(mockAuth.signInWithPassword).toHaveBeenCalledWith({
+        email: "test@example.com",
+        password: "password123",
+      });
+      expect(response).toEqual({ error: null });
+    });
+
+    it("returns error from supabase", async () => {
+      const authError = new AuthError("Invalid credentials", 400);
+      mockAuth.signInWithPassword.mockResolvedValue({
+        data: { session: null, user: null },
+        error: authError,
+      });
+
+      const { result } = renderHook(() => useAuth(), {
+        wrapper: AuthProvider,
+      });
+
+      const response = await result.current.signInWithPassword(
+        "test@example.com",
+        "wrong-password"
+      );
+
+      expect(response).toEqual({ error: authError });
+    });
+  });
+
   describe("signOut", () => {
     it("calls supabase signOut", async () => {
       mockAuth.signOut.mockResolvedValue({ error: null });
