@@ -8,7 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "generate:api": "openapi-typescript ../spec/openapi/openapi.bundle.yaml -o src/api/schema.d.ts",
-    "postinstall": "npm run generate:api",
+    "postinstall": "npm run generate:api && cp ../shared/validation.json src/lib/validation.json",
     "test": "jest",
     "eas-build:dev": "npx eas-cli@latest build --profile development --platform all",
     "eas-build:preview": "npx eas-cli@latest build --profile preview --platform all",
