@@ -61,6 +61,16 @@ jest.mock("../../../hooks/useUpdateNotificationPreferences", () => ({
   }),
 }));
 
+const mockDeleteAccount = jest.fn().mockResolvedValue({});
+
+jest.mock("../../../hooks/useDeleteAccount", () => ({
+  useDeleteAccount: () => ({
+    deleteAccount: mockDeleteAccount,
+    isDeleting: false,
+    error: null,
+  }),
+}));
+
 // Import after mocks
 import SettingsScreen from "../SettingsScreen";
 
@@ -209,5 +219,29 @@ describe("SettingsScreen", () => {
     });
     const toggle = findByTestId(renderer, "mobile-push-toggle")[0];
     expect(toggle?.props.value).toBe(true);
+  });
+
+  it("renders the delete account button", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(findByTestId(renderer, "delete-account-button").length).toBeGreaterThanOrEqual(1);
+    expect(hasText(renderer, "Delete Account")).toBe(true);
+  });
+
+  it("renders the privacy policy link", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(findByTestId(renderer, "privacy-policy-link").length).toBeGreaterThanOrEqual(1);
+    expect(hasText(renderer, "Privacy Policy")).toBe(true);
+  });
+
+  it("renders the terms of service link", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(findByTestId(renderer, "terms-link").length).toBeGreaterThanOrEqual(1);
+    expect(hasText(renderer, "Terms of Service")).toBe(true);
   });
 });
