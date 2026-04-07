@@ -287,7 +287,7 @@ describe("SettingsScreen", () => {
     await act(async () => {
       link?.props.onPress();
     });
-    expect(openURLSpy).toHaveBeenCalledWith("https://permissionslip.dev/privacy");
+    expect(openURLSpy).toHaveBeenCalledWith("https://app.permissionslip.dev/policy/privacy");
     openURLSpy.mockRestore();
   });
 
@@ -306,7 +306,7 @@ describe("SettingsScreen", () => {
     await act(async () => {
       link?.props.onPress();
     });
-    expect(openURLSpy).toHaveBeenCalledWith("https://permissionslip.dev/terms");
+    expect(openURLSpy).toHaveBeenCalledWith("https://app.permissionslip.dev/policy/terms");
     openURLSpy.mockRestore();
   });
 });
