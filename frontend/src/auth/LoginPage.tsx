@@ -37,6 +37,7 @@ export default function LoginPage() {
         onVerify={(code) => verifyOtp(email, code)}
         onBack={() => setStep("email")}
         onResend={handleResend}
+        onUsePassword={() => setStep("password")}
       />
     );
   }

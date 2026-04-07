@@ -28,6 +28,7 @@ export default function LoginScreen() {
         onVerify={(code) => verifyOtp(email, code)}
         onResend={() => sendOtp(email)}
         onBack={() => setStep("email")}
+        onUsePassword={() => setStep("password")}
       />
     );
   }

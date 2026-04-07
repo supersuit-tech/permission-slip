@@ -15,6 +15,8 @@ interface OtpStepProps {
   onVerify: (code: string) => Promise<{ error: AuthError | null }>;
   onBack: () => void;
   onResend: () => Promise<{ error: AuthError | null }>;
+  /** Shown below resend — for users who cannot access their email for the code. */
+  onUsePassword?: () => void;
 }
 
 export default function OtpStep({
@@ -22,6 +24,7 @@ export default function OtpStep({
   onVerify,
   onBack,
   onResend,
+  onUsePassword,
 }: OtpStepProps) {
   const [otpCode, setOtpCode] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
@@ -81,6 +84,16 @@ export default function OtpStep({
         label="Resend code"
         successMessage="Code resent."
       />
+      {onUsePassword ? (
+        <button
+          type="button"
+          className="text-sm text-muted-foreground underline hover:text-foreground disabled:opacity-40"
+          onClick={onUsePassword}
+          disabled={isSubmitting}
+        >
+          or sign in with password
+        </button>
+      ) : null}
       <DevOnly>
         <Button
           type="button"
