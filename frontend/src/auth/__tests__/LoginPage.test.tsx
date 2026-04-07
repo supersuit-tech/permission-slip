@@ -98,12 +98,12 @@ describe("LoginPage", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Code")).toBeInTheDocument();
     });
-    await userEvent.type(screen.getByLabelText("Code"), "123456");
+    await userEvent.type(screen.getByLabelText("Code"), "12345678");
     await userEvent.click(screen.getByText("Verify"));
 
     expect(mockAuth.verifyOtp).toHaveBeenCalledWith({
       email: "test@example.com",
-      token: "123456",
+      token: "12345678",
       type: "email",
     });
   });

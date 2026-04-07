@@ -20,6 +20,8 @@ func TestValidationConfigLoads(t *testing.T) {
 		{"ActionTypeMaxLength", ActionTypeMaxLength, 128},
 		{"ActionVersionMaxLength", ActionVersionMaxLength, 10},
 		{"ConfirmationCodeLength", ConfirmationCodeLength, 6},
+		{"EmailOtpCodeLength", EmailOtpCodeLength, 8},
+		{"TotpCodeLength", TotpCodeLength, 6},
 		{"MaxConstraintsBytes", MaxConstraintsBytes, 16384},
 		{"MaxParametersBytes", MaxParametersBytes, 16384},
 	}

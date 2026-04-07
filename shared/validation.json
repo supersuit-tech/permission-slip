@@ -9,6 +9,8 @@
   "actionType": { "maxLength": 128 },
   "actionVersion": { "maxLength": 10 },
   "confirmationCode": { "length": 6 },
+  "emailOtpCode": { "length": 8 },
+  "totpCode": { "length": 6 },
   "constraintsBytes": { "max": 16384 },
   "parametersBytes": { "max": 16384 }
 }

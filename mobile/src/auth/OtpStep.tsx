@@ -14,6 +14,7 @@ import type { AuthError } from "@supabase/supabase-js";
 import { useFormSubmit } from "./useFormSubmit";
 import { authStyles } from "./styles";
 import { colors } from "../theme/colors";
+import validation from "../lib/validation";
 
 interface OtpStepProps {
   email: string;
@@ -49,6 +50,8 @@ export default function OtpStep({
       if (resendTimerRef.current) clearTimeout(resendTimerRef.current);
     };
   }, []);
+
+  const emailOtpLen = validation.emailOtpCode.length;
 
   const submit = () => handleSubmit(() => onVerify(otpCode));
 
@@ -97,11 +100,11 @@ export default function OtpStep({
             style={[authStyles.input, localStyles.otpInput]}
             value={otpCode}
             onChangeText={setOtpCode}
-            placeholder="000000"
+            placeholder="00000000"
             placeholderTextColor={colors.gray400}
             keyboardType="number-pad"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={emailOtpLen}
             editable={!isSubmitting}
             onSubmitEditing={submit}
             returnKeyType="go"
@@ -123,11 +126,11 @@ export default function OtpStep({
               authStyles.button,
               authStyles.primaryButton,
               localStyles.flexButton,
-              (isSubmitting || otpCode.length < 6) &&
+              (isSubmitting || otpCode.length < emailOtpLen) &&
                 authStyles.buttonDisabled,
             ]}
             onPress={submit}
-            disabled={isSubmitting || otpCode.length < 6}
+            disabled={isSubmitting || otpCode.length < emailOtpLen}
           >
             <Text style={authStyles.primaryButtonText}>
               {isSubmitting ? "Verifying..." : "Verify"}

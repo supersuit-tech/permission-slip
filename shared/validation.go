@@ -30,6 +30,8 @@ type validationConfig struct {
 	ActionType               fieldLimits `json:"actionType"`
 	ActionVersion            fieldLimits `json:"actionVersion"`
 	ConfirmationCode         fieldLimits `json:"confirmationCode"`
+	EmailOtpCode             fieldLimits `json:"emailOtpCode"`
+	TotpCode                 fieldLimits `json:"totpCode"`
 	ConstraintsBytes         fieldLimits `json:"constraintsBytes"`
 	ParametersBytes          fieldLimits `json:"parametersBytes"`
 }
@@ -48,6 +50,8 @@ var (
 	ActionTypeMaxLength         int
 	ActionVersionMaxLength      int
 	ConfirmationCodeLength      int
+	EmailOtpCodeLength          int
+	TotpCodeLength              int
 	MaxConstraintsBytes         int
 	MaxParametersBytes          int
 )
@@ -78,6 +82,8 @@ func init() {
 	ActionTypeMaxLength = mustInt("actionType.maxLength", cfg.ActionType.MaxLength)
 	ActionVersionMaxLength = mustInt("actionVersion.maxLength", cfg.ActionVersion.MaxLength)
 	ConfirmationCodeLength = mustInt("confirmationCode.length", cfg.ConfirmationCode.Length)
+	EmailOtpCodeLength = mustInt("emailOtpCode.length", cfg.EmailOtpCode.Length)
+	TotpCodeLength = mustInt("totpCode.length", cfg.TotpCode.Length)
 	MaxConstraintsBytes = mustInt("constraintsBytes.max", cfg.ConstraintsBytes.Max)
 	MaxParametersBytes = mustInt("parametersBytes.max", cfg.ParametersBytes.Max)
 }

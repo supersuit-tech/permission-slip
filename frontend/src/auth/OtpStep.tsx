@@ -8,6 +8,7 @@ import DevOnly from "../components/DevOnly";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/FormError";
 import { OtpCodeInput } from "@/components/OtpCodeInput";
+import validation from "@/lib/validation";
 
 interface OtpStepProps {
   email: string;
@@ -25,6 +26,7 @@ export default function OtpStep({
   const [otpCode, setOtpCode] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
   const resend = useResend({ onResend });
+  const emailOtpLen = validation.emailOtpCode.length;
 
   const handleAutoFill = async () => {
     // Dynamic import keeps dev-only Mailpit code out of the production bundle
@@ -47,13 +49,18 @@ export default function OtpStep({
         <OtpCodeInput
           id="otp-code"
           label="Code"
+          variant="email"
           value={otpCode}
           onChange={setOtpCode}
           required
         />
         <FormError error={error} prefix />
         <div className="flex gap-2">
-          <Button type="submit" className="flex-1" disabled={isSubmitting}>
+          <Button
+            type="submit"
+            className="flex-1"
+            disabled={isSubmitting || otpCode.length < emailOtpLen}
+          >
             Verify
           </Button>
           <Button
