@@ -74,7 +74,8 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		profile, err := db.CreateProfile(r.Context(), deps.DB, userID, username, req.MarketingOptIn)
+		email := UserEmail(r.Context())
+		profile, err := db.CreateProfile(r.Context(), deps.DB, userID, username, email, req.MarketingOptIn)
 		if err != nil {
 			var onboardErr *db.OnboardingError
 			if errors.As(err, &onboardErr) {
@@ -83,7 +84,7 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 					// Before rejecting, check if the taken username belongs to
 					// the same user under a different Supabase identity (new UUID,
 					// same email). If so, re-link the existing profile.
-					if email := UserEmail(r.Context()); email != "" {
+					if email != "" {
 						owner, lookupErr := db.FindProfileByUsername(r.Context(), deps.DB, username)
 						if lookupErr != nil {
 							log.Printf("[%s] Onboarding: username owner lookup: %v", TraceID(r.Context()), lookupErr)

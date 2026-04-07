@@ -29,7 +29,7 @@ const (
 // Returns the created Profile, or an *OnboardingError if the username is
 // already taken (OnboardingErrUsernameTaken) or if a profile already exists
 // for this user due to a concurrent request (OnboardingErrProfileExists).
-func CreateProfile(ctx context.Context, db DBTX, userID, username string, marketingOptIn bool) (*Profile, error) {
+func CreateProfile(ctx context.Context, db DBTX, userID, username, email string, marketingOptIn bool) (*Profile, error) {
 	// Upsert auth.users so the FK from profiles is satisfied.
 	// In production (Supabase), auth.users is managed by Supabase and this
 	// row already exists by the time the user reaches onboarding.
@@ -56,12 +56,23 @@ func CreateProfile(ctx context.Context, db DBTX, userID, username string, market
 		}
 	}
 
+	// Use the email passed from the JWT session context instead of
+	// subquerying auth.users. This avoids requiring SELECT + USAGE
+	// grants on the auth schema — which caused production failures
+	// (Sentry PERMISSION-SLIP-GO-J: "permission denied for schema auth")
+	// when the app_backend role lacked auth schema access during the
+	// INSERT's prepared-statement phase.
+	var emailArg *string
+	if email != "" {
+		emailArg = &email
+	}
+
 	var p Profile
 	err = db.QueryRow(ctx,
 		`INSERT INTO profiles (id, username, email, marketing_opt_in)
-		 VALUES ($1, $2, (SELECT email FROM auth.users WHERE id = $1), $3)
+		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, username, email, phone, marketing_opt_in, created_at`,
-		userID, username, marketingOptIn,
+		userID, username, emailArg, marketingOptIn,
 	).Scan(&p.ID, &p.Username, &p.Email, &p.Phone, &p.MarketingOptIn, &p.CreatedAt)
 
 	if err != nil {
