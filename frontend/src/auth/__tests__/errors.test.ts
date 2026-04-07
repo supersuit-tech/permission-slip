@@ -3,6 +3,13 @@ import { AuthError } from "@supabase/supabase-js";
 import { safeErrorMessage } from "../errors";
 
 describe("safeErrorMessage", () => {
+  it("maps invalid_credentials code", () => {
+    const error = new AuthError("Invalid credentials", 400, "invalid_credentials");
+    expect(safeErrorMessage(error)).toBe(
+      "Invalid email or password. Please try again."
+    );
+  });
+
   it("maps otp_expired code", () => {
     const error = new AuthError("Token expired", 401, "otp_expired");
     expect(safeErrorMessage(error)).toBe(

@@ -11,6 +11,12 @@ function mockAuthError(code: string): AuthError {
 }
 
 describe("safeErrorMessage", () => {
+  it("maps invalid_credentials to user-friendly message", () => {
+    expect(safeErrorMessage(mockAuthError("invalid_credentials"))).toBe(
+      "Invalid email or password. Please try again."
+    );
+  });
+
   it("returns a safe message for known error codes", () => {
     expect(safeErrorMessage(mockAuthError("otp_expired"))).toBe(
       "Your code has expired. Please request a new one."

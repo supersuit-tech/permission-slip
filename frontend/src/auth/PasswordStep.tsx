@@ -35,6 +35,7 @@ export default function PasswordStep({
           <Input
             id="password"
             type="password"
+            autoComplete="current-password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoFocus
