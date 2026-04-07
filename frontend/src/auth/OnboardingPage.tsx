@@ -46,9 +46,14 @@ export default function OnboardingPage() {
         password,
       });
       if (pwError) {
-        // Profile was created but password failed — log the user in
-        // anyway so they aren't stuck. They can set a password later.
+        // Profile was created but password failed — warn the user but
+        // don't block onboarding. They can set a password later in settings.
         console.error("Failed to set password during onboarding:", pwError.message);
+        setError(
+          "Your account was created, but we couldn't set your password. " +
+          "You can set a password later in Settings."
+        );
+        // Still proceed — invalidate profile so user reaches the dashboard.
       }
 
       // Invalidate the profile query so App.tsx re-fetches and routes to dashboard

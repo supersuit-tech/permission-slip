@@ -114,6 +114,20 @@ func TestCreateProfile_SMSDisabledByDefault(t *testing.T) {
 	}
 }
 
+func TestCreateProfile_EmptyEmail(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+
+	profile, err := db.CreateProfile(context.Background(), tx, uid, "noemailer", "", false)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if profile.Email != nil {
+		t.Errorf("expected nil email, got %v", profile.Email)
+	}
+}
+
 // isOnboardingErr is a helper to avoid importing errors in test file.
 func isOnboardingErr(err error, target **db.OnboardingError) bool {
 	if e, ok := err.(*db.OnboardingError); ok {
