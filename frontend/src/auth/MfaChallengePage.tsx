@@ -26,6 +26,7 @@ export default function MfaChallengePage() {
         <OtpCodeInput
           id="mfa-code"
           label="Authenticator Code"
+          variant="totp"
           value={code}
           onChange={setCode}
           autoFocus

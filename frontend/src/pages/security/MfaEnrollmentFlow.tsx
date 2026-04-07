@@ -174,6 +174,7 @@ export function MfaEnrollmentFlow({ onEnrolled }: MfaEnrollmentFlowProps) {
         <OtpCodeInput
           id="mfa-enroll-code"
           label="Verification Code"
+          variant="totp"
           value={code}
           onChange={setCode}
           autoFocus

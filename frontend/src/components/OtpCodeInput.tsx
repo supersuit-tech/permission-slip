@@ -7,6 +7,8 @@ interface OtpCodeInputProps {
   id: string;
   /** Visible label text above the input. */
   label: string;
+  /** Email magic-link OTP vs authenticator TOTP — controls max digit length. */
+  variant: "email" | "totp";
   /** Current input value (digits only). */
   value: string;
   /** Called with the new value after non-digit characters are stripped. */
@@ -17,8 +19,9 @@ interface OtpCodeInputProps {
 }
 
 /**
- * A 6-digit one-time-code input with numeric keyboard, digit-only filtering,
- * and browser autofill support. Used for both email OTP and TOTP MFA flows.
+ * One-time-code input with numeric keyboard, digit-only filtering, and browser
+ * autofill support. Email OTP and TOTP use different digit lengths from
+ * shared/validation.json.
  *
  * Digit filtering happens on every keystroke via `.replace(/\D/g, "")` so
  * non-numeric characters can never appear in the value — even on paste.
@@ -26,12 +29,17 @@ interface OtpCodeInputProps {
 export function OtpCodeInput({
   id,
   label,
+  variant,
   value,
   onChange,
   autoFocus,
   disabled,
   required,
 }: OtpCodeInputProps) {
+  const maxLength =
+    variant === "email"
+      ? validation.emailOtpCode.length
+      : validation.totpCode.length;
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
@@ -39,7 +47,7 @@ export function OtpCodeInput({
         id={id}
         type="text"
         inputMode="numeric"
-        maxLength={validation.confirmationCode.length}
+        maxLength={maxLength}
         value={value}
         onChange={(e) => onChange(e.target.value.replace(/\D/g, ""))}
         autoComplete="one-time-code"

@@ -47,6 +47,7 @@ export default function OtpStep({
         <OtpCodeInput
           id="otp-code"
           label="Code"
+          variant="email"
           value={otpCode}
           onChange={setOtpCode}
           required
