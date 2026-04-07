@@ -169,7 +169,7 @@ export default function SettingsScreen(_props: Props) {
           accessibilityLabel="Sign out of your account"
           onPress={handleSignOut}
         >
-          <Text style={styles.signOutText}>Sign Out</Text>
+          <Text style={styles.destructiveActionText}>Sign Out</Text>
         </TouchableOpacity>
         <TouchableOpacity
           testID="delete-account-button"
@@ -182,7 +182,7 @@ export default function SettingsScreen(_props: Props) {
           {isDeleting ? (
             <ActivityIndicator size="small" color={colors.error} />
           ) : (
-            <Text style={styles.deleteAccountText}>Delete Account</Text>
+            <Text style={styles.destructiveActionText}>Delete Account</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -195,7 +195,11 @@ export default function SettingsScreen(_props: Props) {
             style={styles.linkRow}
             accessibilityRole="link"
             accessibilityLabel="Privacy Policy"
-            onPress={() => Linking.openURL(PRIVACY_POLICY_URL)}
+            onPress={() => {
+              Linking.openURL(PRIVACY_POLICY_URL).catch(() => {
+                Alert.alert("Error", "Could not open Privacy Policy.");
+              });
+            }}
           >
             <Text style={styles.linkText}>Privacy Policy</Text>
             <Text style={styles.linkChevron}>›</Text>
@@ -206,7 +210,11 @@ export default function SettingsScreen(_props: Props) {
             style={styles.linkRow}
             accessibilityRole="link"
             accessibilityLabel="Terms of Service"
-            onPress={() => Linking.openURL(TERMS_OF_SERVICE_URL)}
+            onPress={() => {
+              Linking.openURL(TERMS_OF_SERVICE_URL).catch(() => {
+                Alert.alert("Error", "Could not open Terms of Service.");
+              });
+            }}
           >
             <Text style={styles.linkText}>Terms of Service</Text>
             <Text style={styles.linkChevron}>›</Text>
@@ -322,12 +330,7 @@ const styles = StyleSheet.create({
   actionButtonSpaced: {
     marginTop: 12,
   },
-  signOutText: {
-    color: colors.error,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  deleteAccountText: {
+  destructiveActionText: {
     color: colors.error,
     fontSize: 15,
     fontWeight: "600",
