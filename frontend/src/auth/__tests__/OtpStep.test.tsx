@@ -58,7 +58,7 @@ describe("OtpStep", () => {
     await waitFor(() => {
       expect(
         screen.getByText(
-          "Your code has expired. Please request a new one.",
+          "Invalid or expired code. Please check your code or request a new one.",
           { exact: false }
         )
       ).toBeInTheDocument();
