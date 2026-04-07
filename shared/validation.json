@@ -1,5 +1,6 @@
 {
   "username": { "minLength": 3, "maxLength": 32 },
+  "password": { "minLength": 8 },
   "agentName": { "maxLength": 256 },
   "actionConfigName": { "maxLength": 255 },
   "actionConfigDescription": { "maxLength": 4096 },

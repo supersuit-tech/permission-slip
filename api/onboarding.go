@@ -74,7 +74,8 @@ func handleOnboarding(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		profile, err := db.CreateProfile(r.Context(), deps.DB, userID, username, req.MarketingOptIn)
+		email := UserEmail(r.Context())
+		profile, err := db.CreateProfile(r.Context(), deps.DB, userID, username, email, req.MarketingOptIn)
 		if err != nil {
 			var onboardErr *db.OnboardingError
 			if errors.As(err, &onboardErr) {

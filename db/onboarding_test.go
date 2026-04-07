@@ -13,7 +13,7 @@ func TestCreateProfile_Success(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 
-	profile, err := db.CreateProfile(context.Background(), tx, uid, "newuser", false)
+	profile, err := db.CreateProfile(context.Background(), tx, uid, "newuser", "newuser@example.com", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -29,6 +29,9 @@ func TestCreateProfile_Success(t *testing.T) {
 	if profile.CreatedAt.IsZero() {
 		t.Error("expected non-zero created_at")
 	}
+	if profile.Email == nil || *profile.Email != "newuser@example.com" {
+		t.Errorf("expected email %q, got %v", "newuser@example.com", profile.Email)
+	}
 }
 
 func TestCreateProfile_UsernameTaken(t *testing.T) {
@@ -38,7 +41,7 @@ func TestCreateProfile_UsernameTaken(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid1, "taken")
 
-	_, err := db.CreateProfile(context.Background(), tx, uid2, "taken", false)
+	_, err := db.CreateProfile(context.Background(), tx, uid2, "taken", "taken@example.com", false)
 	if err == nil {
 		t.Fatal("expected error for duplicate username, got nil")
 	}
@@ -60,7 +63,7 @@ func TestCreateProfile_Idempotent_AuthUsers(t *testing.T) {
 	// Pre-insert the auth.users row (as Supabase would have done)
 	testhelper.MustExec(t, tx, `INSERT INTO auth.users (id) VALUES ($1)`, uid)
 
-	profile, err := db.CreateProfile(context.Background(), tx, uid, "preseeded", false)
+	profile, err := db.CreateProfile(context.Background(), tx, uid, "preseeded", "preseeded@example.com", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,7 +77,7 @@ func TestCreateProfile_MarketingOptIn(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 
-	profile, err := db.CreateProfile(context.Background(), tx, uid, "marketer", true)
+	profile, err := db.CreateProfile(context.Background(), tx, uid, "marketer", "marketer@example.com", true)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -97,7 +100,7 @@ func TestCreateProfile_SMSDisabledByDefault(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 
-	_, err := db.CreateProfile(context.Background(), tx, uid, "smsuser", false)
+	_, err := db.CreateProfile(context.Background(), tx, uid, "smsuser", "smsuser@example.com", false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
