@@ -20,6 +20,8 @@ interface OtpStepProps {
   onVerify: (code: string) => Promise<{ error: AuthError | null }>;
   onResend: () => Promise<{ error: AuthError | null }>;
   onBack: () => void;
+  /** Shown below resend — for users who cannot access their email for the code. */
+  onUsePassword?: () => void;
 }
 
 type ResendStatus = "idle" | "sent" | "failed";
@@ -29,6 +31,7 @@ export default function OtpStep({
   onVerify,
   onResend,
   onBack,
+  onUsePassword,
 }: OtpStepProps) {
   const [otpCode, setOtpCode] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
@@ -178,6 +181,26 @@ export default function OtpStep({
             </Text>
           ) : null}
         </View>
+
+        {onUsePassword ? (
+          <TouchableOpacity
+            testID="otp-use-password"
+            accessibilityLabel="Or sign in with password"
+            accessibilityRole="button"
+            onPress={onUsePassword}
+            disabled={isSubmitting}
+            style={localStyles.passwordLink}
+          >
+            <Text
+              style={[
+                localStyles.passwordLinkText,
+                isSubmitting && localStyles.passwordLinkDisabled,
+              ]}
+            >
+              or sign in with password
+            </Text>
+          </TouchableOpacity>
+        ) : null}
       </Pressable>
     </KeyboardAvoidingView>
   );
@@ -233,5 +256,18 @@ const localStyles = StyleSheet.create({
   },
   resendSuccess: {
     color: colors.success,
+  },
+  passwordLink: {
+    marginTop: 20,
+    alignItems: "center",
+  },
+  passwordLinkText: {
+    color: colors.gray500,
+    fontSize: 14,
+    fontWeight: "500",
+    textDecorationLine: "underline",
+  },
+  passwordLinkDisabled: {
+    opacity: 0.4,
   },
 });

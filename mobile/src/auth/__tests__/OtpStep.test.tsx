@@ -52,6 +52,25 @@ describe("OtpStep", () => {
     expect(resendBtn.props.disabled).toBe(false);
   });
 
+  it("shows password fallback when onUsePassword is provided", async () => {
+    const onUsePassword = jest.fn();
+    const props = makeProps({ onUsePassword });
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(OtpStep, props));
+    });
+    await act(async () => {
+      jest.runAllTimers();
+    });
+
+    const link = findByTestId(renderer!, "otp-use-password");
+    expect(link).toBeTruthy();
+    await act(async () => {
+      await link.props.onPress();
+    });
+    expect(onUsePassword).toHaveBeenCalled();
+  });
+
   it("shows success message after successful resend", async () => {
     const props = makeProps();
     let renderer: ReactTestRenderer;
