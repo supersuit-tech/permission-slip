@@ -14,6 +14,7 @@ import { useAuth } from "./AuthContext";
 import { useFormSubmit } from "./useFormSubmit";
 import { authStyles } from "./styles";
 import { colors } from "../theme/colors";
+import validation from "../lib/validation";
 
 /**
  * Full-screen MFA challenge presented when authStatus is "mfa_required".
@@ -39,6 +40,7 @@ export default function MfaChallengeScreen() {
   };
 
   const submit = () => handleSubmit(() => verifyMfa(code));
+  const totpLen = validation.totpCode.length;
 
   return (
     <KeyboardAvoidingView
@@ -64,7 +66,7 @@ export default function MfaChallengeScreen() {
             placeholderTextColor={colors.gray400}
             keyboardType="number-pad"
             autoComplete="one-time-code"
-            maxLength={6}
+            maxLength={totpLen}
             editable={!isSubmitting}
             onSubmitEditing={submit}
             returnKeyType="go"
@@ -86,10 +88,10 @@ export default function MfaChallengeScreen() {
               authStyles.button,
               authStyles.primaryButton,
               localStyles.flexButton,
-              (isSubmitting || code.length < 6) && authStyles.buttonDisabled,
+              (isSubmitting || code.length < totpLen) && authStyles.buttonDisabled,
             ]}
             onPress={submit}
-            disabled={isSubmitting || code.length < 6}
+            disabled={isSubmitting || code.length < totpLen}
           >
             <Text style={authStyles.primaryButtonText}>
               {isSubmitting ? "Verifying..." : "Verify"}

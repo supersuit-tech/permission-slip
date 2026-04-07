@@ -36,14 +36,26 @@ describe("OtpStep", () => {
     expect(screen.getByText("Back")).toBeInTheDocument();
   });
 
+  it("disables verify until full email OTP length is entered", async () => {
+    renderOtpStep();
+    const verify = screen.getByRole("button", { name: "Verify" });
+    expect(verify).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText("Code"), "1234567");
+    expect(verify).toBeDisabled();
+
+    await userEvent.type(screen.getByLabelText("Code"), "8");
+    expect(verify).not.toBeDisabled();
+  });
+
   it("calls onVerify with entered code", async () => {
     const onVerify = vi.fn().mockResolvedValue({ error: null });
     renderOtpStep({ ...defaultProps, onVerify });
 
-    await userEvent.type(screen.getByLabelText("Code"), "123456");
+    await userEvent.type(screen.getByLabelText("Code"), "12345678");
     await userEvent.click(screen.getByText("Verify"));
 
-    expect(onVerify).toHaveBeenCalledWith("123456");
+    expect(onVerify).toHaveBeenCalledWith("12345678");
   });
 
   it("shows error on verification failure", async () => {
@@ -52,7 +64,7 @@ describe("OtpStep", () => {
     });
     renderOtpStep({ ...defaultProps, onVerify });
 
-    await userEvent.type(screen.getByLabelText("Code"), "000000");
+    await userEvent.type(screen.getByLabelText("Code"), "00000000");
     await userEvent.click(screen.getByText("Verify"));
 
     await waitFor(() => {
