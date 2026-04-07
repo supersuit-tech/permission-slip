@@ -50,3 +50,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# Copied from repo root shared/ during postinstall
+src/lib/validation.json
