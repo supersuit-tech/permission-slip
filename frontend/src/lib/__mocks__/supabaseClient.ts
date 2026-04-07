@@ -27,6 +27,7 @@ export const supabase = {
       .mockResolvedValue({ data: { session: null }, error: null }),
     signInWithOtp: vi.fn(),
     verifyOtp: vi.fn(),
+    setSession: vi.fn(),
     updateUser: vi.fn(),
     signOut: vi.fn(),
     onAuthStateChange: vi.fn(() => ({
