@@ -24,8 +24,8 @@ import { useUpdateNotificationPreferences } from "../../hooks/useUpdateNotificat
 import { useDeleteAccount } from "../../hooks/useDeleteAccount";
 import { colors } from "../../theme/colors";
 
-const PRIVACY_POLICY_URL = "https://permissionslip.dev/privacy";
-const TERMS_OF_SERVICE_URL = "https://permissionslip.dev/terms";
+const PRIVACY_POLICY_URL = "https://app.permissionslip.dev/policy/privacy";
+const TERMS_OF_SERVICE_URL = "https://app.permissionslip.dev/policy/terms";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
 
