@@ -1,7 +1,15 @@
+import { execSync } from "child_process";
 import { ExpoConfig } from "expo/config";
 
 const projectId =
   process.env.EXPO_PROJECT_ID || "6bbabfc7-f70d-45f7-bdc2-4f8387d14006";
+
+let gitCommitHash = "unknown";
+try {
+  gitCommitHash = execSync("git rev-parse HEAD", { encoding: "utf-8" }).trim();
+} catch {
+  // Git not available at build time — leave as "unknown"
+}
 
 const config: ExpoConfig = {
   name: "Permission Slip",
@@ -19,7 +27,7 @@ const config: ExpoConfig = {
     backgroundColor: "#ffffff",
   },
   ios: {
-    supportsTablet: true,
+    supportsTablet: false,
     bundleIdentifier: process.env.APP_BUNDLE_ID || "dev.permissionslip.app",
     associatedDomains: ["applinks:app.permissionslip.dev"],
     infoPlist: {
@@ -73,6 +81,7 @@ const config: ExpoConfig = {
     fallbackToCacheTimeout: 0,
   },
   extra: {
+    gitCommitHash,
     eas: {
       projectId,
     },

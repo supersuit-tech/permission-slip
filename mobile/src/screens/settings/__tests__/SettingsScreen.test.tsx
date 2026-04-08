@@ -31,6 +31,15 @@ jest.mock("../../../auth/AuthContext", () => ({
   }),
 }));
 
+jest.mock("expo-constants", () => ({
+  __esModule: true,
+  default: {
+    expoConfig: {
+      extra: { gitCommitHash: "abc1234def5678" },
+    },
+  },
+}));
+
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
@@ -289,6 +298,16 @@ describe("SettingsScreen", () => {
     });
     expect(openURLSpy).toHaveBeenCalledWith("https://app.permissionslip.dev/policy/privacy");
     openURLSpy.mockRestore();
+  });
+
+  it("renders the git commit hash at the bottom", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    const hashNodes = findByTestId(renderer, "git-commit-hash");
+    expect(hashNodes.length).toBeGreaterThanOrEqual(1);
+    const textContent = hashNodes[0]?.children?.join("") ?? "";
+    expect(textContent).toContain("abc1234");
   });
 
   it("opens terms of service URL when tapped", async () => {
