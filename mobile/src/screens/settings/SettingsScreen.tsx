@@ -21,8 +21,12 @@ import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAuth } from "../../auth/AuthContext";
 import { useNotificationPreferences } from "../../hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "../../hooks/useUpdateNotificationPreferences";
+import Constants from "expo-constants";
 import { useDeleteAccount } from "../../hooks/useDeleteAccount";
 import { colors } from "../../theme/colors";
+
+const GIT_COMMIT_HASH: string =
+  (Constants.expoConfig?.extra?.gitCommitHash as string) ?? "unknown";
 
 const PRIVACY_POLICY_URL = "https://app.permissionslip.dev/policy/privacy";
 const TERMS_OF_SERVICE_URL = "https://app.permissionslip.dev/policy/terms";
@@ -221,6 +225,12 @@ export default function SettingsScreen(_props: Props) {
           </TouchableOpacity>
         </View>
       </View>
+
+      <View style={styles.buildInfo}>
+        <Text style={styles.buildInfoText} testID="git-commit-hash">
+          Build {GIT_COMMIT_HASH.slice(0, 7)}
+        </Text>
+      </View>
     </ScrollView>
   );
 }
@@ -353,6 +363,15 @@ const styles = StyleSheet.create({
   },
   linkChevron: {
     fontSize: 18,
+    color: colors.gray400,
+  },
+  buildInfo: {
+    paddingTop: 24,
+    paddingBottom: 8,
+    alignItems: "center",
+  },
+  buildInfoText: {
+    fontSize: 12,
     color: colors.gray400,
   },
 });
