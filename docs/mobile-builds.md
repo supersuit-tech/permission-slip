@@ -18,19 +18,14 @@ From the `mobile/` directory:
 npx eas-cli init
 ```
 
-This creates a project on Expo's servers and outputs an `EXPO_PROJECT_ID`. Add this to your `.env`:
+This creates a project on Expo's servers and outputs an `EXPO_PROJECT_ID`. Add it (along with your Expo account name) to your `.env`:
 
 ```
 EXPO_PROJECT_ID=your-project-id-here
+EXPO_OWNER=your-expo-username
 ```
 
-Then update the OTA update URL in `app.json` — replace `${EXPO_PROJECT_ID}` with the actual ID:
-
-```json
-"updates": {
-  "url": "https://u.expo.dev/your-project-id-here"
-}
-```
+`app.config.ts` reads these env vars automatically — no manual edits needed.
 
 ### 2. Configure app signing
 
