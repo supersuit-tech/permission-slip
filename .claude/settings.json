@@ -1,4 +1,31 @@
 {
+  "permissions": {
+    "allow": [
+      "Bash(git:*)",
+      "Bash(gh:*)",
+      "Bash(GH_HOST=github.com:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(make:*)",
+      "Bash(cd:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(head:*)",
+      "Bash(tail:*)",
+      "Bash(echo:*)",
+      "Bash(python3:*)",
+      "Bash(go:*)",
+      "Bash(true:*)",
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Agent",
+      "Skill",
+      "NotebookEdit"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
