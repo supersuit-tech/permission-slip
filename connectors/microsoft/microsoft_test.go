@@ -166,8 +166,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	}
 
 	// Validate templates.
-	if len(m.Templates) != 26 {
-		t.Errorf("Manifest().Templates has %d items, want 26", len(m.Templates))
+	if len(m.Templates) != 27 {
+		t.Errorf("Manifest().Templates has %d items, want 27", len(m.Templates))
 	}
 
 	// Validate the manifest passes validation.
