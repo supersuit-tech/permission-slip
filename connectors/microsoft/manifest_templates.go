@@ -142,16 +142,16 @@ func microsoftTemplates() []connectors.ManifestTemplate {
 		{
 			ID:          "tpl_microsoft_excel_write_range",
 			ActionType:  "microsoft.excel_write_range",
-			Name:        "Write Excel range",
-			Description: "Agent can write to any range in a specific workbook.",
-			Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*","values":"*"}`),
+			Name:        "Write to specific workbook",
+			Description: "Locks the workbook; agent chooses the sheet, range, and values to write.",
+			Parameters:  json.RawMessage(`{"item_id":"WORKBOOK_ID","sheet_name":"*","range":"*","values":"*"}`),
 		},
 		{
 			ID:          "tpl_microsoft_excel_append_rows",
 			ActionType:  "microsoft.excel_append_rows",
-			Name:        "Append Excel rows",
-			Description: "Agent can append rows to a table in a specific workbook.",
-			Parameters:  json.RawMessage(`{"item_id":"*","table_name":"*","values":"*"}`),
+			Name:        "Append to specific workbook",
+			Description: "Locks the workbook; agent chooses the table and rows to append.",
+			Parameters:  json.RawMessage(`{"item_id":"WORKBOOK_ID","table_name":"*","values":"*"}`),
 		},
 		{
 			ID:          "tpl_microsoft_create_spreadsheet",
