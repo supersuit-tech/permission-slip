@@ -18,8 +18,9 @@ func InsertActionConfigTemplate(t *testing.T, d db.DBTX, templateID, connectorID
 
 // ActionConfigTemplateOpts holds optional fields for InsertActionConfigTemplateFull.
 type ActionConfigTemplateOpts struct {
-	Description *string
-	Parameters  []byte // raw JSON, defaults to '{}'
+	Description          *string
+	Parameters           []byte // raw JSON, defaults to '{}'
+	StandingApprovalSpec []byte // raw JSON, optional
 }
 
 // InsertActionConfigTemplateFull creates an action configuration template with full control over all fields.
@@ -29,8 +30,9 @@ func InsertActionConfigTemplateFull(t *testing.T, d db.DBTX, templateID, connect
 	if params == nil {
 		params = []byte("{}")
 	}
+	saSpec := opts.StandingApprovalSpec
 	mustExec(t, d,
-		`INSERT INTO action_config_templates (id, connector_id, action_type, name, description, parameters)
-		 VALUES ($1, $2, $3, $4, $5, $6)`,
-		templateID, connectorID, actionType, name, opts.Description, params)
+		`INSERT INTO action_config_templates (id, connector_id, action_type, name, description, parameters, standing_approval_spec)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		templateID, connectorID, actionType, name, opts.Description, params, saSpec)
 }

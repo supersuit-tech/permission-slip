@@ -15,7 +15,7 @@ func TestActionConfigTemplatesSchema(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireColumns(t, tx, "action_config_templates", []string{
 		"id", "connector_id", "action_type", "name", "description",
-		"parameters", "created_at",
+		"parameters", "standing_approval_spec", "created_at",
 	})
 }
 

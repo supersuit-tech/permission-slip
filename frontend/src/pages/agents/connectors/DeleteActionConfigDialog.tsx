@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useDeleteActionConfig } from "@/hooks/useDeleteActionConfig";
+import { useLinkedStandingApprovalsForConfig } from "@/hooks/useLinkedStandingApprovalsForConfig";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 
@@ -27,6 +28,16 @@ export function DeleteActionConfigDialog({
   agentId,
 }: DeleteActionConfigDialogProps) {
   const { deleteActionConfig, isPending } = useDeleteActionConfig();
+  const embeddedCount = config.linked_standing_approvals?.length ?? 0;
+  const needsFetch = embeddedCount === 0;
+  const { data: linkedStandingData } = useLinkedStandingApprovalsForConfig(
+    config.id,
+    needsFetch && open,
+  );
+  const linkedCount =
+    embeddedCount > 0
+      ? embeddedCount
+      : (linkedStandingData?.data?.length ?? 0);
 
   async function handleDelete() {
     try {
@@ -61,6 +72,14 @@ export function DeleteActionConfigDialog({
                 <strong>{config.name}</strong> ({config.action_type}). The agent
                 will no longer be able to reference this configuration. This
                 action is irreversible.
+              </>
+            )}
+            {linkedCount > 0 && (
+              <>
+                {" "}
+                This action configuration has {linkedCount} active standing
+                approval{linkedCount === 1 ? "" : "s"}. Deleting it will also
+                revoke them.
               </>
             )}
           </DialogDescription>

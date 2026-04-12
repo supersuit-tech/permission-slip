@@ -41,6 +41,19 @@ const (
 // ListAgentConnectors returns enabled connectors for an agent, scoped to the approver.
 // Each entry includes the connector summary (name, actions, required credentials) and
 // the enabled_at timestamp.
+// AgentConnectorEnabled returns true if the given connector is enabled for the agent.
+func AgentConnectorEnabled(ctx context.Context, db DBTX, agentID int64, approverID, connectorID string) (bool, error) {
+	var ok bool
+	err := db.QueryRow(ctx,
+		`SELECT EXISTS (
+			SELECT 1 FROM agent_connectors
+			WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
+		)`,
+		agentID, approverID, connectorID,
+	).Scan(&ok)
+	return ok, err
+}
+
 func ListAgentConnectors(ctx context.Context, db DBTX, agentID int64, approverID string) ([]AgentConnector, error) {
 	rows, err := db.Query(ctx, `
 		SELECT c.id, c.name, c.description,

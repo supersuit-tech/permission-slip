@@ -62,3 +62,75 @@ actionConfigTemplates:
 
       '500':
         $ref: '../responses/errors.yaml#/InternalServerError'
+
+applyActionConfigTemplate:
+  post:
+    operationId: applyActionConfigTemplate
+    summary: Apply Action Configuration Template
+    description: |
+      Create an action configuration from a template in one step. When the
+      template defines `standing_approval`, also creates an active standing
+      approval in the same transaction.
+
+      If the connector is not yet enabled for the agent, it is enabled
+      automatically so the configuration can be created.
+
+    tags:
+      - Action Configurations
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: id
+        in: path
+        required: true
+        description: Template ID (from list templates).
+        schema:
+          type: string
+          maxLength: 255
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/action_config_templates.yaml#/ApplyActionConfigTemplateRequest'
+
+    responses:
+      '201':
+        description: Configuration created (and standing approval if applicable)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/action_config_templates.yaml#/ApplyActionConfigTemplateResponse'
+
+      '400':
+        description: Invalid request
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '403':
+        description: Standing approval plan limit reached
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '404':
+        description: Template or agent not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'

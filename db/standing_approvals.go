@@ -158,7 +158,10 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 //
 // If statusFilter is "active" (or empty), only active standing approvals are
 // returned. Pass "all" to include all statuses.
-func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFilter string, limit int, cursor *StandingApprovalCursor) (*StandingApprovalPage, error) {
+//
+// If sourceActionConfigID is non-nil, only rows whose source_action_configuration_id
+// equals that value are returned.
+func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFilter string, sourceActionConfigID *string, limit int, cursor *StandingApprovalCursor) (*StandingApprovalPage, error) {
 	if limit <= 0 {
 		limit = DefaultStandingApprovalLimit
 	}
@@ -182,6 +185,11 @@ func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFil
 	default:
 		p := b.addArg(statusFilter)
 		where = append(where, "status = "+p)
+	}
+
+	if sourceActionConfigID != nil {
+		p := b.addArg(*sourceActionConfigID)
+		where = append(where, "source_action_configuration_id = "+p)
 	}
 
 	if cursor != nil {
@@ -227,6 +235,94 @@ func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFil
 	}
 
 	return &StandingApprovalPage{Approvals: approvals, HasMore: hasMore}, nil
+}
+
+// CountActiveStandingApprovalsBySourceActionConfigID returns how many active
+// standing approvals reference the given action configuration.
+func CountActiveStandingApprovalsBySourceActionConfigID(ctx context.Context, db DBTX, userID, sourceConfigID string) (int, error) {
+	var n int
+	err := db.QueryRow(ctx,
+		`SELECT COUNT(*) FROM standing_approvals
+		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'`,
+		userID, sourceConfigID,
+	).Scan(&n)
+	return n, err
+}
+
+// ListActiveStandingApprovalsBySourceActionConfigID returns active standing
+// approvals linked to the given action configuration via
+// source_action_configuration_id, scoped to the user.
+// ListActiveStandingApprovalsBySourceActionConfigIDs returns active standing
+// approvals grouped by source_action_configuration_id for the given config IDs.
+func ListActiveStandingApprovalsBySourceActionConfigIDs(ctx context.Context, db DBTX, userID string, configIDs []string) (map[string][]StandingApproval, error) {
+	out := make(map[string][]StandingApproval)
+	if len(configIDs) == 0 {
+		return out, nil
+	}
+	rows, err := db.Query(ctx,
+		`SELECT `+standingApprovalColumns+`
+		 FROM standing_approvals
+		 WHERE user_id = $1 AND status = 'active'
+		   AND source_action_configuration_id = ANY($2::text[])`,
+		userID, configIDs,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	for rows.Next() {
+		sa, err := scanStandingApproval(rows)
+		if err != nil {
+			return nil, err
+		}
+		if sa.SourceActionConfigurationID == nil {
+			continue
+		}
+		id := *sa.SourceActionConfigurationID
+		out[id] = append(out[id], *sa)
+	}
+	return out, rows.Err()
+}
+
+func ListActiveStandingApprovalsBySourceActionConfigID(ctx context.Context, db DBTX, userID, sourceConfigID string) ([]StandingApproval, error) {
+	rows, err := db.Query(ctx,
+		`SELECT `+standingApprovalColumns+`
+		 FROM standing_approvals
+		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'
+		 ORDER BY created_at DESC
+		 LIMIT $3`,
+		userID, sourceConfigID, MaxStandingApprovalListSize,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var approvals []StandingApproval
+	for rows.Next() {
+		sa, err := scanStandingApproval(rows)
+		if err != nil {
+			return nil, err
+		}
+		approvals = append(approvals, *sa)
+	}
+	return approvals, rows.Err()
+}
+
+// RevokeActiveStandingApprovalsForSourceActionConfig revokes all active standing
+// approvals that reference the given action configuration ID. Returns the
+// number of rows updated.
+func RevokeActiveStandingApprovalsForSourceActionConfig(ctx context.Context, db DBTX, userID, sourceConfigID string) (int64, error) {
+	tag, err := db.Exec(ctx,
+		`UPDATE standing_approvals
+		 SET status = 'revoked', revoked_at = now()
+		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'`,
+		userID, sourceConfigID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
 }
 
 // ListStandingApprovalsByAgent returns standing approvals for the given agent,

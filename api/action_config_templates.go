@@ -12,13 +12,19 @@ import (
 // --- Response types ---
 
 type actionConfigTemplateResponse struct {
-	ID          string  `json:"id"`
-	ConnectorID string  `json:"connector_id"`
-	ActionType  string  `json:"action_type"`
-	Name        string  `json:"name"`
-	Description *string `json:"description,omitempty"`
-	Parameters  any     `json:"parameters"`
-	CreatedAt   time.Time `json:"created_at"`
+	ID                 string  `json:"id"`
+	ConnectorID        string  `json:"connector_id"`
+	ActionType           string  `json:"action_type"`
+	Name                 string  `json:"name"`
+	Description          *string `json:"description,omitempty"`
+	Parameters           any     `json:"parameters"`
+	StandingApproval     *standingApprovalTemplateSubResponse `json:"standing_approval,omitempty"`
+	CreatedAt            time.Time `json:"created_at"`
+}
+
+type standingApprovalTemplateSubResponse struct {
+	DurationDays  *int `json:"duration_days"`
+	MaxExecutions *int `json:"max_executions"`
 }
 
 type actionConfigTemplateListResponse struct {
@@ -35,6 +41,7 @@ func init() {
 func RegisterActionConfigTemplateRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /action-config-templates", requireProfile(handleListActionConfigTemplates(deps)))
+	mux.Handle("POST /action-config-templates/{id}/apply", requireProfile(handleApplyActionConfigTemplate(deps)))
 }
 
 // --- Handlers ---
@@ -78,6 +85,14 @@ func toActionConfigTemplateResponse(t db.ActionConfigTemplate) actionConfigTempl
 		Name:        t.Name,
 		Description: t.Description,
 		CreatedAt:   t.CreatedAt,
+	}
+	if len(t.StandingApprovalSpec) > 0 && string(t.StandingApprovalSpec) != "null" {
+		var sub standingApprovalTemplateSubResponse
+		if err := json.Unmarshal(t.StandingApprovalSpec, &sub); err != nil {
+			log.Printf("warning: failed to unmarshal template %s standing_approval_spec: %v", t.ID, err)
+		} else {
+			resp.StandingApproval = &sub
+		}
 	}
 	if len(t.Parameters) > 0 {
 		var params any

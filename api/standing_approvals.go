@@ -148,7 +148,16 @@ func handleListStandingApprovals(deps *Deps) http.HandlerFunc {
 			cursor = c
 		}
 
-		page, err := db.ListStandingApprovalsByUser(r.Context(), deps.DB, profile.ID, statusFilter, limit, cursor)
+		var sourceConfigID *string
+		if v := strings.TrimSpace(r.URL.Query().Get("source_action_configuration_id")); v != "" {
+			if len(v) > maxActionConfigIDLength {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id exceeds maximum length"))
+				return
+			}
+			sourceConfigID = &v
+		}
+
+		page, err := db.ListStandingApprovalsByUser(r.Context(), deps.DB, profile.ID, statusFilter, sourceConfigID, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] ListStandingApprovals: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)

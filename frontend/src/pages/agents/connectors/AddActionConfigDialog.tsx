@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,6 +13,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
+import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
@@ -48,7 +50,11 @@ export function AddActionConfigDialog({
   actions,
   initialTemplate = null,
 }: AddActionConfigDialogProps) {
-  const { createActionConfig, isPending } = useCreateActionConfig();
+  const { createActionConfig, isPending: isCreatingConfig } =
+    useCreateActionConfig();
+  const { createStandingApproval, isPending: isCreatingStanding } =
+    useCreateStandingApproval();
+  const isPending = isCreatingConfig || isCreatingStanding;
   const { templates, isLoading: templatesLoading } =
     useActionConfigTemplates(connectorId);
 
@@ -65,6 +71,11 @@ export function AddActionConfigDialog({
     () => actions.find((a) => a.action_type === selectedActionType) ?? null,
     [actions, selectedActionType],
   );
+
+  const standingSpecFromTemplate = useMemo(() => {
+    if (!initialTemplate?.standing_approval) return null;
+    return initialTemplate.standing_approval;
+  }, [initialTemplate]);
 
   const schema = useMemo(
     // Cast is safe: parameters_schema is typed as `{ [key: string]: unknown }` in
@@ -167,15 +178,50 @@ export function AddActionConfigDialog({
     }
 
     try {
-      await createActionConfig({
+      const builtParams = buildParametersFromForm(
+        paramValues,
+        schema?.properties,
+        paramModes,
+      );
+      const ac = await createActionConfig({
         agent_id: agentId,
         connector_id: connectorId,
         action_type: selectedActionType,
         name: name.trim(),
         description: description.trim() || undefined,
-        parameters: buildParametersFromForm(paramValues, schema?.properties, paramModes),
+        parameters: builtParams,
       });
-      toast.success(`Configuration "${name.trim()}" created`);
+
+      if (standingSpecFromTemplate && ac?.id) {
+        const startsAt = new Date();
+        let expiresAt: string | null = null;
+        if (standingSpecFromTemplate.duration_days != null) {
+          const exp = new Date(startsAt);
+          exp.setUTCDate(
+            exp.getUTCDate() + standingSpecFromTemplate.duration_days,
+          );
+          expiresAt = exp.toISOString();
+        }
+        const constraints = standingApprovalConstraintsFromParams(
+          builtParams as Record<string, unknown>,
+        );
+        await createStandingApproval({
+          agent_id: agentId,
+          action_type: selectedActionType,
+          action_version: "1",
+          constraints,
+          source_action_configuration_id: ac.id,
+          max_executions: standingSpecFromTemplate.max_executions ?? null,
+          starts_at: startsAt.toISOString(),
+          expires_at: expiresAt,
+        });
+      }
+
+      toast.success(
+        standingSpecFromTemplate
+          ? `Configuration "${name.trim()}" created with auto-approval`
+          : `Configuration "${name.trim()}" created`,
+      );
       resetForm();
       onOpenChange(false);
     } catch (err) {
@@ -217,6 +263,21 @@ export function AddActionConfigDialog({
                 disabled={isPending}
                 selectedTemplateId={appliedTemplateId}
               />
+            )}
+
+            {standingSpecFromTemplate && (
+              <p className="text-muted-foreground text-xs">
+                Saving will also create a standing approval from this template’s
+                auto-approve settings. You can change duration or limits later
+                on the{" "}
+                <Link
+                  to="/standing-approvals"
+                  className="text-primary underline-offset-4 hover:underline"
+                >
+                  standing approvals
+                </Link>{" "}
+                page.
+              </p>
             )}
 
             <NameField
@@ -268,4 +329,19 @@ export function AddActionConfigDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/** Ensures standing-approval constraints are valid (at least one non-wildcard). Mirrors backend template-apply behavior. */
+function standingApprovalConstraintsFromParams(
+  params: Record<string, unknown>,
+): Record<string, unknown> {
+  const entries = Object.entries(params).filter(([k]) => k !== "_scope");
+  if (entries.length === 0) {
+    return { _scope: { $pattern: "*" } };
+  }
+  const allBareWildcard = entries.every(([, v]) => v === "*");
+  if (allBareWildcard) {
+    return { ...params, _scope: { $pattern: "*" } };
+  }
+  return params;
 }

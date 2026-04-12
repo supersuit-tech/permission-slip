@@ -9,7 +9,12 @@ import (
 // trelloTemplates returns the pre-built permission templates for common Trello
 // use cases. Templates let workspace admins grant scoped access to agents
 // without exposing full parameter freedom.
+func intPtr(n int) *int {
+	return &n
+}
+
 func trelloTemplates() []connectors.ManifestTemplate {
+	saRead30d := &connectors.ManifestStandingApproval{DurationDays: intPtr(30)}
 	return []connectors.ManifestTemplate{
 		{
 			ID:          "tpl_trello_create_card",
@@ -61,18 +66,20 @@ func trelloTemplates() []connectors.ManifestTemplate {
 			Parameters:  json.RawMessage(`{"card_id":"*","name":"*","items":"*"}`),
 		},
 		{
-			ID:          "tpl_trello_search_cards",
-			ActionType:  "trello.search_cards",
-			Name:        "Search cards",
-			Description: "Agent can search for cards across boards.",
-			Parameters:  json.RawMessage(`{"query":"*","board_id":"*","list_id":"*","members":"*","due":"*","limit":"*"}`),
+			ID:               "tpl_trello_search_cards",
+			ActionType:       "trello.search_cards",
+			Name:             "Search cards",
+			Description:      "Agent can search for cards across boards.",
+			Parameters:       json.RawMessage(`{"query":"*","board_id":"*","list_id":"*","members":"*","due":"*","limit":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
-			ID:          "tpl_trello_list_boards",
-			ActionType:  "trello.list_boards",
-			Name:        "List boards",
-			Description: "Agent can list all boards accessible to the user.",
-			Parameters:  json.RawMessage(`{"filter":"open"}`),
+			ID:               "tpl_trello_list_boards",
+			ActionType:       "trello.list_boards",
+			Name:             "List boards",
+			Description:      "Agent can list all boards accessible to the user.",
+			Parameters:       json.RawMessage(`{"filter":"open"}`),
+			StandingApproval: saRead30d,
 		},
 		{
 			ID:          "tpl_trello_create_board",
@@ -82,11 +89,12 @@ func trelloTemplates() []connectors.ManifestTemplate {
 			Parameters:  json.RawMessage(`{"name":"*","desc":"*","defaultLists":true}`),
 		},
 		{
-			ID:          "tpl_trello_list_lists",
-			ActionType:  "trello.list_lists",
-			Name:        "List lists on any board",
-			Description: "Agent can list all lists on any board.",
-			Parameters:  json.RawMessage(`{"board_id":"*","filter":"open"}`),
+			ID:               "tpl_trello_list_lists",
+			ActionType:       "trello.list_lists",
+			Name:             "List lists on any board",
+			Description:      "Agent can list all lists on any board.",
+			Parameters:       json.RawMessage(`{"board_id":"*","filter":"open"}`),
+			StandingApproval: saRead30d,
 		},
 		{
 			ID:          "tpl_trello_create_list",
@@ -103,11 +111,12 @@ func trelloTemplates() []connectors.ManifestTemplate {
 			Parameters:  json.RawMessage(`{"card_id":"*"}`),
 		},
 		{
-			ID:          "tpl_trello_list_labels",
-			ActionType:  "trello.list_labels",
-			Name:        "List labels on a board",
-			Description: "Agent can list all labels available on any board.",
-			Parameters:  json.RawMessage(`{"board_id":"*"}`),
+			ID:               "tpl_trello_list_labels",
+			ActionType:       "trello.list_labels",
+			Name:             "List labels on a board",
+			Description:      "Agent can list all labels available on any board.",
+			Parameters:       json.RawMessage(`{"board_id":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
 			ID:          "tpl_trello_add_label",

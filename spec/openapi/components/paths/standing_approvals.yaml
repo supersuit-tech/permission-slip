@@ -205,6 +205,17 @@ userListStandingApprovals:
           type: string
         example: "2026-02-14T10:30:00Z,sa_abc123"
 
+      - name: source_action_configuration_id
+        in: query
+        required: false
+        description: |
+          When set, only standing approvals whose `source_action_configuration_id`
+          matches this value are returned (e.g. to filter approvals linked to a
+          specific action configuration).
+        schema:
+          type: string
+          maxLength: 128
+
     responses:
       '200':
         description: Standing approvals retrieved successfully

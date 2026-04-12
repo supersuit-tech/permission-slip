@@ -10,29 +10,37 @@ import (
 // Templates offer different permission levels — from read-only balance checks
 // to capped refunds — so administrators can grant agents the minimum access
 // they need.
+func intPtr(n int) *int {
+	return &n
+}
+
 func stripeTemplates() []connectors.ManifestTemplate {
+	saRead30d := &connectors.ManifestStandingApproval{DurationDays: intPtr(30)}
 	return []connectors.ManifestTemplate{
 		// --- Read-only ---
 		{
-			ID:          "tpl_stripe_get_balance",
-			ActionType:  "stripe.get_balance",
-			Name:        "Check account balance",
-			Description: "Agent can retrieve the current Stripe account balance. Read-only, no financial risk.",
-			Parameters:  json.RawMessage(`{}`),
+			ID:               "tpl_stripe_get_balance",
+			ActionType:       "stripe.get_balance",
+			Name:             "Check account balance",
+			Description:      "Agent can retrieve the current Stripe account balance. Read-only, no financial risk.",
+			Parameters:       json.RawMessage(`{}`),
+			StandingApproval: saRead30d,
 		},
 		{
-			ID:          "tpl_stripe_list_subscriptions_active",
-			ActionType:  "stripe.list_subscriptions",
-			Name:        "List active subscriptions",
-			Description: "Agent can list active subscriptions for any customer. Status is locked to \"active\".",
-			Parameters:  json.RawMessage(`{"customer_id":"*","status":"active","limit":"*"}`),
+			ID:               "tpl_stripe_list_subscriptions_active",
+			ActionType:       "stripe.list_subscriptions",
+			Name:             "List active subscriptions",
+			Description:      "Agent can list active subscriptions for any customer. Status is locked to \"active\".",
+			Parameters:       json.RawMessage(`{"customer_id":"*","status":"active","limit":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
-			ID:          "tpl_stripe_list_subscriptions_any",
-			ActionType:  "stripe.list_subscriptions",
-			Name:        "List subscriptions (any status)",
-			Description: "Agent can list subscriptions in any status — active, past due, canceled, etc.",
-			Parameters:  json.RawMessage(`{"customer_id":"*","status":"*","price_id":"*","limit":"*"}`),
+			ID:               "tpl_stripe_list_subscriptions_any",
+			ActionType:       "stripe.list_subscriptions",
+			Name:             "List subscriptions (any status)",
+			Description:      "Agent can list subscriptions in any status — active, past due, canceled, etc.",
+			Parameters:       json.RawMessage(`{"customer_id":"*","status":"*","price_id":"*","limit":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		// --- Write (low risk) ---
 		{
@@ -176,32 +184,36 @@ func stripeTemplates() []connectors.ManifestTemplate {
 		},
 		// --- Read-only: customers, invoices, charges ---
 		{
-			ID:          "tpl_stripe_list_customers",
-			ActionType:  "stripe.list_customers",
-			Name:        "List customers",
-			Description: "Agent can list customers and search by email. Read-only, no financial risk.",
-			Parameters:  json.RawMessage(`{"email":"*","limit":"*","starting_after":"*"}`),
+			ID:               "tpl_stripe_list_customers",
+			ActionType:       "stripe.list_customers",
+			Name:             "List customers",
+			Description:      "Agent can list customers and search by email. Read-only, no financial risk.",
+			Parameters:       json.RawMessage(`{"email":"*","limit":"*","starting_after":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
-			ID:          "tpl_stripe_get_customer",
-			ActionType:  "stripe.get_customer",
-			Name:        "Get customer by ID",
-			Description: "Agent can retrieve any customer by ID. Read-only, no financial risk.",
-			Parameters:  json.RawMessage(`{"customer_id":"*"}`),
+			ID:               "tpl_stripe_get_customer",
+			ActionType:       "stripe.get_customer",
+			Name:             "Get customer by ID",
+			Description:      "Agent can retrieve any customer by ID. Read-only, no financial risk.",
+			Parameters:       json.RawMessage(`{"customer_id":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
-			ID:          "tpl_stripe_list_invoices",
-			ActionType:  "stripe.list_invoices",
-			Name:        "List invoices",
-			Description: "Agent can list and filter invoices by customer or status. Read-only, no financial risk.",
-			Parameters:  json.RawMessage(`{"customer_id":"*","status":"*","limit":"*","starting_after":"*"}`),
+			ID:               "tpl_stripe_list_invoices",
+			ActionType:       "stripe.list_invoices",
+			Name:             "List invoices",
+			Description:      "Agent can list and filter invoices by customer or status. Read-only, no financial risk.",
+			Parameters:       json.RawMessage(`{"customer_id":"*","status":"*","limit":"*","starting_after":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
-			ID:          "tpl_stripe_list_charges",
-			ActionType:  "stripe.list_charges",
-			Name:        "List charges",
-			Description: "Agent can list and filter charges by customer or payment intent. Read-only, no financial risk.",
-			Parameters:  json.RawMessage(`{"customer_id":"*","payment_intent_id":"*","limit":"*","starting_after":"*"}`),
+			ID:               "tpl_stripe_list_charges",
+			ActionType:       "stripe.list_charges",
+			Name:             "List charges",
+			Description:      "Agent can list and filter charges by customer or payment intent. Read-only, no financial risk.",
+			Parameters:       json.RawMessage(`{"customer_id":"*","payment_intent_id":"*","limit":"*","starting_after":"*"}`),
+			StandingApproval: saRead30d,
 		},
 	}
 }

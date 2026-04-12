@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -651,6 +652,42 @@ func TestDeleteActionConfig_Success(t *testing.T) {
 	router.ServeHTTP(getW, getReq)
 	if getW.Code != http.StatusNotFound {
 		t.Fatalf("expected 404 after delete, got %d", getW.Code)
+	}
+}
+
+func TestDeleteActionConfig_RevokesLinkedStandingApprovals(t *testing.T) {
+	t.Parallel()
+	tx, uid, agentID, connID, actionType := setupActionConfigTest(t)
+
+	configID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
+
+	saID := testhelper.GenerateID(t, "sa_")
+	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:                  actionType,
+		Constraints:                 []byte(`{"x":"*"}`),
+		SourceActionConfigurationID: &configID,
+	})
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodDelete, "/action-configurations/"+configID, uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var status string
+	err := tx.QueryRow(context.Background(),
+		`SELECT status FROM standing_approvals WHERE standing_approval_id = $1`, saID).Scan(&status)
+	if err != nil {
+		t.Fatalf("query standing approval: %v", err)
+	}
+	if status != "revoked" {
+		t.Errorf("expected standing approval revoked, got status %q", status)
 	}
 }
 

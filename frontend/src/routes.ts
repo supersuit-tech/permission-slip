@@ -21,6 +21,7 @@ export interface RouteConfig {
  */
 export const appRoutes: RouteConfig[] = [
   { path: "/", Component: Dashboard },
+  { path: "/standing-approvals", Component: Dashboard },
   { path: "/agents/:agentId", Component: AgentConfigPage },
   { path: "/agents/:agentId/connectors/:connectorId", Component: ConnectorConfigPage },
   { path: "/activity", Component: ActivityPage },
