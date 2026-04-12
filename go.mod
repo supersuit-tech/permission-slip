@@ -1,6 +1,6 @@
 module github.com/supersuit-tech/permission-slip
 
-go 1.25.8
+go 1.25.9
 
 require (
 	cloud.google.com/go/bigquery v1.74.0
