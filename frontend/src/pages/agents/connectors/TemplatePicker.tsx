@@ -113,7 +113,7 @@ function TemplateCard({
   );
 }
 
-function TemplateParamBadge({
+export function TemplateParamBadge({
   name,
   value,
 }: {

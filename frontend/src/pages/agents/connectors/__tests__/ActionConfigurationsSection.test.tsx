@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderWithProviders } from "../../../../test-helpers";
 import { setupAuthMocks } from "../../../../auth/__tests__/fixtures";
 import {
+  mockGet,
   mockPost,
   mockPut,
   mockDelete,
@@ -88,6 +89,12 @@ describe("ActionConfigurationsSection", () => {
     vi.restoreAllMocks();
     resetClientMocks();
     setupAuthMocks({ authenticated: true });
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return Promise.resolve({ data: { data: [] } });
+      }
+      return Promise.resolve({ data: null });
+    });
   });
 
   it("shows empty state with Enable All Actions button", () => {
@@ -492,5 +499,125 @@ describe("ActionConfigurationsSection", () => {
     expect(
       screen.getByText("Add Custom Configuration"),
     ).toBeInTheDocument();
+  });
+
+  it("hides Recommended Templates triggers while templates are loading", () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return new Promise(() => {});
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    renderSection();
+    expect(
+      screen.queryByRole("button", { name: "Recommended Templates" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("Or start from a recommended template →"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("shows empty-state recommended template link when templates exist", async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "tpl_1",
+                connector_id: "github",
+                action_type: "github.create_issue",
+                name: "T",
+                description: null,
+                parameters: {},
+                created_at: "2026-01-01T00:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    renderSection();
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Or start from a recommended template →"),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("shows header Recommended Templates button when configs exist and templates exist", async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "tpl_1",
+                connector_id: "github",
+                action_type: "github.create_issue",
+                name: "T",
+                description: null,
+                parameters: {},
+                created_at: "2026-01-01T00:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    renderSection({ configs: mockConfigs });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Recommended Templates" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("hides recommended triggers when API returns no matching templates", async () => {
+    let resolveTemplates: (v: unknown) => void;
+    const templatesPromise = new Promise((resolve) => {
+      resolveTemplates = resolve;
+    });
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return templatesPromise;
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    renderSection({ configs: mockConfigs });
+
+    expect(
+      screen.queryByRole("button", { name: "Recommended Templates" }),
+    ).not.toBeInTheDocument();
+
+    resolveTemplates!({
+      data: {
+        data: [
+          {
+            id: "tpl_stale",
+            connector_id: "github",
+            action_type: "removed.action",
+            name: "Stale",
+            description: null,
+            parameters: {},
+            created_at: "2026-01-01T00:00:00Z",
+          },
+        ],
+      },
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole("button", { name: "Recommended Templates" }),
+      ).not.toBeInTheDocument();
+    });
   });
 });

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -36,6 +36,8 @@ interface AddActionConfigDialogProps {
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
+  /** When the dialog opens, apply this template (action type, fields, parameters). */
+  initialTemplate?: ActionConfigTemplate | null;
 }
 
 export function AddActionConfigDialog({
@@ -44,6 +46,7 @@ export function AddActionConfigDialog({
   agentId,
   connectorId,
   actions,
+  initialTemplate = null,
 }: AddActionConfigDialogProps) {
   const { createActionConfig, isPending } = useCreateActionConfig();
   const { templates, isLoading: templatesLoading } =
@@ -55,6 +58,8 @@ export function AddActionConfigDialog({
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
+
+  const prevOpenRef = useRef(false);
 
   const selectedAction = useMemo(
     () => actions.find((a) => a.action_type === selectedActionType) ?? null,
@@ -94,35 +99,50 @@ export function AddActionConfigDialog({
     setAppliedTemplateId(null);
   }
 
-  function handleTemplateSelect(template: ActionConfigTemplate) {
-    // Pre-fill form fields from the template
-    setName(template.name);
-    setDescription(template.description ?? "");
+  const handleTemplateSelect = useCallback(
+    (
+      template: ActionConfigTemplate,
+      options?: { fromInitial?: boolean },
+    ) => {
+      setSelectedActionType(template.action_type);
+      setName(template.name);
+      setDescription(template.description ?? "");
 
-    // Convert template parameters to form values and modes
-    const values: Record<string, string> = {};
-    const modes: Record<string, ParamMode> = {};
-    for (const [key, value] of Object.entries(template.parameters)) {
-      if (value === "*") {
-        values[key] = "*";
-        modes[key] = "wildcard";
-      } else if (isPatternWrapper(value)) {
-        values[key] = value.$pattern;
-        modes[key] = "pattern";
-      } else if (value === null || value === undefined) {
-        values[key] = "";
-        modes[key] = "fixed";
-      } else {
-        values[key] = String(value);
-        modes[key] = "fixed";
+      const values: Record<string, string> = {};
+      const modes: Record<string, ParamMode> = {};
+      for (const [key, value] of Object.entries(template.parameters)) {
+        if (value === "*") {
+          values[key] = "*";
+          modes[key] = "wildcard";
+        } else if (isPatternWrapper(value)) {
+          values[key] = value.$pattern;
+          modes[key] = "pattern";
+        } else if (value === null || value === undefined) {
+          values[key] = "";
+          modes[key] = "fixed";
+        } else {
+          values[key] = String(value);
+          modes[key] = "fixed";
+        }
       }
-    }
-    setParamValues(values);
-    setParamModes(modes);
-    setAppliedTemplateId(template.id);
+      setParamValues(values);
+      setParamModes(modes);
+      setAppliedTemplateId(template.id);
 
-    toast.success(`Template "${template.name}" applied`);
-  }
+      if (!options?.fromInitial) {
+        toast.success(`Template "${template.name}" applied`);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => {
+    const wasOpen = prevOpenRef.current;
+    prevOpenRef.current = open;
+    if (open && !wasOpen && initialTemplate) {
+      handleTemplateSelect(initialTemplate, { fromInitial: true });
+    }
+  }, [open, initialTemplate, handleTemplateSelect]);
 
   function handleParamChange(key: string, value: string) {
     setParamValues((prev) => ({ ...prev, [key]: value }));
