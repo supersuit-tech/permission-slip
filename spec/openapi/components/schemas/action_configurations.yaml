@@ -97,6 +97,14 @@ ActionConfiguration:
         Optional longer description of what this configuration permits.
       example: "Agent can create issues labeled 'bug' in the main repo. Title and body are freeform."
 
+    linked_standing_approvals:
+      type: array
+      description: |
+        Active standing approvals that reference this configuration via
+        `source_action_configuration_id`. Omitted when empty.
+      items:
+        $ref: '#/LinkedStandingApprovalSummary'
+
     created_at:
       type: string
       format: date-time
@@ -127,6 +135,38 @@ ActionConfiguration:
     description: "Agent can create issues labeled 'bug' in any supersuit-tech repo."
     created_at: "2026-02-25T10:00:00Z"
     updated_at: "2026-02-25T10:00:00Z"
+
+LinkedStandingApprovalSummary:
+  type: object
+  required:
+    - standing_approval_id
+    - action_type
+    - status
+    - execution_count
+  properties:
+    standing_approval_id:
+      type: string
+      description: Standing approval identifier.
+    action_type:
+      type: string
+      description: Action type covered by this standing approval.
+    status:
+      type: string
+      description: Standing approval status (typically `active` in this summary).
+    expires_at:
+      type: string
+      format: date-time
+      nullable: true
+      description: When the standing approval expires, or null if it lasts until revoked.
+    max_executions:
+      type: integer
+      nullable: true
+      minimum: 1
+      description: Execution cap, if any.
+    execution_count:
+      type: integer
+      minimum: 0
+      description: Executions recorded so far.
 
 CreateActionConfigRequest:
   type: object

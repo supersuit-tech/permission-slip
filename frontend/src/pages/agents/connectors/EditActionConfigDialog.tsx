@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -194,6 +195,32 @@ export function EditActionConfigDialog({
                 />
               </div>
             ) : null}
+
+            {config.linked_standing_approvals &&
+              config.linked_standing_approvals.length > 0 && (
+                <div className="space-y-2 rounded-md border border-input p-3">
+                  <Label>Linked standing approvals</Label>
+                  <ul className="space-y-1 text-sm">
+                    {config.linked_standing_approvals.map((sa) => (
+                      <li key={sa.standing_approval_id}>
+                        <Link
+                          to={`/standing-approvals?source_action_configuration_id=${encodeURIComponent(config.id)}`}
+                          className="text-primary underline-offset-4 hover:underline"
+                        >
+                          {sa.standing_approval_id}
+                        </Link>
+                        <span className="text-muted-foreground">
+                          {" "}
+                          ({sa.action_type})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-muted-foreground text-xs">
+                    Edit duration or limits on the standing approvals page.
+                  </p>
+                </div>
+              )}
           </div>
 
           <DialogFooter>

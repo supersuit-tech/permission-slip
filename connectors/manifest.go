@@ -75,15 +75,23 @@ type ManifestOAuthProvider struct {
 	PKCE            bool              `json:"pkce,omitempty"`
 }
 
+// ManifestStandingApproval declares optional auto-approval behavior when a
+// template is applied: duration and execution cap are manifest-authored only.
+type ManifestStandingApproval struct {
+	DurationDays  *int `json:"duration_days"`
+	MaxExecutions *int `json:"max_executions"`
+}
+
 // ManifestTemplate describes a predefined configuration preset for an action.
 // Templates pre-fill the name, description, and parameter constraints when a
 // user creates a new action configuration. ID must be globally unique.
 type ManifestTemplate struct {
-	ID          string          `json:"id"`
-	ActionType  string          `json:"action_type"`
-	Name        string          `json:"name"`
-	Description string          `json:"description,omitempty"`
-	Parameters  json.RawMessage `json:"parameters"`
+	ID               string                    `json:"id"`
+	ActionType       string                    `json:"action_type"`
+	Name             string                    `json:"name"`
+	Description      string                    `json:"description,omitempty"`
+	Parameters       json.RawMessage           `json:"parameters"`
+	StandingApproval *ManifestStandingApproval `json:"standing_approval,omitempty"`
 }
 
 // maxInstructionsURLLen is the maximum length for an instructions URL,
@@ -309,6 +317,16 @@ func (m *ConnectorManifest) Validate() error {
 		var params map[string]json.RawMessage
 		if err := json.Unmarshal(tpl.Parameters, &params); err != nil {
 			return fmt.Errorf("manifest validation: templates[%d].parameters must be a JSON object: %w", i, err)
+		}
+
+		if tpl.StandingApproval != nil {
+			sa := tpl.StandingApproval
+			if sa.DurationDays != nil && *sa.DurationDays <= 0 {
+				return fmt.Errorf("manifest validation: templates[%d].standing_approval.duration_days must be a positive integer or null", i)
+			}
+			if sa.MaxExecutions != nil && *sa.MaxExecutions < 1 {
+				return fmt.Errorf("manifest validation: templates[%d].standing_approval.max_executions must be at least 1 or null", i)
+			}
 		}
 	}
 
@@ -646,12 +664,22 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 		})
 	}
 	for _, tpl := range m.Templates {
+		var standingSpec []byte
+		if tpl.StandingApproval != nil {
+			b, err := json.Marshal(tpl.StandingApproval)
+			if err != nil {
+				log.Printf("warning: failed to marshal standing_approval for template %s: %v", tpl.ID, err)
+			} else {
+				standingSpec = b
+			}
+		}
 		out.Templates = append(out.Templates, db.ExternalConnectorTemplate{
-			ID:          tpl.ID,
-			ActionType:  tpl.ActionType,
-			Name:        tpl.Name,
-			Description: tpl.Description,
-			Parameters:  tpl.Parameters,
+			ID:                   tpl.ID,
+			ActionType:           tpl.ActionType,
+			Name:                 tpl.Name,
+			Description:          tpl.Description,
+			Parameters:           tpl.Parameters,
+			StandingApprovalSpec: standingSpec,
 		})
 	}
 	return out

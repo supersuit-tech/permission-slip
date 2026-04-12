@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -32,16 +33,26 @@ type updateActionConfigRequest struct {
 }
 
 type actionConfigResponse struct {
-	ID          string    `json:"id"`
-	AgentID     int64     `json:"agent_id"`
-	ConnectorID string    `json:"connector_id"`
-	ActionType  string    `json:"action_type"`
-	Parameters  any       `json:"parameters"`
-	Status      string    `json:"status"`
-	Name        string    `json:"name"`
-	Description *string   `json:"description,omitempty"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                      string                         `json:"id"`
+	AgentID                 int64                          `json:"agent_id"`
+	ConnectorID             string                         `json:"connector_id"`
+	ActionType              string                         `json:"action_type"`
+	Parameters              any                            `json:"parameters"`
+	Status                  string                         `json:"status"`
+	Name                    string                         `json:"name"`
+	Description             *string                        `json:"description,omitempty"`
+	LinkedStandingApprovals []linkedStandingApprovalSummary `json:"linked_standing_approvals,omitempty"`
+	CreatedAt               time.Time                      `json:"created_at"`
+	UpdatedAt               time.Time                      `json:"updated_at"`
+}
+
+type linkedStandingApprovalSummary struct {
+	StandingApprovalID string     `json:"standing_approval_id"`
+	ActionType         string     `json:"action_type"`
+	Status             string     `json:"status"`
+	ExpiresAt          *time.Time `json:"expires_at,omitempty"`
+	MaxExecutions      *int       `json:"max_executions,omitempty"`
+	ExecutionCount     int        `json:"execution_count"`
 }
 
 type actionConfigListResponse struct {
@@ -173,7 +184,15 @@ func handleCreateActionConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		RespondJSON(w, http.StatusCreated, toActionConfigResponse(*ac))
+		sas, err := db.ListActiveStandingApprovalsBySourceActionConfigID(r.Context(), deps.DB, profile.ID, ac.ID)
+		if err != nil {
+			log.Printf("[%s] CreateActionConfig: linked standing approvals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create action configuration"))
+			return
+		}
+
+		RespondJSON(w, http.StatusCreated, toActionConfigResponseWithLinked(*ac, sas))
 	}
 }
 
@@ -200,9 +219,21 @@ func handleListActionConfigs(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		ids := make([]string, len(configs))
+		for i, ac := range configs {
+			ids[i] = ac.ID
+		}
+		linkedByConfig, err := db.ListActiveStandingApprovalsBySourceActionConfigIDs(r.Context(), deps.DB, profile.ID, ids)
+		if err != nil {
+			log.Printf("[%s] ListActionConfigs: linked standing approvals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to list action configurations"))
+			return
+		}
+
 		data := make([]actionConfigResponse, len(configs))
 		for i, ac := range configs {
-			data[i] = toActionConfigResponse(ac)
+			data[i] = toActionConfigResponseWithLinked(ac, linkedByConfig[ac.ID])
 		}
 
 		RespondJSON(w, http.StatusOK, actionConfigListResponse{Data: data})
@@ -231,7 +262,15 @@ func handleGetActionConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		RespondJSON(w, http.StatusOK, toActionConfigResponse(*ac))
+		sas, err := db.ListActiveStandingApprovalsBySourceActionConfigID(r.Context(), deps.DB, profile.ID, configID)
+		if err != nil {
+			log.Printf("[%s] GetActionConfig: linked standing approvals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get action configuration"))
+			return
+		}
+
+		RespondJSON(w, http.StatusOK, toActionConfigResponseWithLinked(*ac, sas))
 	}
 }
 
@@ -330,7 +369,15 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		RespondJSON(w, http.StatusOK, toActionConfigResponse(*ac))
+		sas, err := db.ListActiveStandingApprovalsBySourceActionConfigID(r.Context(), deps.DB, profile.ID, configID)
+		if err != nil {
+			log.Printf("[%s] UpdateActionConfig: linked standing approvals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
+			return
+		}
+
+		RespondJSON(w, http.StatusOK, toActionConfigResponseWithLinked(*ac, sas))
 	}
 }
 
@@ -344,7 +391,25 @@ func handleDeleteActionConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		ac, err := db.DeleteActionConfig(r.Context(), deps.DB, configID, profile.ID)
+		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] DeleteActionConfig: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete action configuration"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(r.Context(), tx)
+		}
+
+		if _, err := db.RevokeActiveStandingApprovalsForSourceActionConfig(r.Context(), tx, profile.ID, configID); err != nil {
+			log.Printf("[%s] DeleteActionConfig: revoke standing approvals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete action configuration"))
+			return
+		}
+
+		ac, err := db.DeleteActionConfig(r.Context(), tx, configID, profile.ID)
 		if err != nil {
 			log.Printf("[%s] DeleteActionConfig: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -356,6 +421,15 @@ func handleDeleteActionConfig(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] DeleteActionConfig: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete action configuration"))
+				return
+			}
+		}
+
 		RespondJSON(w, http.StatusOK, deleteActionConfigResponse{
 			ID:        configID,
 			DeletedAt: ac.UpdatedAt,
@@ -365,17 +439,23 @@ func handleDeleteActionConfig(deps *Deps) http.HandlerFunc {
 
 // --- Helpers ---
 
-func toActionConfigResponse(ac db.ActionConfiguration) actionConfigResponse {
+func toActionConfigResponseWithLinked(ac db.ActionConfiguration, sas []db.StandingApproval) actionConfigResponse {
+	resp := baseActionConfigResponse(ac, standingApprovalSummariesFromDB(sas))
+	return resp
+}
+
+func baseActionConfigResponse(ac db.ActionConfiguration, linked []linkedStandingApprovalSummary) actionConfigResponse {
 	resp := actionConfigResponse{
-		ID:          ac.ID,
-		AgentID:     ac.AgentID,
-		ConnectorID: ac.ConnectorID,
-		ActionType:  ac.ActionType,
-		Status:      ac.Status,
-		Name:        ac.Name,
-		Description: ac.Description,
-		CreatedAt:   ac.CreatedAt,
-		UpdatedAt:   ac.UpdatedAt,
+		ID:                      ac.ID,
+		AgentID:                 ac.AgentID,
+		ConnectorID:             ac.ConnectorID,
+		ActionType:              ac.ActionType,
+		Status:                  ac.Status,
+		Name:                    ac.Name,
+		Description:             ac.Description,
+		LinkedStandingApprovals: linked,
+		CreatedAt:               ac.CreatedAt,
+		UpdatedAt:               ac.UpdatedAt,
 	}
 	// Parse parameters into a generic map for clean JSON output.
 	if len(ac.Parameters) > 0 {
@@ -390,4 +470,25 @@ func toActionConfigResponse(ac db.ActionConfiguration) actionConfigResponse {
 		resp.Parameters = map[string]any{}
 	}
 	return resp
+}
+
+func standingApprovalSummariesFromDB(sas []db.StandingApproval) []linkedStandingApprovalSummary {
+	if len(sas) == 0 {
+		return nil
+	}
+	out := make([]linkedStandingApprovalSummary, 0, len(sas))
+	for _, sa := range sas {
+		out = append(out, linkedStandingApprovalSummary{
+			StandingApprovalID: sa.StandingApprovalID,
+			ActionType:         sa.ActionType,
+			Status:             sa.Status,
+			ExpiresAt:          sa.ExpiresAt,
+			MaxExecutions:      sa.MaxExecutions,
+			ExecutionCount:     sa.ExecutionCount,
+		})
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return strings.Compare(out[i].StandingApprovalID, out[j].StandingApprovalID) < 0
+	})
+	return out
 }

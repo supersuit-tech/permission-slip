@@ -148,7 +148,16 @@ func handleListStandingApprovals(deps *Deps) http.HandlerFunc {
 			cursor = c
 		}
 
-		page, err := db.ListStandingApprovalsByUser(r.Context(), deps.DB, profile.ID, statusFilter, limit, cursor)
+		var sourceConfigID *string
+		if v := strings.TrimSpace(r.URL.Query().Get("source_action_configuration_id")); v != "" {
+			if len(v) > maxActionConfigIDLength {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id exceeds maximum length"))
+				return
+			}
+			sourceConfigID = &v
+		}
+
+		page, err := db.ListStandingApprovalsByUser(r.Context(), deps.DB, profile.ID, statusFilter, sourceConfigID, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] ListStandingApprovals: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -233,14 +242,36 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		constraintsBytes, err := validateStandingApprovalConstraints(req.Constraints)
-		if err != nil {
-			resp := BadRequest(ErrInvalidConstraints, err.Error())
-			resp.Error.Details = map[string]any{
-				"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
+		var constraintsBytes []byte
+		if req.SourceActionConfigurationID != nil && len(req.Constraints) > 0 {
+			s := strings.TrimSpace(string(req.Constraints))
+			if s == "{}" || s == "null" {
+				// Match-all parameters for this action type (trusted when tied to a source config,
+				// e.g. template customize with all-wildcard parameters). Stored as NULL in DB.
+				constraintsBytes = nil
+			} else {
+				var err error
+				constraintsBytes, err = validateStandingApprovalConstraints(req.Constraints)
+				if err != nil {
+					resp := BadRequest(ErrInvalidConstraints, err.Error())
+					resp.Error.Details = map[string]any{
+						"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
+					}
+					RespondError(w, r, http.StatusBadRequest, resp)
+					return
+				}
 			}
-			RespondError(w, r, http.StatusBadRequest, resp)
-			return
+		} else {
+			var err error
+			constraintsBytes, err = validateStandingApprovalConstraints(req.Constraints)
+			if err != nil {
+				resp := BadRequest(ErrInvalidConstraints, err.Error())
+				resp.Error.Details = map[string]any{
+					"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
+				}
+				RespondError(w, r, http.StatusBadRequest, resp)
+				return
+			}
 		}
 
 		// Wrap limit check + insert in a transaction with an advisory lock

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Loader2, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { LimitBadge } from "@/components/LimitBadge";
@@ -176,8 +177,25 @@ function EmptyState({ onCreate }: { onCreate: () => void }) {
 }
 
 export function StandingApprovalsCard() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filterSourceConfigId =
+    searchParams.get("source_action_configuration_id") ?? undefined;
+
   const { standingApprovals, isLoading, error, refetch } =
-    useStandingApprovals();
+    useStandingApprovals({
+      sourceActionConfigurationId: filterSourceConfigId,
+    });
+
+  function clearSourceFilter() {
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("source_action_configuration_id");
+        return next;
+      },
+      { replace: true },
+    );
+  }
   const { agents } = useAgents();
   const agentIds = useMemo(
     () =>
@@ -221,6 +239,19 @@ export function StandingApprovalsCard() {
         </div>
       </CardHeader>
       <CardContent className="px-3 md:px-6">
+        {filterSourceConfigId && (
+          <p className="text-muted-foreground mb-3 text-sm">
+            Showing approvals linked to configuration{" "}
+            <span className="font-mono text-xs">{filterSourceConfigId}</span>.{" "}
+            <button
+              type="button"
+              className="text-primary underline-offset-4 hover:underline"
+              onClick={clearSourceFilter}
+            >
+              Show all
+            </button>
+          </p>
+        )}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="text-muted-foreground size-6 animate-spin" />

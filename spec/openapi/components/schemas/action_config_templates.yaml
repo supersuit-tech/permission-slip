@@ -57,6 +57,13 @@ ActionConfigTemplate:
         title: "*"
         body: "*"
 
+    standing_approval:
+      $ref: '../schemas/action_config_templates.yaml#/StandingApprovalTemplateSpec'
+      description: |
+        When present, applying this template also creates an active standing
+        approval with constraints derived from `parameters`. Omitted when the
+        template does not bundle auto-approval.
+
     created_at:
       type: string
       format: date-time
@@ -76,6 +83,47 @@ ActionConfigTemplate:
       title: "*"
       body: "*"
     created_at: "2026-02-28T10:00:00Z"
+
+StandingApprovalTemplateSpec:
+  type: object
+  description: |
+    Manifest-authored standing approval behavior when a template is applied.
+  properties:
+    duration_days:
+      type: integer
+      nullable: true
+      minimum: 1
+      description: |
+        Number of days until the standing approval expires. `null` means no
+        expiry (until revoked).
+    max_executions:
+      type: integer
+      nullable: true
+      minimum: 1
+      description: |
+        Optional cap on executions. `null` means unlimited within the window.
+
+ApplyActionConfigTemplateRequest:
+  type: object
+  required:
+    - agent_id
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: Agent to attach the new configuration and standing approval to.
+      example: 42
+
+ApplyActionConfigTemplateResponse:
+  type: object
+  required:
+    - action_configuration
+  properties:
+    action_configuration:
+      $ref: '../schemas/action_configurations.yaml#/ActionConfiguration'
+    standing_approval:
+      $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
+      description: Present when the template bundles a standing approval.
 
 ActionConfigTemplateListResponse:
   type: object

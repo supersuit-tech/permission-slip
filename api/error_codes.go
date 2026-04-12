@@ -39,6 +39,7 @@ const (
 	ErrInternalError                ErrorCode = "internal_error"
 	ErrUpstreamError                ErrorCode = "upstream_error"
 	ErrActionConfigNotFound         ErrorCode = "action_config_not_found"
+	ErrActionConfigTemplateNotFound ErrorCode = "action_config_template_not_found"
 	ErrInvalidConfiguration         ErrorCode = "invalid_configuration"
 	ErrConfigurationDisabled        ErrorCode = "configuration_disabled"
 	ErrConfigActionTypeMismatch     ErrorCode = "configuration_action_type_mismatch"

@@ -280,11 +280,12 @@ type ExternalConnectorCredential struct {
 
 // ExternalConnectorTemplate describes a configuration template from a connector manifest.
 type ExternalConnectorTemplate struct {
-	ID          string
-	ActionType  string
-	Name        string
-	Description string
-	Parameters  []byte // raw JSON
+	ID                   string
+	ActionType           string
+	Name                 string
+	Description          string
+	Parameters           []byte // raw JSON
+	StandingApprovalSpec []byte // raw JSON; nil = no bundled standing approval
 }
 
 // UpsertConnectorFromManifest inserts or updates a connector and its actions
@@ -419,15 +420,18 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 			params = []byte("{}")
 		}
 
+		saSpec := nilIfEmptyBytes(tpl.StandingApprovalSpec)
+
 		_, err := tx.Exec(ctx, `
-			INSERT INTO action_config_templates (id, connector_id, action_type, name, description, parameters)
-			VALUES ($1, $2, $3, $4, $5, $6)
+			INSERT INTO action_config_templates (id, connector_id, action_type, name, description, parameters, standing_approval_spec)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (id) DO UPDATE SET
 				action_type = EXCLUDED.action_type,
 				name = EXCLUDED.name,
 				description = EXCLUDED.description,
-				parameters = EXCLUDED.parameters`,
-			tpl.ID, m.ID, tpl.ActionType, tpl.Name, nilIfEmpty(tpl.Description), params)
+				parameters = EXCLUDED.parameters,
+				standing_approval_spec = EXCLUDED.standing_approval_spec`,
+			tpl.ID, m.ID, tpl.ActionType, tpl.Name, nilIfEmpty(tpl.Description), params, saSpec)
 		if err != nil {
 			return err
 		}

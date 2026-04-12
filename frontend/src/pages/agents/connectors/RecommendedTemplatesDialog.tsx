@@ -12,7 +12,8 @@ import {
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
-import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
+import { useApplyActionConfigTemplate } from "@/hooks/useApplyActionConfigTemplate";
+import { Badge } from "@/components/ui/badge";
 import { TemplateParamBadge } from "./TemplatePicker";
 
 export interface RecommendedTemplatesDialogProps {
@@ -34,7 +35,7 @@ export function RecommendedTemplatesDialog({
 }: RecommendedTemplatesDialogProps) {
   const { templates, isLoading, error } =
     useActionConfigTemplates(connectorId);
-  const { createActionConfig, isPending } = useCreateActionConfig();
+  const { applyTemplate, isPending } = useApplyActionConfigTemplate();
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(
     null,
   );
@@ -83,17 +84,13 @@ export function RecommendedTemplatesDialog({
   async function handleUseTemplate(template: ActionConfigTemplate) {
     setPendingTemplateId(template.id);
     try {
-      await createActionConfig({
-        agent_id: agentId,
-        connector_id: connectorId,
-        action_type: template.action_type,
-        name: template.name,
-        description: template.description ?? undefined,
-        // Cast is safe: OpenAPI types template.parameters as object with
-        // additionalProperties — structurally the same as Record<string, unknown>.
-        parameters: template.parameters as Record<string, unknown>,
-      });
-      toast.success(`Configuration "${template.name}" created`);
+      const res = await applyTemplate({ templateId: template.id, agentId });
+      const sa = res.standing_approval;
+      toast.success(
+        sa
+          ? `Configuration "${template.name}" created with auto-approval`
+          : `Configuration "${template.name}" created`,
+      );
       onOpenChange(false);
     } catch (err) {
       toast.error(
@@ -185,11 +182,21 @@ function RecommendedTemplateCard({
   usePending: boolean;
 }) {
   const paramEntries = Object.entries(template.parameters);
+  const autoApproved = template.standing_approval != null;
 
   return (
     <div className="rounded-lg border border-input p-3">
       <div className="space-y-2">
-        <p className="text-sm font-medium">{template.name}</p>
+        <div className="flex flex-wrap items-center gap-2">
+          <p className="text-sm font-medium">{template.name}</p>
+          {autoApproved ? (
+            <Badge>Auto-approved</Badge>
+          ) : (
+            <Badge variant="secondary" className="text-muted-foreground">
+              Requires approval each time
+            </Badge>
+          )}
+        </div>
         {template.description && (
           <p className="text-muted-foreground text-sm">{template.description}</p>
         )}

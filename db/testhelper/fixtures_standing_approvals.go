@@ -67,12 +67,13 @@ func InsertStandingApprovalExecutionWithParams(t *testing.T, d db.DBTX, saID str
 
 // StandingApprovalOpts holds optional fields for InsertStandingApprovalFull.
 type StandingApprovalOpts struct {
-	ActionType    string
-	Status        string
-	Constraints   []byte
-	MaxExecutions *int
-	StartsAt      time.Time
-	ExpiresAt     time.Time
+	ActionType                  string
+	Status                      string
+	Constraints                 []byte
+	SourceActionConfigurationID *string
+	MaxExecutions               *int
+	StartsAt                    time.Time
+	ExpiresAt                   time.Time
 }
 
 // InsertStandingApprovalFull creates a standing approval with full control over all fields.
@@ -91,7 +92,7 @@ func InsertStandingApprovalFull(t *testing.T, d db.DBTX, saID string, agentID in
 		opts.ExpiresAt = time.Now().Add(30 * 24 * time.Hour)
 	}
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, max_executions, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, opts.MaxExecutions, opts.StartsAt, opts.ExpiresAt)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, max_executions, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, opts.SourceActionConfigurationID, opts.MaxExecutions, opts.StartsAt, opts.ExpiresAt)
 }

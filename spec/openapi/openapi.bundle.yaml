@@ -3256,6 +3256,66 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/action-config-templates/{id}/apply:
+    post:
+      operationId: applyActionConfigTemplate
+      summary: Apply Action Configuration Template
+      description: |
+        Create an action configuration from a template in one step. When the
+        template defines `standing_approval`, also creates an active standing
+        approval in the same transaction.
+
+        If the connector is not yet enabled for the agent, it is enabled
+        automatically so the configuration can be created.
+      tags:
+        - Action Configurations
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID (from list templates).
+          schema:
+            type: string
+            maxLength: 255
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyActionConfigTemplateRequest'
+      responses:
+        '201':
+          description: Configuration created (and standing approval if applicable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplyActionConfigTemplateResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Standing approval plan limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Template or agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/action-configurations:
     post:
       operationId: createActionConfiguration
@@ -3985,6 +4045,16 @@ paths:
           schema:
             type: string
           example: 2026-02-14T10:30:00Z,sa_abc123
+        - name: source_action_configuration_id
+          in: query
+          required: false
+          description: |
+            When set, only standing approvals whose `source_action_configuration_id`
+            matches this value are returned (e.g. to filter approvals linked to a
+            specific action configuration).
+          schema:
+            type: string
+            maxLength: 128
       responses:
         '200':
           description: Standing approvals retrieved successfully
@@ -7067,6 +7137,12 @@ components:
             repo: '*'
             title: '*'
             body: '*'
+        standing_approval:
+          $ref: '#/components/schemas/StandingApprovalTemplateSpec'
+          description: |
+            When present, applying this template also creates an active standing
+            approval with constraints derived from `parameters`. Omitted when the
+            template does not bundle auto-approval.
         created_at:
           type: string
           format: date-time
@@ -7200,6 +7276,13 @@ components:
           description: |
             Optional longer description of what this configuration permits.
           example: Agent can create issues labeled 'bug' in the main repo. Title and body are freeform.
+        linked_standing_approvals:
+          type: array
+          description: |
+            Active standing approvals that reference this configuration via
+            `source_action_configuration_id`. Omitted when empty.
+          items:
+            $ref: '#/components/schemas/LinkedStandingApprovalSummary'
         created_at:
           type: string
           format: date-time
@@ -8313,11 +8396,13 @@ components:
           type: object
           additionalProperties: true
           description: |
-            Constraint boundaries for this standing approval. Required and must
-            contain at least one non-wildcard parameter constraint. A standing
-            approval without parameter constraints is a blank check — the backend
-            rejects empty constraints or constraints where every value is a
-            wildcard (`"*"`).
+            Constraint boundaries for this standing approval. Normally required and must
+            contain at least one non-wildcard parameter constraint; the backend rejects
+            empty objects or constraints where every value is a wildcard (`"*"`).
+
+            When `source_action_configuration_id` is set (trusted flows such as template customize),
+            send `{}` to mean **match all** parameter values for this action type (stored as empty
+            constraints in the database).
           example:
             recipient_pattern: '*@mycompany.com'
             max_recipients: 5
@@ -11568,6 +11653,75 @@ components:
             recently downgraded from a paid plan. After this time, the shorter
             retention window takes effect.
           example: '2026-03-08T14:30:00Z'
+    StandingApprovalTemplateSpec:
+      type: object
+      description: |
+        Manifest-authored standing approval behavior when a template is applied.
+      properties:
+        duration_days:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: |
+            Number of days until the standing approval expires. `null` means no
+            expiry (until revoked).
+        max_executions:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: |
+            Optional cap on executions. `null` means unlimited within the window.
+    ApplyActionConfigTemplateRequest:
+      type: object
+      required:
+        - agent_id
+      properties:
+        agent_id:
+          type: integer
+          format: int64
+          description: Agent to attach the new configuration and standing approval to.
+          example: 42
+    LinkedStandingApprovalSummary:
+      type: object
+      required:
+        - standing_approval_id
+        - action_type
+        - status
+        - execution_count
+      properties:
+        standing_approval_id:
+          type: string
+          description: Standing approval identifier.
+        action_type:
+          type: string
+          description: Action type covered by this standing approval.
+        status:
+          type: string
+          description: Standing approval status (typically `active` in this summary).
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the standing approval expires, or null if it lasts until revoked.
+        max_executions:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Execution cap, if any.
+        execution_count:
+          type: integer
+          minimum: 0
+          description: Executions recorded so far.
+    ApplyActionConfigTemplateResponse:
+      type: object
+      required:
+        - action_configuration
+      properties:
+        action_configuration:
+          $ref: '#/components/schemas/ActionConfiguration'
+        standing_approval:
+          $ref: '#/components/schemas/StandingApproval'
+          description: Present when the template bundles a standing approval.
     NotificationPreferenceUpdate:
       type: object
       description: A channel preference update (request-only, no `available` field).

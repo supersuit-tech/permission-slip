@@ -6,28 +6,36 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
+func intPtr(n int) *int {
+	return &n
+}
+
 func paypalTemplates() []connectors.ManifestTemplate {
+	saRead30d := &connectors.ManifestStandingApproval{DurationDays: intPtr(30)}
 	return []connectors.ManifestTemplate{
 		{
-			ID:          "tpl_paypal_get_order",
-			ActionType:  "paypal.get_order",
-			Name:        "Look up order status",
-			Description: "Read-only: fetch a Checkout order by ID (e.g. after a buyer completes payment).",
-			Parameters:  json.RawMessage(`{"order_id":"*"}`),
+			ID:               "tpl_paypal_get_order",
+			ActionType:       "paypal.get_order",
+			Name:             "Look up order status",
+			Description:      "Read-only: fetch a Checkout order by ID (e.g. after a buyer completes payment).",
+			Parameters:       json.RawMessage(`{"order_id":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
-			ID:          "tpl_paypal_get_payout_batch",
-			ActionType:  "paypal.get_payout_batch",
-			Name:        "Check payout batch status",
-			Description: "Read-only: poll batch payout processing status.",
-			Parameters:  json.RawMessage(`{"payout_batch_id":"*"}`),
+			ID:               "tpl_paypal_get_payout_batch",
+			ActionType:       "paypal.get_payout_batch",
+			Name:             "Check payout batch status",
+			Description:      "Read-only: poll batch payout processing status.",
+			Parameters:       json.RawMessage(`{"payout_batch_id":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
-			ID:          "tpl_paypal_get_invoice",
-			ActionType:  "paypal.get_invoice",
-			Name:        "Look up invoice",
-			Description: "Read-only: fetch invoice details and payment state.",
-			Parameters:  json.RawMessage(`{"invoice_id":"*"}`),
+			ID:               "tpl_paypal_get_invoice",
+			ActionType:       "paypal.get_invoice",
+			Name:             "Look up invoice",
+			Description:      "Read-only: fetch invoice details and payment state.",
+			Parameters:       json.RawMessage(`{"invoice_id":"*"}`),
+			StandingApproval: saRead30d,
 		},
 		{
 			ID:          "tpl_paypal_create_order_minimal",

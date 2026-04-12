@@ -293,11 +293,13 @@ CreateStandingApprovalRequest:
       type: object
       additionalProperties: true
       description: |
-        Constraint boundaries for this standing approval. Required and must
-        contain at least one non-wildcard parameter constraint. A standing
-        approval without parameter constraints is a blank check — the backend
-        rejects empty constraints or constraints where every value is a
-        wildcard (`"*"`).
+        Constraint boundaries for this standing approval. Normally required and must
+        contain at least one non-wildcard parameter constraint; the backend rejects
+        empty objects or constraints where every value is a wildcard (`"*"`).
+
+        When `source_action_configuration_id` is set (trusted flows such as template customize),
+        send `{}` to mean **match all** parameter values for this action type (stored as empty
+        constraints in the database).
       example:
         recipient_pattern: "*@mycompany.com"
         max_recipients: 5

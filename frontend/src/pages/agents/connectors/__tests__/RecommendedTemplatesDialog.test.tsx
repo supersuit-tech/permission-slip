@@ -41,6 +41,7 @@ const baseTemplates = [
     name: "All open",
     description: "Desc A",
     parameters: { repo: "*", title: "*" },
+    standing_approval: { duration_days: 30 },
     created_at: "2026-01-01T00:00:00Z",
   },
   {
@@ -200,15 +201,31 @@ describe("RecommendedTemplatesDialog", () => {
     const onOpenChange = vi.fn();
     mockPost.mockResolvedValue({
       data: {
-        id: "ac_new",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "github.create_issue",
-        parameters: { repo: "*", title: "*" },
-        status: "active",
-        name: "All open",
-        created_at: "2026-02-25T10:00:00Z",
-        updated_at: "2026-02-25T10:00:00Z",
+        action_configuration: {
+          id: "ac_new",
+          agent_id: 42,
+          connector_id: "github",
+          action_type: "github.create_issue",
+          parameters: { repo: "*", title: "*" },
+          status: "active",
+          name: "All open",
+          created_at: "2026-02-25T10:00:00Z",
+          updated_at: "2026-02-25T10:00:00Z",
+        },
+        standing_approval: {
+          standing_approval_id: "sa_new",
+          agent_id: 42,
+          user_id: "user",
+          action_type: "github.create_issue",
+          action_version: "1",
+          constraints: { repo: "*", title: "*" },
+          status: "active",
+          execution_count: 0,
+          starts_at: "2026-02-25T10:00:00Z",
+          expires_at: "2026-03-25T10:00:00Z",
+          created_at: "2026-02-25T10:00:00Z",
+          source_action_configuration_id: "ac_new",
+        },
       },
     });
 
@@ -222,18 +239,15 @@ describe("RecommendedTemplatesDialog", () => {
     await user.click(within(tplCard as HTMLElement).getByRole("button", { name: "Use Template" }));
 
     await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith("/v1/action-configurations", {
-        headers: { Authorization: "Bearer token" },
-        body: {
-          agent_id: 42,
-          connector_id: "github",
-          action_type: "github.create_issue",
-          name: "All open",
-          description: "Desc A",
-          parameters: { repo: "*", title: "*" },
-        },
-      });
+      expect(mockPost).toHaveBeenCalled();
     });
+    const [url, opts] = mockPost.mock.calls[0] as [
+      string,
+      { body: { agent_id: number }; params: { path: { id: string } } },
+    ];
+    expect(url).toContain("/v1/action-config-templates/{id}/apply");
+    expect(opts.params.path.id).toBe("tpl_a");
+    expect(opts.body).toEqual({ agent_id: 42 });
 
     await waitFor(() => {
       expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -310,15 +324,17 @@ describe("RecommendedTemplatesDialog", () => {
 
     resolvePost!({
       data: {
-        id: "ac_new",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "github.create_issue",
-        parameters: {},
-        status: "active",
-        name: "All open",
-        created_at: "2026-02-25T10:00:00Z",
-        updated_at: "2026-02-25T10:00:00Z",
+        action_configuration: {
+          id: "ac_new",
+          agent_id: 42,
+          connector_id: "github",
+          action_type: "github.create_issue",
+          parameters: {},
+          status: "active",
+          name: "All open",
+          created_at: "2026-02-25T10:00:00Z",
+          updated_at: "2026-02-25T10:00:00Z",
+        },
       },
     });
 
@@ -352,16 +368,34 @@ describe("RecommendedTemplatesDialog", () => {
 
     resolvePost!({
       data: {
-        id: "ac_new",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "github.create_issue",
-        parameters: {},
-        status: "active",
-        name: "All open",
-        created_at: "2026-02-25T10:00:00Z",
-        updated_at: "2026-02-25T10:00:00Z",
+        action_configuration: {
+          id: "ac_new",
+          agent_id: 42,
+          connector_id: "github",
+          action_type: "github.create_issue",
+          parameters: {},
+          status: "active",
+          name: "All open",
+          created_at: "2026-02-25T10:00:00Z",
+          updated_at: "2026-02-25T10:00:00Z",
+        },
       },
     });
+  });
+
+  it("shows auto-approve badge when template has standing_approval", async () => {
+    renderDialog();
+    await waitFor(() => {
+      expect(screen.getByText("All open")).toBeInTheDocument();
+    });
+    const tplCard = screen.getByText("All open").closest(".rounded-lg")!;
+    expect(
+      within(tplCard as HTMLElement).getByText("Auto-approved"),
+    ).toBeInTheDocument();
+    expect(
+      within(screen.getByText("Merge main").closest(".rounded-lg")!).getByText(
+        "Requires approval each time",
+      ),
+    ).toBeInTheDocument();
   });
 });
