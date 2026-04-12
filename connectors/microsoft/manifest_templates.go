@@ -20,13 +20,6 @@ func microsoftTemplates() []connectors.ManifestTemplate {
 			Description: "Agent can list emails from the inbox.",
 			Parameters:  json.RawMessage(`{"folder":"inbox","top":"*"}`),
 		},
-		{
-			ID:          "tpl_microsoft_list_emails_from_domain",
-			ActionType:  "microsoft.list_emails",
-			Name:        "Read emails from a domain",
-			Description: "Agent can list inbox emails from senders matching a specific domain. Set the domain before applying.",
-			Parameters:  json.RawMessage(`{"folder":"inbox","top":"*"}`),
-		},
 		// --- Outlook write ---
 		{
 			ID:          "tpl_microsoft_send_email",
@@ -78,7 +71,7 @@ func microsoftTemplates() []connectors.ManifestTemplate {
 			ActionType:  "microsoft.get_drive_file",
 			Name:        "View OneDrive file metadata",
 			Description: "Agent can view file metadata from OneDrive but cannot download content.",
-			Parameters:  json.RawMessage(`{"item_id":"*","include_content":false}`),
+			Parameters:  json.RawMessage(`{"item_id":"*","include_content":"false"}`),
 		},
 		// --- OneDrive write ---
 		{
@@ -135,9 +128,9 @@ func microsoftTemplates() []connectors.ManifestTemplate {
 		{
 			ID:          "tpl_microsoft_excel_read_range",
 			ActionType:  "microsoft.excel_read_range",
-			Name:        "Read Excel range",
-			Description: "Agent can read any range from a specific workbook.",
-			Parameters:  json.RawMessage(`{"item_id":"*","sheet_name":"*","range":"*"}`),
+			Name:        "Read from specific workbook",
+			Description: "Locks the workbook; agent chooses the sheet and range to read.",
+			Parameters:  json.RawMessage(`{"item_id":"WORKBOOK_ID","sheet_name":"*","range":"*"}`),
 		},
 		{
 			ID:          "tpl_microsoft_excel_read_any",
