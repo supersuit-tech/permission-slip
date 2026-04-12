@@ -94,7 +94,7 @@ Created ──> Active ──> Expired
               └──> Exhausted (max executions reached)
 ```
 
-1. **Created:** User configures and confirms the standing approval (requires confirmation code, same as one-off).
+1. **Created:** User configures the standing approval from the web UI.
 2. **Active:** Agent can execute the action freely within constraints.
 3. **Expired:** Duration elapsed. Agent must request a new standing approval or fall back to one-off.
 4. **Revoked:** User manually cancels at any time. Takes effect immediately.
