@@ -1,14 +1,24 @@
 ---
 name: review
-description: Perform a comprehensive, multi-round code review on a GitHub PR. Leaves inline review comments and summaries across up to 6 rounds, with 3-minute waits between rounds to let the author push fixes.
+description: Perform a comprehensive, multi-round code review on a GitHub PR. Leaves inline review comments prioritized by severity (Critical/High/Medium/Low) across up to 6 rounds, with 90-second waits between rounds to check for fixes.
 argument-hint: "<PR_URL> [--max-turns <N>]"
 ---
 
 # Review PR — Multi-Round Comprehensive Code Review
 
-Performs up to 6 rounds of thorough code review on a GitHub Pull Request. Each round submits a PR review with inline comments covering security, architecture, maintainability, code quality, documentation, and performance. Between rounds, waits 3 minutes and re-fetches the diff to check for fixes before reviewing again.
+Performs up to 6 rounds of thorough code review on a GitHub Pull Request. Each round submits a PR review with inline comments covering security, architecture, maintainability, code quality, documentation, and performance. Between rounds, waits 90 seconds and re-fetches the diff to check for fixes before reviewing again.
 
 This skill is **strictly read-only** — it never modifies code, creates branches, or makes commits.
+
+## Reviewer Mindset
+
+You are a Staff+ Engineer performing this review. Follow these principles:
+
+- **Brutally honest, genuinely kind.** Flag real problems without hedging, but frame feedback constructively. Never condescend.
+- **Prioritize by real impact.** Every finding gets a severity: Critical > High > Medium > Low. Lead with what matters most.
+- **Explain WHY.** Don't just say what's wrong — explain the consequence if it ships. Then give a concrete fix with code.
+- **No fluff.** If a category has no issues, skip it. Don't pad reviews to seem thorough.
+- **Acknowledge good work.** Reviews that only criticize are demoralizing. Call out good patterns.
 
 ## Setup
 
@@ -33,6 +43,7 @@ Set these variables for the session:
 - `GH_CMD` — `GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh`
 - `GH_REPO_PATH` — `supersuit-tech/permission-slip` (used in `gh api` endpoint paths to avoid hardcoding)
 - `LAST_HEAD_SHA` — empty string initially, updated after each round
+- `LAST_ACTIVITY_TIME` — timestamp of the most recent new commit detection (or session start). Used for inactivity timeout.
 - `ROUND` — current round number, starting at 1
 
 ## Step 1: Gather Context
@@ -86,9 +97,9 @@ Repeat for `ROUND` = 1 to `MAX_TURNS`:
 
 If `ROUND > 1`:
 
-1. **Wait 3 minutes** using the Bash tool with `run_in_background: true`:
+1. **Wait 90 seconds** using the Bash tool with `run_in_background: true`:
    ```bash
-   sleep 180 && echo "WAIT_COMPLETE"
+   sleep 90 && echo "WAIT_COMPLETE"
    ```
    Set `run_in_background: true` on this Bash call so the agent is not blocked. You will be notified when the sleep completes. While waiting, do NOT proceed to the next step — wait for the background task notification before continuing.
 
@@ -100,7 +111,7 @@ If `ROUND > 1`:
 
 3. **Check for new commits:**
    - Compare the new `HEAD_SHA` against `LAST_HEAD_SHA`.
-   - If they differ, new commits were pushed. Re-fetch the diff and re-read any files that changed:
+   - If they differ, new commits were pushed. **Update `LAST_ACTIVITY_TIME`** to the current time. Re-fetch the diff and re-read any files that changed:
      ```bash
      $GH_CMD pr diff $PR_NUMBER
      ```
@@ -118,6 +129,9 @@ If `ROUND > 1`:
      Track these in a `PRIOR_COMMENTS` list and skip any finding that matches an already-posted comment (same file, same line, same issue).
    - Note which prior review comments may have been addressed by the new commits.
    - **Update `LAST_HEAD_SHA`** to the new `HEAD_SHA` value from step 2a.2 (the `head` field from the state check). This must happen regardless of whether commits changed — the state check fetches the authoritative SHA.
+
+4. **Check inactivity timeout:**
+   - If the time elapsed since `LAST_ACTIVITY_TIME` exceeds **10 minutes**, exit to Step 3 with reason "no activity for 10 minutes". This catches the case where the author has stopped responding even though issues remain open.
 
 ### 2b. Perform Comprehensive Review
 
@@ -174,12 +188,22 @@ Review the PR diff and source files across **all** of these dimensions:
 - Did fixes introduce new problems?
 - Anything missed in earlier rounds that stands out now with fresh eyes?
 
+**Severity Guide — assign one to every finding:**
+
+| Severity | Meaning | Examples |
+|----------|---------|----------|
+| **Critical** | Must fix before merge | Security vulnerabilities, data loss, correctness bugs that will hit production |
+| **High** | Should fix before merge | Architectural issues, missing error handling at boundaries, race conditions |
+| **Medium** | Improve if time permits | DRY violations, naming issues, missing tests for edge cases |
+| **Low** | Optional/nitpick | Style preferences, minor documentation gaps, suggestions for future improvement |
+
 ### 2c. Collect Findings
 
 For each issue found, create an inline comment with:
-- **Category prefix:** `**[Security]**`, `**[Architecture]**`, `**[Maintainability]**`, `**[Code Quality]**`, `**[Documentation]**`, `**[Performance]**`, or `**[Migration]**`
-- **The issue:** what's wrong or could be improved
-- **Suggestion:** how to fix it (be specific — suggest code when possible)
+- **Dual prefix:** `**[Severity · Category]**` — e.g., `**[Critical · Security]**`, `**[High · Architecture]**`, `**[Medium · Maintainability]**`, `**[Low · Documentation]**`
+- **The issue:** what's wrong
+- **Why it matters:** the consequence if it ships (1 sentence)
+- **Fix:** concrete suggestion with code when possible
 
 Only flag **real issues**. Do not invent problems or pad the review. If you can't find issues in a category, that's fine — skip it. Quality over quantity.
 
@@ -210,7 +234,7 @@ Where `$REVIEW_JSON` is:
       "path": "path/to/file.go",
       "line": 42,
       "side": "RIGHT",
-      "body": "**[Security]** This query uses string interpolation which is vulnerable to SQL injection. Use parameterized queries instead:\n```go\ndb.Query(\"SELECT * FROM users WHERE id = $1\", userID)\n```"
+      "body": "**[Critical · Security]** This query uses string interpolation which is vulnerable to SQL injection.\n\n**Why:** An attacker can inject arbitrary SQL to read/modify/delete data.\n\n**Fix:** Use parameterized queries:\n```go\ndb.Query(\"SELECT * FROM users WHERE id = $1\", userID)\n```"
     }
   ]
 }
@@ -226,9 +250,9 @@ For Round 1:
 ```markdown
 ## Review Round 1/{MAX_TURNS}
 
-**Findings:** {count} inline comments
+**Findings:** {count} ({X} critical, {Y} high, {Z} medium, {W} low)
 
-{paragraph summary of findings — what are the main themes/concerns}
+{paragraph summary of findings — what are the main themes/concerns, leading with the highest-severity items}
 
 ### What Looks Good
 {brief acknowledgment of things done well — good patterns, thorough tests, clean code}
@@ -241,13 +265,13 @@ For Rounds 2+:
 ```markdown
 ## Review Round {N}/{MAX_TURNS}
 
-**Findings:** {count} inline comments
+**Findings:** {count} ({X} critical, {Y} high, {Z} medium, {W} low)
 
 ### Changes Since Last Round
 {list of new commits if any, and which prior comments they addressed}
 
 ### Remaining Issues
-{summary of issues that still need attention}
+{summary of issues that still need attention, ordered by severity}
 
 ### What Looks Good
 {acknowledgment of fixes applied and good patterns}
@@ -275,6 +299,7 @@ After submitting the review, check whether to continue:
 
 - If this round had **no findings** → exit early, go to Step 3. There is no reason to wait and re-review a clean PR.
 - If `ROUND >= MAX_TURNS` → exit, go to Step 3.
+- If time since `LAST_ACTIVITY_TIME` exceeds **10 minutes** → exit, go to Step 3 with reason "no activity for 10 minutes".
 - Otherwise → increment `ROUND`, loop back to 2a.
 
 ## Step 3: Final Summary
@@ -299,7 +324,7 @@ Summary format:
 **PR:** #{PR_NUMBER} — {PR_TITLE}
 **Author:** @{PR_AUTHOR}
 **Rounds completed:** {ROUND}/{MAX_TURNS}
-**Reason for stopping:** {completed all rounds | no issues remaining | PR merged | PR closed | max turns reached}
+**Reason for stopping:** {completed all rounds | no issues remaining | PR merged | PR closed | max turns reached | no activity for 10 minutes}
 
 ### Outstanding Issues
 {any unresolved concerns from the final round, or "None — this PR looks good to merge."}
@@ -323,10 +348,10 @@ Summary format:
 - **Strictly read-only** — NEVER modify files, create branches, make commits, or push code. This skill only reads and comments.
 - **Use `COMMENT` event** — never `APPROVE` or `REQUEST_CHANGES`. The skill provides findings; humans make approval decisions.
 - **Don't invent problems** — only flag real, substantive issues. If a round has no findings, say so and move on. Padding reviews with nitpicks erodes trust.
-- **Be specific** — every comment should explain what's wrong AND how to fix it. Suggest code when possible.
-- **Prefix inline comments** with category tags (`[Security]`, `[Architecture]`, etc.) for scannability.
+- **Be specific** — every comment must explain what's wrong, WHY it matters (the consequence), and how to fix it. Suggest code when possible.
+- **Use dual-prefix format** — `**[Severity · Category]**` (e.g., `**[High · Architecture]**`) on every inline comment for scannability. Severity levels: Critical, High, Medium, Low.
 - **Read source files for context** — not just diff hunks. Many issues (DRY violations, architectural problems) are invisible without file-level context. For files over 500 lines, read diff hunks ±30 lines of context instead of the full file to avoid exhausting the context window.
 - **Check diff lines** — inline comments can only be placed on lines that appear in the PR diff. If you need to comment on an unchanged line, include it in the review body instead.
 - **Acknowledge good work** — every round summary should include a "What Looks Good" section. Reviews that only criticize are demoralizing.
 - **Re-fetch between rounds** — always check for new commits before reviewing again to avoid flagging already-fixed issues.
-- **Exit early when clean** — if any round has no findings, stop immediately. Don't wait 3 minutes just to re-review a clean PR.
+- **Exit early when clean** — if any round has no findings, stop immediately. Don't wait just to re-review a clean PR.
