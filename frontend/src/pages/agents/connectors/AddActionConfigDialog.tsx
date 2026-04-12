@@ -202,7 +202,7 @@ export function AddActionConfigDialog({
           );
           expiresAt = exp.toISOString();
         }
-        const constraints = standingApprovalConstraintsFromParams(
+        const constraints = standingApprovalConstraintsForCreate(
           builtParams as Record<string, unknown>,
         );
         await createStandingApproval({
@@ -331,17 +331,17 @@ export function AddActionConfigDialog({
   );
 }
 
-/** Ensures standing-approval constraints are valid (at least one non-wildcard). Mirrors backend template-apply behavior. */
-function standingApprovalConstraintsFromParams(
+/** With source_action_configuration_id, `{}` means match-all (backend stores NULL constraints). */
+function standingApprovalConstraintsForCreate(
   params: Record<string, unknown>,
 ): Record<string, unknown> {
-  const entries = Object.entries(params).filter(([k]) => k !== "_scope");
+  const entries = Object.entries(params);
   if (entries.length === 0) {
-    return { _scope: { $pattern: "*" } };
+    return {};
   }
   const allBareWildcard = entries.every(([, v]) => v === "*");
   if (allBareWildcard) {
-    return { ...params, _scope: { $pattern: "*" } };
+    return {};
   }
   return params;
 }

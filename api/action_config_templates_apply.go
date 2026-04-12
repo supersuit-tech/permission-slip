@@ -280,30 +280,34 @@ func handleApplyActionConfigTemplate(deps *Deps) http.HandlerFunc {
 
 // buildStandingApprovalConstraintsFromTemplate turns template parameter JSON into
 // standing-approval constraint JSON (non-wildcard values required by validateStandingApprovalConstraints).
+//
+// When every parameter value is a bare wildcard ("*") or the object is empty, validation fails
+// because standing approvals require at least one non-wildcard constraint. In that case we return
+// nil bytes: empty constraints mean "match all" in tryStandingApprovalAutoApprove (see
+// api/standing_approval_match.go). A synthetic _scope key would never appear in execution
+// parameters and would prevent matching.
 func buildStandingApprovalConstraintsFromTemplate(templateParams []byte) ([]byte, error) {
 	validated, err := validateStandingApprovalConstraints(json.RawMessage(templateParams))
 	if err == nil {
 		return validated, nil
 	}
-	// Templates may use all bare wildcards; add a synthetic scope so the approval is still bounded.
 	var obj map[string]json.RawMessage
-	if err := json.Unmarshal(templateParams, &obj); err != nil {
+	if jsonErr := json.Unmarshal(templateParams, &obj); jsonErr != nil {
 		return nil, fmt.Errorf("template parameters must be a JSON object")
 	}
 	if obj == nil {
 		obj = map[string]json.RawMessage{}
 	}
-	if _, has := obj["_scope"]; !has {
-		wrapped, err := json.Marshal(map[string]string{db.PatternKey: "*"})
-		if err != nil {
-			return nil, err
+	allBareWildcard := true
+	for _, v := range obj {
+		var s string
+		if json.Unmarshal(v, &s) != nil || s != "*" {
+			allBareWildcard = false
+			break
 		}
-		obj["_scope"] = wrapped
-		combined, err := json.Marshal(obj)
-		if err != nil {
-			return nil, err
-		}
-		return validateStandingApprovalConstraints(json.RawMessage(combined))
+	}
+	if allBareWildcard {
+		return nil, nil
 	}
 	return nil, fmt.Errorf("standing approval constraints could not be derived from template parameters: %w", err)
 }

@@ -23,6 +23,7 @@ func TestStandingApprovalsIndex(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireIndex(t, tx, "standing_approvals", "idx_standing_approvals_agent_action_status")
+	testhelper.RequireIndex(t, tx, "standing_approvals", "idx_standing_approvals_source_config_active")
 }
 
 func TestStandingApprovalsCascadeDeleteOnAgentDelete(t *testing.T) {
