@@ -89,6 +89,8 @@ export function RecommendedTemplatesDialog({
         action_type: template.action_type,
         name: template.name,
         description: template.description ?? undefined,
+        // Cast is safe: OpenAPI types template.parameters as object with
+        // additionalProperties — structurally the same as Record<string, unknown>.
         parameters: template.parameters as Record<string, unknown>,
       });
       toast.success(`Configuration "${template.name}" created`);

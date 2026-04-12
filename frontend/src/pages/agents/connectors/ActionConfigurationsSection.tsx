@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { ChevronDown, ChevronRight, Loader2, Plus, Settings, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -61,7 +61,10 @@ export function ActionConfigurationsSection({
   const { templates, isLoading: templatesLoading } =
     useActionConfigTemplates(connectorId);
 
-  const actionTypeSet = new Set(actions.map((a) => a.action_type));
+  const actionTypeSet = useMemo(
+    () => new Set(actions.map((a) => a.action_type)),
+    [actions],
+  );
   const hasRecommendedTemplates =
     !templatesLoading &&
     templates.some((t) => actionTypeSet.has(t.action_type));
