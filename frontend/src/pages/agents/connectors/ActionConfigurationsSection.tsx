@@ -17,12 +17,15 @@ import {
 } from "@/components/ui/table";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
+import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
+import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 import { ActionConfigRow } from "./ActionConfigRow";
 import { AddActionConfigDialog } from "./AddActionConfigDialog";
 import { EditActionConfigDialog } from "./EditActionConfigDialog";
 import { DeleteActionConfigDialog } from "./DeleteActionConfigDialog";
+import { RecommendedTemplatesDialog } from "./RecommendedTemplatesDialog";
 
 interface ActionConfigurationsSectionProps {
   agentId: number;
@@ -44,6 +47,9 @@ export function ActionConfigurationsSection({
   error,
 }: ActionConfigurationsSectionProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [initialTemplateForAdd, setInitialTemplateForAdd] =
+    useState<ActionConfigTemplate | null>(null);
+  const [recommendedDialogOpen, setRecommendedDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ActionConfiguration | null>(
     null,
   );
@@ -51,6 +57,14 @@ export function ActionConfigurationsSection({
     null,
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const { templates, isLoading: templatesLoading } =
+    useActionConfigTemplates(connectorId);
+
+  const actionTypeSet = new Set(actions.map((a) => a.action_type));
+  const hasRecommendedTemplates =
+    !templatesLoading &&
+    templates.some((t) => actionTypeSet.has(t.action_type));
 
   const hasWildcardConfig = configs.some(
     (c) => c.action_type === WILDCARD_ACTION_TYPE,
@@ -78,6 +92,18 @@ export function ActionConfigurationsSection({
     }
   };
 
+  function openAddDialog(fromTemplate?: ActionConfigTemplate | null) {
+    setInitialTemplateForAdd(fromTemplate ?? null);
+    setAddDialogOpen(true);
+  }
+
+  function handleAddDialogOpenChange(open: boolean) {
+    if (!open) {
+      setInitialTemplateForAdd(null);
+    }
+    setAddDialogOpen(open);
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -104,11 +130,23 @@ export function ActionConfigurationsSection({
                 Enable All Actions
               </Button>
             )}
+            {hasRecommendedTemplates && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="shrink-0"
+                onClick={() => setRecommendedDialogOpen(true)}
+                disabled={actions.length === 0}
+              >
+                Recommended Templates
+              </Button>
+            )}
             <Button
               type="button"
               size="sm"
               className="shrink-0"
-              onClick={() => setAddDialogOpen(true)}
+              onClick={() => openAddDialog()}
               disabled={actions.length === 0}
             >
               <Plus className="size-4" />
@@ -133,7 +171,11 @@ export function ActionConfigurationsSection({
             isEnablingAll={isEnablingAll}
             showAdvanced={showAdvanced}
             onToggleAdvanced={() => setShowAdvanced((v) => !v)}
-            onAddCustom={() => setAddDialogOpen(true)}
+            onAddCustom={() => openAddDialog()}
+            onBrowseRecommendedTemplates={() =>
+              setRecommendedDialogOpen(true)
+            }
+            showRecommendedLink={hasRecommendedTemplates}
             actionsDisabled={actions.length === 0}
           />
         ) : (
@@ -174,10 +216,22 @@ export function ActionConfigurationsSection({
 
       <AddActionConfigDialog
         open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
+        onOpenChange={handleAddDialogOpenChange}
         agentId={agentId}
         connectorId={connectorId}
         actions={actions}
+        initialTemplate={initialTemplateForAdd}
+      />
+
+      <RecommendedTemplatesDialog
+        open={recommendedDialogOpen}
+        onOpenChange={setRecommendedDialogOpen}
+        agentId={agentId}
+        connectorId={connectorId}
+        actions={actions}
+        onCustomize={(template) => {
+          openAddDialog(template);
+        }}
       />
 
       {editTarget && (
@@ -213,6 +267,8 @@ function EnableAllEmptyState({
   showAdvanced,
   onToggleAdvanced,
   onAddCustom,
+  onBrowseRecommendedTemplates,
+  showRecommendedLink,
   actionsDisabled,
 }: {
   onEnableAll: () => void;
@@ -220,6 +276,8 @@ function EnableAllEmptyState({
   showAdvanced: boolean;
   onToggleAdvanced: () => void;
   onAddCustom: () => void;
+  onBrowseRecommendedTemplates: () => void;
+  showRecommendedLink: boolean;
   actionsDisabled: boolean;
 }) {
   return (
@@ -241,6 +299,18 @@ function EnableAllEmptyState({
           Your agent can use any action from this connector. Every action still
           requires your approval before it runs.
         </p>
+        {showRecommendedLink && (
+          <div>
+            <button
+              type="button"
+              onClick={onBrowseRecommendedTemplates}
+              disabled={actionsDisabled}
+              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 transition-colors hover:underline disabled:pointer-events-none disabled:opacity-50"
+            >
+              Or start from a recommended template →
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="pt-2">
