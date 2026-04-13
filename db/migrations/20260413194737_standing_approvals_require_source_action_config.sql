@@ -40,19 +40,14 @@ DECLARE
 BEGIN
     SELECT id INTO fallback_connector FROM connectors ORDER BY id LIMIT 1;
 
-    -- Avoid inserting into connectors when no backfill is needed (keeps fresh DBs
-    -- connector-empty for tests). Only create a placeholder when orphans exist.
+    -- Do not INSERT into connectors here: CI uses a long-lived test DB and any
+    -- extra row would break tests that expect an empty connectors table. If
+    -- orphans remain with no connector to attach, fail loudly (requires manual
+    -- remediation: seed a connector or clean orphan standing approvals).
     IF fallback_connector IS NULL AND EXISTS (
         SELECT 1 FROM standing_approvals WHERE source_action_configuration_id IS NULL
     ) THEN
-        INSERT INTO connectors (id, name, description, status)
-        VALUES (
-            '__migrated_sa_backing_fallback',
-            'Migrated standing approval backing (system)',
-            'Placeholder connector for orphan standing approvals (migration 20260413194737).',
-            'untested'
-        ) ON CONFLICT (id) DO NOTHING;
-        SELECT id INTO fallback_connector FROM connectors WHERE id = '__migrated_sa_backing_fallback';
+        RAISE EXCEPTION 'Cannot backfill standing approvals: connectors table is empty but orphan standing approvals remain';
     END IF;
 
     FOR r IN

@@ -101,7 +101,6 @@ func TestStandingApprovalsStatusCheckConstraint(t *testing.T) {
 func TestStandingApprovalsExpiryConstraints(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
 	uid := testhelper.GenerateUID(t)
 
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -206,7 +205,6 @@ func TestStandingApprovalExecutionsCascadeOnProfileDelete(t *testing.T) {
 func TestStandingApprovalsMaxExecutionsCheckConstraint(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
 	uid := testhelper.GenerateUID(t)
 
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
