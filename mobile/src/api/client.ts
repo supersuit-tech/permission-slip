@@ -1,9 +1,13 @@
 import createClient, { type Middleware } from "openapi-fetch";
 import type { paths } from "./schema";
 import mockClient from "./mockClient";
+import {
+  getCustomHost,
+  getGatewaySecret,
+} from "../lib/customHostConfig";
 
 /**
- * Returns the API base URL for the mobile app.
+ * Returns the default API base URL for the mobile app.
  *
  * In React Native there is no browser origin to resolve relative paths against,
  * so the base URL must always be an absolute URL. It reads from the
@@ -12,7 +16,7 @@ import mockClient from "./mockClient";
  *
  * Falls back to the production URL if no env var is set.
  */
-function resolveBaseUrl(): string {
+function resolveDefaultBaseUrl(): string {
   const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
   if (!envUrl) {
     if (__DEV__) {
@@ -25,6 +29,9 @@ function resolveBaseUrl(): string {
   }
   return envUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
 }
+
+/** The default (non-custom) base URL, computed once at module load. */
+const defaultBaseUrl = resolveDefaultBaseUrl();
 
 const useMockApi = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
 
@@ -73,22 +80,61 @@ export const jsonSafeMiddleware: Middleware = {
 };
 
 /**
+ * Middleware that rewrites the request URL to a custom host and injects
+ * the X-Gateway-Secret header when custom host mode is enabled.
+ *
+ * Reads from the in-memory cache in customHostConfig (synchronous, fast).
+ * The cache is hydrated from SecureStore at app startup via
+ * loadCustomHostConfig().
+ */
+export const customHostMiddleware: Middleware = {
+  async onRequest({ request }) {
+    const customHost = getCustomHost();
+    const gatewaySecret = getGatewaySecret();
+
+    let modifiedRequest = request;
+
+    if (customHost) {
+      // Replace the default base URL prefix with the custom host.
+      // e.g., "https://app.permissionslip.dev/api/v1/approvals"
+      //     → "https://my-server.example.com/api/v1/approvals"
+      const customBase = customHost
+        .replace(/\/v1\/?$/, "")
+        .replace(/\/$/, "");
+      const newUrl = request.url.replace(defaultBaseUrl, customBase);
+      modifiedRequest = new Request(newUrl, request);
+    }
+
+    if (gatewaySecret) {
+      modifiedRequest.headers.set("X-Gateway-Secret", gatewaySecret);
+    }
+
+    return modifiedRequest;
+  },
+};
+
+/**
  * Typed API client generated from the OpenAPI spec.
  * Uses the same `openapi-fetch` library as the web frontend.
  * Spec paths already include the "/v1" prefix, so the base URL is version-free.
  *
  * When EXPO_PUBLIC_MOCK_AUTH=true in dev mode, a mock client is used instead
  * so the app works without a running backend.
+ *
+ * Custom host mode: when a custom host URL is configured via Settings, the
+ * customHostMiddleware rewrites request URLs and injects the gateway secret
+ * header on every request.
  */
 // Safe: mockClient implements only GET/POST — the subset the mobile app uses.
 // TypeScript enforcement is bypassed because the mock doesn't expose the full
-// openapi-fetch interface. resolveBaseUrl() is only called when mock is off.
+// openapi-fetch interface.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const client = useMockApi
   ? (mockClient as any)
-  : createClient<paths>({ baseUrl: resolveBaseUrl() });
+  : createClient<paths>({ baseUrl: defaultBaseUrl });
 
 if (!useMockApi) {
+  client.use(customHostMiddleware);
   client.use(jsonSafeMiddleware);
 }
 

@@ -20,6 +20,7 @@ import { usePushSetup } from "./src/hooks/usePushSetup";
 import { useBiometricAuth } from "./src/hooks/useBiometricAuth";
 import { BiometricLockScreen } from "./src/screens/BiometricLockScreen";
 import { colors } from "./src/theme/colors";
+import { loadCustomHostConfig } from "./src/lib/customHostConfig";
 
 const useMockAuth = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
 const ActiveAuthProvider = useMockAuth ? MockAuthProvider : AuthProvider;
@@ -139,6 +140,12 @@ function AppContent({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function App() {
+  // Hydrate custom host config from SecureStore so the API client middleware
+  // can route requests to a private deployment if configured.
+  useEffect(() => {
+    loadCustomHostConfig();
+  }, []);
+
   // Subscribe to AppState changes so React Query knows when the app is focused.
   useEffect(() => {
     const sub = AppState.addEventListener("change", onAppStateChange);

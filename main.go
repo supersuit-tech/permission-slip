@@ -441,6 +441,12 @@ func main() {
 	// handler, including the health check and SPA handler.
 	handler := api.CORSMiddleware(deps.AllowedOrigins)(mux)
 
+	// Gateway secret — optional access gate for private deployments.
+	// When GATEWAY_SECRET is set, every non-OPTIONS request must include a
+	// matching X-Gateway-Secret header or receive 403. This is the outermost
+	// middleware so unauthorized requests are rejected before any processing.
+	handler = api.GatewaySecretMiddleware(os.Getenv("GATEWAY_SECRET"))(handler)
+
 	// Wrap all routes with security headers (outermost layer).
 	// Include the Supabase URL in CSP connect-src so the frontend can reach
 	// the auth/API endpoints in production. Sentry's ingest domain is always

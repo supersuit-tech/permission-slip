@@ -31,6 +31,12 @@ jest.mock("../../../auth/AuthContext", () => ({
   }),
 }));
 
+jest.mock("expo-secure-store", () => ({
+  getItemAsync: jest.fn().mockResolvedValue(null),
+  setItemAsync: jest.fn().mockResolvedValue(undefined),
+  deleteItemAsync: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock("expo-constants", () => ({
   __esModule: true,
   default: {
