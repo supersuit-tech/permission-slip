@@ -32,6 +32,7 @@ type ConnectorManifest struct {
 // ManifestAction describes a single action exposed by an external connector.
 type ManifestAction struct {
 	ActionType            string          `json:"action_type"`
+	OperationType         string          `json:"operation_type,omitempty"` // read, write, or delete; inferred from action_type when empty
 	Name                  string          `json:"name"`
 	Description           string          `json:"description"`
 	RiskLevel             string          `json:"risk_level"`
@@ -113,6 +114,13 @@ var validRiskLevels = map[string]bool{
 	"low":    true,
 	"medium": true,
 	"high":   true,
+}
+
+// validOperationTypes are the allowed values for ManifestAction.OperationType.
+var validOperationTypes = map[string]bool{
+	"read":   true,
+	"write":  true,
+	"delete": true,
 }
 
 // validPreviewLayouts are the allowed values for ActionPreview.Layout.
@@ -247,6 +255,9 @@ func (m *ConnectorManifest) Validate() error {
 		actionTypes[a.ActionType] = true
 		if a.Name == "" {
 			return fmt.Errorf("manifest validation: actions[%d].name is required", i)
+		}
+		if a.OperationType != "" && !validOperationTypes[a.OperationType] {
+			return fmt.Errorf("manifest validation: actions[%d].operation_type %q must be read, write, or delete", i, a.OperationType)
 		}
 		if a.RiskLevel != "" && !validRiskLevels[a.RiskLevel] {
 			return fmt.Errorf("manifest validation: actions[%d].risk_level %q must be low, medium, or high", i, a.RiskLevel)
@@ -643,8 +654,13 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 				log.Printf("warning: failed to marshal preview for action %s: %v", a.ActionType, err)
 			}
 		}
+		opType := a.OperationType
+		if opType == "" {
+			opType = string(InferOperationType(a.ActionType))
+		}
 		out.Actions = append(out.Actions, db.ExternalConnectorAction{
 			ActionType:            a.ActionType,
+			OperationType:         opType,
 			Name:                  a.Name,
 			Description:           a.Description,
 			RiskLevel:             a.RiskLevel,

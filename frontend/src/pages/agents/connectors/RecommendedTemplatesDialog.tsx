@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
@@ -17,8 +18,11 @@ import { useApplyActionConfigTemplate } from "@/hooks/useApplyActionConfigTempla
 import { useBulkApplyActionConfigTemplates } from "@/hooks/useBulkApplyActionConfigTemplates";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TemplateParamBadge } from "./TemplatePicker";
+import { cn } from "@/lib/utils";
 
 export type ApprovalMode = "auto_approve" | "requires_approval";
+
+export type OperationTypeUI = ConnectorAction["operation_type"];
 
 export interface RecommendedTemplatesDialogProps {
   open: boolean;
@@ -33,6 +37,12 @@ const approvalModeOptions: { label: string; value: ApprovalMode }[] = [
   { label: "Auto-approve", value: "auto_approve" },
   { label: "Requires approval", value: "requires_approval" },
 ];
+
+const operationSectionTitle: Record<OperationTypeUI, string> = {
+  read: "Read actions",
+  write: "Write actions",
+  delete: "Delete actions",
+};
 
 function defaultApprovalMode(template: ActionConfigTemplate): ApprovalMode {
   return template.standing_approval != null ? "auto_approve" : "requires_approval";
@@ -55,6 +65,10 @@ export function RecommendedTemplatesDialog({
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [approvalModes, setApprovalModes] = useState<Record<string, ApprovalMode>>({});
+
+  const [quickRead, setQuickRead] = useState<ApprovalMode>("auto_approve");
+  const [quickWrite, setQuickWrite] = useState<ApprovalMode>("requires_approval");
+  const [quickDelete, setQuickDelete] = useState<ApprovalMode>("requires_approval");
 
   const getApprovalMode = useCallback(
     (template: ActionConfigTemplate): ApprovalMode =>
@@ -82,33 +96,68 @@ export function RecommendedTemplatesDialog({
     return m;
   }, [actions]);
 
+  const operationTypeByActionType = useMemo(() => {
+    const m = new Map<string, OperationTypeUI>();
+    for (const a of actions) {
+      m.set(a.action_type, a.operation_type);
+    }
+    return m;
+  }, [actions]);
+
+  const getOperationType = useCallback(
+    (template: ActionConfigTemplate): OperationTypeUI =>
+      operationTypeByActionType.get(template.action_type) ?? "write",
+    [operationTypeByActionType],
+  );
+
   const liveTemplates = useMemo(
     () => templates.filter((t) => actionTypeSet.has(t.action_type)),
     [templates, actionTypeSet],
   );
 
-  const grouped = useMemo(() => {
-    const byType = new Map<string, ActionConfigTemplate[]>();
-    for (const t of liveTemplates) {
-      const list = byType.get(t.action_type) ?? [];
-      list.push(t);
-      byType.set(t.action_type, list);
-    }
-    const order = actions.map((a) => a.action_type);
-    const groups: { actionType: string; actionName: string; items: ActionConfigTemplate[] }[] =
-      [];
-    for (const actionType of order) {
-      const items = byType.get(actionType);
-      if (items && items.length > 0) {
-        groups.push({
+  const groupedByOperation = useMemo(() => {
+    const opOrder: OperationTypeUI[] = ["read", "write", "delete"];
+    const firstActionIndex = new Map<string, number>();
+    actions.forEach((a, i) => {
+      if (!firstActionIndex.has(a.action_type)) {
+        firstActionIndex.set(a.action_type, i);
+      }
+    });
+
+    const out: {
+      operationType: OperationTypeUI;
+      subgroups: {
+        actionType: string;
+        actionName: string;
+        items: ActionConfigTemplate[];
+      }[];
+    }[] = [];
+
+    for (const op of opOrder) {
+      const byAction = new Map<string, ActionConfigTemplate[]>();
+      for (const t of liveTemplates) {
+        if (getOperationType(t) !== op) continue;
+        const list = byAction.get(t.action_type) ?? [];
+        list.push(t);
+        byAction.set(t.action_type, list);
+      }
+      if (byAction.size === 0) continue;
+
+      const subgroups = [...byAction.entries()]
+        .sort(
+          ([a], [b]) =>
+            (firstActionIndex.get(a) ?? 999) - (firstActionIndex.get(b) ?? 999),
+        )
+        .map(([actionType, items]) => ({
           actionType,
           actionName: actionNameByType.get(actionType) ?? actionType,
           items,
-        });
-      }
+        }));
+
+      out.push({ operationType: op, subgroups });
     }
-    return groups;
-  }, [liveTemplates, actions, actionNameByType]);
+    return out;
+  }, [liveTemplates, actions, actionNameByType, getOperationType]);
 
   const toggleSelected = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -132,6 +181,60 @@ export function RecommendedTemplatesDialog({
       setSelectedIds(new Set(liveTemplates.map((t) => t.id)));
     }
   }, [allSelected, liveTemplates]);
+
+  const templateIdsForOperation = useCallback(
+    (op: OperationTypeUI) =>
+      liveTemplates.filter((t) => getOperationType(t) === op).map((t) => t.id),
+    [liveTemplates, getOperationType],
+  );
+
+  const allSelectedInOperation = useCallback(
+    (op: OperationTypeUI) => {
+      const ids = templateIdsForOperation(op);
+      return (
+        ids.length > 0 && ids.every((id) => selectedIds.has(id))
+      );
+    },
+    [templateIdsForOperation, selectedIds],
+  );
+
+  const toggleSelectOperation = useCallback(
+    (op: OperationTypeUI) => {
+      const ids = templateIdsForOperation(op);
+      const allOn = ids.length > 0 && ids.every((id) => selectedIds.has(id));
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        if (allOn) {
+          for (const id of ids) {
+            next.delete(id);
+          }
+        } else {
+          for (const id of ids) {
+            next.add(id);
+          }
+        }
+        return next;
+      });
+    },
+    [templateIdsForOperation],
+  );
+
+  const handleQuickApply = useCallback(() => {
+    setApprovalModes((prev) => {
+      const next = { ...prev };
+      for (const t of liveTemplates) {
+        const op = getOperationType(t);
+        next[t.id] =
+          op === "read"
+            ? quickRead
+            : op === "write"
+              ? quickWrite
+              : quickDelete;
+      }
+      return next;
+    });
+    setSelectedIds(new Set(liveTemplates.map((t) => t.id)));
+  }, [liveTemplates, getOperationType, quickRead, quickWrite, quickDelete]);
 
   async function handleUseTemplate(template: ActionConfigTemplate) {
     const approvalMode = getApprovalMode(template);
@@ -169,7 +272,6 @@ export function RecommendedTemplatesDialog({
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
 
-    // Collect per-template approval modes for overrides only.
     const modes: Record<string, ApprovalMode> = {};
     for (const id of ids) {
       const tpl = liveTemplates.find((t) => t.id === id);
@@ -213,6 +315,13 @@ export function RecommendedTemplatesDialog({
 
   const anyPending = isPending || isBulkPending;
 
+  const selectClassName = cn(
+    "border-input bg-background text-foreground",
+    "h-9 max-w-[11rem] min-w-0 flex-1 rounded-md border px-2 text-sm shadow-xs",
+    "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
+    "disabled:cursor-not-allowed disabled:opacity-50",
+  );
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-lg">
@@ -236,13 +345,97 @@ export function RecommendedTemplatesDialog({
           </div>
         ) : error ? (
           <p className="text-destructive py-4 text-sm">{error}</p>
-        ) : grouped.length === 0 ? (
+        ) : groupedByOperation.length === 0 ? (
           <p className="text-muted-foreground py-4 text-sm">
             No recommended templates are available for this connector.
           </p>
         ) : (
           <>
-            {/* Select all toggle */}
+            <div className="bg-muted/40 space-y-3 rounded-lg border border-input p-3">
+              <p className="text-sm font-semibold">Quick setup</p>
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <Label
+                    htmlFor="quick-read"
+                    className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
+                  >
+                    Read actions
+                  </Label>
+                  <select
+                    id="quick-read"
+                    className={selectClassName}
+                    value={quickRead}
+                    onChange={(e) =>
+                      setQuickRead(e.target.value as ApprovalMode)
+                    }
+                    disabled={anyPending}
+                  >
+                    {approvalModeOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <Label
+                    htmlFor="quick-write"
+                    className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
+                  >
+                    Write actions
+                  </Label>
+                  <select
+                    id="quick-write"
+                    className={selectClassName}
+                    value={quickWrite}
+                    onChange={(e) =>
+                      setQuickWrite(e.target.value as ApprovalMode)
+                    }
+                    disabled={anyPending}
+                  >
+                    {approvalModeOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+                  <Label
+                    htmlFor="quick-delete"
+                    className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
+                  >
+                    Delete actions
+                  </Label>
+                  <select
+                    id="quick-delete"
+                    className={selectClassName}
+                    value={quickDelete}
+                    onChange={(e) =>
+                      setQuickDelete(e.target.value as ApprovalMode)
+                    }
+                    disabled={anyPending}
+                  >
+                    {approvalModeOptions.map((o) => (
+                      <option key={o.value} value={o.value}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <Button
+                type="button"
+                size="sm"
+                variant="secondary"
+                className="w-full sm:w-auto"
+                onClick={handleQuickApply}
+                disabled={anyPending || liveTemplates.length === 0}
+              >
+                Apply
+              </Button>
+            </div>
+
             <label className="flex items-center gap-2 py-1">
               <Checkbox
                 checked={allSelected}
@@ -254,38 +447,68 @@ export function RecommendedTemplatesDialog({
               </span>
             </label>
 
-            {/* Scrollable template list */}
             <div className="min-h-0 flex-1 overflow-y-auto">
               <div className="space-y-6 py-2">
-                {grouped.map((group) => (
-                  <section key={group.actionType} className="space-y-3">
-                    <h3 className="text-sm font-semibold">{group.actionName}</h3>
-                    <div className="space-y-3">
-                      {group.items.map((template) => (
-                        <RecommendedTemplateCard
-                          key={template.id}
-                          template={template}
-                          selected={selectedIds.has(template.id)}
-                          onToggleSelected={() => toggleSelected(template.id)}
-                          approvalMode={getApprovalMode(template)}
-                          onApprovalModeChange={(mode) =>
-                            handleApprovalModeChange(template.id, mode)
-                          }
-                          onUseTemplate={() => void handleUseTemplate(template)}
-                          onCustomize={() => handleCustomize(template)}
-                          disabled={anyPending}
-                          usePending={
-                            isPending && pendingTemplateId === template.id
-                          }
-                        />
-                      ))}
-                    </div>
-                  </section>
-                ))}
+                {groupedByOperation.map((section) => {
+                  const op = section.operationType;
+                  const countInOp = templateIdsForOperation(op).length;
+                  return (
+                    <section key={op} className="space-y-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <h2 className="text-base font-semibold">
+                          {operationSectionTitle[op]}
+                        </h2>
+                        <label className="flex items-center gap-2">
+                          <Checkbox
+                            checked={allSelectedInOperation(op)}
+                            onCheckedChange={() => toggleSelectOperation(op)}
+                            disabled={anyPending || countInOp === 0}
+                          />
+                          <span className="text-muted-foreground text-xs sm:text-sm">
+                            Select all in section ({countInOp})
+                          </span>
+                        </label>
+                      </div>
+                      <div className="space-y-5 pl-0 sm:pl-1">
+                        {section.subgroups.map((group) => (
+                          <div key={group.actionType} className="space-y-3">
+                            <h3 className="text-sm font-medium">
+                              {group.actionName}
+                            </h3>
+                            <div className="space-y-3">
+                              {group.items.map((template) => (
+                                <RecommendedTemplateCard
+                                  key={template.id}
+                                  template={template}
+                                  selected={selectedIds.has(template.id)}
+                                  onToggleSelected={() =>
+                                    toggleSelected(template.id)
+                                  }
+                                  approvalMode={getApprovalMode(template)}
+                                  onApprovalModeChange={(mode) =>
+                                    handleApprovalModeChange(template.id, mode)
+                                  }
+                                  onUseTemplate={() =>
+                                    void handleUseTemplate(template)
+                                  }
+                                  onCustomize={() => handleCustomize(template)}
+                                  disabled={anyPending}
+                                  usePending={
+                                    isPending &&
+                                    pendingTemplateId === template.id
+                                  }
+                                />
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  );
+                })}
               </div>
             </div>
 
-            {/* Sticky footer */}
             <div className="flex items-center justify-between border-t pt-3">
               <span className="text-muted-foreground text-sm">
                 {selectedIds.size} of {liveTemplates.length} selected

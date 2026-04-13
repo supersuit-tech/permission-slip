@@ -61,6 +61,7 @@ function setupMocks() {
           actions: [
             {
               action_type: "github.create_issue",
+              operation_type: "write",
               name: "Create Issue",
               parameters_schema: {
                 type: "object",

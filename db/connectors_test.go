@@ -17,7 +17,7 @@ func TestConnectorsSchema(t *testing.T) {
 	})
 	t.Run("connector_actions", func(t *testing.T) {
 		testhelper.RequireColumns(t, tx, "connector_actions", []string{
-			"connector_id", "action_type", "name", "description",
+			"connector_id", "action_type", "operation_type", "name", "description",
 			"risk_level", "parameters_schema",
 		})
 	})
@@ -195,8 +195,8 @@ func TestUpsertConnectorFromManifest_Insert(t *testing.T) {
 		Name:        "External Test",
 		Description: "A test connector",
 		Actions: []db.ExternalConnectorAction{
-			{ActionType: "ext-test.create", Name: "Create", Description: "Create thing", RiskLevel: "low"},
-			{ActionType: "ext-test.delete", Name: "Delete", RiskLevel: "high"},
+			{ActionType: "ext-test.create", OperationType: "write", Name: "Create", Description: "Create thing", RiskLevel: "low"},
+			{ActionType: "ext-test.delete", OperationType: "delete", Name: "Delete", RiskLevel: "high"},
 		},
 		Credentials: []db.ExternalConnectorCredential{
 			{Service: "ext-test", AuthType: "api_key"},
@@ -238,6 +238,26 @@ func TestUpsertConnectorFromManifest_Insert(t *testing.T) {
 	}
 	if credCount != 1 {
 		t.Errorf("credential count = %d, want 1", credCount)
+	}
+
+	var opCreate, opDelete string
+	err = tx.QueryRow(ctx,
+		`SELECT operation_type FROM connector_actions WHERE connector_id = $1 AND action_type = $2`,
+		"ext-test", "ext-test.create").Scan(&opCreate)
+	if err != nil {
+		t.Fatalf("querying operation_type for create: %v", err)
+	}
+	if opCreate != "write" {
+		t.Errorf("ext-test.create operation_type = %q, want write", opCreate)
+	}
+	err = tx.QueryRow(ctx,
+		`SELECT operation_type FROM connector_actions WHERE connector_id = $1 AND action_type = $2`,
+		"ext-test", "ext-test.delete").Scan(&opDelete)
+	if err != nil {
+		t.Fatalf("querying operation_type for delete: %v", err)
+	}
+	if opDelete != "delete" {
+		t.Errorf("ext-test.delete operation_type = %q, want delete", opDelete)
 	}
 }
 

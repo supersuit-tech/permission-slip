@@ -129,6 +129,9 @@ func TestGetConnector_Found(t *testing.T) {
 	if resp.Actions[0].ActionType != "test.act" {
 		t.Errorf("expected action_type 'test.act', got %q", resp.Actions[0].ActionType)
 	}
+	if resp.Actions[0].OperationType != "write" {
+		t.Errorf("expected operation_type 'write' (column default), got %q", resp.Actions[0].OperationType)
+	}
 	if len(resp.RequiredCredentials) != 1 {
 		t.Fatalf("expected 1 credential, got %d", len(resp.RequiredCredentials))
 	}
