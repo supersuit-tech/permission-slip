@@ -76,10 +76,10 @@ git clone https://github.com/supersuit-tech/permission-slip.git
 cd permission-slip
 ```
 
-Generate a vault encryption key (Supabase Vault uses this to encrypt stored credentials at rest):
+Generate a vault encryption key (Supabase Vault uses this to encrypt stored credentials at rest). The append-if-missing pattern protects any existing `.env`:
 
 ```bash
-echo "VAULT_SECRET_KEY=$(openssl rand -hex 32)" > .env
+grep -q "^VAULT_SECRET_KEY=" .env 2>/dev/null || echo "VAULT_SECRET_KEY=$(openssl rand -hex 32)" >> .env
 ```
 
 Start the local Supabase stack. The first run pulls Docker images — expect this to take 5-10 minutes on a Pi:

@@ -35,7 +35,7 @@ Before deploying, you'll need:
 The server handles everything on a single port:
 - API endpoints under `/api/v1/`
 - Health check at `/api/health`
-- Supabase reverse proxy at `/supabase/*` (forwards to `SUPABASE_URL`)
+- Supabase Auth reverse proxy at `/supabase/auth/v1/*` (forwards to `SUPABASE_URL`)
 - React SPA for all other routes
 - Database migrations run automatically on startup
 
@@ -70,8 +70,8 @@ If you prefer to run everything locally with zero external accounts, you can use
 git clone https://github.com/supersuit-tech/permission-slip.git
 cd permission-slip
 
-# Generate a vault encryption key
-echo "VAULT_SECRET_KEY=$(openssl rand -hex 32)" > .env
+# Generate a vault encryption key (appends to .env if the key isn't already set)
+grep -q "^VAULT_SECRET_KEY=" .env 2>/dev/null || echo "VAULT_SECRET_KEY=$(openssl rand -hex 32)" >> .env
 
 # Start local Supabase (pulls Docker images on first run)
 supabase start
@@ -93,6 +93,8 @@ This gives you PostgreSQL, Auth (GoTrue), Vault, and Inbucket (email capture) �
 - No CORS configuration needed
 - The frontend works regardless of hostname or IP changes
 - Only port 8080 needs to be reachable
+
+The proxy is deliberately narrow — it **only forwards `/auth/v1/*`** (the Supabase Auth surface, which is all the frontend uses). Requests for other Supabase surfaces (`/rest/v1/`, `/storage/v1/`, `/realtime/v1/`, `/functions/v1/`) return 404. This prevents the proxy from being usable as an open HTTP relay into arbitrary upstream paths.
 
 **Auth emails** are captured by Inbucket at `http://localhost:54324` (no real emails are sent). Check Inbucket for OTP verification codes during signup and login.
 
@@ -155,7 +157,7 @@ These are inlined into the JavaScript bundle by Vite at build time. They must be
 
 > The publishable key is safe to include in the build — it's a public key visible in client-side JavaScript by design. (Supabase previously called this the "anon key.")
 
-**Supabase reverse proxy:** The Go server proxies `/supabase/*` to `SUPABASE_URL` at runtime. When `VITE_SUPABASE_URL` is omitted from the build, the frontend automatically uses this proxy. This is the recommended approach for self-hosted deployments because it eliminates hostname/IP dependencies in the frontend build and avoids CORS issues. Cloud Supabase deployments should still set `VITE_SUPABASE_URL` for direct browser-to-Supabase communication.
+**Supabase reverse proxy:** The Go server proxies `/supabase/auth/v1/*` to `SUPABASE_URL` at runtime. When `VITE_SUPABASE_URL` is omitted from the build, the frontend automatically uses this proxy. Only the Supabase Auth surface is forwarded — other Supabase surfaces (rest, storage, realtime, functions) return 404 to prevent the proxy from being used as an open HTTP relay. This is the recommended approach for self-hosted deployments because it eliminates hostname/IP dependencies in the frontend build and avoids CORS issues. Cloud Supabase deployments should still set `VITE_SUPABASE_URL` for direct browser-to-Supabase communication.
 
 ### Web Push Notifications (VAPID)
 
