@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Label } from "@/components/ui/label";
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
@@ -18,11 +17,15 @@ import { useApplyActionConfigTemplate } from "@/hooks/useApplyActionConfigTempla
 import { useBulkApplyActionConfigTemplates } from "@/hooks/useBulkApplyActionConfigTemplates";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TemplateParamBadge } from "./TemplatePicker";
-import { cn } from "@/lib/utils";
+import { QuickSetupPanel } from "./QuickSetupPanel";
+import {
+  approvalModeOptions,
+  type ApprovalMode,
+  type OperationTypeUI,
+} from "./recommendedTemplatesTypes";
+import { useRecommendedTemplateSelection } from "./useRecommendedTemplateSelection";
 
-export type ApprovalMode = "auto_approve" | "requires_approval";
-
-export type OperationTypeUI = ConnectorAction["operation_type"];
+export type { ApprovalMode, OperationTypeUI };
 
 export interface RecommendedTemplatesDialogProps {
   open: boolean;
@@ -33,20 +36,11 @@ export interface RecommendedTemplatesDialogProps {
   onCustomize: (template: ActionConfigTemplate, approvalMode: ApprovalMode) => void;
 }
 
-const approvalModeOptions: { label: string; value: ApprovalMode }[] = [
-  { label: "Auto-approve", value: "auto_approve" },
-  { label: "Requires approval", value: "requires_approval" },
-];
-
 const operationSectionTitle: Record<OperationTypeUI, string> = {
   read: "Read actions",
   write: "Write actions",
   delete: "Delete actions",
 };
-
-function defaultApprovalMode(template: ActionConfigTemplate): ApprovalMode {
-  return template.standing_approval != null ? "auto_approve" : "requires_approval";
-}
 
 export function RecommendedTemplatesDialog({
   open,
@@ -62,25 +56,6 @@ export function RecommendedTemplatesDialog({
   const { bulkApply, isBulkPending } = useBulkApplyActionConfigTemplates();
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(
     null,
-  );
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [approvalModes, setApprovalModes] = useState<Record<string, ApprovalMode>>({});
-
-  const [quickRead, setQuickRead] = useState<ApprovalMode>("auto_approve");
-  const [quickWrite, setQuickWrite] = useState<ApprovalMode>("requires_approval");
-  const [quickDelete, setQuickDelete] = useState<ApprovalMode>("requires_approval");
-
-  const getApprovalMode = useCallback(
-    (template: ActionConfigTemplate): ApprovalMode =>
-      approvalModes[template.id] ?? defaultApprovalMode(template),
-    [approvalModes],
-  );
-
-  const handleApprovalModeChange = useCallback(
-    (templateId: string, mode: ApprovalMode) => {
-      setApprovalModes((prev) => ({ ...prev, [templateId]: mode }));
-    },
-    [],
   );
 
   const actionTypeSet = useMemo(
@@ -114,6 +89,26 @@ export function RecommendedTemplatesDialog({
     () => templates.filter((t) => actionTypeSet.has(t.action_type)),
     [templates, actionTypeSet],
   );
+
+  const {
+    selectedIds,
+    setSelectedIds,
+    getApprovalMode,
+    handleApprovalModeChange,
+    allSelected,
+    toggleSelectAll,
+    toggleSelected,
+    templateIdsForOperation,
+    allSelectedInOperation,
+    toggleSelectOperation,
+    handleQuickApply,
+    quickRead,
+    setQuickRead,
+    quickWrite,
+    setQuickWrite,
+    quickDelete,
+    setQuickDelete,
+  } = useRecommendedTemplateSelection(liveTemplates, getOperationType);
 
   const groupedByOperation = useMemo(() => {
     const opOrder: OperationTypeUI[] = ["read", "write", "delete"];
@@ -158,83 +153,6 @@ export function RecommendedTemplatesDialog({
     }
     return out;
   }, [liveTemplates, actions, actionNameByType, getOperationType]);
-
-  const toggleSelected = useCallback((id: string) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  }, []);
-
-  const allSelected =
-    liveTemplates.length > 0 && selectedIds.size === liveTemplates.length;
-
-  const toggleSelectAll = useCallback(() => {
-    if (allSelected) {
-      setSelectedIds(new Set());
-    } else {
-      setSelectedIds(new Set(liveTemplates.map((t) => t.id)));
-    }
-  }, [allSelected, liveTemplates]);
-
-  const templateIdsForOperation = useCallback(
-    (op: OperationTypeUI) =>
-      liveTemplates.filter((t) => getOperationType(t) === op).map((t) => t.id),
-    [liveTemplates, getOperationType],
-  );
-
-  const allSelectedInOperation = useCallback(
-    (op: OperationTypeUI) => {
-      const ids = templateIdsForOperation(op);
-      return (
-        ids.length > 0 && ids.every((id) => selectedIds.has(id))
-      );
-    },
-    [templateIdsForOperation, selectedIds],
-  );
-
-  const toggleSelectOperation = useCallback(
-    (op: OperationTypeUI) => {
-      const ids = templateIdsForOperation(op);
-      const allOn = ids.length > 0 && ids.every((id) => selectedIds.has(id));
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        if (allOn) {
-          for (const id of ids) {
-            next.delete(id);
-          }
-        } else {
-          for (const id of ids) {
-            next.add(id);
-          }
-        }
-        return next;
-      });
-    },
-    [templateIdsForOperation],
-  );
-
-  const handleQuickApply = useCallback(() => {
-    setApprovalModes((prev) => {
-      const next = { ...prev };
-      for (const t of liveTemplates) {
-        const op = getOperationType(t);
-        next[t.id] =
-          op === "read"
-            ? quickRead
-            : op === "write"
-              ? quickWrite
-              : quickDelete;
-      }
-      return next;
-    });
-    setSelectedIds(new Set(liveTemplates.map((t) => t.id)));
-  }, [liveTemplates, getOperationType, quickRead, quickWrite, quickDelete]);
 
   async function handleUseTemplate(template: ActionConfigTemplate) {
     const approvalMode = getApprovalMode(template);
@@ -315,13 +233,6 @@ export function RecommendedTemplatesDialog({
 
   const anyPending = isPending || isBulkPending;
 
-  const selectClassName = cn(
-    "border-input bg-background text-foreground",
-    "h-9 max-w-[11rem] min-w-0 flex-1 rounded-md border px-2 text-sm shadow-xs",
-    "focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] focus-visible:outline-none",
-    "disabled:cursor-not-allowed disabled:opacity-50",
-  );
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="flex max-h-[85dvh] flex-col sm:max-w-lg">
@@ -351,90 +262,17 @@ export function RecommendedTemplatesDialog({
           </p>
         ) : (
           <>
-            <div className="bg-muted/40 space-y-3 rounded-lg border border-input p-3">
-              <p className="text-sm font-semibold">Quick setup</p>
-              <div className="space-y-2">
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <Label
-                    htmlFor="quick-read"
-                    className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
-                  >
-                    Read actions
-                  </Label>
-                  <select
-                    id="quick-read"
-                    className={selectClassName}
-                    value={quickRead}
-                    onChange={(e) =>
-                      setQuickRead(e.target.value as ApprovalMode)
-                    }
-                    disabled={anyPending}
-                  >
-                    {approvalModeOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <Label
-                    htmlFor="quick-write"
-                    className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
-                  >
-                    Write actions
-                  </Label>
-                  <select
-                    id="quick-write"
-                    className={selectClassName}
-                    value={quickWrite}
-                    onChange={(e) =>
-                      setQuickWrite(e.target.value as ApprovalMode)
-                    }
-                    disabled={anyPending}
-                  >
-                    {approvalModeOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-                  <Label
-                    htmlFor="quick-delete"
-                    className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
-                  >
-                    Delete actions
-                  </Label>
-                  <select
-                    id="quick-delete"
-                    className={selectClassName}
-                    value={quickDelete}
-                    onChange={(e) =>
-                      setQuickDelete(e.target.value as ApprovalMode)
-                    }
-                    disabled={anyPending}
-                  >
-                    {approvalModeOptions.map((o) => (
-                      <option key={o.value} value={o.value}>
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <Button
-                type="button"
-                size="sm"
-                variant="secondary"
-                className="w-full sm:w-auto"
-                onClick={handleQuickApply}
-                disabled={anyPending || liveTemplates.length === 0}
-              >
-                Apply
-              </Button>
-            </div>
+            <QuickSetupPanel
+              quickRead={quickRead}
+              quickWrite={quickWrite}
+              quickDelete={quickDelete}
+              onQuickReadChange={setQuickRead}
+              onQuickWriteChange={setQuickWrite}
+              onQuickDeleteChange={setQuickDelete}
+              onApply={handleQuickApply}
+              disabled={anyPending}
+              applyDisabled={liveTemplates.length === 0}
+            />
 
             <label className="flex items-center gap-2 py-1">
               <Checkbox
@@ -609,3 +447,4 @@ function RecommendedTemplateCard({
     </div>
   );
 }
+
