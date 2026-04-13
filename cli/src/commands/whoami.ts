@@ -7,6 +7,7 @@
 import type { Command } from "commander";
 import { ApiClient } from "../api/client.js";
 import { loadRegistrations, findRegistration } from "../config/store.js";
+import { resolveServerUrl } from "../config/serverUrl.js";
 import { keyPairExists, readPublicKey } from "../auth/keys.js";
 import { output, type OutputOptions } from "../output.js";
 
@@ -16,18 +17,18 @@ export function whoamiCommand(program: Command): void {
     .description("Show agent identity and registration info")
     .option(
       "--server <url>",
-      "Permission Slip server URL",
-      "https://app.permissionslip.dev",
+      "Permission Slip server URL (overrides PS_SERVER and config default_server)",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
-      server: string;
+      server?: string;
       agentId?: string;
       pretty?: boolean;
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
+        const { url: server } = resolveServerUrl({ serverFlag: opts.server });
         const hasKey = keyPairExists();
         let publicKey: string | null = null;
         if (hasKey) {
@@ -39,7 +40,7 @@ export function whoamiCommand(program: Command): void {
         }
 
         const registrations = loadRegistrations();
-        const reg = findRegistration(opts.server);
+        const reg = findRegistration(server);
         let agentId: number | undefined;
         if (opts.agentId) {
           agentId = parseInt(opts.agentId, 10);
@@ -50,7 +51,7 @@ export function whoamiCommand(program: Command): void {
         let liveStatus: unknown = null;
         if (agentId !== undefined) {
           try {
-            const client = new ApiClient({ serverUrl: opts.server, agentId });
+            const client = new ApiClient({ serverUrl: server, agentId });
             liveStatus = await client.status();
           } catch {
             liveStatus = null;
@@ -62,7 +63,7 @@ export function whoamiCommand(program: Command): void {
             key: { exists: hasKey, public_key: publicKey },
             registrations,
             current_server: {
-              server: opts.server,
+              server,
               registration: reg ?? null,
               live_status: liveStatus,
             },

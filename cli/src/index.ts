@@ -13,7 +13,7 @@
  *   connectors    List available connectors
  *   request        Request approval for an action (auto-approves if standing approval matches)
  *   request-status Check the status/outcome of an approval request
- *   config        Show saved configuration and registrations
+ *   config        Show or update saved configuration and registrations
  *   whoami        Show agent identity and registration info
  *
  * All commands output compact JSON by default. Pass --pretty for pretty-printed JSON.
@@ -37,6 +37,8 @@ program
   .description(
     "Agent-facing CLI for Permission Slip — register, verify, and interact with Permission Slip servers.\n\n" +
     "All commands output compact JSON by default. Pass --pretty for pretty-printed JSON.\n\n" +
+    "Server URL: use --server, or set PS_SERVER, or run: permission-slip config set default_server <url> " +
+    "(stored in ~/.permission-slip/config.json).\n\n" +
     "Quick start:\n" +
     "  1. Register:  permission-slip register --invite-code <code>\n" +
     "  2. Verify:    permission-slip verify --code <confirmation_code>\n" +

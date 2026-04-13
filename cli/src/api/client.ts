@@ -89,7 +89,7 @@ export class ApiClient {
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
       throw new Error(
         `Server URL must use http or https (got ${parsed.protocol}). ` +
-        "Check the --server flag.",
+        "Check --server, PS_SERVER, or config default_server.",
       );
     }
     this.base = normalizeBase(opts.serverUrl);

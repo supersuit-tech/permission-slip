@@ -15,6 +15,7 @@ import { generateKeyPair, keyPairExists, displayPath } from "../auth/keys.js";
 import { ApiClient } from "../api/client.js";
 import { REGISTRATION_AGENT_ID } from "../auth/signing.js";
 import { saveRegistration } from "../config/store.js";
+import { resolveServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
 
@@ -25,21 +26,21 @@ export function registerCommand(program: Command): void {
     .requiredOption("--invite-code <code>", "Invite code from the dashboard")
     .option(
       "--server <url>",
-      "Permission Slip server URL (default: https://app.permissionslip.dev)",
-      "https://app.permissionslip.dev",
+      "Permission Slip server URL (overrides PS_SERVER and config default_server)",
     )
     .option("--name <name>", "Agent name shown in the dashboard", "Agent")
     .option("--version <version>", "Agent version metadata", "1.0.0")
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       inviteCode: string;
-      server: string;
+      server?: string;
       name: string;
       version: string;
       pretty?: boolean;
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
+        const { url: server } = resolveServerUrl({ serverFlag: opts.server });
         // Key generation
         const hadKey = keyPairExists();
         const kp = generateKeyPair(false);
@@ -56,7 +57,7 @@ export function registerCommand(program: Command): void {
 
         // Register
         const client = new ApiClient({
-          serverUrl: opts.server,
+          serverUrl: server,
           agentId: REGISTRATION_AGENT_ID,
         });
 
@@ -69,7 +70,7 @@ export function registerCommand(program: Command): void {
 
         // Save a partial registration (will be completed after verify)
         saveRegistration({
-          server: opts.server,
+          server,
           agent_id: result.agent_id,
           registered_at: new Date().toISOString(),
         });
@@ -80,7 +81,7 @@ export function registerCommand(program: Command): void {
             expires_at: result.expires_at,
             verification_required: result.verification_required,
             key_file: displayPath(kp.privateKeyFile),
-            next_step: `Run: permission-slip verify --code <confirmation_code> --server ${shellQuote(opts.server)}`,
+            next_step: `Run: permission-slip verify --code <confirmation_code> --server ${shellQuote(server)}`,
           },
           outputOpts,
         );

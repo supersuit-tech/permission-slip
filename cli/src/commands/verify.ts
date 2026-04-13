@@ -8,6 +8,7 @@
 import type { Command } from "commander";
 import { ApiClient } from "../api/client.js";
 import { findRegistration, saveRegistration } from "../config/store.js";
+import { resolveServerUrl, isBuiltInDefaultServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
 
@@ -18,19 +19,19 @@ export function verifyCommand(program: Command): void {
     .requiredOption("--code <confirmation_code>", "Confirmation code from the dashboard")
     .option(
       "--server <url>",
-      "Permission Slip server URL",
-      "https://app.permissionslip.dev",
+      "Permission Slip server URL (overrides PS_SERVER and config default_server)",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       code: string;
-      server: string;
+      server?: string;
       agentId?: string;
       pretty?: boolean;
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
+        const { url: server } = resolveServerUrl({ serverFlag: opts.server });
         let agentId: number;
         if (opts.agentId) {
           agentId = parseInt(opts.agentId, 10);
@@ -38,10 +39,10 @@ export function verifyCommand(program: Command): void {
             throw new Error(`Invalid agent ID: ${opts.agentId}`);
           }
         } else {
-          const reg = findRegistration(opts.server);
+          const reg = findRegistration(server);
           if (!reg) {
             throw new Error(
-              `No registration found for ${opts.server}. ` +
+              `No registration found for ${server}. ` +
               "Run 'permission-slip register --invite-code <code>' first, " +
               "or pass --agent-id explicitly.",
             );
@@ -49,12 +50,12 @@ export function verifyCommand(program: Command): void {
           agentId = reg.agent_id;
         }
 
-        const client = new ApiClient({ serverUrl: opts.server, agentId });
+        const client = new ApiClient({ serverUrl: server, agentId });
         const result = await client.verify(agentId, opts.code);
 
         // Update the registration with the confirmed timestamp
         saveRegistration({
-          server: opts.server,
+          server,
           agent_id: agentId,
           registered_at: result.registered_at,
         });
@@ -64,9 +65,9 @@ export function verifyCommand(program: Command): void {
             status: result.status,
             agent_id: agentId,
             registered_at: result.registered_at,
-            next_step: opts.server === "https://app.permissionslip.dev"
+            next_step: isBuiltInDefaultServerUrl(server)
               ? "Run: permission-slip capabilities"
-              : `Run: permission-slip capabilities --server ${shellQuote(opts.server)}`,
+              : `Run: permission-slip capabilities --server ${shellQuote(server)}`,
           },
           outputOpts,
         );

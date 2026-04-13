@@ -8,14 +8,20 @@ import {
   loadRegistrations,
   saveRegistration,
   findRegistration,
+  loadConfig,
+  saveConfig,
+  unsetConfigKey,
   CONFIG_DIR,
   REGISTRATIONS_FILE,
+  CONFIG_FILE,
 } from "../src/config/store.js";
+import fs from "node:fs";
 
 describe("CONFIG_DIR / REGISTRATIONS_FILE", () => {
   it("uses the test temp dir (not ~/.permission-slip)", () => {
     expect(CONFIG_DIR).toContain("ps-cli-test-");
     expect(REGISTRATIONS_FILE).toContain("ps-cli-test-");
+    expect(CONFIG_FILE).toContain("ps-cli-test-");
   });
 });
 
@@ -64,6 +70,40 @@ describe("saveRegistration / loadRegistrations", () => {
     });
     const afterCount = loadRegistrations().length;
     expect(afterCount).toBe(beforeCount + 1);
+  });
+});
+
+describe("loadConfig / saveConfig / unsetConfigKey", () => {
+  afterEach(() => {
+    unsetConfigKey("default_server");
+    if (fs.existsSync(CONFIG_FILE)) {
+      fs.unlinkSync(CONFIG_FILE);
+    }
+  });
+
+  it("returns empty object when config file is missing", () => {
+    expect(loadConfig()).toEqual({});
+  });
+
+  it("saves and loads default_server", () => {
+    saveConfig({ default_server: "https://cfg.example.dev" });
+    expect(loadConfig().default_server).toBe("https://cfg.example.dev");
+  });
+
+  it("normalizes trailing slashes on default_server", () => {
+    saveConfig({ default_server: "https://cfg.example.dev/" });
+    expect(loadConfig().default_server).toBe("https://cfg.example.dev");
+  });
+
+  it("rejects invalid default_server URLs", () => {
+    expect(() => saveConfig({ default_server: "not-a-url" })).toThrow(/Invalid server URL/);
+  });
+
+  it("unset removes key and deletes file when empty", () => {
+    saveConfig({ default_server: "https://cfg.example.dev" });
+    unsetConfigKey("default_server");
+    expect(loadConfig()).toEqual({});
+    expect(fs.existsSync(CONFIG_FILE)).toBe(false);
   });
 });
 
