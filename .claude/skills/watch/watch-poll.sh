@@ -135,7 +135,8 @@ echo "$PR_NUMBER" > "$PR_NUMBER_FILE"
 # Constants
 # ---------------------------------------------------------------------------
 POLL_INTERVAL="${POLL_INTERVAL_OVERRIDE:-60}"
-MAX_IDLE_CYCLES="${MAX_IDLE_CYCLES_OVERRIDE:-6}"
+MAX_IDLE_CYCLES="${MAX_IDLE_CYCLES_OVERRIDE:-10}"
+INITIAL_DELAY="${INITIAL_DELAY_OVERRIDE:-600}"  # seconds to wait before first poll (default: 10 minutes)
 MAX_DRAIN_PASSES=2
 IDLE_COUNTER=0
 CYCLE=0
@@ -741,6 +742,14 @@ pending_count=$(echo "$pending_comments" | jq 'length')
 if [[ "$pending_count" -gt 0 ]]; then
   echo "[pending] Found ${pending_count} unprocessed items from previous run"
   echo "[pending] Re-including in next work batch"
+fi
+
+# --- Initial delay before first poll ---
+# Give reviewers time to leave comments before we start polling.
+# Only applies on fresh sessions (not re-invocations with --work-dir).
+if [[ -z "$EXISTING_WORK_DIR" && "$INITIAL_DELAY" -gt 0 ]]; then
+  echo "[setup] Waiting ${INITIAL_DELAY}s ($((INITIAL_DELAY / 60))m) before first poll to let reviewers comment..."
+  sleep "$INITIAL_DELAY"
 fi
 
 # --- Polling loop ---
