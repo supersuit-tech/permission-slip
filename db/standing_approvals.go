@@ -325,6 +325,21 @@ func RevokeActiveStandingApprovalsForSourceActionConfig(ctx context.Context, db 
 	return tag.RowsAffected(), nil
 }
 
+// DeleteStandingApprovalsForSourceActionConfig deletes all standing approval rows
+// that reference the given action configuration. Used when removing an action
+// configuration so FK constraints (when present) are satisfied.
+func DeleteStandingApprovalsForSourceActionConfig(ctx context.Context, db DBTX, userID, sourceConfigID string) (int64, error) {
+	tag, err := db.Exec(ctx,
+		`DELETE FROM standing_approvals
+		 WHERE user_id = $1 AND source_action_configuration_id = $2`,
+		userID, sourceConfigID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
 // ListStandingApprovalsByAgent returns standing approvals for the given agent,
 // ordered by creation time descending (newest first). Only active standing
 // approvals are returned (agents only need to see what they can currently use).

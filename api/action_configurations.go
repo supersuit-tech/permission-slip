@@ -26,24 +26,24 @@ type createActionConfigRequest struct {
 }
 
 type updateActionConfigRequest struct {
-	Parameters json.RawMessage `json:"parameters,omitempty"`
-	Status     *string         `json:"status,omitempty" validate:"omitempty,oneof=active disabled"`
-	Name       *string         `json:"name,omitempty"`
-	Description *string        `json:"description,omitempty"`
+	Parameters  json.RawMessage `json:"parameters,omitempty"`
+	Status      *string         `json:"status,omitempty" validate:"omitempty,oneof=active disabled"`
+	Name        *string         `json:"name,omitempty"`
+	Description *string         `json:"description,omitempty"`
 }
 
 type actionConfigResponse struct {
-	ID                      string                         `json:"id"`
-	AgentID                 int64                          `json:"agent_id"`
-	ConnectorID             string                         `json:"connector_id"`
-	ActionType              string                         `json:"action_type"`
-	Parameters              any                            `json:"parameters"`
-	Status                  string                         `json:"status"`
-	Name                    string                         `json:"name"`
-	Description             *string                        `json:"description,omitempty"`
+	ID                      string                          `json:"id"`
+	AgentID                 int64                           `json:"agent_id"`
+	ConnectorID             string                          `json:"connector_id"`
+	ActionType              string                          `json:"action_type"`
+	Parameters              any                             `json:"parameters"`
+	Status                  string                          `json:"status"`
+	Name                    string                          `json:"name"`
+	Description             *string                         `json:"description,omitempty"`
 	LinkedStandingApprovals []linkedStandingApprovalSummary `json:"linked_standing_approvals,omitempty"`
-	CreatedAt               time.Time                      `json:"created_at"`
-	UpdatedAt               time.Time                      `json:"updated_at"`
+	CreatedAt               time.Time                       `json:"created_at"`
+	UpdatedAt               time.Time                       `json:"updated_at"`
 }
 
 type linkedStandingApprovalSummary struct {
@@ -402,8 +402,8 @@ func handleDeleteActionConfig(deps *Deps) http.HandlerFunc {
 			defer db.RollbackTx(r.Context(), tx)
 		}
 
-		if _, err := db.RevokeActiveStandingApprovalsForSourceActionConfig(r.Context(), tx, profile.ID, configID); err != nil {
-			log.Printf("[%s] DeleteActionConfig: revoke standing approvals: %v", TraceID(r.Context()), err)
+		if _, err := db.DeleteStandingApprovalsForSourceActionConfig(r.Context(), tx, profile.ID, configID); err != nil {
+			log.Printf("[%s] DeleteActionConfig: delete standing approvals: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete action configuration"))
 			return
