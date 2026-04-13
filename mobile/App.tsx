@@ -140,10 +140,13 @@ function AppContent({ onRetry }: { onRetry: () => void }) {
 }
 
 export default function App() {
-  // Hydrate custom host config from SecureStore so the API client middleware
-  // can route requests to a private deployment if configured.
+  // Hydrate custom host config from SecureStore BEFORE mounting any subtree
+  // that can issue API calls. Without this gate, the first one or more
+  // requests after cold start would bypass the custom host and gateway
+  // secret, causing surprising 403s against a gateway-locked server.
+  const [hostHydrated, setHostHydrated] = useState(false);
   useEffect(() => {
-    loadCustomHostConfig();
+    loadCustomHostConfig().finally(() => setHostHydrated(true));
   }, []);
 
   // Subscribe to AppState changes so React Query knows when the app is focused.
@@ -156,6 +159,17 @@ export default function App() {
   // Supabase's onAuthStateChange and retries the initial session check.
   const [authKey, setAuthKey] = useState(0);
   const handleRetry = useCallback(() => setAuthKey((k) => k + 1), []);
+
+  if (!hostHydrated) {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.loading}>
+          <ActivityIndicator size="large" color={colors.gray900} />
+        </View>
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <QueryClientProvider client={queryClient}>

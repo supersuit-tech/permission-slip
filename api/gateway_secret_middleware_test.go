@@ -74,7 +74,7 @@ func TestGatewaySecretMiddleware_MissingHeader_Rejects(t *testing.T) {
 	}
 }
 
-func TestGatewaySecretMiddleware_OptionsExempt(t *testing.T) {
+func TestGatewaySecretMiddleware_CORSPreflightExempt(t *testing.T) {
 	t.Parallel()
 	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNoContent)
@@ -82,12 +82,32 @@ func TestGatewaySecretMiddleware_OptionsExempt(t *testing.T) {
 
 	handler := GatewaySecretMiddleware("my-secret-key")(inner)
 	req := httptest.NewRequest(http.MethodOptions, "/api/v1/test", nil)
-	// No X-Gateway-Secret header — should still pass through.
+	// Genuine CORS preflight — includes Access-Control-Request-Method and no
+	// X-Gateway-Secret header — should pass through.
+	req.Header.Set("Access-Control-Request-Method", "POST")
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNoContent {
-		t.Errorf("expected 204 for OPTIONS (preflight exempt), got %d", rec.Code)
+		t.Errorf("expected 204 for genuine CORS preflight, got %d", rec.Code)
+	}
+}
+
+func TestGatewaySecretMiddleware_BareOPTIONS_Rejects(t *testing.T) {
+	t.Parallel()
+	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusNoContent)
+	})
+
+	handler := GatewaySecretMiddleware("my-secret-key")(inner)
+	// OPTIONS request without Access-Control-Request-Method is not a CORS
+	// preflight — it should still be gated.
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/test", nil)
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("expected 403 for bare OPTIONS without gateway secret, got %d", rec.Code)
 	}
 }
 
