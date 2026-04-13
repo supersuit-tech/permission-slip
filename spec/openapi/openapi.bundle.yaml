@@ -3256,6 +3256,62 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/action-config-templates/bulk-apply:
+    post:
+      operationId: bulkApplyActionConfigTemplates
+      summary: Bulk Apply Action Configuration Templates
+      description: |
+        Apply multiple templates in a single request. Creates an action
+        configuration (and optional standing approval) for each template.
+
+        All templates must belong to the same connector. The connector is
+        automatically enabled for the agent if not already enabled.
+
+        Each template is applied independently — if one fails (e.g., standing
+        approval limit reached), the others still succeed. The response
+        includes per-template results.
+      tags:
+        - Action Configurations
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkApplyActionConfigTemplateRequest'
+      responses:
+        '200':
+          description: |
+            Bulk apply completed. Check individual `results[].success` for
+            per-template outcomes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkApplyActionConfigTemplateResponse'
+        '400':
+          description: Invalid request (empty list, mixed connectors, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: |
+            A requested template ID was not found. This is an upfront
+            validation error — no configurations are created.
+            Per-template failures (e.g., agent not found, standing approval
+            limit) are reported in `results[]` with `success: false`, not
+            as HTTP-level errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/action-config-templates/{id}/apply:
     post:
       operationId: applyActionConfigTemplate
@@ -11671,27 +11727,42 @@ components:
           minimum: 1
           description: |
             Optional cap on executions. `null` means unlimited within the window.
-    ApplyActionConfigTemplateRequest:
+    BulkApplyActionConfigTemplateRequest:
       type: object
       required:
         - agent_id
+        - template_ids
       properties:
         agent_id:
           type: integer
           format: int64
-          description: Agent to attach the new configuration and standing approval to.
+          description: Agent to attach the new configurations and standing approvals to.
           example: 42
-        approval_mode:
-          type: string
-          enum:
-            - auto_approve
-            - requires_approval
+        template_ids:
+          type: array
+          items:
+            type: string
+            maxLength: 255
+          minItems: 1
+          maxItems: 50
           description: |
-            Override the template's built-in approval behavior.
-            `auto_approve` creates a standing approval (using the template's spec
-            if present, otherwise sensible defaults: no expiry, unlimited executions).
-            `requires_approval` skips standing approval creation.
-            When omitted, falls back to the template's built-in behavior.
+            Template IDs to apply. All templates must belong to the same connector.
+            Duplicates are silently deduplicated.
+          example:
+            - tpl_github_create_issue_all
+            - tpl_github_merge_pr_all
+        approval_modes:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - auto_approve
+              - requires_approval
+          description: |
+            Optional per-template approval mode overrides keyed by template ID.
+            Templates not in this map use their built-in behavior.
+          example:
+            tpl_github_create_issue_all: auto_approve
     LinkedStandingApprovalSummary:
       type: object
       required:
@@ -11723,6 +11794,72 @@ components:
           type: integer
           minimum: 0
           description: Executions recorded so far.
+    BulkApplyResultError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          example: standing_approval_limit_reached
+        message:
+          type: string
+          description: Human-readable error message.
+          example: Standing approval limit reached
+    BulkApplyResult:
+      type: object
+      required:
+        - template_id
+        - success
+      properties:
+        template_id:
+          type: string
+          description: The template ID that was applied (or failed).
+        success:
+          type: boolean
+          description: Whether this template was applied successfully.
+        action_configuration:
+          $ref: '#/components/schemas/ActionConfiguration'
+        standing_approval:
+          $ref: '#/components/schemas/StandingApproval'
+          description: Present when the template bundles a standing approval and it was created successfully.
+        error:
+          $ref: '#/components/schemas/BulkApplyResultError'
+          description: Present when `success` is false.
+    BulkApplyActionConfigTemplateResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkApplyResult'
+          description: |
+            Per-template results. Order matches the deduplicated input order.
+    ApplyActionConfigTemplateRequest:
+      type: object
+      required:
+        - agent_id
+      properties:
+        agent_id:
+          type: integer
+          format: int64
+          description: Agent to attach the new configuration and standing approval to.
+          example: 42
+        approval_mode:
+          type: string
+          enum:
+            - auto_approve
+            - requires_approval
+          description: |
+            Override the template's built-in approval behavior.
+            `auto_approve` creates a standing approval (using the template's spec
+            if present, otherwise sensible defaults: no expiry, unlimited executions).
+            `requires_approval` skips standing approval creation.
+            When omitted, falls back to the template's built-in behavior.
     ApplyActionConfigTemplateResponse:
       type: object
       required:

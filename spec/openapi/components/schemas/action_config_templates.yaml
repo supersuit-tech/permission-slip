@@ -136,6 +136,91 @@ ApplyActionConfigTemplateResponse:
       $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
       description: Present when the template bundles a standing approval.
 
+BulkApplyActionConfigTemplateRequest:
+  type: object
+  required:
+    - agent_id
+    - template_ids
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: Agent to attach the new configurations and standing approvals to.
+      example: 42
+    template_ids:
+      type: array
+      items:
+        type: string
+        maxLength: 255
+      minItems: 1
+      maxItems: 50
+      description: |
+        Template IDs to apply. All templates must belong to the same connector.
+        Duplicates are silently deduplicated.
+      example:
+        - "tpl_github_create_issue_all"
+        - "tpl_github_merge_pr_all"
+    approval_modes:
+      type: object
+      additionalProperties:
+        type: string
+        enum:
+          - auto_approve
+          - requires_approval
+      description: |
+        Optional per-template approval mode overrides keyed by template ID.
+        Templates not in this map use their built-in behavior.
+      example:
+        tpl_github_create_issue_all: "auto_approve"
+
+BulkApplyResultError:
+  type: object
+  required:
+    - code
+    - message
+  properties:
+    code:
+      type: string
+      description: Machine-readable error code.
+      example: "standing_approval_limit_reached"
+    message:
+      type: string
+      description: Human-readable error message.
+      example: "Standing approval limit reached"
+
+BulkApplyResult:
+  type: object
+  required:
+    - template_id
+    - success
+  properties:
+    template_id:
+      type: string
+      description: The template ID that was applied (or failed).
+    success:
+      type: boolean
+      description: Whether this template was applied successfully.
+    action_configuration:
+      $ref: '../schemas/action_configurations.yaml#/ActionConfiguration'
+    standing_approval:
+      $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
+      description: Present when the template bundles a standing approval and it was created successfully.
+    error:
+      $ref: '../schemas/action_config_templates.yaml#/BulkApplyResultError'
+      description: Present when `success` is false.
+
+BulkApplyActionConfigTemplateResponse:
+  type: object
+  required:
+    - results
+  properties:
+    results:
+      type: array
+      items:
+        $ref: '../schemas/action_config_templates.yaml#/BulkApplyResult'
+      description: |
+        Per-template results. Order matches the deduplicated input order.
+
 ActionConfigTemplateListResponse:
   type: object
   required:

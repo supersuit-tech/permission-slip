@@ -198,6 +198,9 @@ paths:
   /v1/action-config-templates:
     $ref: './components/paths/action_config_templates.yaml#/actionConfigTemplates'
 
+  /v1/action-config-templates/bulk-apply:
+    $ref: './components/paths/action_config_templates.yaml#/bulkApplyActionConfigTemplates'
+
   /v1/action-config-templates/{id}/apply:
     $ref: './components/paths/action_config_templates.yaml#/applyActionConfigTemplate'
 
