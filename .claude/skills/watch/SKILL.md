@@ -82,7 +82,8 @@ The script handles:
 - Deduplication via last-seen ID tracking per endpoint
 - Merging from main and detecting conflicts
 - Parsing the PR body for unchecked `### Claude Code` checklist items
-- Idle counter tracking (6 consecutive empty cycles = timeout)
+- Initial delay before first poll (10 minutes by default, skipped on re-invocations)
+- Idle counter tracking (10 consecutive empty cycles = timeout)
 - Turn limit tracking (exits when `--max-turns` agent invocations reached)
 - Generating and posting the wrap-up comment on idle timeout **or** at the **start** of the next poll after the turn counter reaches `--max-turns`
 
