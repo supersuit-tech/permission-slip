@@ -54,6 +54,15 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		// Validate approval_modes values.
+		for tid, mode := range req.ApprovalModes {
+			if mode != "auto_approve" && mode != "requires_approval" {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+					fmt.Sprintf("invalid approval_mode %q for template %q", mode, tid)))
+				return
+			}
+		}
+
 		// Deduplicate template IDs while preserving order.
 		uniqueIDs := deduplicateStrings(req.TemplateIDs)
 
@@ -130,7 +139,9 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Check if any template needs a standing approval — acquire the lock once.
+		// Check if any template needs a standing approval — acquire the lock
+		// once and pre-compute remaining SA slots to avoid per-iteration
+		// race conditions within the same transaction.
 		anyWantSA := false
 		for _, id := range uniqueIDs {
 			tpl := tplByID[id]
@@ -139,6 +150,7 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 				break
 			}
 		}
+		saRemaining := -1 // -1 = unlimited
 		if anyWantSA {
 			if err := db.AcquireStandingApprovalLimitLock(r.Context(), tx, profile.ID); err != nil {
 				log.Printf("[%s] BulkApplyTemplates: advisory lock: %v", TraceID(r.Context()), err)
@@ -146,6 +158,14 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply templates"))
 				return
 			}
+			remaining, err := standingApprovalSlotsRemaining(r.Context(), tx, profile.ID)
+			if err != nil {
+				log.Printf("[%s] BulkApplyTemplates: SA limit check: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply templates"))
+				return
+			}
+			saRemaining = remaining
 		}
 
 		// Apply each template. Use savepoints so individual failures don't
@@ -161,12 +181,16 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 					approvalMode = &m
 				}
 			}
-			res, err := applyOneTemplateInSavepoint(r.Context(), pgxTx, tx, profile, tpl, req.AgentID, approvalMode)
+			res, err := applyOneTemplateInSavepoint(r.Context(), pgxTx, tx, profile, tpl, req.AgentID, approvalMode, &saRemaining)
 			if err != nil {
+				code := string(ErrInternalError)
+				if res != nil {
+					code = res.errorCode
+				}
 				results = append(results, bulkApplyResult{
 					TemplateID: id,
 					Success:    false,
-					Error:      &bulkApplyResultError{Code: res.errorCode, Message: err.Error()},
+					Error:      &bulkApplyResultError{Code: code, Message: err.Error()},
 				})
 				continue
 			}
@@ -214,6 +238,7 @@ func applyOneTemplateInSavepoint(
 	tpl *db.ActionConfigTemplate,
 	agentID int64,
 	approvalMode *string,
+	saRemaining *int,
 ) (*applyOneResult, error) {
 	var dtx db.DBTX
 	var sp pgx.Tx
@@ -230,7 +255,7 @@ func applyOneTemplateInSavepoint(
 		dtx = fallbackTx
 	}
 
-	res, err := applyOneTemplateCore(ctx, dtx, profile, tpl, agentID, approvalMode)
+	res, err := applyOneTemplateCore(ctx, dtx, profile, tpl, agentID, approvalMode, saRemaining)
 	if err != nil {
 		return res, err
 	}
@@ -245,7 +270,9 @@ func applyOneTemplateInSavepoint(
 }
 
 // applyOneTemplateCore contains the validation and creation logic for a
-// single template, without transaction management.
+// single template, without transaction management. saRemaining tracks remaining
+// standing approval slots across the batch (-1 = unlimited); on successful SA
+// creation it is decremented so subsequent iterations see the correct count.
 func applyOneTemplateCore(
 	ctx context.Context,
 	tx db.DBTX,
@@ -253,6 +280,7 @@ func applyOneTemplateCore(
 	tpl *db.ActionConfigTemplate,
 	agentID int64,
 	approvalMode *string,
+	saRemaining *int,
 ) (*applyOneResult, error) {
 	// Validate template fields.
 	if len(tpl.Name) > shared.ActionConfigNameMaxLength {
@@ -342,12 +370,11 @@ func applyOneTemplateCore(
 
 	var saOut *db.StandingApproval
 	if wantStanding {
-		// Check standing approval limit.
-		exceeded, err := isStandingApprovalLimitReached(ctx, tx, profile.ID)
-		if err != nil {
-			return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("internal error")
-		}
-		if exceeded {
+		// Check standing approval limit using the pre-computed remaining
+		// slot counter. This avoids re-querying the DB inside each savepoint
+		// (which would see the same pre-batch count) and correctly tracks
+		// consumption across the batch.
+		if saRemaining != nil && *saRemaining >= 0 && *saRemaining == 0 {
 			return &applyOneResult{errorCode: string(ErrStandingApprovalLimitReached)}, fmt.Errorf("standing approval limit reached")
 		}
 
@@ -395,6 +422,11 @@ func applyOneTemplateCore(
 			return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("internal error")
 		}
 		saOut = sa
+		// Decrement remaining SA slots so subsequent templates see the
+		// updated count.
+		if saRemaining != nil && *saRemaining > 0 {
+			*saRemaining--
+		}
 	}
 
 	var linkedSA []db.StandingApproval
@@ -411,26 +443,31 @@ func applyOneTemplateCore(
 	return result, nil
 }
 
-// isStandingApprovalLimitReached checks whether the user has reached their
-// plan's standing approval limit. Returns (exceeded, error).
-func isStandingApprovalLimitReached(ctx context.Context, d db.DBTX, userID string) (bool, error) {
+// standingApprovalSlotsRemaining returns how many standing approvals the user
+// can still create. Returns -1 when there is no limit (no subscription or
+// unlimited plan).
+func standingApprovalSlotsRemaining(ctx context.Context, d db.DBTX, userID string) (int, error) {
 	sp, err := db.GetSubscriptionWithPlan(ctx, d, userID)
 	if err != nil {
-		return false, fmt.Errorf("get subscription: %w", err)
+		return 0, fmt.Errorf("get subscription: %w", err)
 	}
 	if sp == nil {
-		return false, nil // no subscription — bypass limits
+		return -1, nil // no subscription — bypass limits
 	}
 	eff := sp.EffectiveQuotaPlan()
 	limit := eff.MaxStandingApprovals
 	if limit == nil {
-		return false, nil // unlimited
+		return -1, nil // unlimited
 	}
 	count, err := db.CountActiveStandingApprovalsByUser(ctx, d, userID)
 	if err != nil {
-		return false, fmt.Errorf("count standing approvals: %w", err)
+		return 0, fmt.Errorf("count standing approvals: %w", err)
 	}
-	return count >= *limit, nil
+	remaining := *limit - count
+	if remaining < 0 {
+		remaining = 0
+	}
+	return remaining, nil
 }
 
 // deduplicateStrings returns a new slice with duplicates removed, preserving

@@ -3298,7 +3298,12 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
-          description: Template or agent not found
+          description: |
+            A requested template ID was not found. This is an upfront
+            validation error — no configurations are created.
+            Per-template failures (e.g., agent not found, standing approval
+            limit) are reported in `results[]` with `success: false`, not
+            as HTTP-level errors.
           content:
             application/json:
               schema:
