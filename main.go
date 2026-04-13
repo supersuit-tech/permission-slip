@@ -427,6 +427,19 @@ func main() {
 		w.Write([]byte(`{"applinks":{"apps":[],"details":[{"appID":"AWUV887E3B.dev.permissionslip.app","paths":["*"]}]}}`))
 	})
 
+	// Supabase reverse proxy — lets the frontend reach Supabase Auth through
+	// the same origin as the app, eliminating CORS issues and extra port
+	// exposure. Active when SUPABASE_URL is set. The frontend falls back to
+	// this proxy automatically when VITE_SUPABASE_URL is not baked in.
+	if deps.SupabaseURL != "" {
+		supabaseTarget, err := url.Parse(deps.SupabaseURL)
+		if err != nil {
+			log.Fatalf("invalid SUPABASE_URL for proxy: %v", err)
+		}
+		mux.Handle("/supabase/", supabaseProxy(supabaseTarget))
+		log.Printf("Supabase proxy: /supabase/* → %s", deps.SupabaseURL)
+	}
+
 	// In production, serve the built React app.
 	// In development, use Vite's dev server (port 5173) instead.
 	if os.Getenv("MODE") != "development" {
