@@ -1,6 +1,7 @@
 package testhelper
 
 import (
+	"context"
 	"encoding/hex"
 	"testing"
 	"time"
@@ -8,21 +9,33 @@ import (
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
-const standingApprovalFixtureConnectorID = "standing_approval_fixture"
+func standingApprovalFixtureConnectorID(t *testing.T) string {
+	t.Helper()
+	// Unique per test so ON CONFLICT cannot leak a shared connector row into the
+	// long-lived CI DB (shared pool + transaction rollback).
+	return "sa_fixture_c_" + hex.EncodeToString(mustRandBytes(t, 8))
+}
 
 // ensureStandingApprovalSourceConfig creates connector, action, and action_configuration
 // rows so standing_approvals.source_action_configuration_id FK is satisfied.
 func ensureStandingApprovalSourceConfig(t *testing.T, d db.DBTX, agentID int64, userID, actionType string) string {
 	t.Helper()
+	connectorID := standingApprovalFixtureConnectorID(t)
 	mustExec(t, d,
-		`INSERT INTO connectors (id, name) VALUES ($1, $1) ON CONFLICT (id) DO NOTHING`,
-		standingApprovalFixtureConnectorID)
+		`INSERT INTO connectors (id, name) VALUES ($1, $1)`,
+		connectorID)
 	mustExec(t, d,
-		`INSERT INTO connector_actions (connector_id, action_type, name) VALUES ($1, $2, $2)
-		 ON CONFLICT (connector_id, action_type) DO NOTHING`,
-		standingApprovalFixtureConnectorID, actionType)
+		`INSERT INTO connector_actions (connector_id, action_type, name) VALUES ($1, $2, $2)`,
+		connectorID, actionType)
 	configID := "ac_" + hex.EncodeToString(mustRandBytes(t, 16))
-	InsertActionConfig(t, d, configID, agentID, userID, standingApprovalFixtureConnectorID, actionType)
+	InsertActionConfig(t, d, configID, agentID, userID, connectorID, actionType)
+	t.Cleanup(func() {
+		ctx := context.Background()
+		_, _ = d.Exec(ctx, `DELETE FROM standing_approvals WHERE source_action_configuration_id = $1`, configID)
+		_, _ = d.Exec(ctx, `DELETE FROM action_configurations WHERE id = $1`, configID)
+		_, _ = d.Exec(ctx, `DELETE FROM connector_actions WHERE connector_id = $1`, connectorID)
+		_, _ = d.Exec(ctx, `DELETE FROM connectors WHERE id = $1`, connectorID)
+	})
 	return configID
 }
 
