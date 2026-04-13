@@ -13,6 +13,8 @@ import (
 	"github.com/supersuit-tech/permission-slip/vault"
 )
 
+const planLimitsStandingApprovalActionType = "test.action"
+
 // ── Standing Approval Limit Tests ───────────────────────────────────────────
 
 func TestCreateStandingApproval_FreePlan_AtLimit_Returns403(t *testing.T) {
@@ -26,6 +28,7 @@ func TestCreateStandingApproval_FreePlan_AtLimit_Returns403(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
 	}
+	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -34,8 +37,9 @@ func TestCreateStandingApproval_FreePlan_AtLimit_Returns403(t *testing.T) {
 		"agent_id": %d,
 		"action_type": "test.action",
 		"constraints": {"channel": "#test"},
+		"source_action_configuration_id": %q,
 		"expires_at": "%s"
-	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
+	}`, agentID, acID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
@@ -76,6 +80,7 @@ func TestCreateStandingApproval_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 	for i := 0; i < 4; i++ {
 		testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
 	}
+	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -84,8 +89,9 @@ func TestCreateStandingApproval_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 		"agent_id": %d,
 		"action_type": "test.action",
 		"constraints": {"channel": "#test"},
+		"source_action_configuration_id": %q,
 		"expires_at": "%s"
-	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
+	}`, agentID, acID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
@@ -108,6 +114,7 @@ func TestCreateStandingApproval_PaidPlan_NoLimit(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
 	}
+	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -116,8 +123,9 @@ func TestCreateStandingApproval_PaidPlan_NoLimit(t *testing.T) {
 		"agent_id": %d,
 		"action_type": "test.action",
 		"constraints": {"channel": "#test"},
+		"source_action_configuration_id": %q,
 		"expires_at": "%s"
-	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
+	}`, agentID, acID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
@@ -135,6 +143,7 @@ func TestCreateStandingApproval_NoSubscription_NoLimit(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = now() WHERE agent_id = $1`, agentID)
 	// Intentionally no subscription — should bypass limits.
+	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -143,8 +152,9 @@ func TestCreateStandingApproval_NoSubscription_NoLimit(t *testing.T) {
 		"agent_id": %d,
 		"action_type": "test.action",
 		"constraints": {"channel": "#test"},
+		"source_action_configuration_id": %q,
 		"expires_at": "%s"
-	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
+	}`, agentID, acID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
@@ -452,6 +462,7 @@ func TestCreateStandingApproval_RevokedDoNotCountTowardLimit(t *testing.T) {
 	for i := 0; i < 5; i++ {
 		testhelper.InsertStandingApprovalWithStatus(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, "revoked")
 	}
+	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -460,8 +471,9 @@ func TestCreateStandingApproval_RevokedDoNotCountTowardLimit(t *testing.T) {
 		"agent_id": %d,
 		"action_type": "test.action",
 		"constraints": {"channel": "#test"},
+		"source_action_configuration_id": %q,
 		"expires_at": "%s"
-	}`, agentID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
+	}`, agentID, acID, time.Now().Add(24*time.Hour).Format(time.RFC3339))
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()

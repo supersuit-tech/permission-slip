@@ -864,13 +864,22 @@ func seedUserHasActivity(ctx context.Context, tx db.DBTX, supa *supabaseClient) 
 			createdAt)
 	}
 
-	// 1 active standing approval
+	// Backing action config + 1 active standing approval
 	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7)`,
+		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
+		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
+		"ac-activity-ci-create-issue", agentCI, userHasActivity,
+		"github", "github.create_issue",
+		`{"repo": "supersuit-tech/ci-actions", "title": "*", "body": "*"}`,
+		"CI: create issues in ci-actions",
+		"Seed standing approval backing for activity user.")
+	exec(ctx, tx,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8)`,
 		"sa-activity-1", agentCI, userHasActivity,
 		"github.create_issue",
 		`{"repo": "supersuit-tech/ci-actions"}`,
+		"ac-activity-ci-create-issue",
 		now.Add(-7*24*time.Hour),
 		now.Add(23*24*time.Hour))
 
@@ -1256,37 +1265,6 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		"00000000-0000-0000-0000-000000000098")
 
 	// ---------------------------------------------------------------
-	// Standing approvals (2 active, 1 expired)
-	// ---------------------------------------------------------------
-	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, max_executions, constraints, source_action_configuration_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8, $9)`,
-		"sa-everything-1", claude, userHasEverything,
-		"github.create_issue", 100,
-		`{"repo": "supersuit-tech/permission-slip", "title": "*"}`,
-		"ac-claude-create-issue",
-		now.Add(-7*24*time.Hour),
-		now.Add(23*24*time.Hour))
-
-	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7)`,
-		"sa-everything-2", slack, userHasEverything,
-		"slack.send_message",
-		`{"channel": "#engineering"}`,
-		now.Add(-3*24*time.Hour),
-		now.Add(27*24*time.Hour))
-
-	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, starts_at, expires_at, expired_at)
-		 VALUES ($1, $2, $3, $4, 'expired', $5, $6, $7, $7)`,
-		"sa-everything-expired", github, userHasEverything,
-		"github.merge_pr",
-		`{"pr": "supersuit-tech/permission-slip#123"}`,
-		now.Add(-60*24*time.Hour),
-		now.Add(-30*24*time.Hour))
-
-	// ---------------------------------------------------------------
 	// Action configurations (4: mix of active/disabled, with/without credentials)
 	// ---------------------------------------------------------------
 
@@ -1329,6 +1307,39 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		`{"channel": "#incidents", "message": "*"}`,
 		"Post to #incidents (disabled)",
 		"Disabled — credential needs to be assigned before activation.")
+
+	// ---------------------------------------------------------------
+	// Standing approvals (2 active, 1 expired) — after action configs (FK)
+	// ---------------------------------------------------------------
+	exec(ctx, tx,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, max_executions, constraints, source_action_configuration_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8, $9)`,
+		"sa-everything-1", claude, userHasEverything,
+		"github.create_issue", 100,
+		`{"repo": "supersuit-tech/permission-slip", "title": "*"}`,
+		"ac-claude-create-issue",
+		now.Add(-7*24*time.Hour),
+		now.Add(23*24*time.Hour))
+
+	exec(ctx, tx,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8)`,
+		"sa-everything-2", slack, userHasEverything,
+		"slack.send_message",
+		`{"channel": "#engineering"}`,
+		"ac-slack-send-releases",
+		now.Add(-3*24*time.Hour),
+		now.Add(27*24*time.Hour))
+
+	exec(ctx, tx,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at, expired_at)
+		 VALUES ($1, $2, $3, $4, 'expired', $5, $6, $7, $7)`,
+		"sa-everything-expired", github, userHasEverything,
+		"github.merge_pr",
+		`{"pr": "supersuit-tech/permission-slip#123"}`,
+		"ac-claude-merge-pr",
+		now.Add(-60*24*time.Hour),
+		now.Add(-30*24*time.Hour))
 
 	// ---------------------------------------------------------------
 	// Registration invite (active)

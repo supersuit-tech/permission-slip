@@ -46,7 +46,7 @@ StandingApprovalListResponse:
         expires_at: "2026-02-21T00:00:00Z"
         created_at: "2026-02-14T10:30:00Z"
         revoked_at: null
-        source_action_configuration_id: null
+        source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
     has_more: false
 
 StandingApproval:
@@ -189,16 +189,14 @@ StandingApproval:
 
     source_action_configuration_id:
       type: string
+      minLength: 1
       maxLength: 128
-      nullable: true
       description: |
-        The action configuration this standing approval was derived from, if any.
-        Nullable — `null` when the standing approval was created with a custom
-        action type rather than from an existing configuration. The referenced
-        configuration may have been deleted since creation.
+        The action configuration this standing approval is tied to. Every standing
+        approval references a backing configuration row.
         Expected format: `ac_` prefix followed by 32 hex characters, but the
         backend does not enforce the pattern.
-      example: null
+      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
   example:
     standing_approval_id: "sa_abc123"
@@ -216,7 +214,7 @@ StandingApproval:
     expires_at: "2026-02-21T00:00:00Z"
     created_at: "2026-02-14T10:30:00Z"
     revoked_at: null
-    source_action_configuration_id: null
+    source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
 UserStandingApprovalListResponse:
   type: object
@@ -268,6 +266,7 @@ CreateStandingApprovalRequest:
     - agent_id
     - action_type
     - constraints
+    - source_action_configuration_id
   properties:
     agent_id:
       type: integer
@@ -297,9 +296,9 @@ CreateStandingApprovalRequest:
         contain at least one non-wildcard parameter constraint; the backend rejects
         empty objects or constraints where every value is a wildcard (`"*"`).
 
-        When `source_action_configuration_id` is set (trusted flows such as template customize),
-        send `{}` to mean **match all** parameter values for this action type (stored as empty
-        constraints in the database).
+        When tied to an action configuration (always required for create), trusted flows
+        such as template customize may send `{}` to mean **match all** parameter values for
+        this action type (stored as empty constraints in the database).
       example:
         recipient_pattern: "*@mycompany.com"
         max_recipients: 5
@@ -309,9 +308,8 @@ CreateStandingApprovalRequest:
       minLength: 1
       maxLength: 128
       description: |
-        Optional reference to the action configuration this standing approval
-        was derived from. When provided, the backend records it for traceability.
-        No foreign-key enforcement — the configuration may be deleted later.
+        Action configuration this standing approval is created from. Must exist,
+        belong to the same `agent_id`, and have the same `action_type` as the request.
         Expected format: `ac_` prefix followed by 32 hex characters (e.g.,
         `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
         enforce the pattern — only non-empty and max 128 characters.
