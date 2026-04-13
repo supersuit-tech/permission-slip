@@ -39,6 +39,12 @@ DECLARE
 BEGIN
     SELECT id INTO fallback_connector FROM connectors ORDER BY id LIMIT 1;
 
+    IF fallback_connector IS NULL AND EXISTS (
+        SELECT 1 FROM standing_approvals WHERE source_action_configuration_id IS NULL
+    ) THEN
+        RAISE EXCEPTION 'Cannot backfill standing approvals: connectors table is empty but orphan standing approvals remain';
+    END IF;
+
     FOR r IN
         SELECT standing_approval_id, agent_id, user_id, action_type
         FROM standing_approvals

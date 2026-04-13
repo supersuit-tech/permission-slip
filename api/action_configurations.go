@@ -402,6 +402,8 @@ func handleDeleteActionConfig(deps *Deps) http.HandlerFunc {
 			defer db.RollbackTx(r.Context(), tx)
 		}
 
+		// Hard-delete standing approvals so the action_configurations row can be
+		// removed under ON DELETE RESTRICT (see db.DeleteStandingApprovalsForSourceActionConfig).
 		if _, err := db.DeleteStandingApprovalsForSourceActionConfig(r.Context(), tx, profile.ID, configID); err != nil {
 			log.Printf("[%s] DeleteActionConfig: delete standing approvals: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)

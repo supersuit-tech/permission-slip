@@ -328,6 +328,11 @@ func RevokeActiveStandingApprovalsForSourceActionConfig(ctx context.Context, db 
 // DeleteStandingApprovalsForSourceActionConfig deletes all standing approval rows
 // that reference the given action configuration. Used when removing an action
 // configuration so FK constraints (when present) are satisfied.
+//
+// Trade-off: this removes historical rows (not only active ones). The prior
+// revoke-only path could not satisfy ON DELETE RESTRICT while non-active rows
+// still referenced the config. A future soft-delete on action_configurations
+// could preserve rows without hard-deleting standing_approvals.
 func DeleteStandingApprovalsForSourceActionConfig(ctx context.Context, db DBTX, userID, sourceConfigID string) (int64, error) {
 	tag, err := db.Exec(ctx,
 		`DELETE FROM standing_approvals
