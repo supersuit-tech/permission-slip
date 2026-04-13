@@ -45,6 +45,7 @@ Set these variables for the session:
 - `LAST_HEAD_SHA` — empty string initially, updated after each round
 - `LAST_ACTIVITY_TIME` — timestamp of the most recent new commit detection (or session start). Used for inactivity timeout.
 - `ROUND` — current round number, starting at 1
+- `CONSECUTIVE_CLEAN_ROUNDS` — number of consecutive rounds with no findings and no new commits. Starts at 0. Reset to 0 whenever new commits are detected or new findings are posted.
 
 ## Step 1: Gather Context
 
@@ -295,9 +296,13 @@ No new issues found.
 
 ### 2e. Early Exit Check
 
-After submitting the review, check whether to continue:
+After submitting the review, update `CONSECUTIVE_CLEAN_ROUNDS`:
+- If this round had **no findings** and **no new commits** since the previous round → increment `CONSECUTIVE_CLEAN_ROUNDS`.
+- Otherwise (new findings were posted OR new commits were detected) → reset `CONSECUTIVE_CLEAN_ROUNDS` to 0.
 
-- If this round had **no findings** → exit early, go to Step 3. There is no reason to wait and re-review a clean PR.
+Then check whether to continue:
+
+- If `CONSECUTIVE_CLEAN_ROUNDS >= 3` → exit, go to Step 3 with reason "3 consecutive clean rounds with no new findings or commits".
 - If `ROUND >= MAX_TURNS` → exit, go to Step 3.
 - If time since `LAST_ACTIVITY_TIME` exceeds **10 minutes** → exit, go to Step 3 with reason "no activity for 10 minutes".
 - Otherwise → increment `ROUND`, loop back to 2a.
@@ -324,7 +329,7 @@ Summary format:
 **PR:** #{PR_NUMBER} — {PR_TITLE}
 **Author:** @{PR_AUTHOR}
 **Rounds completed:** {ROUND}/{MAX_TURNS}
-**Reason for stopping:** {completed all rounds | no issues remaining | PR merged | PR closed | max turns reached | no activity for 10 minutes}
+**Reason for stopping:** {completed all rounds | 3 consecutive clean rounds | PR merged | PR closed | max turns reached | no activity for 10 minutes}
 
 ### Outstanding Issues
 {any unresolved concerns from the final round, or "None — this PR looks good to merge."}
@@ -354,4 +359,4 @@ Summary format:
 - **Check diff lines** — inline comments can only be placed on lines that appear in the PR diff. If you need to comment on an unchanged line, include it in the review body instead.
 - **Acknowledge good work** — every round summary should include a "What Looks Good" section. Reviews that only criticize are demoralizing.
 - **Re-fetch between rounds** — always check for new commits before reviewing again to avoid flagging already-fixed issues.
-- **Exit early when clean** — if any round has no findings, stop immediately. Don't wait just to re-review a clean PR.
+- **Exit after 3 consecutive clean rounds** — if 3 rounds in a row have no findings and no new commits, stop. This avoids endlessly re-reviewing a stable PR while still giving authors time to push fixes.
