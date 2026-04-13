@@ -90,9 +90,6 @@ function StandingApprovalSummaryRow({
       <TableCell className="max-w-[200px] truncate text-xs">
         {agentName}
       </TableCell>
-      <TableCell>
-        <span className="text-muted-foreground text-xs">On</span>
-      </TableCell>
       <TableCell>{formatExpiresIn(sa.expires_at)}</TableCell>
       <TableCell className="text-right">
         <Link
@@ -195,14 +192,13 @@ export function StandingApprovalsCard() {
           <EmptyState />
         ) : (
           <div className="overflow-x-auto">
-            <div className="min-w-[640px] overflow-hidden rounded-lg">
+            <div className="min-w-[560px] overflow-hidden rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
                     <TableHead>Configuration</TableHead>
                     <TableHead>Connector</TableHead>
                     <TableHead>Agent</TableHead>
-                    <TableHead>Auto-approve</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead className="text-right">
                       <span className="sr-only">Open</span>

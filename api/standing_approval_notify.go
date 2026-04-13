@@ -39,7 +39,8 @@ func NotifyStandingApprovalExecution(ctx context.Context, deps *Deps, exec *db.S
 	agentName := extractAgentName(agent)
 	activityURL := fmt.Sprintf("%s/activity", deps.BaseURL)
 
-	contextJSON, _ := json.Marshal(map[string]any{})
+	// Standing execution templates do not use Context; omit empty object noise.
+	var contextJSON json.RawMessage
 
 	// Build the action JSON with type and parameters for the notification
 	// templates (used for parameter summary in emails).
@@ -50,7 +51,7 @@ func NotifyStandingApprovalExecution(ctx context.Context, deps *Deps, exec *db.S
 		AgentID:     exec.AgentID,
 		AgentName:   agentName,
 		Action:      actionJSON,
-		Context:     contextJSON,
+		Context: contextJSON,
 		ApprovalURL: activityURL,
 		CreatedAt:   time.Now(),
 		Type:        notify.NotificationTypeStandingExecution,
