@@ -33,6 +33,10 @@ export function useRevokeStandingApproval() {
     onSuccess: () => {
       trackEvent(PostHogEvents.STANDING_APPROVAL_REVOKED);
       queryClient.invalidateQueries({ queryKey: ["standing-approvals"] });
+      queryClient.invalidateQueries({
+        queryKey: ["standing-approvals-by-config-ids"],
+      });
+      queryClient.invalidateQueries({ queryKey: ["action-configs"] });
     },
   });
 

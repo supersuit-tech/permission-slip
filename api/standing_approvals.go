@@ -51,7 +51,7 @@ type createStandingApprovalRequest struct {
 	ActionType                  string          `json:"action_type" validate:"required"`
 	ActionVersion               string          `json:"action_version"`
 	Constraints                 json.RawMessage `json:"constraints"`
-	SourceActionConfigurationID *string         `json:"source_action_configuration_id"`
+	SourceActionConfigurationID *string         `json:"source_action_configuration_id" validate:"required"`
 	MaxExecutions               *int            `json:"max_executions" validate:"omitempty,gte=1"`
 	StartsAt                    *time.Time      `json:"starts_at"`
 	ExpiresAt                   *time.Time      `json:"expires_at"`
@@ -237,23 +237,46 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if req.SourceActionConfigurationID != nil && (len(*req.SourceActionConfigurationID) == 0 || len(*req.SourceActionConfigurationID) > maxActionConfigIDLength) {
+		sourceConfigID := strings.TrimSpace(*req.SourceActionConfigurationID)
+		if sourceConfigID == "" || len(sourceConfigID) > maxActionConfigIDLength {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id must be between 1 and 128 characters"))
 			return
 		}
 
+		ac, err := db.GetActionConfigByID(r.Context(), deps.DB, sourceConfigID, profile.ID)
+		if err != nil {
+			log.Printf("[%s] CreateStandingApproval: load action config: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+			return
+		}
+		if ac == nil {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id must reference an existing action configuration"))
+			return
+		}
+		if ac.AgentID != req.AgentID {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action configuration does not belong to the specified agent"))
+			return
+		}
+		if ac.ActionType != req.ActionType {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action_type must match the referenced action configuration"))
+			return
+		}
+
+		sourceConfigIDPtr := sourceConfigID
+
 		var constraintsBytes []byte
-		if req.SourceActionConfigurationID != nil && len(req.Constraints) > 0 {
+		if len(req.Constraints) > 0 {
 			s := strings.TrimSpace(string(req.Constraints))
 			if s == "{}" || s == "null" {
 				// Match-all parameters for this action type (trusted when tied to a source config,
 				// e.g. template customize with all-wildcard parameters). Stored as NULL in DB.
 				constraintsBytes = nil
 			} else {
-				var err error
-				constraintsBytes, err = validateStandingApprovalConstraints(req.Constraints)
-				if err != nil {
-					resp := BadRequest(ErrInvalidConstraints, err.Error())
+				var cErr error
+				constraintsBytes, cErr = validateStandingApprovalConstraints(req.Constraints)
+				if cErr != nil {
+					resp := BadRequest(ErrInvalidConstraints, cErr.Error())
 					resp.Error.Details = map[string]any{
 						"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
 					}
@@ -262,10 +285,10 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 				}
 			}
 		} else {
-			var err error
-			constraintsBytes, err = validateStandingApprovalConstraints(req.Constraints)
-			if err != nil {
-				resp := BadRequest(ErrInvalidConstraints, err.Error())
+			var cErr error
+			constraintsBytes, cErr = validateStandingApprovalConstraints(req.Constraints)
+			if cErr != nil {
+				resp := BadRequest(ErrInvalidConstraints, cErr.Error())
 				resp.Error.Details = map[string]any{
 					"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
 				}
@@ -306,7 +329,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			ActionType:                  req.ActionType,
 			ActionVersion:               req.ActionVersion,
 			Constraints:                 constraintsBytes,
-			SourceActionConfigurationID: req.SourceActionConfigurationID,
+			SourceActionConfigurationID: &sourceConfigIDPtr,
 			MaxExecutions:               req.MaxExecutions,
 			StartsAt:                    startsAt,
 			ExpiresAt:                   req.ExpiresAt,

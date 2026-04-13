@@ -1,22 +1,35 @@
-import { Ban, Check, Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
+import { Ban, Check, Pencil, Settings2, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
+import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import { isPatternWrapper } from "@/lib/constraints";
+import {
+  standingApprovalRowStatus,
+  standingApprovalStatusLabel,
+} from "@/lib/standingApprovalStatus";
 import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
+import { ActionConfigStandingApprovalSheet } from "./ActionConfigStandingApprovalSheet";
 
 interface ActionConfigRowProps {
+  agentId: number;
   config: ActionConfiguration;
   actions: ConnectorAction[];
+  standingRows: StandingApproval[];
+  onStandingSuccess: () => void;
   onEdit: (config: ActionConfiguration) => void;
   onDelete: (config: ActionConfiguration) => void;
 }
 
 export function ActionConfigRow({
+  agentId,
   config,
   actions,
+  standingRows,
+  onStandingSuccess,
   onEdit,
   onDelete,
 }: ActionConfigRowProps) {
@@ -27,6 +40,14 @@ export function ActionConfigRow({
 
   const paramEntries = Object.entries(config.parameters);
   const isDisabled = config.status === "disabled";
+  const [standingSheetOpen, setStandingSheetOpen] = useState(false);
+  const saStatus = standingApprovalRowStatus(standingRows);
+  const standingBadgeVariant =
+    saStatus === "active"
+      ? "success-soft"
+      : saStatus === "none"
+        ? "outline"
+        : "secondary";
 
   return (
     <TableRow
@@ -81,6 +102,29 @@ export function ActionConfigRow({
       </TableCell>
       <TableCell>
         <StatusBadge status={config.status} />
+      </TableCell>
+      <TableCell>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="h-auto gap-1.5 px-2 py-1 font-normal"
+          onClick={() => setStandingSheetOpen(true)}
+          aria-label={`Standing approval for ${config.name}: ${standingApprovalStatusLabel(saStatus)}`}
+        >
+          <Badge variant={standingBadgeVariant} className="font-normal">
+            {standingApprovalStatusLabel(saStatus)}
+          </Badge>
+          <Settings2 className="text-muted-foreground size-3.5 shrink-0" aria-hidden />
+        </Button>
+        <ActionConfigStandingApprovalSheet
+          open={standingSheetOpen}
+          onOpenChange={setStandingSheetOpen}
+          agentId={agentId}
+          config={config}
+          standingRows={standingRows}
+          onSuccess={onStandingSuccess}
+        />
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1">

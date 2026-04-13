@@ -10,9 +10,10 @@ vi.mock("../../../api/client");
 
 const mockStandingApprovals = [
   {
-    standing_approval_id: 1,
+    standing_approval_id: "sa_test1",
     action_type: "email.send",
     agent_id: 1,
+    status: "active" as const,
     execution_count: 3,
     max_executions: 10,
     expires_at: null,
@@ -93,7 +94,6 @@ function mockApiFetch(
     if (url === "/v1/action-configurations") {
       return Promise.resolve({ data: { data: actionConfigs } });
     }
-    // agents endpoint
     return Promise.resolve({ data: { data: agents, has_more: false } });
   });
 }
@@ -161,24 +161,23 @@ describe("StandingApprovalsCard", () => {
     });
   });
 
-  it("shows Constraints column header", async () => {
+  it("shows Configuration column header", async () => {
     mockApiFetch();
 
     render(<StandingApprovalsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("Constraints")).toBeInTheDocument();
+      expect(screen.getByText("Configuration")).toBeInTheDocument();
     });
   });
 
-  it("shows constraint badges for standing approvals", async () => {
+  it("shows Manage link for each row", async () => {
     mockApiFetch();
 
     render(<StandingApprovalsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("to")).toBeInTheDocument();
-      expect(screen.getByText("subject")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Manage/i })).toBeInTheDocument();
     });
   });
 
@@ -205,14 +204,13 @@ describe("StandingApprovalsCard", () => {
     });
   });
 
-  it("shows no config subtitle when source config is not found", async () => {
+  it("shows unknown configuration when source config is not found", async () => {
     mockApiFetch(mockStandingApprovals, freePlanResponse, mockAgents, []);
 
     render(<StandingApprovalsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.queryByText("Send company emails")).not.toBeInTheDocument();
-      expect(screen.getByText("email.send")).toBeInTheDocument();
+      expect(screen.getByText("Unknown configuration")).toBeInTheDocument();
     });
   });
 });

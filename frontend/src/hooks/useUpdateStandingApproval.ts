@@ -42,6 +42,10 @@ export function useUpdateStandingApproval() {
     onSuccess: () => {
       trackEvent(PostHogEvents.STANDING_APPROVAL_UPDATED);
       queryClient.invalidateQueries({ queryKey: ["standing-approvals"] });
+      queryClient.invalidateQueries({
+        queryKey: ["standing-approvals-by-config-ids"],
+      });
+      queryClient.invalidateQueries({ queryKey: ["action-configs"] });
     },
   });
 

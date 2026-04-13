@@ -3,19 +3,18 @@ info:
   title: Permission Slip API
   version: 0.1.0
   description: |
-    Permission Slip is a centralized middle-man service that sits between AI agents and external 
-    APIs. Agents submit pre-defined **actions** for human approval, and Permission Slip executes 
-    them using the user's stored credentials. Agents never see user credentials and can never 
-    make arbitrary API calls.
+    Permission Slip is the approval layer for Openclaw. Openclaw submits pre-defined **actions**
+    for human approval, and Permission Slip executes them using the user's stored credentials.
+    Openclaw never sees user credentials and can never make arbitrary API calls.
 
-    **Base URL**: `https://app.permissionslip.dev`
+    **Base URL**: `http://localhost:8080`
 
     ## Key Concepts
 
     - **Action**: Pre-defined, structured request with a type, validated parameters, and execution logic — the core primitive
     - **Agent**: Automated system with a cryptographic key pair that submits actions for approval
     - **Approver**: Human authorized to approve or deny agent actions
-    - **Connector**: Integration with an external service (e.g., Gmail, Stripe) that defines available actions
+    - **Connector**: Integration with an external service (e.g., Gmail, Stripe, PayPal) that defines available actions
     - **Credential**: Encrypted API key or OAuth token for an external service, stored in Permission Slip's vault
     - **Registration**: One-time setup where agent proves identity via public key
     - **Approval Request**: Async request for permission to execute a specific action
@@ -53,14 +52,14 @@ info:
     ## Architecture
 
     ```
-    Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, etc.)
+    Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, PayPal, etc.)
                    │
                    ▼
               User (approve/deny)
     ```
 
     Permission Slip is the **single integration point** for agents. Agents talk to 
-    `https://app.permissionslip.dev` for everything — they never need to know about individual 
+    `http://localhost:8080` for everything — they never need to know about individual 
     service URLs or APIs.
 
     ## Related Documentation
@@ -72,10 +71,8 @@ info:
     name: Permission Slip
     url: https://github.com/supersuit-tech/permission-slip
 servers:
-  - url: https://app.permissionslip.dev
-    description: Production server
-  - url: https://staging.app.permissionslip.dev
-    description: Staging server
+  - url: http://localhost:8080
+    description: Local development server
 tags:
   - name: Connectors
     description: Discover available service integrations and actions
@@ -118,12 +115,16 @@ paths:
       summary: List Available Connectors
       description: |
         List all available connectors (external service integrations) that Permission Slip
-        supports. Each connector represents an external service (e.g., GitHub, Stripe, Slack)
+        supports. Each connector represents an external service (e.g., GitHub, Stripe, PayPal, Slack)
         and defines which actions are available.
 
         Agents use this endpoint to discover what actions they can submit for approval. 
         This replaces the old service discovery model — agents don't need to know about 
         individual service URLs, they just query Permission Slip for available actions.
+
+        Built-in connectors (for example `instacart` with `instacart.create_products_link`)
+        appear here automatically from connector manifests; parameter schemas and optional
+        display templates are the source of truth at runtime, not this OpenAPI document.
 
         ## Use Cases
 
@@ -135,6 +136,13 @@ paths:
 
         This endpoint is publicly accessible (no signature required) to allow agents to 
         discover available actions before registration.
+
+        ## PayPal / Venmo
+
+        The **paypal** connector exposes PayPal REST actions (payouts, Checkout orders, invoicing,
+        refunds). Users connect via OAuth (`GET /v1/oauth/paypal/authorize`). Optional credential
+        key `environment`=`sandbox` routes REST calls to PayPal's sandbox API host. See
+        `docs/oauth-setup.md` (PayPal OAuth Setup) and `connectors/paypal/README.md` in the repo.
       tags:
         - Connectors
       security: []
@@ -185,6 +193,9 @@ paths:
 
         This endpoint is publicly accessible (no signature required) to allow agents to 
         discover action schemas before registration.
+
+        For connector-specific setup (e.g. PayPal OAuth and optional `environment` credential for
+        sandbox REST), see the repository docs referenced in the list-connectors description.
       tags:
         - Connectors
       security: []
@@ -1663,6 +1674,85 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: Agent, connector, or calendar listing not supported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/channels:
+    get:
+      operationId: listAgentConnectorChannels
+      summary: List channels for agent connector
+      description: |
+        Returns Slack channels visible to the OAuth credential assigned to this agent–connector pair.
+        Used by the dashboard to populate channel pickers for Slack actions.
+
+        Requires session authentication (Supabase JWT). The agent must belong to the current user.
+        Private channels and DMs require the user's profile email to match their Slack account (same rules as `slack.list_channels`).
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      responses:
+        '200':
+          description: Channels listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorChannelListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent, connector, or channel listing not supported
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/users:
+    get:
+      operationId: listAgentConnectorUsers
+      summary: List users for agent connector
+      description: |
+        Returns workspace users visible to the OAuth credential assigned to this agent–connector pair.
+        Used by the dashboard to populate user pickers for Slack actions.
+
+        Requires session authentication (Supabase JWT). The agent must belong to the current user.
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      responses:
+        '200':
+          description: Users listed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorUserListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent, connector, or user listing not supported
           content:
             application/json:
               schema:
@@ -3166,6 +3256,122 @@ paths:
           $ref: '#/components/responses/TooManyRequests'
         '500':
           $ref: '#/components/responses/InternalServerError'
+  /v1/action-config-templates/bulk-apply:
+    post:
+      operationId: bulkApplyActionConfigTemplates
+      summary: Bulk Apply Action Configuration Templates
+      description: |
+        Apply multiple templates in a single request. Creates an action
+        configuration (and optional standing approval) for each template.
+
+        All templates must belong to the same connector. The connector is
+        automatically enabled for the agent if not already enabled.
+
+        Each template is applied independently — if one fails (e.g., standing
+        approval limit reached), the others still succeed. The response
+        includes per-template results.
+      tags:
+        - Action Configurations
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkApplyActionConfigTemplateRequest'
+      responses:
+        '200':
+          description: |
+            Bulk apply completed. Check individual `results[].success` for
+            per-template outcomes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkApplyActionConfigTemplateResponse'
+        '400':
+          description: Invalid request (empty list, mixed connectors, etc.)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: |
+            A requested template ID was not found. This is an upfront
+            validation error — no configurations are created.
+            Per-template failures (e.g., agent not found, standing approval
+            limit) are reported in `results[]` with `success: false`, not
+            as HTTP-level errors.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/action-config-templates/{id}/apply:
+    post:
+      operationId: applyActionConfigTemplate
+      summary: Apply Action Configuration Template
+      description: |
+        Create an action configuration from a template in one step. When the
+        template defines `standing_approval`, also creates an active standing
+        approval in the same transaction.
+
+        If the connector is not yet enabled for the agent, it is enabled
+        automatically so the configuration can be created.
+      tags:
+        - Action Configurations
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Template ID (from list templates).
+          schema:
+            type: string
+            maxLength: 255
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ApplyActionConfigTemplateRequest'
+      responses:
+        '201':
+          description: Configuration created (and standing approval if applicable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApplyActionConfigTemplateResponse'
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: Standing approval plan limit reached
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Template or agent not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/action-configurations:
     post:
       operationId: createActionConfiguration
@@ -3895,6 +4101,16 @@ paths:
           schema:
             type: string
           example: 2026-02-14T10:30:00Z,sa_abc123
+        - name: source_action_configuration_id
+          in: query
+          required: false
+          description: |
+            When set, only standing approvals whose `source_action_configuration_id`
+            matches this value are returned (e.g. to filter approvals linked to a
+            specific action configuration).
+          schema:
+            type: string
+            maxLength: 128
       responses:
         '200':
           description: Standing approvals retrieved successfully
@@ -5637,6 +5853,7 @@ paths:
                       - https://www.googleapis.com/auth/userinfo.email
                     source: built_in
                     has_credentials: true
+                    pkce: false
                   - id: microsoft
                     scopes:
                       - openid
@@ -5644,6 +5861,15 @@ paths:
                       - User.Read
                     source: built_in
                     has_credentials: true
+                    pkce: false
+                  - id: dropbox
+                    scopes:
+                      - files.content.read
+                      - files.content.write
+                      - sharing.write
+                    source: built_in
+                    has_credentials: true
+                    pkce: true
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
@@ -5674,6 +5900,13 @@ paths:
         the `user_scope` query parameter and does **not** send a bot `scope` parameter.
         After consent, the stored connection uses the Slack user token (`xoxp-`) as the
         primary secret. Workspace bot install is not required.
+
+        ### PKCE (`pkce: true` on the provider)
+
+        For providers that require PKCE (e.g. Dropbox), the server adds an S256 code
+        challenge to the provider authorization URL and stores the verifier only inside
+        the signed state token (encrypted at rest in the JWT payload). No client-side
+        PKCE logic is required.
       tags:
         - OAuth
       security:
@@ -5739,6 +5972,11 @@ paths:
         When Slack token rotation is enabled, user `refresh_token` and expiry may be
         nested under `authed_user` in the token response; the server normalizes these
         before persisting.
+
+        ### PKCE
+
+        When the provider uses PKCE, the callback recovers the code verifier from the
+        validated state token and passes it to the token exchange per RFC 7636.
       tags:
         - OAuth
       security:
@@ -6955,6 +7193,12 @@ components:
             repo: '*'
             title: '*'
             body: '*'
+        standing_approval:
+          $ref: '#/components/schemas/StandingApprovalTemplateSpec'
+          description: |
+            When present, applying this template also creates an active standing
+            approval with constraints derived from `parameters`. Omitted when the
+            template does not bundle auto-approval.
         created_at:
           type: string
           format: date-time
@@ -7088,6 +7332,13 @@ components:
           description: |
             Optional longer description of what this configuration permits.
           example: Agent can create issues labeled 'bug' in the main repo. Title and body are freeform.
+        linked_standing_approvals:
+          type: array
+          description: |
+            Active standing approvals that reference this configuration via
+            `source_action_configuration_id`. Omitted when empty.
+          items:
+            $ref: '#/components/schemas/LinkedStandingApprovalSummary'
         created_at:
           type: string
           format: date-time
@@ -7615,6 +7866,7 @@ components:
         description: GitHub integration for repository management
         actions:
           - action_type: github.create_issue
+            operation_type: write
             name: Create Issue
             description: Create a new issue in a repository
             risk_level: low
@@ -7635,6 +7887,7 @@ components:
                   type: string
                   description: Issue body (markdown)
           - action_type: github.merge_pr
+            operation_type: write
             name: Merge Pull Request
             description: Merge an open pull request
             risk_level: medium
@@ -7967,16 +8220,14 @@ components:
           example: null
         source_action_configuration_id:
           type: string
+          minLength: 1
           maxLength: 128
-          nullable: true
           description: |
-            The action configuration this standing approval was derived from, if any.
-            Nullable — `null` when the standing approval was created with a custom
-            action type rather than from an existing configuration. The referenced
-            configuration may have been deleted since creation.
+            The action configuration this standing approval is tied to. Every standing
+            approval references a backing configuration row.
             Expected format: `ac_` prefix followed by 32 hex characters, but the
             backend does not enforce the pattern.
-          example: null
+          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
       example:
         standing_approval_id: sa_abc123
         agent_id: 42
@@ -7993,7 +8244,7 @@ components:
         expires_at: '2026-02-21T00:00:00Z'
         created_at: '2026-02-14T10:30:00Z'
         revoked_at: null
-        source_action_configuration_id: null
+        source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
     StandingApprovalExecuteRequest:
       type: object
       required:
@@ -8141,7 +8392,7 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
-            source_action_configuration_id: null
+            source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         has_more: false
     UserStandingApprovalListResponse:
       type: object
@@ -8191,6 +8442,7 @@ components:
         - agent_id
         - action_type
         - constraints
+        - source_action_configuration_id
       properties:
         agent_id:
           type: integer
@@ -8213,11 +8465,13 @@ components:
           type: object
           additionalProperties: true
           description: |
-            Constraint boundaries for this standing approval. Required and must
-            contain at least one non-wildcard parameter constraint. A standing
-            approval without parameter constraints is a blank check — the backend
-            rejects empty constraints or constraints where every value is a
-            wildcard (`"*"`).
+            Constraint boundaries for this standing approval. Normally required and must
+            contain at least one non-wildcard parameter constraint; the backend rejects
+            empty objects or constraints where every value is a wildcard (`"*"`).
+
+            When tied to an action configuration (always required for create), trusted flows
+            such as template customize may send `{}` to mean **match all** parameter values for
+            this action type (stored as empty constraints in the database).
           example:
             recipient_pattern: '*@mycompany.com'
             max_recipients: 5
@@ -8226,9 +8480,8 @@ components:
           minLength: 1
           maxLength: 128
           description: |
-            Optional reference to the action configuration this standing approval
-            was derived from. When provided, the backend records it for traceability.
-            No foreign-key enforcement — the configuration may be deleted later.
+            Action configuration this standing approval is created from. Must exist,
+            belong to the same `agent_id`, and have the same `action_type` as the request.
             Expected format: `ac_` prefix followed by 32 hex characters (e.g.,
             `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
             enforce the pattern — only non-empty and max 128 characters.
@@ -10632,6 +10885,12 @@ components:
           type: boolean
           description: Whether the provider has client credentials configured and is ready to use
           example: true
+        pkce:
+          type: boolean
+          description: |
+            When true, the platform uses PKCE (RFC 7636) for this provider's authorize and token exchange. The browser still follows the normal redirect to `GET /v1/oauth/{provider}/authorize`; the code verifier is generated and recovered server-side inside the signed OAuth state JWT (sealed so the JWT payload does not contain the verifier in plaintext).
+          default: false
+          example: true
     OAuthProviderListResponse:
       type: object
       required:
@@ -11363,6 +11622,81 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/CalendarListItem'
+    ChannelListItem:
+      type: object
+      required:
+        - id
+        - display_label
+      properties:
+        id:
+          type: string
+          description: Slack channel ID (C…, G…, or D…).
+        name:
+          type: string
+          description: Channel name when available (may be empty for some DMs).
+        user:
+          type: string
+          description: For IM channels, the other participant's user ID when present.
+        is_private:
+          type: boolean
+          description: True for private channels (no
+        is_im:
+          type: boolean
+          description: True for direct messages.
+        is_mpim:
+          type: boolean
+          description: True for group direct messages.
+        num_members:
+          type: integer
+          description: Member count when provided by Slack.
+        display_label:
+          type: string
+          description: Human-readable label for pickers (#public-name, private name, DM label).
+    AgentConnectorChannelListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChannelListItem'
+    UserListItem:
+      type: object
+      required:
+        - id
+        - display_label
+      properties:
+        id:
+          type: string
+          description: Slack user ID (U…).
+        name:
+          type: string
+          description: Slack username.
+        real_name:
+          type: string
+          description: User's real name.
+        display_name:
+          type: string
+          description: User's display name.
+        email:
+          type: string
+          description: User's email address when available.
+        is_bot:
+          type: boolean
+          description: True for bot users.
+        display_label:
+          type: string
+          description: Human-readable label for pickers (real name with email).
+    AgentConnectorUserListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/UserListItem'
     RetentionMeta:
       type: object
       description: |
@@ -11387,6 +11721,167 @@ components:
             recently downgraded from a paid plan. After this time, the shorter
             retention window takes effect.
           example: '2026-03-08T14:30:00Z'
+    StandingApprovalTemplateSpec:
+      type: object
+      description: |
+        Manifest-authored standing approval behavior when a template is applied.
+      properties:
+        duration_days:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: |
+            Number of days until the standing approval expires. `null` means no
+            expiry (until revoked).
+        max_executions:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: |
+            Optional cap on executions. `null` means unlimited within the window.
+    BulkApplyActionConfigTemplateRequest:
+      type: object
+      required:
+        - agent_id
+        - template_ids
+      properties:
+        agent_id:
+          type: integer
+          format: int64
+          description: Agent to attach the new configurations and standing approvals to.
+          example: 42
+        template_ids:
+          type: array
+          items:
+            type: string
+            maxLength: 255
+          minItems: 1
+          maxItems: 50
+          description: |
+            Template IDs to apply. All templates must belong to the same connector.
+            Duplicates are silently deduplicated.
+          example:
+            - tpl_github_create_issue_all
+            - tpl_github_merge_pr_all
+        approval_modes:
+          type: object
+          additionalProperties:
+            type: string
+            enum:
+              - auto_approve
+              - requires_approval
+          description: |
+            Optional per-template approval mode overrides keyed by template ID.
+            Templates not in this map use their built-in behavior.
+          example:
+            tpl_github_create_issue_all: auto_approve
+    LinkedStandingApprovalSummary:
+      type: object
+      required:
+        - standing_approval_id
+        - action_type
+        - status
+        - execution_count
+      properties:
+        standing_approval_id:
+          type: string
+          description: Standing approval identifier.
+        action_type:
+          type: string
+          description: Action type covered by this standing approval.
+        status:
+          type: string
+          description: Standing approval status (typically `active` in this summary).
+        expires_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When the standing approval expires, or null if it lasts until revoked.
+        max_executions:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: Execution cap, if any.
+        execution_count:
+          type: integer
+          minimum: 0
+          description: Executions recorded so far.
+    BulkApplyResultError:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable error code.
+          example: standing_approval_limit_reached
+        message:
+          type: string
+          description: Human-readable error message.
+          example: Standing approval limit reached
+    BulkApplyResult:
+      type: object
+      required:
+        - template_id
+        - success
+      properties:
+        template_id:
+          type: string
+          description: The template ID that was applied (or failed).
+        success:
+          type: boolean
+          description: Whether this template was applied successfully.
+        action_configuration:
+          $ref: '#/components/schemas/ActionConfiguration'
+        standing_approval:
+          $ref: '#/components/schemas/StandingApproval'
+          description: Present when the template bundles a standing approval and it was created successfully.
+        error:
+          $ref: '#/components/schemas/BulkApplyResultError'
+          description: Present when `success` is false.
+    BulkApplyActionConfigTemplateResponse:
+      type: object
+      required:
+        - results
+      properties:
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkApplyResult'
+          description: |
+            Per-template results. Order matches the deduplicated input order.
+    ApplyActionConfigTemplateRequest:
+      type: object
+      required:
+        - agent_id
+      properties:
+        agent_id:
+          type: integer
+          format: int64
+          description: Agent to attach the new configuration and standing approval to.
+          example: 42
+        approval_mode:
+          type: string
+          enum:
+            - auto_approve
+            - requires_approval
+          description: |
+            Override the template's built-in approval behavior.
+            `auto_approve` creates a standing approval (using the template's spec
+            if present, otherwise sensible defaults: no expiry, unlimited executions).
+            `requires_approval` skips standing approval creation.
+            When omitted, falls back to the template's built-in behavior.
+    ApplyActionConfigTemplateResponse:
+      type: object
+      required:
+        - action_configuration
+      properties:
+        action_configuration:
+          $ref: '#/components/schemas/ActionConfiguration'
+        standing_approval:
+          $ref: '#/components/schemas/StandingApproval'
+          description: Present when the template bundles a standing approval.
     NotificationPreferenceUpdate:
       type: object
       description: A channel preference update (request-only, no `available` field).

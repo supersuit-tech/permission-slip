@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { useStandingApprovalsForConfigs } from "@/hooks/useStandingApprovalsForConfigs";
 import { ChevronDown, ChevronRight, Loader2, Plus, Settings, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,6 +15,7 @@ import {
   TableBody,
   TableHead,
   TableRow,
+  TableCell,
 } from "@/components/ui/table";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
@@ -36,6 +38,7 @@ interface ActionConfigurationsSectionProps {
   configs: ActionConfiguration[];
   isLoading: boolean;
   error: string | null;
+  onConfigsChanged?: () => void;
 }
 
 export function ActionConfigurationsSection({
@@ -46,6 +49,7 @@ export function ActionConfigurationsSection({
   configs,
   isLoading,
   error,
+  onConfigsChanged,
 }: ActionConfigurationsSectionProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [initialTemplateForAdd, setInitialTemplateForAdd] =
@@ -75,6 +79,13 @@ export function ActionConfigurationsSection({
   const hasWildcardConfig = configs.some(
     (c) => c.action_type === WILDCARD_ACTION_TYPE,
   );
+
+  const configIds = useMemo(() => configs.map((c) => c.id), [configs]);
+  const {
+    byConfigId: standingByConfig,
+    error: standingError,
+    refetch: refetchStanding,
+  } = useStandingApprovalsForConfigs(configIds);
 
   const { createActionConfig, isPending: isEnablingAll } =
     useCreateActionConfig();
@@ -203,15 +214,34 @@ export function ActionConfigurationsSection({
                   <TableHead className="font-semibold text-primary-foreground">
                     Status
                   </TableHead>
+                  <TableHead className="font-semibold text-primary-foreground">
+                    Standing Approval
+                  </TableHead>
                   <TableHead className="w-[100px] font-semibold text-primary-foreground" />
                 </TableRow>
               </TableHeader>
               <TableBody className="[&>tr:nth-child(even)]:bg-muted">
+                {standingError && (
+                  <TableRow>
+                    <TableCell
+                      colSpan={6}
+                      className="text-destructive bg-destructive/5 py-2 text-sm"
+                    >
+                      {standingError}
+                    </TableCell>
+                  </TableRow>
+                )}
                 {configs.map((config) => (
                   <ActionConfigRow
                     key={config.id}
+                    agentId={agentId}
                     config={config}
                     actions={actions}
+                    standingRows={standingByConfig.get(config.id) ?? []}
+                    onStandingSuccess={() => {
+                      void refetchStanding();
+                      onConfigsChanged?.();
+                    }}
                     onEdit={setEditTarget}
                     onDelete={setDeleteTarget}
                   />

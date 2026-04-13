@@ -1,11 +1,30 @@
 package testhelper
 
 import (
+	"encoding/hex"
 	"testing"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/db"
 )
+
+const standingApprovalFixtureConnectorID = "standing_approval_fixture"
+
+// ensureStandingApprovalSourceConfig creates connector, action, and action_configuration
+// rows so standing_approvals.source_action_configuration_id FK is satisfied.
+func ensureStandingApprovalSourceConfig(t *testing.T, d db.DBTX, agentID int64, userID, actionType string) string {
+	t.Helper()
+	mustExec(t, d,
+		`INSERT INTO connectors (id, name) VALUES ($1, $1) ON CONFLICT (id) DO NOTHING`,
+		standingApprovalFixtureConnectorID)
+	mustExec(t, d,
+		`INSERT INTO connector_actions (connector_id, action_type, name) VALUES ($1, $2, $2)
+		 ON CONFLICT (connector_id, action_type) DO NOTHING`,
+		standingApprovalFixtureConnectorID, actionType)
+	configID := "ac_" + hex.EncodeToString(mustRandBytes(t, 16))
+	InsertActionConfig(t, d, configID, agentID, userID, standingApprovalFixtureConnectorID, actionType)
+	return configID
+}
 
 // InsertStandingApproval creates an active standing approval for the given agent and user.
 // The agent and user must already exist via InsertUser and InsertAgent.
@@ -18,31 +37,36 @@ func InsertStandingApproval(t *testing.T, d db.DBTX, saID string, agentID int64,
 // The agent and user must already exist via InsertUser and InsertAgent.
 func InsertStandingApprovalWithStatus(t *testing.T, d db.DBTX, saID string, agentID int64, userID, status string) {
 	t.Helper()
+	actionType := "test.action"
+	configID := ensureStandingApprovalSourceConfig(t, d, agentID, userID, actionType)
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, starts_at, expires_at)
-		 VALUES ($1, $2, $3, 'test.action', $4, now(), now() + interval '30 days')`,
-		saID, agentID, userID, status)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, now(), now() + interval '30 days')`,
+		saID, agentID, userID, actionType, status, configID)
 }
 
 // InsertStandingApprovalWithCreatedAt creates an active standing approval with an explicit created_at timestamp.
 // Useful for pagination tests that need deterministic ordering.
 func InsertStandingApprovalWithCreatedAt(t *testing.T, d db.DBTX, saID string, agentID int64, userID string, createdAt time.Time) {
 	t.Helper()
+	actionType := "test.action"
+	configID := ensureStandingApprovalSourceConfig(t, d, agentID, userID, actionType)
 	expiresAt := createdAt.Add(30 * 24 * time.Hour)
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, starts_at, expires_at, created_at)
-		 VALUES ($1, $2, $3, 'test.action', 'active', $4, $5, $4)`,
-		saID, agentID, userID, createdAt, expiresAt)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at, created_at)
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $6)`,
+		saID, agentID, userID, actionType, configID, createdAt, expiresAt)
 }
 
 // InsertStandingApprovalWithActionType creates an active standing approval with a specific action_type.
 // The agent and user must already exist via InsertUser and InsertAgent.
 func InsertStandingApprovalWithActionType(t *testing.T, d db.DBTX, saID string, agentID int64, userID, actionType string) {
 	t.Helper()
+	configID := ensureStandingApprovalSourceConfig(t, d, agentID, userID, actionType)
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', now(), now() + interval '30 days')`,
-		saID, agentID, userID, actionType)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, 'active', $5, now(), now() + interval '30 days')`,
+		saID, agentID, userID, actionType, configID)
 }
 
 // InsertStandingApprovalExecution records a standing approval execution with no parameters.
@@ -91,8 +115,13 @@ func InsertStandingApprovalFull(t *testing.T, d db.DBTX, saID string, agentID in
 	if opts.ExpiresAt.IsZero() {
 		opts.ExpiresAt = time.Now().Add(30 * 24 * time.Hour)
 	}
+	sourceID := opts.SourceActionConfigurationID
+	if sourceID == nil || *sourceID == "" {
+		id := ensureStandingApprovalSourceConfig(t, d, agentID, userID, opts.ActionType)
+		sourceID = &id
+	}
 	mustExec(t, d,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, max_executions, starts_at, expires_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, opts.SourceActionConfigurationID, opts.MaxExecutions, opts.StartsAt, opts.ExpiresAt)
+		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, sourceID, opts.MaxExecutions, opts.StartsAt, opts.ExpiresAt)
 }

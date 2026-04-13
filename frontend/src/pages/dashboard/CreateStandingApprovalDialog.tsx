@@ -36,6 +36,8 @@ export interface CreateStandingApprovalDialogProps {
   onOpenChange: (open: boolean) => void;
   initialAgentId?: number;
   initialActionType?: string;
+  /** When known, pins the backing action configuration for create (required by API). */
+  initialSourceActionConfigurationId?: string;
   initialConstraints?: Record<string, unknown>;
   /** When provided, the dialog operates in edit mode for the given standing approval. */
   editTarget?: StandingApproval;
@@ -85,6 +87,7 @@ export function CreateStandingApprovalDialog({
   onOpenChange,
   initialAgentId,
   initialActionType,
+  initialSourceActionConfigurationId,
   initialConstraints,
   editTarget,
   onCreated,
@@ -198,6 +201,8 @@ export function CreateStandingApprovalDialog({
       } else {
         setSelectedConfigId(matchingConfigForContext?.id ?? "");
       }
+    } else if (initialSourceActionConfigurationId) {
+      setSelectedConfigId(initialSourceActionConfigurationId);
     } else if (hasInitialContext) {
       setSelectedConfigId(matchingConfigForContext?.id ?? "");
     }
@@ -211,6 +216,7 @@ export function CreateStandingApprovalDialog({
     editTarget,
     hasInitialContext,
     matchingConfigForContext,
+    initialSourceActionConfigurationId,
   ]);
 
   const effectiveActionType =
@@ -451,12 +457,17 @@ export function CreateStandingApprovalDialog({
         onUpdated?.();
         onOpenChange(false);
       } else {
+        const sourceId = selectedConfig?.id;
+        if (!sourceId) {
+          toast.error("Select an action configuration before creating a standing approval");
+          return;
+        }
         await createStandingApproval({
           agent_id: agentId,
           action_type: effectiveActionType,
           action_version: "1",
           constraints,
-          source_action_configuration_id: selectedConfig?.id,
+          source_action_configuration_id: sourceId,
           max_executions: maxExecutions ? Number(maxExecutions) : null,
           ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
         });

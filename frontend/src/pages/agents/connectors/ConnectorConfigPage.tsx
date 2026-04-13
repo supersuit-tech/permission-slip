@@ -44,6 +44,7 @@ export function ConnectorConfigPage() {
     configs,
     isLoading: configsLoading,
     error: configsError,
+    refetch: refetchConfigs,
   } = useActionConfigs(agentId);
 
   const { binding: credentialBinding } = useAgentConnectorCredential(
@@ -160,6 +161,7 @@ export function ConnectorConfigPage() {
         configs={connectorConfigs}
         isLoading={configsLoading}
         error={configsError}
+        onConfigsChanged={() => void refetchConfigs()}
       />
       <ConnectorCredentialsSection
         agentId={agentId}

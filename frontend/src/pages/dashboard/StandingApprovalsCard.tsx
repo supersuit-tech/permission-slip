@@ -1,7 +1,6 @@
-import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { Loader2, ShieldCheck } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useMemo } from "react";
+import { Link } from "react-router-dom";
+import { Loader2, ShieldCheck, ExternalLink } from "lucide-react";
 import { LimitBadge } from "@/components/LimitBadge";
 import { UpgradePrompt } from "@/components/UpgradePrompt";
 import {
@@ -29,9 +28,6 @@ import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import { useActionConfigMap } from "@/hooks/useActionConfigMap";
 import { useResourceLimit } from "@/hooks/useResourceLimit";
 import { getAgentDisplayName } from "@/lib/agents";
-import { RevokeStandingApprovalDialog } from "./RevokeStandingApprovalDialog";
-import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
-import { ConstraintsSummary } from "./ConstraintsSummary";
 
 function formatExpiresIn(expiresAt: string | null | undefined): string {
   if (expiresAt === null) return "Never";
@@ -83,51 +79,40 @@ function resolveAgentName(
   return agent ? getAgentDisplayName(agent) : `Agent ${agentId}`;
 }
 
-function resolveActionConfigName(
-  sourceId: string | null | undefined,
-  configMap: Map<string, ActionConfiguration>,
-): string | null {
-  if (!sourceId) return null;
-  const config = configMap.get(sourceId);
-  return config?.name ?? null;
-}
-
-function StandingApprovalRow({
+function StandingApprovalSummaryRow({
   sa,
-  onEdit,
-  onRevoke,
+  config,
   agentMap,
-  configMap,
 }: {
   sa: StandingApproval;
-  onEdit: (sa: StandingApproval) => void;
-  onRevoke: (sa: StandingApproval) => void;
+  config: ActionConfiguration | undefined;
   agentMap: Map<number, Agent>;
-  configMap: Map<string, ActionConfiguration>;
 }) {
   const agentName = resolveAgentName(sa.agent_id, agentMap);
-  const configName = resolveActionConfigName(
-    sa.source_action_configuration_id,
-    configMap,
-  );
+  const href =
+    config != null
+      ? `/agents/${sa.agent_id}/connectors/${encodeURIComponent(config.connector_id)}`
+      : `/agents/${sa.agent_id}`;
 
   return (
     <TableRow>
       <TableCell className="font-medium">
-        <div>
-          <span>{sa.action_type}</span>
-          {configName && (
-            <span className="text-muted-foreground block text-xs">
-              {configName}
-            </span>
+        <div className="min-w-0">
+          <p className="truncate">
+            {config?.name ?? "Unknown configuration"}
+          </p>
+          {config && (
+            <p className="text-muted-foreground truncate font-mono text-xs">
+              {config.action_type}
+            </p>
           )}
         </div>
       </TableCell>
+      <TableCell className="text-sm">
+        {config?.connector_id ?? "\u2014"}
+      </TableCell>
       <TableCell className="max-w-[200px] truncate text-xs">
         {agentName}
-      </TableCell>
-      <TableCell>
-        <ConstraintsSummary constraints={sa.constraints} />
       </TableCell>
       <TableCell>
         <ExecutionBadge
@@ -137,72 +122,51 @@ function StandingApprovalRow({
       </TableCell>
       <TableCell>{formatExpiresIn(sa.expires_at)}</TableCell>
       <TableCell className="text-right">
-        {sa.status === "active" && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(sa)}
-          >
-            Edit
-          </Button>
-        )}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onRevoke(sa)}
+        <Link
+          to={href}
+          className="text-primary inline-flex items-center gap-1 text-sm underline-offset-4 hover:underline"
         >
-          Revoke
-        </Button>
+          Manage
+          <ExternalLink className="size-3.5" aria-hidden />
+        </Link>
       </TableCell>
     </TableRow>
   );
 }
 
-function EmptyState({ onCreate }: { onCreate: () => void }) {
+function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-8 text-center">
       <ShieldCheck className="text-muted-foreground mb-3 size-10" />
       <p className="text-muted-foreground mb-1 text-sm font-medium">
-        No standing approvals yet
+        No active standing approvals
       </p>
-      <p className="text-muted-foreground mb-4 max-w-xs text-xs">
-        Tired of approving the same action? Create a standing approval to
-        let an agent repeat it automatically — with limits you control.
+      <p className="text-muted-foreground mb-4 max-w-md text-xs leading-relaxed">
+        Standing approvals are created from an agent&apos;s connector page, on each
+        action configuration. Open a connector, then use the Standing Approval column
+        to enable auto-approve with limits you control.
       </p>
-      <Button size="sm" onClick={onCreate}>
-        Create Standing Approval
-      </Button>
     </div>
   );
 }
 
 export function StandingApprovalsCard() {
-  const [searchParams, setSearchParams] = useSearchParams();
-  const filterSourceConfigId =
-    searchParams.get("source_action_configuration_id") ?? undefined;
-
-  const { standingApprovals, isLoading, error, refetch } =
-    useStandingApprovals({
-      sourceActionConfigurationId: filterSourceConfigId,
-    });
-
-  function clearSourceFilter() {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.delete("source_action_configuration_id");
-        return next;
-      },
-      { replace: true },
-    );
-  }
+  const { standingApprovals, isLoading, error, refetch } = useStandingApprovals();
   const { agents } = useAgents();
-  const agentIds = useMemo(
+
+  const linkedActive = useMemo(
     () =>
-      standingApprovals
-        .filter((sa) => !!sa.source_action_configuration_id)
-        .map((sa) => sa.agent_id),
+      standingApprovals.filter(
+        (sa) =>
+          !!sa.source_action_configuration_id &&
+          sa.status === "active",
+      ),
     [standingApprovals],
+  );
+
+  const agentIds = useMemo(
+    () => [...new Set(linkedActive.map((sa) => sa.agent_id))],
+    [linkedActive],
   );
   const configMap = useActionConfigMap(agentIds);
   const agentMap = useMemo(() => {
@@ -212,23 +176,19 @@ export function StandingApprovalsCard() {
     }
     return map;
   }, [agents]);
+
   const {
     max: maxStandingApprovals,
     current: standingApprovalCount,
     atLimit,
     hasData: hasBillingData,
   } = useResourceLimit("max_standing_approvals", standingApprovals.length);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<StandingApproval | null>(null);
-  const [revokeTarget, setRevokeTarget] = useState<StandingApproval | null>(
-    null,
-  );
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
-          <CardTitle>Standing Approvals</CardTitle>
+          <CardTitle>Standing approvals</CardTitle>
           {hasBillingData && (
             <LimitBadge
               current={standingApprovalCount}
@@ -237,21 +197,12 @@ export function StandingApprovalsCard() {
             />
           )}
         </div>
+        <p className="text-muted-foreground text-sm">
+          Action configurations with an active standing approval. Manage limits and
+          revocation on each connector&apos;s configuration page.
+        </p>
       </CardHeader>
       <CardContent className="px-3 md:px-6">
-        {filterSourceConfigId && (
-          <p className="text-muted-foreground mb-3 text-sm">
-            Showing approvals linked to configuration{" "}
-            <span className="font-mono text-xs">{filterSourceConfigId}</span>.{" "}
-            <button
-              type="button"
-              className="text-primary underline-offset-4 hover:underline"
-              onClick={clearSourceFilter}
-            >
-              Show all
-            </button>
-          </p>
-        )}
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="text-muted-foreground size-6 animate-spin" />
@@ -259,113 +210,57 @@ export function StandingApprovalsCard() {
         ) : error ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <p className="text-destructive mb-2 text-sm">{error}</p>
-            <Button variant="ghost" size="sm" onClick={() => refetch()}>
+            <button
+              type="button"
+              className="text-primary text-sm underline-offset-4 hover:underline"
+              onClick={() => refetch()}
+            >
               Retry
-            </Button>
+            </button>
           </div>
-        ) : standingApprovals.length === 0 ? (
-          <EmptyState onCreate={() => setCreateDialogOpen(true)} />
+        ) : linkedActive.length === 0 ? (
+          <EmptyState />
         ) : (
-          <StandingApprovalsTable
-            approvals={standingApprovals}
-            onEdit={(sa) => setEditTarget(sa)}
-            onRevoke={(sa) => setRevokeTarget(sa)}
-            agentMap={agentMap}
-            configMap={configMap}
-          />
+          <div className="overflow-x-auto">
+            <div className="min-w-[640px] overflow-hidden rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
+                    <TableHead>Configuration</TableHead>
+                    <TableHead>Connector</TableHead>
+                    <TableHead>Agent</TableHead>
+                    <TableHead>Executions</TableHead>
+                    <TableHead>Expires</TableHead>
+                    <TableHead className="text-right">
+                      <span className="sr-only">Open</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {linkedActive.map((sa) => {
+                    const cid = sa.source_action_configuration_id;
+                    const config =
+                      cid != null ? configMap.get(cid) : undefined;
+                    return (
+                      <StandingApprovalSummaryRow
+                        key={sa.standing_approval_id}
+                        sa={sa}
+                        config={config}
+                        agentMap={agentMap}
+                      />
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </div>
+          </div>
         )}
       </CardContent>
       {atLimit ? (
         <CardFooter>
           <UpgradePrompt feature="Upgrade to create more standing approvals." />
         </CardFooter>
-      ) : standingApprovals.length > 0 ? (
-        <CardFooter>
-          <Button
-            className="w-full sm:w-auto"
-            onClick={() => setCreateDialogOpen(true)}
-          >
-            Create Standing Approval
-          </Button>
-        </CardFooter>
       ) : null}
-
-      <CreateStandingApprovalDialog
-        agents={agents}
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
-      />
-
-      {editTarget && (
-        <CreateStandingApprovalDialog
-          agents={agents}
-          open={!!editTarget}
-          onOpenChange={(open) => {
-            if (!open) setEditTarget(null);
-          }}
-          editTarget={editTarget}
-          onUpdated={() => setEditTarget(null)}
-        />
-      )}
-
-      {revokeTarget && (
-        <RevokeStandingApprovalDialog
-          standingApprovalId={revokeTarget.standing_approval_id}
-          actionType={revokeTarget.action_type}
-          agentId={revokeTarget.agent_id}
-          open={!!revokeTarget}
-          onOpenChange={(open) => {
-            if (!open) setRevokeTarget(null);
-          }}
-        />
-      )}
     </Card>
-  );
-}
-
-function StandingApprovalsTable({
-  approvals,
-  onEdit,
-  onRevoke,
-  agentMap,
-  configMap,
-}: {
-  approvals: StandingApproval[];
-  onEdit: (sa: StandingApproval) => void;
-  onRevoke: (sa: StandingApproval) => void;
-  agentMap: Map<number, Agent>;
-  configMap: Map<string, ActionConfiguration>;
-}) {
-  return (
-    <div className="overflow-x-auto">
-      <div className="min-w-[600px] overflow-hidden rounded-lg">
-        <Table>
-          <TableHeader>
-            <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
-              <TableHead>Action</TableHead>
-              <TableHead>Agent</TableHead>
-              <TableHead>Constraints</TableHead>
-              <TableHead>Executions</TableHead>
-              <TableHead>Expires</TableHead>
-              <TableHead>
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {approvals.map((sa) => (
-              <StandingApprovalRow
-                key={sa.standing_approval_id}
-                sa={sa}
-                onEdit={onEdit}
-                onRevoke={onRevoke}
-                agentMap={agentMap}
-                configMap={configMap}
-              />
-            ))}
-          </TableBody>
-        </Table>
-      </div>
-    </div>
   );
 }
