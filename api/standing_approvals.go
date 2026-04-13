@@ -228,6 +228,13 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "expires_at must be after starts_at"))
 			return
 		}
+		const maxStandingApprovalDuration = 90 * 24 * time.Hour
+		if req.ExpiresAt != nil {
+			if d := req.ExpiresAt.Sub(startsAt); d > maxStandingApprovalDuration {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Duration exceeds maximum of 90 days"))
+				return
+			}
+		}
 
 		saID, err := generatePrefixedID("sa_", 16)
 		if err != nil {

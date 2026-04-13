@@ -104,7 +104,6 @@ func TestCreateActionConfig_Success(t *testing.T) {
 	}
 }
 
-
 func TestCreateActionConfig_MissingRequiredFields(t *testing.T) {
 	t.Parallel()
 	tx, uid, _, _, _ := setupActionConfigTest(t)
@@ -655,7 +654,7 @@ func TestDeleteActionConfig_Success(t *testing.T) {
 	}
 }
 
-func TestDeleteActionConfig_RevokesLinkedStandingApprovals(t *testing.T) {
+func TestDeleteActionConfig_DeletesLinkedStandingApprovals(t *testing.T) {
 	t.Parallel()
 	tx, uid, agentID, connID, actionType := setupActionConfigTest(t)
 
@@ -680,14 +679,14 @@ func TestDeleteActionConfig_RevokesLinkedStandingApprovals(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var status string
+	var n int
 	err := tx.QueryRow(context.Background(),
-		`SELECT status FROM standing_approvals WHERE standing_approval_id = $1`, saID).Scan(&status)
+		`SELECT COUNT(*) FROM standing_approvals WHERE standing_approval_id = $1`, saID).Scan(&n)
 	if err != nil {
 		t.Fatalf("query standing approval: %v", err)
 	}
-	if status != "revoked" {
-		t.Errorf("expected standing approval revoked, got status %q", status)
+	if n != 0 {
+		t.Errorf("expected standing approval row removed, got count %d", n)
 	}
 }
 
