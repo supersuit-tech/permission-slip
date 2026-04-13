@@ -52,7 +52,12 @@ export function configCommand(program: Command): void {
         if (key === "default_server") {
           saveConfig({ default_server: value.trim() });
         }
-        output({ ok: true, key, value: value.trim() }, outputOpts);
+        const saved = loadConfig();
+        const persisted =
+          key === "default_server"
+            ? (saved.default_server ?? value.trim())
+            : value.trim();
+        output({ ok: true, key, value: persisted }, outputOpts);
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
         process.exit(1);

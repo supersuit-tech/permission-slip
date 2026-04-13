@@ -15,7 +15,7 @@ import { generateKeyPair, keyPairExists, displayPath } from "../auth/keys.js";
 import { ApiClient } from "../api/client.js";
 import { REGISTRATION_AGENT_ID } from "../auth/signing.js";
 import { saveRegistration } from "../config/store.js";
-import { resolveServerUrl } from "../config/serverUrl.js";
+import { resolveServerUrl, isBuiltInDefaultServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
 
@@ -81,7 +81,11 @@ export function registerCommand(program: Command): void {
             expires_at: result.expires_at,
             verification_required: result.verification_required,
             key_file: displayPath(kp.privateKeyFile),
-            next_step: `Run: permission-slip verify --code <confirmation_code> --server ${shellQuote(server)}`,
+            next_step:
+              `Run: permission-slip verify --code <confirmation_code>` +
+              (!isBuiltInDefaultServerUrl(server)
+                ? ` --server ${shellQuote(server)}`
+                : ""),
           },
           outputOpts,
         );

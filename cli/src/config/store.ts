@@ -130,7 +130,11 @@ export function loadConfig(): CliConfigFile {
     return typeof data === "object" && data !== null && !Array.isArray(data)
       ? data
       : {};
-  } catch {
+  } catch (err) {
+    console.error(
+      `Warning: could not parse ${CONFIG_FILE}, using defaults. ` +
+        (err instanceof Error ? err.message : String(err)),
+    );
     return {};
   }
 }
