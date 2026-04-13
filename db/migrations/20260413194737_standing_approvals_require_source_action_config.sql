@@ -30,6 +30,7 @@ WHERE sa.standing_approval_id = sub.standing_approval_id
   AND sub.config_id IS NOT NULL;
 
 -- Remaining rows: create one backing disabled config per standing approval.
+-- +goose StatementBegin
 DO $$
 DECLARE
     r RECORD;
@@ -80,6 +81,7 @@ BEGIN
         WHERE standing_approval_id = r.standing_approval_id;
     END LOOP;
 END $$;
+-- +goose StatementEnd
 
 ALTER TABLE standing_approvals
     ALTER COLUMN source_action_configuration_id SET NOT NULL;
