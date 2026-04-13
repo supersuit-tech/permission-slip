@@ -13,14 +13,21 @@ export function useApplyActionConfigTemplate() {
   const token = session?.access_token;
 
   const mutation = useMutation({
-    mutationFn: async (input: { templateId: string; agentId: number }) => {
+    mutationFn: async (input: {
+      templateId: string;
+      agentId: number;
+      approvalMode?: "auto_approve" | "requires_approval";
+    }) => {
       if (!token) throw new Error("Missing access token");
       const { data, error } = await client.POST(
         "/v1/action-config-templates/{id}/apply",
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { path: { id: input.templateId } },
-          body: { agent_id: input.agentId },
+          body: {
+            agent_id: input.agentId,
+            ...(input.approvalMode && { approval_mode: input.approvalMode }),
+          },
         },
       );
       if (error || !data) {

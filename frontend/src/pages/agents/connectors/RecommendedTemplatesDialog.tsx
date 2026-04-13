@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,10 @@ import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import { useApplyActionConfigTemplate } from "@/hooks/useApplyActionConfigTemplate";
-import { Badge } from "@/components/ui/badge";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TemplateParamBadge } from "./TemplatePicker";
+
+export type ApprovalMode = "auto_approve" | "requires_approval";
 
 export interface RecommendedTemplatesDialogProps {
   open: boolean;
@@ -22,7 +24,16 @@ export interface RecommendedTemplatesDialogProps {
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
-  onCustomize: (template: ActionConfigTemplate) => void;
+  onCustomize: (template: ActionConfigTemplate, approvalMode: ApprovalMode) => void;
+}
+
+const approvalModeOptions: { label: string; value: ApprovalMode }[] = [
+  { label: "Auto-approve", value: "auto_approve" },
+  { label: "Requires approval", value: "requires_approval" },
+];
+
+function defaultApprovalMode(template: ActionConfigTemplate): ApprovalMode {
+  return template.standing_approval != null ? "auto_approve" : "requires_approval";
 }
 
 export function RecommendedTemplatesDialog({
@@ -38,6 +49,20 @@ export function RecommendedTemplatesDialog({
   const { applyTemplate, isPending } = useApplyActionConfigTemplate();
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(
     null,
+  );
+  const [approvalModes, setApprovalModes] = useState<Record<string, ApprovalMode>>({});
+
+  const getApprovalMode = useCallback(
+    (template: ActionConfigTemplate): ApprovalMode =>
+      approvalModes[template.id] ?? defaultApprovalMode(template),
+    [approvalModes],
+  );
+
+  const handleApprovalModeChange = useCallback(
+    (templateId: string, mode: ApprovalMode) => {
+      setApprovalModes((prev) => ({ ...prev, [templateId]: mode }));
+    },
+    [],
   );
 
   const actionTypeSet = useMemo(
@@ -82,9 +107,14 @@ export function RecommendedTemplatesDialog({
   }, [liveTemplates, actions, actionNameByType]);
 
   async function handleUseTemplate(template: ActionConfigTemplate) {
+    const approvalMode = getApprovalMode(template);
     setPendingTemplateId(template.id);
     try {
-      const res = await applyTemplate({ templateId: template.id, agentId });
+      const res = await applyTemplate({
+        templateId: template.id,
+        agentId,
+        approvalMode,
+      });
       const sa = res.standing_approval;
       toast.success(
         sa
@@ -105,7 +135,7 @@ export function RecommendedTemplatesDialog({
 
   function handleCustomize(template: ActionConfigTemplate) {
     onOpenChange(false);
-    onCustomize(template);
+    onCustomize(template, getApprovalMode(template));
   }
 
   const buttonsDisabled = isPending;
@@ -147,6 +177,10 @@ export function RecommendedTemplatesDialog({
                     <RecommendedTemplateCard
                       key={template.id}
                       template={template}
+                      approvalMode={getApprovalMode(template)}
+                      onApprovalModeChange={(mode) =>
+                        handleApprovalModeChange(template.id, mode)
+                      }
                       onUseTemplate={() => void handleUseTemplate(template)}
                       onCustomize={() => handleCustomize(template)}
                       useDisabled={buttonsDisabled}
@@ -168,6 +202,8 @@ export function RecommendedTemplatesDialog({
 
 function RecommendedTemplateCard({
   template,
+  approvalMode,
+  onApprovalModeChange,
   onUseTemplate,
   onCustomize,
   useDisabled,
@@ -175,6 +211,8 @@ function RecommendedTemplateCard({
   usePending,
 }: {
   template: ActionConfigTemplate;
+  approvalMode: ApprovalMode;
+  onApprovalModeChange: (mode: ApprovalMode) => void;
   onUseTemplate: () => void;
   onCustomize: () => void;
   useDisabled: boolean;
@@ -182,21 +220,11 @@ function RecommendedTemplateCard({
   usePending: boolean;
 }) {
   const paramEntries = Object.entries(template.parameters);
-  const autoApproved = template.standing_approval != null;
 
   return (
     <div className="rounded-lg border border-input p-3">
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="text-sm font-medium">{template.name}</p>
-          {autoApproved ? (
-            <Badge>Auto-approved</Badge>
-          ) : (
-            <Badge variant="secondary" className="text-muted-foreground">
-              Requires approval each time
-            </Badge>
-          )}
-        </div>
+        <p className="text-sm font-medium">{template.name}</p>
         {template.description && (
           <p className="text-muted-foreground text-sm">{template.description}</p>
         )}
@@ -207,6 +235,12 @@ function RecommendedTemplateCard({
             ))}
           </div>
         )}
+        <SegmentedControl
+          options={approvalModeOptions}
+          value={approvalMode}
+          onChange={onApprovalModeChange}
+          ariaLabel="Approval mode"
+        />
         <div className="flex flex-wrap gap-2 pt-1">
           <Button
             type="button"
