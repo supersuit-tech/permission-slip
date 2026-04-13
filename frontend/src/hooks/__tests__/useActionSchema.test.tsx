@@ -14,6 +14,7 @@ const mockConnectorDetail = {
   actions: [
     {
       action_type: "github.create_issue",
+      operation_type: "write",
       name: "Create Issue",
       description: "Create a new issue",
       risk_level: "low",
@@ -29,6 +30,7 @@ const mockConnectorDetail = {
     },
     {
       action_type: "github.merge_pr",
+      operation_type: "write",
       name: "Merge Pull Request",
       risk_level: "medium",
     },

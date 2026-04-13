@@ -33,6 +33,7 @@ type ConnectorDetail struct {
 // ConnectorAction represents a row from the connector_actions table.
 type ConnectorAction struct {
 	ActionType            string
+	OperationType         string // read, write, or delete
 	Name                  string
 	Description           *string
 	RiskLevel             *string
@@ -96,7 +97,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch actions.
 	actionRows, err := db.Query(ctx,
-		`SELECT action_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template, preview
+		`SELECT action_type, operation_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template, preview
 		 FROM connector_actions
 		 WHERE connector_id = $1
 		 ORDER BY action_type`,
@@ -109,7 +110,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	for actionRows.Next() {
 		var a ConnectorAction
-		if err := actionRows.Scan(&a.ActionType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema, &a.RequiresPaymentMethod, &a.DisplayTemplate, &a.Preview); err != nil {
+		if err := actionRows.Scan(&a.ActionType, &a.OperationType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema, &a.RequiresPaymentMethod, &a.DisplayTemplate, &a.Preview); err != nil {
 			return nil, err
 		}
 		cd.Actions = append(cd.Actions, a)
@@ -260,6 +261,7 @@ type ExternalConnectorManifest struct {
 // ExternalConnectorAction describes an action from an external connector manifest.
 type ExternalConnectorAction struct {
 	ActionType            string
+	OperationType         string // read, write, or delete
 	Name                  string
 	Description           string
 	RiskLevel             string
@@ -322,10 +324,15 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	actionTypes := make([]string, 0, len(m.Actions))
 	for _, a := range m.Actions {
 		actionTypes = append(actionTypes, a.ActionType)
+		opType := a.OperationType
+		if opType == "" {
+			opType = "write"
+		}
 		_, err := tx.Exec(ctx, `
-			INSERT INTO connector_actions (connector_id, action_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template, preview)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+			INSERT INTO connector_actions (connector_id, action_type, operation_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template, preview)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 			ON CONFLICT (connector_id, action_type) DO UPDATE SET
+				operation_type = EXCLUDED.operation_type,
 				name = EXCLUDED.name,
 				description = EXCLUDED.description,
 				risk_level = EXCLUDED.risk_level,
@@ -333,7 +340,7 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 				requires_payment_method = EXCLUDED.requires_payment_method,
 				display_template = EXCLUDED.display_template,
 				preview = EXCLUDED.preview`,
-			m.ID, a.ActionType, a.Name, nilIfEmpty(a.Description), nilIfEmpty(a.RiskLevel), nilIfEmptyBytes(a.ParametersSchema), a.RequiresPaymentMethod, nilIfEmpty(a.DisplayTemplate), nilIfEmptyBytes(a.Preview))
+			m.ID, a.ActionType, opType, a.Name, nilIfEmpty(a.Description), nilIfEmpty(a.RiskLevel), nilIfEmptyBytes(a.ParametersSchema), a.RequiresPaymentMethod, nilIfEmpty(a.DisplayTemplate), nilIfEmptyBytes(a.Preview))
 		if err != nil {
 			return err
 		}

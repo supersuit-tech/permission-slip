@@ -27,6 +27,7 @@ type connectorListResponse struct {
 
 type connectorActionResponse struct {
 	ActionType            string  `json:"action_type"`
+	OperationType         string  `json:"operation_type"`
 	Name                  string  `json:"name"`
 	Description           *string `json:"description,omitempty"`
 	RiskLevel             *string `json:"risk_level,omitempty"`
@@ -45,12 +46,12 @@ type requiredCredentialResponse struct {
 }
 
 type connectorDetailResponse struct {
-	ID                  string                      `json:"id"`
-	Name                string                      `json:"name"`
-	Description         *string                     `json:"description,omitempty"`
-	Status              string                      `json:"status"`
-	LogoSVG             *string                     `json:"logo_svg,omitempty"`
-	Actions             []connectorActionResponse   `json:"actions"`
+	ID                  string                       `json:"id"`
+	Name                string                       `json:"name"`
+	Description         *string                      `json:"description,omitempty"`
+	Status              string                       `json:"status"`
+	LogoSVG             *string                      `json:"logo_svg,omitempty"`
+	Actions             []connectorActionResponse    `json:"actions"`
 	RequiredCredentials []requiredCredentialResponse `json:"required_credentials"`
 }
 
@@ -125,6 +126,7 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 	for i, a := range c.Actions {
 		resp := connectorActionResponse{
 			ActionType:            a.ActionType,
+			OperationType:         a.OperationType,
 			Name:                  a.Name,
 			Description:           a.Description,
 			RiskLevel:             a.RiskLevel,

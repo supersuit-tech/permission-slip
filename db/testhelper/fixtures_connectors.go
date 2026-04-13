@@ -35,16 +35,21 @@ func InsertConnectorActionWithPayment(t *testing.T, d db.DBTX, connectorID, acti
 type ConnectorActionOpts struct {
 	Description      *string
 	RiskLevel        *string
-	ParametersSchema []byte // raw JSON
+	ParametersSchema []byte  // raw JSON
+	OperationType    *string // read, write, delete — defaults to write when nil
 }
 
 // InsertConnectorActionFull creates an action with full details for the given connector.
 func InsertConnectorActionFull(t *testing.T, d db.DBTX, connectorID, actionType, name string, opts ConnectorActionOpts) {
 	t.Helper()
+	op := "write"
+	if opts.OperationType != nil && *opts.OperationType != "" {
+		op = *opts.OperationType
+	}
 	mustExec(t, d,
-		`INSERT INTO connector_actions (connector_id, action_type, name, description, risk_level, parameters_schema)
-		 VALUES ($1, $2, $3, $4, $5, $6)`,
-		connectorID, actionType, name, opts.Description, opts.RiskLevel, opts.ParametersSchema)
+		`INSERT INTO connector_actions (connector_id, action_type, operation_type, name, description, risk_level, parameters_schema)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		connectorID, actionType, op, name, opts.Description, opts.RiskLevel, opts.ParametersSchema)
 }
 
 // InsertConnectorWithDescription creates a connector with a custom description.

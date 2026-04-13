@@ -19,6 +19,7 @@ vi.mock("../../../../api/client");
 const mockActions: ConnectorAction[] = [
   {
     action_type: "github.create_issue",
+    operation_type: "write",
     name: "Create Issue",
     description: "Create a new issue in a repository",
     risk_level: "low",
@@ -35,6 +36,7 @@ const mockActions: ConnectorAction[] = [
   },
   {
     action_type: "github.merge_pr",
+    operation_type: "write",
     name: "Merge Pull Request",
     description: "Merge an open pull request",
     risk_level: "high",

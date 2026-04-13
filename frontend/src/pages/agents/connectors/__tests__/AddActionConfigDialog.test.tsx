@@ -12,6 +12,7 @@ vi.mock("../../../../api/client");
 const actions: ConnectorAction[] = [
   {
     action_type: "github.create_issue",
+    operation_type: "write",
     name: "Create Issue",
     description: "",
     risk_level: "low",

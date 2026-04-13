@@ -197,6 +197,7 @@ ConnectorDetailResponse:
     description: "GitHub integration for repository management"
     actions:
       - action_type: "github.create_issue"
+        operation_type: "write"
         name: "Create Issue"
         description: "Create a new issue in a repository"
         risk_level: "low"
@@ -217,6 +218,7 @@ ConnectorDetailResponse:
               type: "string"
               description: "Issue body (markdown)"
       - action_type: "github.merge_pr"
+        operation_type: "write"
         name: "Merge Pull Request"
         description: "Merge an open pull request"
         risk_level: "medium"
@@ -246,6 +248,7 @@ ConnectorAction:
   type: object
   required:
     - action_type
+    - operation_type
     - name
   properties:
     action_type:
@@ -255,6 +258,17 @@ ConnectorAction:
         Action type identifier. Use this value as the `action.type` when submitting 
         approval requests and as `action_id` when executing actions.
       example: "github.create_issue"
+
+    operation_type:
+      type: string
+      enum:
+        - read
+        - write
+        - delete
+      description: |
+        High-level classification for bulk template setup and grouping in the UI.
+        Derived from verb-based action naming (e.g. list/get → read, create/update → write,
+        delete/cancel → delete) unless overridden in the connector manifest.
 
     name:
       type: string
@@ -356,6 +370,7 @@ ConnectorAction:
 
   example:
     action_type: "github.create_issue"
+    operation_type: "write"
     name: "Create Issue"
     description: "Create a new issue in a repository"
     risk_level: "low"
