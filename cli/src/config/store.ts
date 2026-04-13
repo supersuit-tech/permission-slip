@@ -1,5 +1,8 @@
 /**
- * Manages ~/.permission-slip/ — config directory and registrations file.
+ * Manages ~/.permission-slip/ — config directory, preferences, and registrations.
+ *
+ * User preferences:
+ *   ~/.permission-slip/config.json
  *
  * Registrations are stored as:
  *   ~/.permission-slip/registrations.json
@@ -28,6 +31,7 @@ export const CONFIG_DIR =
   process.env["PS_CLI_TEST_CONFIG_DIR"] ??
   path.join(os.homedir(), ".permission-slip");
 export const REGISTRATIONS_FILE = path.join(CONFIG_DIR, "registrations.json");
+export const CONFIG_FILE = path.join(CONFIG_DIR, "config.json");
 export const SSH_DIR =
   process.env["PS_CLI_TEST_SSH_DIR"] ?? path.join(os.homedir(), ".ssh");
 export const PRIVATE_KEY_FILE =
@@ -91,4 +95,78 @@ export function findRegistration(server: string): Registration | undefined {
     (a, b) =>
       new Date(b.registered_at).getTime() - new Date(a.registered_at).getTime(),
   )[0];
+}
+
+/** Stored in ~/.permission-slip/config.json — extend with new optional fields as needed. */
+export interface CliConfigFile {
+  default_server?: string;
+}
+
+export function normalizeServerUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+function assertValidServerUrl(url: string): void {
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
+    throw new Error(`Invalid server URL: ${url}`);
+  }
+  if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+    throw new Error(
+      `Server URL must use http or https (got ${parsed.protocol}).`,
+    );
+  }
+}
+
+export function loadConfig(): CliConfigFile {
+  if (!fs.existsSync(CONFIG_FILE)) {
+    return {};
+  }
+  try {
+    const raw = fs.readFileSync(CONFIG_FILE, "utf-8");
+    const data = JSON.parse(raw) as CliConfigFile;
+    return typeof data === "object" && data !== null && !Array.isArray(data)
+      ? data
+      : {};
+  } catch (err) {
+    console.error(
+      `Warning: could not parse ${CONFIG_FILE}, using defaults. ` +
+        (err instanceof Error ? err.message : String(err)),
+    );
+    return {};
+  }
+}
+
+export function saveConfig(partial: CliConfigFile): void {
+  ensureConfigDir();
+  const current = loadConfig();
+  const next: CliConfigFile = { ...current, ...partial };
+  if (next.default_server !== undefined) {
+    next.default_server = normalizeServerUrl(next.default_server);
+    assertValidServerUrl(next.default_server);
+  }
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2) + "\n", {
+    mode: 0o600,
+  });
+}
+
+export function unsetConfigKey(key: keyof CliConfigFile): void {
+  if (!fs.existsSync(CONFIG_FILE)) {
+    return;
+  }
+  const current = loadConfig();
+  if (!(key in current)) {
+    return;
+  }
+  const next = { ...current };
+  delete next[key];
+  if (Object.keys(next).length === 0) {
+    fs.unlinkSync(CONFIG_FILE);
+    return;
+  }
+  fs.writeFileSync(CONFIG_FILE, JSON.stringify(next, null, 2) + "\n", {
+    mode: 0o600,
+  });
 }
