@@ -139,13 +139,17 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Check if any template needs a standing approval — acquire the lock
-		// once and pre-compute remaining SA slots to avoid per-iteration
-		// race conditions within the same transaction.
+		// Check if any template will effectively want a standing approval,
+		// considering both the template's built-in spec and any approval_mode
+		// overrides. A template wants SA if it has a standing approval spec
+		// (and isn't overridden to requires_approval), or if approval_mode
+		// is auto_approve (even without a built-in spec).
 		anyWantSA := false
 		for _, id := range uniqueIDs {
 			tpl := tplByID[id]
-			if len(tpl.StandingApprovalSpec) > 0 && string(tpl.StandingApprovalSpec) != "null" {
+			templateHasSA := len(tpl.StandingApprovalSpec) > 0 && string(tpl.StandingApprovalSpec) != "null"
+			mode := req.ApprovalModes[id]
+			if mode == "auto_approve" || (templateHasSA && mode != "requires_approval") {
 				anyWantSA = true
 				break
 			}
