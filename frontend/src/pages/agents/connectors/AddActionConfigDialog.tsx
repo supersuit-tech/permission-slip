@@ -208,7 +208,12 @@ export function AddActionConfigDialog({
       });
 
       if (approvalMode === "auto_approve" && ac?.id) {
-        const standingSpec = initialTemplate?.standing_approval;
+        const activeTemplate =
+          appliedTemplateId != null
+            ? templates.find((t) => t.id === appliedTemplateId) ?? null
+            : null;
+        const standingSpec =
+          activeTemplate?.standing_approval ?? initialTemplate?.standing_approval;
         const startsAt = new Date();
         let expiresAt: string | null = null;
         if (standingSpec?.duration_days != null) {
