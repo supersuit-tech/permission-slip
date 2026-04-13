@@ -18,8 +18,9 @@ import (
 // --- Request / Response types ---
 
 type bulkApplyActionConfigTemplateRequest struct {
-	AgentID     int64    `json:"agent_id" validate:"gt=0"`
-	TemplateIDs []string `json:"template_ids" validate:"required,min=1,max=50,dive,required,max=255"`
+	AgentID       int64             `json:"agent_id" validate:"gt=0"`
+	TemplateIDs   []string          `json:"template_ids" validate:"required,min=1,max=50,dive,required,max=255"`
+	ApprovalModes map[string]string `json:"approval_modes,omitempty"`
 }
 
 type bulkApplyResultError struct {
@@ -154,7 +155,13 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 
 		for _, id := range uniqueIDs {
 			tpl := tplByID[id]
-			res, err := applyOneTemplateInSavepoint(r.Context(), pgxTx, tx, profile, tpl, req.AgentID)
+			var approvalMode *string
+			if m, ok := req.ApprovalModes[id]; ok {
+				if m == "auto_approve" || m == "requires_approval" {
+					approvalMode = &m
+				}
+			}
+			res, err := applyOneTemplateInSavepoint(r.Context(), pgxTx, tx, profile, tpl, req.AgentID, approvalMode)
 			if err != nil {
 				results = append(results, bulkApplyResult{
 					TemplateID: id,
@@ -206,6 +213,7 @@ func applyOneTemplateInSavepoint(
 	profile *db.Profile,
 	tpl *db.ActionConfigTemplate,
 	agentID int64,
+	approvalMode *string,
 ) (*applyOneResult, error) {
 	var dtx db.DBTX
 	var sp pgx.Tx
@@ -222,7 +230,7 @@ func applyOneTemplateInSavepoint(
 		dtx = fallbackTx
 	}
 
-	res, err := applyOneTemplateCore(ctx, dtx, profile, tpl, agentID)
+	res, err := applyOneTemplateCore(ctx, dtx, profile, tpl, agentID, approvalMode)
 	if err != nil {
 		return res, err
 	}
@@ -244,6 +252,7 @@ func applyOneTemplateCore(
 	profile *db.Profile,
 	tpl *db.ActionConfigTemplate,
 	agentID int64,
+	approvalMode *string,
 ) (*applyOneResult, error) {
 	// Validate template fields.
 	if len(tpl.Name) > shared.ActionConfigNameMaxLength {
@@ -286,11 +295,22 @@ func applyOneTemplateCore(
 	// Parse standing approval spec before creating the config.
 	var spec standingApprovalTemplateSpec
 	var standingBytes []byte
-	wantStanding := len(tpl.StandingApprovalSpec) > 0 && string(tpl.StandingApprovalSpec) != "null"
-	if wantStanding {
+	templateHasStanding := len(tpl.StandingApprovalSpec) > 0 && string(tpl.StandingApprovalSpec) != "null"
+	wantStanding := templateHasStanding // default: follow template
+	if approvalMode != nil {
+		switch *approvalMode {
+		case "auto_approve":
+			wantStanding = true
+		case "requires_approval":
+			wantStanding = false
+		}
+	}
+	if wantStanding && templateHasStanding {
 		if err := json.Unmarshal(tpl.StandingApprovalSpec, &spec); err != nil {
 			return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("invalid standing approval spec")
 		}
+	}
+	if wantStanding {
 		standingBytes, err = buildStandingApprovalConstraintsFromTemplate(params)
 		if err != nil {
 			return &applyOneResult{errorCode: string(ErrInvalidRequest)}, fmt.Errorf("%s", err.Error())

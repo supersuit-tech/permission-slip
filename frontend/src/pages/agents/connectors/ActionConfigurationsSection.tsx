@@ -20,6 +20,7 @@ import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
+import type { ApprovalMode } from "./RecommendedTemplatesDialog";
 import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 import { ActionConfigRow } from "./ActionConfigRow";
 import { AddActionConfigDialog } from "./AddActionConfigDialog";
@@ -49,6 +50,8 @@ export function ActionConfigurationsSection({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [initialTemplateForAdd, setInitialTemplateForAdd] =
     useState<ActionConfigTemplate | null>(null);
+  const [initialApprovalModeForAdd, setInitialApprovalModeForAdd] =
+    useState<ApprovalMode | undefined>(undefined);
   const [recommendedDialogOpen, setRecommendedDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<ActionConfiguration | null>(
     null,
@@ -95,14 +98,16 @@ export function ActionConfigurationsSection({
     }
   };
 
-  function openAddDialog(fromTemplate?: ActionConfigTemplate | null) {
+  function openAddDialog(fromTemplate?: ActionConfigTemplate | null, approvalMode?: ApprovalMode) {
     setInitialTemplateForAdd(fromTemplate ?? null);
+    setInitialApprovalModeForAdd(approvalMode);
     setAddDialogOpen(true);
   }
 
   function handleAddDialogOpenChange(open: boolean) {
     if (!open) {
       setInitialTemplateForAdd(null);
+      setInitialApprovalModeForAdd(undefined);
     }
     setAddDialogOpen(open);
   }
@@ -224,6 +229,7 @@ export function ActionConfigurationsSection({
         connectorId={connectorId}
         actions={actions}
         initialTemplate={initialTemplateForAdd}
+        initialApprovalMode={initialApprovalModeForAdd}
       />
 
       <RecommendedTemplatesDialog
@@ -232,8 +238,8 @@ export function ActionConfigurationsSection({
         agentId={agentId}
         connectorId={connectorId}
         actions={actions}
-        onCustomize={(template) => {
-          openAddDialog(template);
+        onCustomize={(template, approvalMode) => {
+          openAddDialog(template, approvalMode);
         }}
       />
 

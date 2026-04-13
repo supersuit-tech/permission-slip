@@ -17,6 +17,7 @@ export function useBulkApplyActionConfigTemplates() {
     mutationFn: async (input: {
       templateIds: string[];
       agentId: number;
+      approvalModes?: Record<string, "auto_approve" | "requires_approval">;
     }): Promise<BulkApplyActionConfigTemplateResponse> => {
       if (!token) throw new Error("Missing access token");
       const { data, error } = await client.POST(
@@ -26,6 +27,7 @@ export function useBulkApplyActionConfigTemplates() {
           body: {
             agent_id: input.agentId,
             template_ids: input.templateIds,
+            ...(input.approvalModes && { approval_modes: input.approvalModes }),
           },
         },
       );

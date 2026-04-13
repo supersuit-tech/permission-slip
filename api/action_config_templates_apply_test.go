@@ -169,3 +169,109 @@ func TestApplyActionConfigTemplate_Unauthorized(t *testing.T) {
 		t.Fatalf("expected 401, got %d", w.Code)
 	}
 }
+
+func TestApplyActionConfigTemplate_ApprovalModeAutoApprove_OverridesPlainTemplate(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	at := connID + ".plain_override"
+	testhelper.InsertConnectorAction(t, tx, connID, at, "Plain Override")
+
+	testhelper.InsertActionConfigTemplateFull(t, tx, "tpl_plain_ov", connID, at, "Plain override tpl", testhelper.ActionConfigTemplateOpts{
+		Parameters: []byte(`{"x":"*"}`),
+	})
+
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	body := fmt.Sprintf(`{"agent_id": %d, "approval_mode": "auto_approve"}`, agentID)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/action-config-templates/tpl_plain_ov/apply", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := decodeApplyTemplateResponse(t, w.Body.Bytes())
+	if resp.StandingApproval == nil {
+		t.Fatal("expected standing approval when approval_mode=auto_approve overrides plain template")
+	}
+	if resp.StandingApproval.ExpiresAt != nil {
+		t.Fatal("expected nil expires_at (sensible default: no expiry)")
+	}
+	if resp.StandingApproval.MaxExecutions != nil {
+		t.Fatal("expected nil max_executions (sensible default: unlimited)")
+	}
+}
+
+func TestApplyActionConfigTemplate_ApprovalModeRequiresApproval_OverridesStandingTemplate(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	at := connID + ".sa_override"
+	testhelper.InsertConnectorAction(t, tx, connID, at, "SA Override")
+
+	testhelper.InsertActionConfigTemplateFull(t, tx, "tpl_sa_ov", connID, at, "SA override tpl", testhelper.ActionConfigTemplateOpts{
+		Parameters:           []byte(`{"repo":"*"}`),
+		StandingApprovalSpec: []byte(`{"duration_days":7}`),
+	})
+
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	body := fmt.Sprintf(`{"agent_id": %d, "approval_mode": "requires_approval"}`, agentID)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/action-config-templates/tpl_sa_ov/apply", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := decodeApplyTemplateResponse(t, w.Body.Bytes())
+	if resp.StandingApproval != nil {
+		t.Fatal("expected no standing approval when approval_mode=requires_approval overrides template with SA spec")
+	}
+	if resp.ActionConfiguration.ID == "" {
+		t.Fatal("expected action_configuration.id")
+	}
+}
+
+func TestApplyActionConfigTemplate_ApprovalModeInvalid(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	at := connID + ".inv_action"
+	testhelper.InsertConnectorAction(t, tx, connID, at, "Inv Action")
+
+	testhelper.InsertActionConfigTemplateFull(t, tx, "tpl_inv", connID, at, "Inv tpl", testhelper.ActionConfigTemplateOpts{
+		Parameters: []byte(`{"x":"*"}`),
+	})
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	body := fmt.Sprintf(`{"agent_id": %d, "approval_mode": "bogus"}`, agentID)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/action-config-templates/tpl_inv/apply", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for invalid approval_mode, got %d: %s", w.Code, w.Body.String())
+	}
+}

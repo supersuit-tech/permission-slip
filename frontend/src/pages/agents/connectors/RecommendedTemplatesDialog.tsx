@@ -15,8 +15,10 @@ import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import { useApplyActionConfigTemplate } from "@/hooks/useApplyActionConfigTemplate";
 import { useBulkApplyActionConfigTemplates } from "@/hooks/useBulkApplyActionConfigTemplates";
-import { Badge } from "@/components/ui/badge";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { TemplateParamBadge } from "./TemplatePicker";
+
+export type ApprovalMode = "auto_approve" | "requires_approval";
 
 export interface RecommendedTemplatesDialogProps {
   open: boolean;
@@ -24,7 +26,16 @@ export interface RecommendedTemplatesDialogProps {
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
-  onCustomize: (template: ActionConfigTemplate) => void;
+  onCustomize: (template: ActionConfigTemplate, approvalMode: ApprovalMode) => void;
+}
+
+const approvalModeOptions: { label: string; value: ApprovalMode }[] = [
+  { label: "Auto-approve", value: "auto_approve" },
+  { label: "Requires approval", value: "requires_approval" },
+];
+
+function defaultApprovalMode(template: ActionConfigTemplate): ApprovalMode {
+  return template.standing_approval != null ? "auto_approve" : "requires_approval";
 }
 
 export function RecommendedTemplatesDialog({
@@ -43,6 +54,20 @@ export function RecommendedTemplatesDialog({
     null,
   );
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [approvalModes, setApprovalModes] = useState<Record<string, ApprovalMode>>({});
+
+  const getApprovalMode = useCallback(
+    (template: ActionConfigTemplate): ApprovalMode =>
+      approvalModes[template.id] ?? defaultApprovalMode(template),
+    [approvalModes],
+  );
+
+  const handleApprovalModeChange = useCallback(
+    (templateId: string, mode: ApprovalMode) => {
+      setApprovalModes((prev) => ({ ...prev, [templateId]: mode }));
+    },
+    [],
+  );
 
   const actionTypeSet = useMemo(
     () => new Set(actions.map((a) => a.action_type)),
@@ -109,9 +134,14 @@ export function RecommendedTemplatesDialog({
   }, [allSelected, liveTemplates]);
 
   async function handleUseTemplate(template: ActionConfigTemplate) {
+    const approvalMode = getApprovalMode(template);
     setPendingTemplateId(template.id);
     try {
-      const res = await applyTemplate({ templateId: template.id, agentId });
+      const res = await applyTemplate({
+        templateId: template.id,
+        agentId,
+        approvalMode,
+      });
       const sa = res.standing_approval;
       toast.success(
         sa
@@ -132,15 +162,28 @@ export function RecommendedTemplatesDialog({
 
   function handleCustomize(template: ActionConfigTemplate) {
     onOpenChange(false);
-    onCustomize(template);
+    onCustomize(template, getApprovalMode(template));
   }
 
   async function handleBulkApply() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
 
+    // Collect per-template approval modes for overrides only.
+    const modes: Record<string, ApprovalMode> = {};
+    for (const id of ids) {
+      const tpl = liveTemplates.find((t) => t.id === id);
+      if (tpl) {
+        modes[id] = getApprovalMode(tpl);
+      }
+    }
+
     try {
-      const res = await bulkApply({ templateIds: ids, agentId });
+      const res = await bulkApply({
+        templateIds: ids,
+        agentId,
+        approvalModes: modes,
+      });
       const succeeded = res.results.filter((r) => r.success);
       const failed = res.results.filter((r) => !r.success);
 
@@ -156,7 +199,6 @@ export function RecommendedTemplatesDialog({
         toast.warning(
           `${succeeded.length} of ${res.results.length} created. ${failed.length} failed.`,
         );
-        // Keep only the failed templates selected.
         const failedIds = new Set(failed.map((r) => r.template_id));
         setSelectedIds(failedIds);
       }
@@ -225,6 +267,10 @@ export function RecommendedTemplatesDialog({
                           template={template}
                           selected={selectedIds.has(template.id)}
                           onToggleSelected={() => toggleSelected(template.id)}
+                          approvalMode={getApprovalMode(template)}
+                          onApprovalModeChange={(mode) =>
+                            handleApprovalModeChange(template.id, mode)
+                          }
                           onUseTemplate={() => void handleUseTemplate(template)}
                           onCustomize={() => handleCustomize(template)}
                           disabled={anyPending}
@@ -266,6 +312,8 @@ function RecommendedTemplateCard({
   template,
   selected,
   onToggleSelected,
+  approvalMode,
+  onApprovalModeChange,
   onUseTemplate,
   onCustomize,
   disabled,
@@ -274,13 +322,14 @@ function RecommendedTemplateCard({
   template: ActionConfigTemplate;
   selected: boolean;
   onToggleSelected: () => void;
+  approvalMode: ApprovalMode;
+  onApprovalModeChange: (mode: ApprovalMode) => void;
   onUseTemplate: () => void;
   onCustomize: () => void;
   disabled: boolean;
   usePending: boolean;
 }) {
   const paramEntries = Object.entries(template.parameters);
-  const autoApproved = template.standing_approval != null;
 
   return (
     <div className="rounded-lg border border-input p-3">
@@ -293,16 +342,7 @@ function RecommendedTemplateCard({
           />
         </div>
         <div className="min-w-0 flex-1 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium">{template.name}</p>
-            {autoApproved ? (
-              <Badge>Auto-approved</Badge>
-            ) : (
-              <Badge variant="secondary" className="text-muted-foreground">
-                Requires approval each time
-              </Badge>
-            )}
-          </div>
+          <p className="text-sm font-medium">{template.name}</p>
           {template.description && (
             <p className="text-muted-foreground text-sm">{template.description}</p>
           )}
@@ -313,6 +353,12 @@ function RecommendedTemplateCard({
               ))}
             </div>
           )}
+          <SegmentedControl
+            options={approvalModeOptions}
+            value={approvalMode}
+            onChange={onApprovalModeChange}
+            ariaLabel="Approval mode"
+          />
           <div className="flex flex-wrap gap-2 pt-1">
             <Button
               type="button"
