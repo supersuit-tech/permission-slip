@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setupAuthMocks } from "../../../../auth/__tests__/fixtures";
@@ -32,6 +32,67 @@ const actions: ConnectorAction[] = [
     risk_level: "high",
     requires_payment_method: false,
     parameters_schema: {},
+  },
+];
+
+const mixedActions: ConnectorAction[] = [
+  {
+    action_type: "github.list_repos",
+    operation_type: "read",
+    name: "List Repos",
+    description: "",
+    risk_level: "low",
+    requires_payment_method: false,
+    parameters_schema: {},
+  },
+  {
+    action_type: "github.create_issue",
+    operation_type: "write",
+    name: "Create Issue",
+    description: "",
+    risk_level: "low",
+    requires_payment_method: false,
+    parameters_schema: {},
+  },
+  {
+    action_type: "github.close_issue",
+    operation_type: "delete",
+    name: "Close Issue",
+    description: "",
+    risk_level: "medium",
+    requires_payment_method: false,
+    parameters_schema: {},
+  },
+];
+
+const mixedTemplates = [
+  {
+    id: "tpl_read",
+    connector_id: "github",
+    action_type: "github.list_repos",
+    name: "List all",
+    description: "R",
+    parameters: {},
+    created_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "tpl_a",
+    connector_id: "github",
+    action_type: "github.create_issue",
+    name: "All open",
+    description: "Desc A",
+    parameters: { repo: "*", title: "*" },
+    standing_approval: { duration_days: 30 },
+    created_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "tpl_del",
+    connector_id: "github",
+    action_type: "github.close_issue",
+    name: "Close stale",
+    description: "D",
+    parameters: {},
+    created_at: "2026-01-01T00:00:00Z",
   },
 ];
 
@@ -72,6 +133,7 @@ describe("RecommendedTemplatesDialog", () => {
 
   beforeEach(() => {
     vi.restoreAllMocks();
+    Element.prototype.scrollIntoView = vi.fn();
     resetClientMocks();
     setupAuthMocks({ authenticated: true });
     wrapper = createAuthWrapper();
@@ -88,15 +150,42 @@ describe("RecommendedTemplatesDialog", () => {
     props: Partial<{
       open: boolean;
       onOpenChange: (open: boolean) => void;
+      actions: ConnectorAction[];
     }> = {},
   ) {
+    return render(
+      <RecommendedTemplatesDialog
+        open
+        onOpenChange={vi.fn()}
+        agentId={42}
+        connectorId="github"
+        onCustomize={onCustomize}
+        {...props}
+        actions={props.actions ?? actions}
+      />,
+      { wrapper },
+    );
+  }
+
+  function renderMixedDialog(
+    props: Partial<{
+      open: boolean;
+      onOpenChange: (open: boolean) => void;
+    }> = {},
+  ) {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return Promise.resolve({ data: { data: mixedTemplates } });
+      }
+      return Promise.resolve({ data: null });
+    });
     return render(
       <RecommendedTemplatesDialog
         open
         onOpenChange={props.onOpenChange ?? vi.fn()}
         agentId={42}
         connectorId="github"
-        actions={actions}
+        actions={mixedActions}
         onCustomize={onCustomize}
         {...props}
       />,
@@ -108,7 +197,7 @@ describe("RecommendedTemplatesDialog", () => {
     renderDialog();
 
     await waitFor(() => {
-      expect(screen.getByText("Create Issue")).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Write actions" })).toBeInTheDocument();
     });
 
     const headings = screen.getAllByRole("heading", { level: 3 });
@@ -479,5 +568,148 @@ describe("RecommendedTemplatesDialog", () => {
       { body: { agent_id: number; approval_mode: string } },
     ];
     expect(opts.body.approval_mode).toBe("requires_approval");
+  });
+
+  it("renders Read / Write / Delete section headings when operation types differ", async () => {
+    renderMixedDialog();
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Read actions" })).toBeInTheDocument();
+    });
+    expect(screen.getByRole("heading", { name: "Write actions" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Delete actions" })).toBeInTheDocument();
+  });
+
+  it("shows a single operation section when the connector has one operation type only", async () => {
+    const readOnlyActions: ConnectorAction[] = [
+      {
+        action_type: "github.list_repos",
+        operation_type: "read",
+        name: "List Repos",
+        description: "",
+        risk_level: "low",
+        requires_payment_method: false,
+        parameters_schema: {},
+      },
+    ];
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "tpl_read",
+                connector_id: "github",
+                action_type: "github.list_repos",
+                name: "List all",
+                description: "",
+                parameters: {},
+                created_at: "2026-01-01T00:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    renderDialog({ actions: readOnlyActions });
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "Read actions" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("heading", { name: "Write actions" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Delete actions" })).not.toBeInTheDocument();
+  });
+
+  it("Quick setup Apply sets approval modes per operation and selects all templates", async () => {
+    const user = userEvent.setup();
+    mockPost.mockResolvedValue({
+      data: {
+        results: [
+          { template_id: "tpl_read", success: true },
+          { template_id: "tpl_a", success: true },
+          { template_id: "tpl_del", success: true },
+        ],
+      },
+    });
+
+    renderMixedDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("List all")).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId("quick-setup-read"));
+    fireEvent.click(await screen.findByRole("option", { name: "Requires approval" }));
+
+    fireEvent.click(screen.getByTestId("quick-setup-write"));
+    fireEvent.click(await screen.findByRole("option", { name: "Auto-approve" }));
+
+    fireEvent.click(screen.getByTestId("quick-setup-delete"));
+    fireEvent.click(await screen.findByRole("option", { name: "Requires approval" }));
+
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
+
+    await waitFor(() => {
+      const readCard = screen.getByText("List all").closest(".rounded-lg")!;
+      expect(
+        within(readCard as HTMLElement).getByRole("radio", { name: "Requires approval" }),
+      ).toHaveAttribute("aria-checked", "true");
+    });
+
+    const writeCard = screen.getByText("All open").closest(".rounded-lg")!;
+    expect(
+      within(writeCard as HTMLElement).getByRole("radio", { name: "Auto-approve" }),
+    ).toHaveAttribute("aria-checked", "true");
+
+    const delCard = screen.getByText("Close stale").closest(".rounded-lg")!;
+    expect(
+      within(delCard as HTMLElement).getByRole("radio", { name: "Requires approval" }),
+    ).toHaveAttribute("aria-checked", "true");
+
+    expect(screen.getByText("3 of 3 selected")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Enable Selected (3)" }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalled();
+    });
+    const [, bulkOpts] = mockPost.mock.calls[0] as [
+      string,
+      {
+        body: {
+          agent_id: number;
+          template_ids: string[];
+          approval_modes: Record<string, string>;
+        };
+      },
+    ];
+    expect(bulkOpts.body.template_ids).toEqual(["tpl_read", "tpl_a", "tpl_del"]);
+    expect(bulkOpts.body.approval_modes).toEqual({
+      tpl_read: "requires_approval",
+      tpl_a: "auto_approve",
+      tpl_del: "requires_approval",
+    });
+  });
+
+  it("Select all in section toggles only that section's templates", async () => {
+    const user = userEvent.setup();
+    renderMixedDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("List all")).toBeInTheDocument();
+    });
+
+    const writeSection = screen.getByRole("heading", { name: "Write actions" }).closest("section")!;
+    const writeSelectAll = within(writeSection as HTMLElement).getByRole("checkbox", {
+      name: /Select all in section/,
+    });
+    await user.click(writeSelectAll);
+
+    expect(screen.getByText("1 of 3 selected")).toBeInTheDocument();
+
+    await user.click(writeSelectAll);
+    expect(screen.getByText("0 of 3 selected")).toBeInTheDocument();
   });
 });

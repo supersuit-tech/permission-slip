@@ -41,21 +41,24 @@ func InferOperationType(actionType string) OperationType {
 
 // Multi-word or domain-specific segments that imply read operations.
 var readVerbs = map[string]bool{
-	"get":         true,
-	"list":        true,
-	"read":        true,
-	"search":      true,
-	"describe":    true,
-	"query":       true,
-	"check":       true,
-	"download":    true,
-	"export":      true,
-	"fetch":       true,
-	"view":        true,
-	"price":       true, // price_check → split gives price? Actually "price_check" is one segment — see below
-	"price_check": true,
+	"get":      true,
+	"list":     true,
+	"read":     true,
+	"search":   true,
+	"describe": true,
+	"query":    true,
+	"check":    true,
+	"download": true,
+	"export":   true,
+	"fetch":    true,
+	"view":     true,
+	"price":    true, // e.g. expedia.price_check → segment "price" matches before "check"
 }
 
+// deleteVerbs includes verbs that remove or irreversibly change external state. Note that
+// connectors often use "close", "archive", or "cancel" for non-destructive workflow moves;
+// we still classify those as delete so bulk "Delete actions" approval covers them — users
+// who need finer control can approve per template.
 var deleteVerbs = map[string]bool{
 	"delete":    true,
 	"remove":    true,
