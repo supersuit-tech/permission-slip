@@ -123,7 +123,7 @@ docker build \
   -t permission-slip .
 ```
 
-> **Note:** `VITE_SUPABASE_URL` is intentionally omitted. The Go server includes a built-in reverse proxy that routes `/supabase/*` to the local Supabase stack. The frontend uses this automatically when no explicit Supabase URL is baked in, so it works regardless of your Pi's hostname or IP address.
+> **Note:** `VITE_SUPABASE_URL` is intentionally omitted. The Go server includes a built-in reverse proxy at `/supabase/auth/v1/*` that routes Supabase Auth requests to the local Supabase stack. The frontend uses this automatically when no explicit Supabase URL is baked in, so it works regardless of your Pi's hostname or IP address. (Non-auth Supabase surfaces — rest/storage/realtime/functions — are intentionally blocked to keep the proxy narrow.)
 
 Run the container:
 

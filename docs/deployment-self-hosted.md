@@ -88,7 +88,7 @@ This gives you PostgreSQL, Auth (GoTrue), Vault, and Inbucket (email capture) â€
 | API URL | `SUPABASE_URL` | `http://127.0.0.1:54321` |
 | anon key | `VITE_SUPABASE_PUBLISHABLE_KEY` | `eyJhbGci...` |
 
-**Built-in Supabase proxy:** The Go server includes a reverse proxy at `/supabase/*` that forwards requests to `SUPABASE_URL`. When `VITE_SUPABASE_URL` is omitted at build time, the frontend uses this proxy automatically. This means:
+**Built-in Supabase proxy:** The Go server includes a reverse proxy at `/supabase/auth/v1/*` that forwards Supabase Auth requests to `SUPABASE_URL`. When `VITE_SUPABASE_URL` is omitted at build time, the frontend uses this proxy automatically. This means:
 - No need to expose Supabase ports to the network
 - No CORS configuration needed
 - The frontend works regardless of hostname or IP changes
