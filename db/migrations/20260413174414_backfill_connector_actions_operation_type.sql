@@ -3,6 +3,7 @@
 -- Backfill operation_type for rows that still have the column default from
 -- 20260413145754_add_operation_type_to_connector_actions. Uses the same
 -- verb-segment rules as connectors.InferOperationType (delete > read > write).
+-- +goose StatementBegin
 CREATE OR REPLACE FUNCTION _tmp_infer_operation_type(p_action_type text)
 RETURNS text
 LANGUAGE plpgsql
@@ -58,6 +59,7 @@ BEGIN
   RETURN 'write';
 END;
 $$;
+-- +goose StatementEnd
 
 -- Rows with operation_type = 'write' are indistinguishable from the column default added in
 -- 20260413145754. At the time of this backfill, no manifest had yet persisted a different
