@@ -59,6 +59,10 @@ BEGIN
 END;
 $$;
 
+-- Rows with operation_type = 'write' are indistinguishable from the column default added in
+-- 20260413145754. At the time of this backfill, no manifest had yet persisted a different
+-- explicit override as 'write', so inferring from action_type is safe. If this migration is
+-- delayed after connectors start storing explicit overrides, revisit before applying.
 UPDATE connector_actions
 SET operation_type = _tmp_infer_operation_type(action_type)
 WHERE operation_type = 'write';

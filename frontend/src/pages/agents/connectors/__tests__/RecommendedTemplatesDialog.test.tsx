@@ -647,7 +647,7 @@ describe("RecommendedTemplatesDialog", () => {
     fireEvent.click(await screen.findByRole("option", { name: "Auto-approve" }));
 
     fireEvent.click(screen.getByTestId("quick-setup-delete"));
-    fireEvent.click(await screen.findByRole("option", { name: "Requires approval" }));
+    fireEvent.click(await screen.findByRole("option", { name: "Auto-approve" }));
 
     fireEvent.click(screen.getByRole("button", { name: "Apply" }));
 
@@ -665,7 +665,7 @@ describe("RecommendedTemplatesDialog", () => {
 
     const delCard = screen.getByText("Close stale").closest(".rounded-lg")!;
     expect(
-      within(delCard as HTMLElement).getByRole("radio", { name: "Requires approval" }),
+      within(delCard as HTMLElement).getByRole("radio", { name: "Auto-approve" }),
     ).toHaveAttribute("aria-checked", "true");
 
     expect(screen.getByText("3 of 3 selected")).toBeInTheDocument();
@@ -689,7 +689,7 @@ describe("RecommendedTemplatesDialog", () => {
     expect(bulkOpts.body.approval_modes).toEqual({
       tpl_read: "requires_approval",
       tpl_a: "auto_approve",
-      tpl_del: "requires_approval",
+      tpl_del: "auto_approve",
     });
   });
 

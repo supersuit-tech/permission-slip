@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ApprovalMode, OperationTypeUI } from "./recommendedTemplatesTypes";
 
@@ -103,44 +103,24 @@ export function useRecommendedTemplateSelection(
     setSelectedIds(new Set(liveTemplates.map((t) => t.id)));
   }, [liveTemplates, getOperationType, quickRead, quickWrite, quickDelete]);
 
-  const selection = useMemo(
-    () => ({
-      selectedIds,
-      setSelectedIds,
-      approvalModes,
-      getApprovalMode,
-      handleApprovalModeChange,
-      allSelected,
-      toggleSelectAll,
-      toggleSelected,
-      templateIdsForOperation,
-      allSelectedInOperation,
-      toggleSelectOperation,
-      handleQuickApply,
-      quickRead,
-      setQuickRead,
-      quickWrite,
-      setQuickWrite,
-      quickDelete,
-      setQuickDelete,
-    }),
-    [
-      selectedIds,
-      approvalModes,
-      getApprovalMode,
-      handleApprovalModeChange,
-      allSelected,
-      toggleSelectAll,
-      toggleSelected,
-      templateIdsForOperation,
-      allSelectedInOperation,
-      toggleSelectOperation,
-      handleQuickApply,
-      quickRead,
-      quickWrite,
-      quickDelete,
-    ],
-  );
-
-  return selection;
+  return {
+    selectedIds,
+    setSelectedIds,
+    approvalModes,
+    getApprovalMode,
+    handleApprovalModeChange,
+    allSelected,
+    toggleSelectAll,
+    toggleSelected,
+    templateIdsForOperation,
+    allSelectedInOperation,
+    toggleSelectOperation,
+    handleQuickApply,
+    quickRead,
+    setQuickRead,
+    quickWrite,
+    setQuickWrite,
+    quickDelete,
+    setQuickDelete,
+  };
 }
