@@ -10,6 +10,7 @@
 import type { Command } from "commander";
 import { ApiClient, PermissionSlipApiError } from "../api/client.js";
 import { resolveAgentId } from "./status.js";
+import { resolveServerUrl, isBuiltInDefaultServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
 
@@ -23,8 +24,7 @@ export function requestCommand(program: Command): void {
     .option("--risk-level <level>", "Risk level: low, medium, high")
     .option(
       "--server <url>",
-      "Permission Slip server URL",
-      "https://app.permissionslip.dev",
+      "Permission Slip server URL (overrides PS_SERVER and config default_server)",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
     .option("--request-id <id>", "Idempotency key — reuse across retries to prevent duplicate execution")
@@ -36,7 +36,7 @@ export function requestCommand(program: Command): void {
       params: string;
       description?: string;
       riskLevel?: string;
-      server: string;
+      server?: string;
       agentId?: string;
       requestId?: string;
       paymentMethodId?: string;
@@ -45,6 +45,7 @@ export function requestCommand(program: Command): void {
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
+        const { url: server } = resolveServerUrl({ serverFlag: opts.server });
         let params: unknown;
         try {
           params = JSON.parse(opts.params);
@@ -52,8 +53,8 @@ export function requestCommand(program: Command): void {
           throw new Error(`--params must be valid JSON. Got: ${opts.params}`);
         }
 
-        const agentId = resolveAgentId(opts.server, opts.agentId);
-        const client = new ApiClient({ serverUrl: opts.server, agentId });
+        const agentId = resolveAgentId(server, opts.agentId);
+        const client = new ApiClient({ serverUrl: server, agentId });
 
         const context =
           opts.description || opts.riskLevel
@@ -83,7 +84,7 @@ export function requestCommand(program: Command): void {
               next_step:
                 "Approval requested. To check the result, run: " +
                 `permission-slip status ${shellQuote(result.approval_id ?? "")}` +
-                (opts.server !== "https://app.permissionslip.dev" ? ` --server ${shellQuote(opts.server)}` : ""),
+                (!isBuiltInDefaultServerUrl(server) ? ` --server ${shellQuote(server)}` : ""),
             },
             outputOpts,
           );
