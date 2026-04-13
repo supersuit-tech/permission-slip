@@ -63,6 +63,67 @@ actionConfigTemplates:
       '500':
         $ref: '../responses/errors.yaml#/InternalServerError'
 
+bulkApplyActionConfigTemplates:
+  post:
+    operationId: bulkApplyActionConfigTemplates
+    summary: Bulk Apply Action Configuration Templates
+    description: |
+      Apply multiple templates in a single request. Creates an action
+      configuration (and optional standing approval) for each template.
+
+      All templates must belong to the same connector. The connector is
+      automatically enabled for the agent if not already enabled.
+
+      Each template is applied independently — if one fails (e.g., standing
+      approval limit reached), the others still succeed. The response
+      includes per-template results.
+
+    tags:
+      - Action Configurations
+
+    security:
+      - SupabaseSession: []
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/action_config_templates.yaml#/BulkApplyActionConfigTemplateRequest'
+
+    responses:
+      '200':
+        description: |
+          Bulk apply completed. Check individual `results[].success` for
+          per-template outcomes.
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/action_config_templates.yaml#/BulkApplyActionConfigTemplateResponse'
+
+      '400':
+        description: Invalid request (empty list, mixed connectors, etc.)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '404':
+        description: Template or agent not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
 applyActionConfigTemplate:
   post:
     operationId: applyActionConfigTemplate

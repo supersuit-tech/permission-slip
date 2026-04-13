@@ -41,6 +41,7 @@ func init() {
 func RegisterActionConfigTemplateRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /action-config-templates", requireProfile(handleListActionConfigTemplates(deps)))
+	mux.Handle("POST /action-config-templates/bulk-apply", requireProfile(handleBulkApplyActionConfigTemplates(deps)))
 	mux.Handle("POST /action-config-templates/{id}/apply", requireProfile(handleApplyActionConfigTemplate(deps)))
 }
 

@@ -54,6 +54,33 @@ func ListTemplatesByConnector(ctx context.Context, db DBTX, connectorID string) 
 	return templates, rows.Err()
 }
 
+// GetActionConfigTemplatesByIDs returns templates matching the given IDs.
+// The result order is not guaranteed to match the input order. Missing IDs are
+// silently omitted (the caller should compare counts to detect missing templates).
+func GetActionConfigTemplatesByIDs(ctx context.Context, db DBTX, ids []string) ([]ActionConfigTemplate, error) {
+	rows, err := db.Query(ctx,
+		`SELECT id, connector_id, action_type, name, description, parameters, standing_approval_spec, created_at
+		 FROM action_config_templates
+		 WHERE id = ANY($1)`,
+		ids,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var templates []ActionConfigTemplate
+	for rows.Next() {
+		var t ActionConfigTemplate
+		if err := rows.Scan(&t.ID, &t.ConnectorID, &t.ActionType, &t.Name,
+			&t.Description, &t.Parameters, &t.StandingApprovalSpec, &t.CreatedAt); err != nil {
+			return nil, err
+		}
+		templates = append(templates, t)
+	}
+	return templates, rows.Err()
+}
+
 // GetActionConfigTemplateByID returns the action configuration template with the
 // given ID, or nil if not found.
 func GetActionConfigTemplateByID(ctx context.Context, db DBTX, templateID string) (*ActionConfigTemplate, error) {
