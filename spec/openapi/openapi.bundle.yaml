@@ -11681,6 +11681,17 @@ components:
           format: int64
           description: Agent to attach the new configuration and standing approval to.
           example: 42
+        approval_mode:
+          type: string
+          enum:
+            - auto_approve
+            - requires_approval
+          description: |
+            Override the template's built-in approval behavior.
+            `auto_approve` creates a standing approval (using the template's spec
+            if present, otherwise sensible defaults: no expiry, unlimited executions).
+            `requires_approval` skips standing approval creation.
+            When omitted, falls back to the template's built-in behavior.
     LinkedStandingApprovalSummary:
       type: object
       required:

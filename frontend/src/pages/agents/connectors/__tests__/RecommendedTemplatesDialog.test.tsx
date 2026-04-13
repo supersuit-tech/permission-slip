@@ -196,7 +196,7 @@ describe("RecommendedTemplatesDialog", () => {
     });
   });
 
-  it("creates config on Use Template and closes dialog", async () => {
+  it("creates config on Use Template with default approval_mode and closes dialog", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
     mockPost.mockResolvedValue({
@@ -243,11 +243,11 @@ describe("RecommendedTemplatesDialog", () => {
     });
     const [url, opts] = mockPost.mock.calls[0] as [
       string,
-      { body: { agent_id: number }; params: { path: { id: string } } },
+      { body: { agent_id: number; approval_mode: string }; params: { path: { id: string } } },
     ];
     expect(url).toContain("/v1/action-config-templates/{id}/apply");
     expect(opts.params.path.id).toBe("tpl_a");
-    expect(opts.body).toEqual({ agent_id: 42 });
+    expect(opts.body).toEqual({ agent_id: 42, approval_mode: "auto_approve" });
 
     await waitFor(() => {
       expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -274,7 +274,7 @@ describe("RecommendedTemplatesDialog", () => {
     expect(onOpenChange).not.toHaveBeenCalledWith(false);
   });
 
-  it("Customize closes dialog and invokes onCustomize with template", async () => {
+  it("Customize closes dialog and invokes onCustomize with template and approval mode", async () => {
     const user = userEvent.setup();
     const onOpenChange = vi.fn();
 
@@ -294,6 +294,7 @@ describe("RecommendedTemplatesDialog", () => {
         action_type: "github.create_issue",
         name: "All open",
       }),
+      "auto_approve",
     );
   });
 
@@ -383,19 +384,98 @@ describe("RecommendedTemplatesDialog", () => {
     });
   });
 
-  it("shows auto-approve badge when template has standing_approval", async () => {
+  it("defaults approval mode based on template standing_approval", async () => {
     renderDialog();
     await waitFor(() => {
       expect(screen.getByText("All open")).toBeInTheDocument();
     });
-    const tplCard = screen.getByText("All open").closest(".rounded-lg")!;
-    expect(
-      within(tplCard as HTMLElement).getByText("Auto-approved"),
-    ).toBeInTheDocument();
-    expect(
-      within(screen.getByText("Merge main").closest(".rounded-lg")!).getByText(
-        "Requires approval each time",
-      ),
-    ).toBeInTheDocument();
+
+    // tpl_a has standing_approval → defaults to Auto-approve
+    const tplACard = screen.getByText("All open").closest(".rounded-lg")!;
+    const autoRadioA = within(tplACard as HTMLElement).getByRole("radio", { name: "Auto-approve" });
+    expect(autoRadioA).toHaveAttribute("aria-checked", "true");
+
+    // tpl_b has no standing_approval → defaults to Requires approval
+    const tplBCard = screen.getByText("Merge main").closest(".rounded-lg")!;
+    const reqRadioB = within(tplBCard as HTMLElement).getByRole("radio", { name: "Requires approval" });
+    expect(reqRadioB).toHaveAttribute("aria-checked", "true");
+  });
+
+  it("sends toggled approval_mode when user switches before Use Template", async () => {
+    const user = userEvent.setup();
+    mockPost.mockResolvedValue({
+      data: {
+        action_configuration: {
+          id: "ac_new",
+          agent_id: 42,
+          connector_id: "github",
+          action_type: "github.merge_pr",
+          parameters: { repo: "supersuit-tech/webapp", pr: 1 },
+          status: "active",
+          name: "Merge main",
+          created_at: "2026-02-25T10:00:00Z",
+          updated_at: "2026-02-25T10:00:00Z",
+        },
+      },
+    });
+
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("Merge main")).toBeInTheDocument();
+    });
+
+    // tpl_b defaults to requires_approval — switch to auto_approve
+    const tplBCard = screen.getByText("Merge main").closest(".rounded-lg")!;
+    await user.click(within(tplBCard as HTMLElement).getByRole("radio", { name: "Auto-approve" }));
+    await user.click(within(tplBCard as HTMLElement).getByRole("button", { name: "Use Template" }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalled();
+    });
+    const [, opts] = mockPost.mock.calls[0] as [
+      string,
+      { body: { agent_id: number; approval_mode: string } },
+    ];
+    expect(opts.body.approval_mode).toBe("auto_approve");
+  });
+
+  it("sends requires_approval when user switches off auto-approve", async () => {
+    const user = userEvent.setup();
+    mockPost.mockResolvedValue({
+      data: {
+        action_configuration: {
+          id: "ac_new",
+          agent_id: 42,
+          connector_id: "github",
+          action_type: "github.create_issue",
+          parameters: { repo: "*", title: "*" },
+          status: "active",
+          name: "All open",
+          created_at: "2026-02-25T10:00:00Z",
+          updated_at: "2026-02-25T10:00:00Z",
+        },
+      },
+    });
+
+    renderDialog();
+
+    await waitFor(() => {
+      expect(screen.getByText("All open")).toBeInTheDocument();
+    });
+
+    // tpl_a defaults to auto_approve — switch to requires_approval
+    const tplACard = screen.getByText("All open").closest(".rounded-lg")!;
+    await user.click(within(tplACard as HTMLElement).getByRole("radio", { name: "Requires approval" }));
+    await user.click(within(tplACard as HTMLElement).getByRole("button", { name: "Use Template" }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalled();
+    });
+    const [, opts] = mockPost.mock.calls[0] as [
+      string,
+      { body: { agent_id: number; approval_mode: string } },
+    ];
+    expect(opts.body.approval_mode).toBe("requires_approval");
   });
 });

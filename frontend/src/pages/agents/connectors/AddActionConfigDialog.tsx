@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { Link } from "react-router-dom";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -12,6 +11,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
 import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
@@ -31,6 +31,12 @@ import {
   type ParamMode,
 } from "./ActionConfigFormFields";
 import { TemplatePicker } from "./TemplatePicker";
+import type { ApprovalMode } from "./RecommendedTemplatesDialog";
+
+const approvalModeOptions: { label: string; value: ApprovalMode }[] = [
+  { label: "Auto-approve", value: "auto_approve" },
+  { label: "Requires approval", value: "requires_approval" },
+];
 
 interface AddActionConfigDialogProps {
   open: boolean;
@@ -40,6 +46,8 @@ interface AddActionConfigDialogProps {
   actions: ConnectorAction[];
   /** When the dialog opens, apply this template (action type, fields, parameters). */
   initialTemplate?: ActionConfigTemplate | null;
+  /** Override the template's default approval mode. */
+  initialApprovalMode?: ApprovalMode;
 }
 
 export function AddActionConfigDialog({
@@ -49,6 +57,7 @@ export function AddActionConfigDialog({
   connectorId,
   actions,
   initialTemplate = null,
+  initialApprovalMode,
 }: AddActionConfigDialogProps) {
   const { createActionConfig, isPending: isCreatingConfig } =
     useCreateActionConfig();
@@ -64,6 +73,7 @@ export function AddActionConfigDialog({
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
+  const [approvalMode, setApprovalMode] = useState<ApprovalMode>("requires_approval");
 
   const prevOpenRef = useRef(false);
 
@@ -71,11 +81,6 @@ export function AddActionConfigDialog({
     () => actions.find((a) => a.action_type === selectedActionType) ?? null,
     [actions, selectedActionType],
   );
-
-  const standingSpecFromTemplate = useMemo(() => {
-    if (!initialTemplate?.standing_approval) return null;
-    return initialTemplate.standing_approval;
-  }, [initialTemplate]);
 
   const schema = useMemo(
     // Cast is safe: parameters_schema is typed as `{ [key: string]: unknown }` in
@@ -96,6 +101,7 @@ export function AddActionConfigDialog({
     setParamValues({});
     setParamModes({});
     setAppliedTemplateId(null);
+    setApprovalMode("requires_approval");
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -140,7 +146,12 @@ export function AddActionConfigDialog({
       setParamModes(modes);
       setAppliedTemplateId(template.id);
 
+      // When selecting a new template via the picker (not from initial),
+      // reset approval mode to the template's default.
       if (!options?.fromInitial) {
+        setApprovalMode(
+          template.standing_approval != null ? "auto_approve" : "requires_approval",
+        );
         toast.success(`Template "${template.name}" applied`);
       }
     },
@@ -152,8 +163,12 @@ export function AddActionConfigDialog({
     prevOpenRef.current = open;
     if (open && !wasOpen && initialTemplate) {
       handleTemplateSelect(initialTemplate, { fromInitial: true });
+      setApprovalMode(
+        initialApprovalMode ??
+          (initialTemplate.standing_approval != null ? "auto_approve" : "requires_approval"),
+      );
     }
-  }, [open, initialTemplate, handleTemplateSelect]);
+  }, [open, initialTemplate, initialApprovalMode, handleTemplateSelect]);
 
   function handleParamChange(key: string, value: string) {
     setParamValues((prev) => ({ ...prev, [key]: value }));
@@ -192,14 +207,13 @@ export function AddActionConfigDialog({
         parameters: builtParams,
       });
 
-      if (standingSpecFromTemplate && ac?.id) {
+      if (approvalMode === "auto_approve" && ac?.id) {
+        const standingSpec = initialTemplate?.standing_approval;
         const startsAt = new Date();
         let expiresAt: string | null = null;
-        if (standingSpecFromTemplate.duration_days != null) {
+        if (standingSpec?.duration_days != null) {
           const exp = new Date(startsAt);
-          exp.setUTCDate(
-            exp.getUTCDate() + standingSpecFromTemplate.duration_days,
-          );
+          exp.setUTCDate(exp.getUTCDate() + standingSpec.duration_days);
           expiresAt = exp.toISOString();
         }
         const constraints = standingApprovalConstraintsForCreate(
@@ -211,14 +225,14 @@ export function AddActionConfigDialog({
           action_version: "1",
           constraints,
           source_action_configuration_id: ac.id,
-          max_executions: standingSpecFromTemplate.max_executions ?? null,
+          max_executions: standingSpec?.max_executions ?? null,
           starts_at: startsAt.toISOString(),
           expires_at: expiresAt,
         });
       }
 
       toast.success(
-        standingSpecFromTemplate
+        approvalMode === "auto_approve"
           ? `Configuration "${name.trim()}" created with auto-approval`
           : `Configuration "${name.trim()}" created`,
       );
@@ -265,20 +279,20 @@ export function AddActionConfigDialog({
               />
             )}
 
-            {standingSpecFromTemplate && (
+            <div className="space-y-2">
+              <Label>Approval mode</Label>
+              <SegmentedControl
+                options={approvalModeOptions}
+                value={approvalMode}
+                onChange={setApprovalMode}
+                ariaLabel="Approval mode"
+              />
               <p className="text-muted-foreground text-xs">
-                Saving will also create a standing approval from this template’s
-                auto-approve settings. You can change duration or limits later
-                on the{" "}
-                <Link
-                  to="/standing-approvals"
-                  className="text-primary underline-offset-4 hover:underline"
-                >
-                  standing approvals
-                </Link>{" "}
-                page.
+                {approvalMode === "auto_approve"
+                  ? "A standing approval will be created so matching requests run automatically."
+                  : "Each request will require your explicit approval before it runs."}
               </p>
-            )}
+            </div>
 
             <NameField
               id="config-name"

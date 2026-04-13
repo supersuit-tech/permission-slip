@@ -14,7 +14,8 @@ import (
 )
 
 type applyActionConfigTemplateRequest struct {
-	AgentID int64 `json:"agent_id" validate:"gt=0"`
+	AgentID      int64   `json:"agent_id" validate:"gt=0"`
+	ApprovalMode *string `json:"approval_mode,omitempty" validate:"omitempty,oneof=auto_approve requires_approval"`
 }
 
 type applyActionConfigTemplateResponse struct {
@@ -107,14 +108,25 @@ func handleApplyActionConfigTemplate(deps *Deps) http.HandlerFunc {
 
 		var standingBytes []byte
 		var spec standingApprovalTemplateSpec
-		wantStanding := len(tpl.StandingApprovalSpec) > 0 && string(tpl.StandingApprovalSpec) != "null"
-		if wantStanding {
+		templateHasStanding := len(tpl.StandingApprovalSpec) > 0 && string(tpl.StandingApprovalSpec) != "null"
+		wantStanding := templateHasStanding // default: follow template
+		if req.ApprovalMode != nil {
+			switch *req.ApprovalMode {
+			case "auto_approve":
+				wantStanding = true
+			case "requires_approval":
+				wantStanding = false
+			}
+		}
+		if wantStanding && templateHasStanding {
 			if err := json.Unmarshal(tpl.StandingApprovalSpec, &spec); err != nil {
 				log.Printf("[%s] ApplyActionConfigTemplate: parse standing spec: %v", TraceID(r.Context()), err)
 				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply template"))
 				return
 			}
+		}
+		if wantStanding {
 			standingBytes, err = buildStandingApprovalConstraintsFromTemplate(params)
 			if err != nil {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error()))
