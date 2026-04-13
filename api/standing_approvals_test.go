@@ -756,15 +756,15 @@ func TestCreateStandingApproval_ConstraintsNull(t *testing.T) {
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
 
-	// Explicit null should be rejected — constraints are required.
+	// With source_action_configuration_id, JSON null constraints mean match-all (stored as NULL).
 	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": null, "source_action_configuration_id": %q, "expires_at": "%s"}`, agentID, acID, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for null constraints, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for null constraints with backing config, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -828,15 +828,15 @@ func TestCreateStandingApproval_ConstraintsEmptyObject(t *testing.T) {
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
 
-	// Empty object {} should be rejected — at least one constraint is required.
+	// With source_action_configuration_id, {} means match-all parameters (stored as NULL).
 	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {}, "source_action_configuration_id": %q, "expires_at": "%s"}`, agentID, acID, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for empty constraints, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for empty constraints with backing config, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
