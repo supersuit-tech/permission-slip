@@ -1,12 +1,12 @@
 ---
 name: review
-description: Perform a comprehensive, multi-round code review on a GitHub PR. Leaves inline review comments prioritized by severity (Critical/High/Medium/Low) across up to 6 rounds, with 90-second waits between rounds to check for fixes.
+description: Perform a comprehensive, multi-round code review on a GitHub PR. Leaves inline review comments prioritized by severity (Critical/High/Medium/Low) across up to 6 rounds, with 5-minute waits between rounds to check for fixes.
 argument-hint: "<PR_URL> [--max-turns <N>]"
 ---
 
 # Review PR — Multi-Round Comprehensive Code Review
 
-Performs up to 6 rounds of thorough code review on a GitHub Pull Request. Each round submits a PR review with inline comments covering security, architecture, maintainability, code quality, documentation, and performance. Between rounds, waits 90 seconds and re-fetches the diff to check for fixes before reviewing again.
+Performs up to 6 rounds of thorough code review on a GitHub Pull Request. Each round submits a PR review with inline comments covering security, architecture, maintainability, code quality, documentation, and performance. Between rounds, waits 5 minutes and re-fetches the diff to check for fixes before reviewing again.
 
 This skill is **strictly read-only** — it never modifies code, creates branches, or makes commits.
 
@@ -97,9 +97,9 @@ Repeat for `ROUND` = 1 to `MAX_TURNS`:
 
 If `ROUND > 1`:
 
-1. **Wait 90 seconds** using the Bash tool with `run_in_background: true`:
+1. **Wait 5 minutes** using the Bash tool with `run_in_background: true`:
    ```bash
-   sleep 90 && echo "WAIT_COMPLETE"
+   sleep 300 && echo "WAIT_COMPLETE"
    ```
    Set `run_in_background: true` on this Bash call so the agent is not blocked. You will be notified when the sleep completes. While waiting, do NOT proceed to the next step — wait for the background task notification before continuing.
 
