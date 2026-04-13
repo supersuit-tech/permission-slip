@@ -15,12 +15,12 @@ listStandingApprovals:
       - **Agent startup**: Agent queries its standing approvals to understand what it can do
       - **Flow selection**: Agent checks if a standing approval covers a desired action before
         deciding whether to use `POST /v1/actions/execute` (standing) or `POST /v1/approvals/request` (one-off)
-      - **Status monitoring**: Agent checks remaining executions or expiration times
+      - **Status monitoring**: Agent checks expiration times
 
       ## Filtering
 
-      Only standing approvals with status `active` are returned by default. Expired,
-      revoked, and exhausted standing approvals are excluded.
+      Only standing approvals with status `active` are returned by default. Expired
+      and revoked standing approvals are excluded.
 
       ## Security
 
@@ -77,8 +77,6 @@ listStandingApprovals:
                     sender: "*@github.com"
                     max_results: 10
                   status: "active"
-                  max_executions: null
-                  execution_count: 42
                   starts_at: "2026-02-14T00:00:00Z"
                   expires_at: "2026-02-21T00:00:00Z"
                   created_at: "2026-02-14T10:30:00Z"
@@ -93,8 +91,6 @@ listStandingApprovals:
                     recipient_pattern: "*@mycompany.com"
                     max_recipients: 5
                   status: "active"
-                  max_executions: 100
-                  execution_count: 12
                   starts_at: "2026-02-14T00:00:00Z"
                   expires_at: "2026-05-15T00:00:00Z"
                   created_at: "2026-02-14T10:35:00Z"
@@ -178,7 +174,6 @@ userListStandingApprovals:
             - active
             - expired
             - revoked
-            - exhausted
             - all
           default: active
         example: active
@@ -233,8 +228,6 @@ userListStandingApprovals:
                   constraints:
                     sender: "*@github.com"
                   status: "active"
-                  max_executions: null
-                  execution_count: 42
                   starts_at: "2026-02-14T00:00:00Z"
                   expires_at: "2026-02-21T00:00:00Z"
                   created_at: "2026-02-14T10:30:00Z"
@@ -312,7 +305,6 @@ createStandingApproval:
             constraints:
               recipient_pattern: "*@mycompany.com"
             source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
-            max_executions: 100
             expires_at: "2026-03-14T00:00:00Z"
 
     responses:
@@ -400,17 +392,13 @@ updateStandingApproval:
     operationId: updateStandingApproval
     summary: Update Standing Approval
     description: |
-      Update the constraints, max_executions, and expires_at of an active standing approval.
+      Update the constraints and expires_at of an active standing approval.
       The standing approval must belong to the authenticated user and be in `active` status.
-      Agent and action type cannot be changed — only constraints and limits.
+      Agent and action type cannot be changed — only constraints and expiry.
 
       **Duration policy**: The total lifespan from the approval's original `starts_at` may not exceed
       the maximum allowed window (90 days). Expiry headroom shrinks as the approval ages — this is
       not a rolling window from the time of the update call.
-
-      **Execution count**: `max_executions` cannot be set below the approval's current
-      `execution_count`. The update is rejected atomically at the database level to prevent
-      a race condition where concurrent executions could otherwise create a zombie approval.
 
       Emits a `standing_approval.updated` audit event on success.
 
@@ -432,7 +420,6 @@ updateStandingApproval:
           example:
             constraints:
               recipient_pattern: "*@mycompany.com"
-            max_executions: 200
             expires_at: "2026-04-14T00:00:00Z"
 
     responses:
@@ -474,7 +461,7 @@ updateStandingApproval:
               $ref: '../schemas/errors.yaml#/ErrorResponse'
 
       '410':
-        description: Standing approval no longer active (expired or exhausted)
+        description: Standing approval no longer active (expired or revoked)
         content:
           application/json:
             schema:
@@ -551,7 +538,7 @@ revokeStandingApproval:
                 trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
 
       '410':
-        description: Standing approval no longer active (expired or exhausted)
+        description: Standing approval no longer active (expired or revoked)
         content:
           application/json:
             schema:
@@ -581,7 +568,7 @@ executeStandingApproval:
     description: |
       Record an execution of an active standing approval. The standing approval
       must belong to the authenticated user and be in `active` status. Atomically
-      increments the execution count and creates an execution record.
+      creates an execution record.
 
       Emits a `standing_approval.executed` audit event on success.
 
@@ -661,7 +648,7 @@ executeStandingApproval:
                 trace_id: "trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4"
 
       '410':
-        description: Standing approval no longer active (expired or exhausted)
+        description: Standing approval no longer active (expired or revoked)
         content:
           application/json:
             schema:

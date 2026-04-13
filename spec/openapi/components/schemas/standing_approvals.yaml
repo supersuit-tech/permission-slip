@@ -40,8 +40,6 @@ StandingApprovalListResponse:
           sender: "*@github.com"
           max_results: 10
         status: "active"
-        max_executions: null
-        execution_count: 42
         starts_at: "2026-02-14T00:00:00Z"
         expires_at: "2026-02-21T00:00:00Z"
         created_at: "2026-02-14T10:30:00Z"
@@ -58,7 +56,6 @@ StandingApproval:
     - action_type
     - constraints
     - status
-    - execution_count
     - starts_at
     - created_at
     - source_action_configuration_id
@@ -127,32 +124,13 @@ StandingApproval:
         - active
         - expired
         - revoked
-        - exhausted
       description: |
         Current status of the standing approval.
 
         - **active**: Agent can execute actions under this standing approval
         - **expired**: Duration elapsed; agent must request a new standing approval or use one-off
         - **revoked**: User manually cancelled this standing approval
-        - **exhausted**: Max execution count reached
       example: "active"
-
-    max_executions:
-      type: integer
-      minimum: 1
-      nullable: true
-      description: |
-        Maximum number of times the agent can execute under this standing approval.
-        `null` means unlimited — the agent can execute as many times as it wants
-        within the duration.
-      example: null
-
-    execution_count:
-      type: integer
-      minimum: 0
-      description: |
-        Number of times this standing approval has been used so far.
-      example: 42
 
     starts_at:
       type: string
@@ -208,8 +186,6 @@ StandingApproval:
       sender: "*@github.com"
       max_results: 10
     status: "active"
-    max_executions: null
-    execution_count: 42
     starts_at: "2026-02-14T00:00:00Z"
     expires_at: "2026-02-21T00:00:00Z"
     created_at: "2026-02-14T10:30:00Z"
@@ -251,8 +227,6 @@ UserStandingApprovalListResponse:
           sender: "*@github.com"
           max_results: 10
         status: "active"
-        max_executions: null
-        execution_count: 42
         starts_at: "2026-02-14T00:00:00Z"
         expires_at: "2026-02-21T00:00:00Z"
         created_at: "2026-02-14T10:30:00Z"
@@ -315,13 +289,6 @@ CreateStandingApprovalRequest:
         enforce the pattern — only non-empty and max 128 characters.
       example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
-    max_executions:
-      type: integer
-      minimum: 1
-      nullable: true
-      description: Maximum number of executions. Null means unlimited.
-      example: 100
-
     starts_at:
       type: string
       format: date-time
@@ -344,7 +311,6 @@ CreateStandingApprovalRequest:
     constraints:
       recipient_pattern: "*@mycompany.com"
     source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
-    max_executions: 100
     expires_at: null
 
 UpdateStandingApprovalRequest:
@@ -360,13 +326,6 @@ UpdateStandingApprovalRequest:
       example:
         recipient_pattern: "*@mycompany.com"
 
-    max_executions:
-      type: integer
-      minimum: 1
-      nullable: true
-      description: Updated maximum number of executions. Null means unlimited.
-      example: 200
-
     expires_at:
       type: string
       format: date-time
@@ -380,7 +339,6 @@ UpdateStandingApprovalRequest:
   example:
     constraints:
       recipient_pattern: "*@mycompany.com"
-    max_executions: 200
     expires_at: null
 
 
@@ -524,7 +482,6 @@ StandingApprovalExecuteResponse:
   required:
     - result
     - standing_approval_id
-    - executions_remaining
   properties:
     result:
       type: object
@@ -545,15 +502,6 @@ StandingApprovalExecuteResponse:
         Which standing approval authorized this execution.
       example: "sa_abc123"
 
-    executions_remaining:
-      type: integer
-      minimum: 0
-      nullable: true
-      description: |
-        Number of executions remaining under this standing approval.
-        `null` means unlimited.
-      example: null
-
   example:
     result:
       emails:
@@ -561,4 +509,3 @@ StandingApprovalExecuteResponse:
           subject: "PR merged"
           sender: "noreply@github.com"
     standing_approval_id: "sa_abc123"
-    executions_remaining: null

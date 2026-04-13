@@ -65,8 +65,6 @@ AgentCapabilitiesResponse:
                 constraints:
                   recipient_pattern: "*@mycompany.com"
                   max_recipients: 5
-                max_executions: 100
-                executions_remaining: 88
                 expires_at: "2026-05-15T00:00:00Z"
             action_configurations:
               - configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
@@ -331,8 +329,6 @@ ActionCapability:
       - standing_approval_id: "sa_def456"
         constraints:
           recipient_pattern: "*@mycompany.com"
-        max_executions: 100
-        executions_remaining: 88
         expires_at: "2026-05-15T00:00:00Z"
     action_configurations:
       - configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
@@ -348,7 +344,6 @@ StandingApprovalCapability:
   required:
     - standing_approval_id
     - constraints
-    - executions_remaining
     - expires_at
   properties:
     standing_approval_id:
@@ -377,25 +372,6 @@ StandingApprovalCapability:
         recipient_pattern: "*@mycompany.com"
         max_recipients: 5
 
-    max_executions:
-      type: integer
-      minimum: 1
-      nullable: true
-      description: |
-        Maximum number of executions allowed under this standing approval.
-        `null` means unlimited.
-      example: 100
-
-    executions_remaining:
-      type: integer
-      minimum: 0
-      nullable: true
-      description: |
-        Number of executions remaining. `null` means unlimited (when
-        `max_executions` is null). When this reaches `0`, the standing
-        approval is exhausted and the agent must use one-off approval.
-      example: 88
-
     expires_at:
       type: string
       format: date-time
@@ -410,8 +386,6 @@ StandingApprovalCapability:
     constraints:
       recipient_pattern: "*@mycompany.com"
       max_recipients: 5
-    max_executions: 100
-    executions_remaining: 88
     expires_at: "2026-05-15T00:00:00Z"
 
 ActionConfigCapability:

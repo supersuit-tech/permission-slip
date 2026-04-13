@@ -311,7 +311,6 @@ describe("RecommendedTemplatesDialog", () => {
           action_version: "1",
           constraints: { repo: "*", title: "*" },
           status: "active",
-          execution_count: 0,
           starts_at: "2026-02-25T10:00:00Z",
           expires_at: "2026-03-25T10:00:00Z",
           created_at: "2026-02-25T10:00:00Z",

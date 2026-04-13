@@ -18,7 +18,6 @@ import {
   TableRow,
   TableCell,
 } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
 import {
   useStandingApprovals,
   type StandingApproval,
@@ -46,29 +45,6 @@ function formatExpiresIn(expiresAt: string | null | undefined): string {
 
   const diffDays = Math.floor(diffHours / 24);
   return `${diffDays}d`;
-}
-
-function ExecutionBadge({
-  executionCount,
-  maxExecutions,
-}: {
-  executionCount: number;
-  maxExecutions?: number | null;
-}) {
-  if (maxExecutions == null) {
-    return (
-      <span className="text-muted-foreground text-xs">
-        {executionCount} / &infin;
-      </span>
-    );
-  }
-  const ratio = executionCount / maxExecutions;
-  const variant = ratio >= 0.9 ? "destructive" : "secondary";
-  return (
-    <Badge variant={variant}>
-      {executionCount} / {maxExecutions}
-    </Badge>
-  );
 }
 
 function resolveAgentName(
@@ -115,10 +91,7 @@ function StandingApprovalSummaryRow({
         {agentName}
       </TableCell>
       <TableCell>
-        <ExecutionBadge
-          executionCount={sa.execution_count}
-          maxExecutions={sa.max_executions}
-        />
+        <span className="text-muted-foreground text-xs">On</span>
       </TableCell>
       <TableCell>{formatExpiresIn(sa.expires_at)}</TableCell>
       <TableCell className="text-right">
@@ -144,7 +117,7 @@ function EmptyState() {
       <p className="text-muted-foreground mb-4 max-w-md text-xs leading-relaxed">
         Standing approvals are created from an agent&apos;s connector page, on each
         action configuration. Open a connector, then use the Standing Approval column
-        to enable auto-approve with limits you control.
+        to enable auto-approve with expiry you control.
       </p>
     </div>
   );
@@ -198,7 +171,7 @@ export function StandingApprovalsCard() {
           )}
         </div>
         <p className="text-muted-foreground text-sm">
-          Action configurations with an active standing approval. Manage limits and
+          Action configurations with an active standing approval. Manage expiry and
           revocation on each connector&apos;s configuration page.
         </p>
       </CardHeader>
@@ -229,7 +202,7 @@ export function StandingApprovalsCard() {
                     <TableHead>Configuration</TableHead>
                     <TableHead>Connector</TableHead>
                     <TableHead>Agent</TableHead>
-                    <TableHead>Executions</TableHead>
+                    <TableHead>Auto-approve</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead className="text-right">
                       <span className="sr-only">Open</span>

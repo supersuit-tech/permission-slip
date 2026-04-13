@@ -77,13 +77,7 @@ func TestRequestApproval_AutoApprove_Success(t *testing.T) {
 	if resp.ApprovalID != "" {
 		t.Errorf("expected empty approval_id for auto-approval, got %q", resp.ApprovalID)
 	}
-	// No max_executions set, so executions_remaining should be nil (unlimited).
-	if resp.ExecutionsRemaining != nil {
-		t.Errorf("expected nil executions_remaining, got %v", *resp.ExecutionsRemaining)
-	}
-
-	// Verify execution_count was incremented.
-	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", saID, "execution_count", "1")
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 1)
 }
 
 func TestRequestApproval_NoStandingApproval_CreatesPending(t *testing.T) {
@@ -175,37 +169,7 @@ func TestRequestApproval_AutoApprove_ConstraintSatisfied(t *testing.T) {
 		t.Errorf("expected status \"approved\", got %q", resp.Status)
 	}
 
-	// Verify execution was recorded.
-	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", saID, "execution_count", "1")
-}
-
-func TestRequestApproval_AutoApprove_ExecutionsRemaining(t *testing.T) {
-	t.Parallel()
-	maxExec := 3
-	_, _, router, agentID, privKey, _, _ := setupStandingApprovalTest(t, "email.read", testhelper.StandingApprovalOpts{
-		MaxExecutions: &maxExec,
-	})
-
-	reqBody := `{"request_id":"f47ac10b-58cc-4372-a567-0e02b2c3d479","action":{"type":"email.read","version":"1","parameters":{}},"context":{"description":"test"}}`
-	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
-	w := httptest.NewRecorder()
-
-	router.ServeHTTP(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp agentRequestApprovalResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if resp.ExecutionsRemaining == nil {
-		t.Fatal("expected executions_remaining to be non-nil")
-	}
-	if *resp.ExecutionsRemaining != 2 {
-		t.Errorf("expected executions_remaining 2, got %d", *resp.ExecutionsRemaining)
-	}
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 1)
 }
 
 func TestRequestApproval_AutoApprove_ExpiredApproval_FallsThroughToPending(t *testing.T) {
@@ -352,47 +316,9 @@ func TestRequestApproval_AutoApprove_SecondApprovalMatchesWhenFirstDoesNot(t *te
 		t.Errorf("expected status \"approved\", got %q", resp.Status)
 	}
 
-	// Assert based on execution counts rather than standing_approval_id, since
-	// the query tiebreaker (standing_approval_id DESC) over random IDs makes
-	// the iteration order non-deterministic. What matters: the github.com
-	// constraint matched (execution_count=1) and competitor.com did not (0).
-	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa1ID, "execution_count", "1")
-	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", sa2ID, "execution_count", "0")
-}
-
-func TestRequestApproval_AutoApprove_ExhaustedBetweenFindAndRecord_FallsThroughToPending(t *testing.T) {
-	t.Parallel()
-	maxExec := 1
-	tx, _, router, agentID, privKey, saID, _ := setupStandingApprovalTest(t, "email.read", testhelper.StandingApprovalOpts{
-		MaxExecutions: &maxExec,
-	})
-
-	// Simulate race: the standing approval was found by FindActiveStandingApprovalsForAgent
-	// (status=active, execution_count < max_executions), but between that query and
-	// RecordStandingApprovalExecutionByAgent, another request exhausted the quota.
-	// Set execution_count = max_executions to trigger StandingApprovalErrNotActive.
-	testhelper.InsertStandingApprovalExecution(t, tx, saID)
-
-	reqBody := `{"request_id":"exhausted-race-test-001","action":{"type":"email.read","version":"1","parameters":{}},"context":{"description":"test"}}`
-	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
-
-	// Should fall through to pending (exhausted SA triggers StandingApprovalErrNotActive).
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200 (pending), got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp agentRequestApprovalResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
-	if resp.Status != "pending" {
-		t.Errorf("expected status \"pending\" (exhausted SA race), got %q", resp.Status)
-	}
-	if resp.ApprovalID == "" {
-		t.Error("expected non-empty approval_id for pending request")
-	}
+	// Only the github.com constraint can match this request.
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, sa1ID, 1)
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, sa2ID, 0)
 }
 
 func TestRequestApproval_AutoApprove_RevokedApproval_FallsThroughToPending(t *testing.T) {

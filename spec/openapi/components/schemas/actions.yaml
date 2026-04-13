@@ -24,5 +24,5 @@ ExecuteActionResponse:
   allOf:
     - $ref: '../schemas/standing_approvals.yaml#/StandingApprovalExecuteResponse'
     - description: |
-        Response from executing an action via a standing approval. Returns the action result,
-        the standing approval that authorized execution, and the remaining execution count.
+        Response from executing an action via a standing approval. Returns the action result
+        and the standing approval that authorized execution.

@@ -49,12 +49,10 @@ type CapabilityActionConfig struct {
 
 // CapabilityStandingApproval represents an active, non-expired standing approval.
 type CapabilityStandingApproval struct {
-	StandingApprovalID  string
-	ActionType          string
-	Constraints         json.RawMessage // raw JSONB
-	MaxExecutions       *int
-	ExecutionsRemaining *int
-	ExpiresAt           *time.Time
+	StandingApprovalID string
+	ActionType         string
+	Constraints        json.RawMessage // raw JSONB
+	ExpiresAt          *time.Time
 }
 
 // GetAgentCapabilities retrieves all data needed for the capabilities endpoint:
@@ -161,11 +159,6 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// 3. Active, non-expired standing approvals for this agent.
 	saRows, err := db.Query(ctx, `
 		SELECT sa.standing_approval_id, sa.action_type, sa.constraints,
-		       sa.max_executions,
-		       CASE WHEN sa.max_executions IS NOT NULL
-		            THEN sa.max_executions - sa.execution_count
-		            ELSE NULL
-		       END AS executions_remaining,
 		       sa.expires_at
 		FROM standing_approvals sa
 		WHERE sa.agent_id = $1
@@ -183,7 +176,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 
 	for saRows.Next() {
 		var sa CapabilityStandingApproval
-		if err := saRows.Scan(&sa.StandingApprovalID, &sa.ActionType, &sa.Constraints, &sa.MaxExecutions, &sa.ExecutionsRemaining, &sa.ExpiresAt); err != nil {
+		if err := saRows.Scan(&sa.StandingApprovalID, &sa.ActionType, &sa.Constraints, &sa.ExpiresAt); err != nil {
 			return nil, err
 		}
 		caps.StandingApprovals = append(caps.StandingApprovals, sa)

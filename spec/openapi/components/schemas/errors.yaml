@@ -47,7 +47,6 @@ Error:
         - standing_approval_limit_reached
         - credential_limit_reached
         # 403 Forbidden (standing approval)
-        - standing_approval_exhausted
         - constraint_violation
         # 410 Gone (standing approval)
         - standing_approval_expired

@@ -46,11 +46,9 @@ type actionConfigCapability struct {
 }
 
 type standingApprovalCapability struct {
-	StandingApprovalID  string          `json:"standing_approval_id"`
-	Constraints         json.RawMessage `json:"constraints"`
-	MaxExecutions       *int            `json:"max_executions"`
-	ExecutionsRemaining *int            `json:"executions_remaining"`
-	ExpiresAt           *time.Time      `json:"expires_at"`
+	StandingApprovalID string          `json:"standing_approval_id"`
+	Constraints        json.RawMessage `json:"constraints"`
+	ExpiresAt          *time.Time      `json:"expires_at"`
 }
 
 // ── Route registration ──────────────────────────────────────────────────────
@@ -174,11 +172,9 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 			sas := make([]standingApprovalCapability, 0, len(dbSAs))
 			for _, sa := range dbSAs {
 				sas = append(sas, standingApprovalCapability{
-					StandingApprovalID:  sa.StandingApprovalID,
-					Constraints:         sa.Constraints,
-					MaxExecutions:       sa.MaxExecutions,
-					ExecutionsRemaining: sa.ExecutionsRemaining,
-					ExpiresAt:           sa.ExpiresAt,
+					StandingApprovalID: sa.StandingApprovalID,
+					Constraints:        sa.Constraints,
+					ExpiresAt:          sa.ExpiresAt,
 				})
 			}
 			acap.StandingApprovals = sas

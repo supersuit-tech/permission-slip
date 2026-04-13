@@ -274,7 +274,6 @@ export class ApiClient {
       created_at?: string;
       result?: unknown;
       standing_approval_id?: string;
-      executions_remaining?: number | null;
     }>({
       method: "POST",
       routerPath: "/approvals/request",

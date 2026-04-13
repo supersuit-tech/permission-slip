@@ -52,7 +52,7 @@ const STEP_LABELS: Record<Step, string> = {
   1: "Pick Agent",
   2: "Pick Action",
   3: "Set Constraints",
-  4: "Set Limits",
+  4: "Expiry",
 };
 
 function defaultExpiresAt(): string {
@@ -137,11 +137,6 @@ export function CreateStandingApprovalDialog({
   const [manualConstraintsJson, setManualConstraintsJson] = useState(
     hasInitialContext && ctxConstraints
       ? JSON.stringify(ctxConstraints, null, 2)
-      : "",
-  );
-  const [maxExecutions, setMaxExecutions] = useState(
-    isEditMode && editTarget.max_executions != null
-      ? String(editTarget.max_executions)
       : "",
   );
   const [noExpiry, setNoExpiry] = useState(isEditMode ? !editTarget.expires_at : true);
@@ -274,11 +269,6 @@ export function CreateStandingApprovalDialog({
         ? JSON.stringify(ctxConstraints, null, 2)
         : "",
     );
-    if (isEditMode && editTarget.max_executions != null) {
-      setMaxExecutions(String(editTarget.max_executions));
-    } else {
-      setMaxExecutions("");
-    }
     setNoExpiry(isEditMode ? !editTarget.expires_at : true);
     if (isEditMode && editTarget.expires_at) {
       const d = new Date(editTarget.expires_at);
@@ -449,7 +439,6 @@ export function CreateStandingApprovalDialog({
       if (isEditMode) {
         await updateStandingApproval(editTarget.standing_approval_id, {
           constraints,
-          max_executions: maxExecutions ? Number(maxExecutions) : null,
           expires_at: noExpiry ? null : new Date(expiresAt).toISOString(),
         });
         toast.success("Standing approval updated");
@@ -468,7 +457,6 @@ export function CreateStandingApprovalDialog({
           action_version: "1",
           constraints,
           source_action_configuration_id: sourceId,
-          max_executions: maxExecutions ? Number(maxExecutions) : null,
           ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
         });
         toast.success("Standing approval created");
@@ -595,22 +583,8 @@ export function CreateStandingApprovalDialog({
 
           {step === 4 && (
             <StepLimits
-              maxExecutions={maxExecutions}
-              onMaxExecutionsChange={(value) => {
-                if (value === "") {
-                  setMaxExecutions("");
-                  return;
-                }
-                const intValue = parseInt(value, 10);
-                // In edit mode enforce the minimum at execution_count so the
-                // client rejects the input before it ever reaches the server.
-                const minAllowed = isEditMode ? editTarget.execution_count : 1;
-                if (Number.isNaN(intValue) || intValue < minAllowed) return;
-                setMaxExecutions(String(intValue));
-              }}
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
-              currentExecutionCount={isEditMode ? editTarget.execution_count : undefined}
               noExpiry={noExpiry}
               onNoExpiryChange={setNoExpiry}
             />
