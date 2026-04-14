@@ -1,22 +1,20 @@
 import { createClient } from "@supabase/supabase-js";
 
-// In development, resolve Supabase via a relative path so requests always go
-// to the same origin as the page — whether that's localhost:5173, the dev
-// proxy on :3000, or the ngrok tunnel. The dev proxy routes /supabase/* →
-// http://127.0.0.1:54321. This avoids cross-origin CORS failures when the
-// browser is on a different host than VITE_SUPABASE_URL points to.
-//
-// In production, VITE_SUPABASE_URL must be set to the real Supabase project URL.
+// Resolve the Supabase URL:
+// 1. If VITE_SUPABASE_URL is set (cloud Supabase), use it directly.
+// 2. Otherwise, use a relative /supabase path — the Go server proxies
+//    /supabase/* → SUPABASE_URL. In dev mode, Vite's proxy handles the same
+//    path. This eliminates CORS issues and avoids exposing extra ports,
+//    which is especially useful for self-hosted and Raspberry Pi deployments.
 const supabaseUrl =
-  import.meta.env.DEV
-    ? `${window.location.origin}/supabase`
-    : import.meta.env.VITE_SUPABASE_URL;
+  import.meta.env.VITE_SUPABASE_URL ||
+  `${window.location.origin}/supabase`;
 
 const supabasePublishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-if (!supabaseUrl || !supabasePublishableKey) {
+if (!supabasePublishableKey) {
   throw new Error(
-    "Missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY environment variables"
+    "Missing VITE_SUPABASE_PUBLISHABLE_KEY environment variable"
   );
 }
 
