@@ -11,6 +11,7 @@ export function useRecommendedTemplateSelection(
 
   const [quickRead, setQuickRead] = useState<ApprovalMode>("auto_approve");
   const [quickWrite, setQuickWrite] = useState<ApprovalMode>("requires_approval");
+  const [quickEdit, setQuickEdit] = useState<ApprovalMode>("requires_approval");
   const [quickDelete, setQuickDelete] = useState<ApprovalMode>("requires_approval");
 
   const getApprovalMode = useCallback(
@@ -96,12 +97,14 @@ export function useRecommendedTemplateSelection(
             ? quickRead
             : op === "write"
               ? quickWrite
-              : quickDelete;
+              : op === "edit"
+                ? quickEdit
+                : quickDelete;
       }
       return next;
     });
     setSelectedIds(new Set(liveTemplates.map((t) => t.id)));
-  }, [liveTemplates, getOperationType, quickRead, quickWrite, quickDelete]);
+  }, [liveTemplates, getOperationType, quickRead, quickWrite, quickEdit, quickDelete]);
 
   return {
     selectedIds,
@@ -120,6 +123,8 @@ export function useRecommendedTemplateSelection(
     setQuickRead,
     quickWrite,
     setQuickWrite,
+    quickEdit,
+    setQuickEdit,
     quickDelete,
     setQuickDelete,
   };

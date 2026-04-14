@@ -31,6 +31,18 @@ func TestGitHubConnector_Actions(t *testing.T) {
 		"github.create_branch",
 		"github.get_file_contents",
 		"github.create_or_update_file",
+		"github.delete_branch",
+		"github.delete_file",
+		"github.remove_label",
+		"github.close_pr",
+		"github.update_issue",
+		"github.update_pr",
+		"github.get_issue",
+		"github.get_pr",
+		"github.list_issues",
+		"github.list_commits",
+		"github.remove_reviewer",
+		"github.delete_webhook",
 		"github.list_repos",
 		"github.get_repo",
 		"github.list_pull_requests",
@@ -126,8 +138,8 @@ func TestGitHubConnector_Manifest(t *testing.T) {
 	if m.Name != "GitHub" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "GitHub")
 	}
-	if len(m.Actions) != 20 {
-		t.Fatalf("Manifest().Actions has %d items, want 20", len(m.Actions))
+	if len(m.Actions) != 32 {
+		t.Fatalf("Manifest().Actions has %d items, want 32", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -138,6 +150,10 @@ func TestGitHubConnector_Manifest(t *testing.T) {
 		"github.add_reviewer", "github.create_release", "github.close_issue",
 		"github.add_label", "github.add_comment", "github.create_branch",
 		"github.get_file_contents", "github.create_or_update_file",
+		"github.delete_branch", "github.delete_file", "github.remove_label",
+		"github.close_pr", "github.update_issue", "github.update_pr",
+		"github.get_issue", "github.get_pr", "github.list_issues", "github.list_commits",
+		"github.remove_reviewer", "github.delete_webhook",
 		"github.list_repos", "github.get_repo", "github.list_pull_requests",
 		"github.trigger_workflow", "github.list_workflow_runs",
 		"github.create_webhook", "github.search_code", "github.search_issues",
