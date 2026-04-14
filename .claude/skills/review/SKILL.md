@@ -341,7 +341,7 @@ Summary format:
 
 - **Strictly read-only** — NEVER modify files, create branches, make commits, or push code. This skill only reads and comments.
 - **Use `COMMENT` event** — never `APPROVE` or `REQUEST_CHANGES`. The skill provides findings; humans make approval decisions.
-- **Don't invent problems** — only flag real, substantive issues. If a round has no findings, skip the review submission entirely for that round (no empty review comment) and move on. Padding reviews with nitpicks erodes trust.
+- **Don't invent problems** — only flag real, substantive issues. If a round has no findings, make a note internally and move on. Padding reviews with nitpicks erodes trust.
 - **Be specific** — every comment must explain what's wrong, WHY it matters (the consequence), and how to fix it. Suggest code when possible.
 - **Use dual-prefix format** — `**[Severity · Category]**` (e.g., `**[High · Architecture]**`) on every inline comment for scannability. Severity levels: Critical, High, Medium, Low.
 - **Read source files for context** — not just diff hunks. Many issues (DRY violations, architectural problems) are invisible without file-level context. For files over 500 lines, read diff hunks ±30 lines of context instead of the full file to avoid exhausting the context window.
