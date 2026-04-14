@@ -2,16 +2,17 @@ package connectors
 
 import "strings"
 
-// OperationType classifies connector actions for bulk template UX (read / write / delete).
+// OperationType classifies connector actions for bulk template UX (read / write / edit / delete).
 type OperationType string
 
 const (
 	OperationRead   OperationType = "read"
 	OperationWrite  OperationType = "write"
+	OperationEdit   OperationType = "edit"
 	OperationDelete OperationType = "delete"
 )
 
-// InferOperationType derives read/write/delete from the action_type suffix (after the first '.').
+// InferOperationType derives read/write/edit/delete from the action_type suffix (after the first '.').
 // Manifests may override via ManifestAction.OperationType; this is used when unset.
 func InferOperationType(actionType string) OperationType {
 	dot := strings.IndexByte(actionType, '.')
@@ -31,6 +32,9 @@ func InferOperationType(actionType string) OperationType {
 		}
 		if readVerbs[seg] {
 			return OperationRead
+		}
+		if editVerbs[seg] {
+			return OperationEdit
 		}
 		if writeVerbs[seg] {
 			return OperationWrite
@@ -70,15 +74,24 @@ var deleteVerbs = map[string]bool{
 	"unfollow":  true,
 	"unlike":    true,
 	"unretweet": true,
+	"unpin":     true,
+}
+
+// editVerbs covers modifying existing resources without necessarily creating new ones.
+var editVerbs = map[string]bool{
+	"update": true,
+	"set":    true,
+	"rename": true,
+	"edit":   true,
+	"modify": true,
+	"patch":  true,
+	"put":    true,
 }
 
 var writeVerbs = map[string]bool{
 	"create":     true,
-	"update":     true,
 	"send":       true,
 	"post":       true,
-	"put":        true,
-	"patch":      true,
 	"add":        true,
 	"merge":      true,
 	"trigger":    true,
@@ -89,7 +102,6 @@ var writeVerbs = map[string]bool{
 	"transition": true,
 	"assign":     true,
 	"invite":     true,
-	"set":        true,
 	"schedule":   true,
 	"fulfill":    true,
 	"enroll":     true,

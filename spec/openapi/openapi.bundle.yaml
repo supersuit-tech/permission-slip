@@ -7901,11 +7901,12 @@ components:
           enum:
             - read
             - write
+            - edit
             - delete
           description: |
             High-level classification for bulk template setup and grouping in the UI.
-            Derived from verb-based action naming (e.g. list/get → read, create/update → write,
-            delete/cancel → delete) unless overridden in the connector manifest.
+            Derived from verb-based action naming (e.g. list/get → read, create → write,
+            update/set/rename → edit, delete/cancel → delete) unless overridden in the connector manifest.
         name:
           type: string
           maxLength: 256

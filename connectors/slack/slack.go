@@ -60,6 +60,8 @@ var OAuthScopes = []string{
 	"search:read",
 	"users:read",
 	"users:read.email",
+	"pins:read",
+	"pins:write",
 }
 
 // SlackConnector owns the shared HTTP client and base URL used by all
@@ -103,11 +105,18 @@ func (c *SlackConnector) Actions() map[string]connectors.Action {
 		"slack.invite_to_channel":     &inviteToChannelAction{conn: c},
 		"slack.upload_file":           &uploadFileAction{conn: c},
 		"slack.add_reaction":          &addReactionAction{conn: c},
+		"slack.remove_reaction":       &removeReactionAction{conn: c},
 		"slack.send_dm":               &sendDMAction{conn: c},
 		"slack.update_message":        &updateMessageAction{conn: c},
 		"slack.delete_message":        &deleteMessageAction{conn: c},
 		"slack.list_users":            &listUsersAction{conn: c},
 		"slack.search_messages":       &searchMessagesAction{conn: c},
+		"slack.archive_channel":       &archiveChannelAction{conn: c},
+		"slack.rename_channel":        &renameChannelAction{conn: c},
+		"slack.remove_from_channel":   &removeFromChannelAction{conn: c},
+		"slack.get_user_profile":      &getUserProfileAction{conn: c},
+		"slack.pin_message":           &pinMessageAction{conn: c},
+		"slack.unpin_message":         &unpinMessageAction{conn: c},
 	}
 }
 

@@ -34,11 +34,18 @@ func TestSlackConnector_Actions(t *testing.T) {
 		"slack.invite_to_channel",
 		"slack.upload_file",
 		"slack.add_reaction",
+		"slack.remove_reaction",
 		"slack.send_dm",
 		"slack.update_message",
 		"slack.delete_message",
 		"slack.list_users",
 		"slack.search_messages",
+		"slack.archive_channel",
+		"slack.rename_channel",
+		"slack.remove_from_channel",
+		"slack.get_user_profile",
+		"slack.pin_message",
+		"slack.unpin_message",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -106,8 +113,8 @@ func TestSlackConnector_Manifest(t *testing.T) {
 	if m.Name != "Slack" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Slack")
 	}
-	if len(m.Actions) != 15 {
-		t.Fatalf("Manifest().Actions has %d items, want 15", len(m.Actions))
+	if len(m.Actions) != 22 {
+		t.Fatalf("Manifest().Actions has %d items, want 22", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -117,9 +124,11 @@ func TestSlackConnector_Manifest(t *testing.T) {
 		"slack.send_message", "slack.create_channel", "slack.list_channels",
 		"slack.read_channel_messages", "slack.read_thread",
 		"slack.schedule_message", "slack.set_topic", "slack.invite_to_channel",
-		"slack.upload_file", "slack.add_reaction",
+		"slack.upload_file", "slack.add_reaction", "slack.remove_reaction",
 		"slack.send_dm", "slack.update_message", "slack.delete_message",
 		"slack.list_users", "slack.search_messages",
+		"slack.archive_channel", "slack.rename_channel", "slack.remove_from_channel",
+		"slack.get_user_profile", "slack.pin_message", "slack.unpin_message",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)

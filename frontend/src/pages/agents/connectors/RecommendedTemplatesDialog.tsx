@@ -39,6 +39,7 @@ export interface RecommendedTemplatesDialogProps {
 const operationSectionTitle: Record<OperationTypeUI, string> = {
   read: "Read actions",
   write: "Write actions",
+  edit: "Edit actions",
   delete: "Delete actions",
 };
 
@@ -106,12 +107,14 @@ export function RecommendedTemplatesDialog({
     setQuickRead,
     quickWrite,
     setQuickWrite,
+    quickEdit,
+    setQuickEdit,
     quickDelete,
     setQuickDelete,
   } = useRecommendedTemplateSelection(liveTemplates, getOperationType);
 
   const groupedByOperation = useMemo(() => {
-    const opOrder: OperationTypeUI[] = ["read", "write", "delete"];
+    const opOrder: OperationTypeUI[] = ["read", "write", "edit", "delete"];
     const firstActionIndex = new Map<string, number>();
     actions.forEach((a, i) => {
       if (!firstActionIndex.has(a.action_type)) {
@@ -265,9 +268,11 @@ export function RecommendedTemplatesDialog({
             <QuickSetupPanel
               quickRead={quickRead}
               quickWrite={quickWrite}
+              quickEdit={quickEdit}
               quickDelete={quickDelete}
               onQuickReadChange={setQuickRead}
               onQuickWriteChange={setQuickWrite}
+              onQuickEditChange={setQuickEdit}
               onQuickDeleteChange={setQuickDelete}
               onApply={handleQuickApply}
               disabled={anyPending}

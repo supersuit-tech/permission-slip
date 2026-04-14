@@ -36,7 +36,7 @@ type ConnectorActionOpts struct {
 	Description      *string
 	RiskLevel        *string
 	ParametersSchema []byte  // raw JSON
-	OperationType    *string // read, write, delete — defaults to write when nil
+	OperationType    *string // read, write, edit, delete — defaults to write when nil
 }
 
 // InsertConnectorActionFull creates an action with full details for the given connector.

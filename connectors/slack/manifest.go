@@ -22,10 +22,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
-				ActionType:  "slack.send_message",
-				Name:        "Send Message",
-				Description: "Send a message to a Slack channel as the authorizing user.",
-				RiskLevel:   "low",
+				ActionType:      "slack.send_message",
+				Name:            "Send Message",
+				Description:     "Send a message to a Slack channel as the authorizing user.",
+				RiskLevel:       "low",
 				DisplayTemplate: "Send message to {{channel_name}}",
 				Preview: &connectors.ActionPreview{
 					Layout: "message",
@@ -56,10 +56,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.create_channel",
-				Name:        "Create Channel",
-				Description: "Create a new Slack channel",
-				RiskLevel:   "medium",
+				ActionType:      "slack.create_channel",
+				Name:            "Create Channel",
+				Description:     "Create a new Slack channel",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create channel #{{name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -80,10 +80,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.list_channels",
-				Name:        "List Channels",
-				Description: "List Slack channels via conversations.list, merged with the authorizing user's DMs and private conversations from users.conversations when a matching profile email is available. Returns all channel types (public, private, group DMs, DMs) by default when email is set.",
-				RiskLevel:   "low",
+				ActionType:      "slack.list_channels",
+				Name:            "List Channels",
+				Description:     "List Slack channels via conversations.list, merged with the authorizing user's DMs and private conversations from users.conversations when a matching profile email is available. Returns all channel types (public, private, group DMs, DMs) by default when email is set.",
+				RiskLevel:       "low",
 				DisplayTemplate: "List Slack channels",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -116,10 +116,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.read_channel_messages",
-				Name:        "Read Channel Messages",
-				Description: "Read recent messages from a Slack channel, DM (D…), or group DM (G…).",
-				RiskLevel:   "low",
+				ActionType:      "slack.read_channel_messages",
+				Name:            "Read Channel Messages",
+				Description:     "Read recent messages from a Slack channel, DM (D…), or group DM (G…).",
+				RiskLevel:       "low",
 				DisplayTemplate: "Read messages from {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -164,10 +164,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.read_thread",
-				Name:        "Read Thread",
-				Description: "Read replies in a Slack thread. For threads in DMs or group DMs, uses the authorizing user's OAuth token when available.",
-				RiskLevel:   "low",
+				ActionType:      "slack.read_thread",
+				Name:            "Read Thread",
+				Description:     "Read replies in a Slack thread. For threads in DMs or group DMs, uses the authorizing user's OAuth token when available.",
+				RiskLevel:       "low",
 				DisplayTemplate: "Read thread in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -205,10 +205,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.schedule_message",
-				Name:        "Schedule Message",
-				Description: "Schedule a message for future delivery to a Slack channel as the authorizing user.",
-				RiskLevel:   "low",
+				ActionType:      "slack.schedule_message",
+				Name:            "Schedule Message",
+				Description:     "Schedule a message for future delivery to a Slack channel as the authorizing user.",
+				RiskLevel:       "low",
 				DisplayTemplate: "Schedule message to {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -241,10 +241,11 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.set_topic",
-				Name:        "Set Topic",
-				Description: "Update a Slack channel's topic",
-				RiskLevel:   "medium",
+				ActionType:      "slack.set_topic",
+				OperationType:   "edit",
+				Name:            "Set Topic",
+				Description:     "Update a Slack channel's topic",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Set topic in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -271,10 +272,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.invite_to_channel",
-				Name:        "Invite to Channel",
-				Description: "Invite one or more users to a Slack channel",
-				RiskLevel:   "medium",
+				ActionType:      "slack.invite_to_channel",
+				Name:            "Invite to Channel",
+				Description:     "Invite one or more users to a Slack channel",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Invite users to {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -309,10 +310,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.upload_file",
-				Name:        "Upload File",
-				Description: "Upload a file to a Slack channel",
-				RiskLevel:   "low",
+				ActionType:      "slack.upload_file",
+				Name:            "Upload File",
+				Description:     "Upload a file to a Slack channel",
+				RiskLevel:       "low",
 				DisplayTemplate: "Upload file to {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -349,10 +350,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.add_reaction",
-				Name:        "Add Reaction",
-				Description: "Add an emoji reaction to a Slack message",
-				RiskLevel:   "low",
+				ActionType:      "slack.add_reaction",
+				Name:            "Add Reaction",
+				Description:     "Add an emoji reaction to a Slack message",
+				RiskLevel:       "low",
 				DisplayTemplate: "Add reaction in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -384,10 +385,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.send_dm",
-				Name:        "Send Direct Message",
-				Description: "Send a direct message to a Slack user as the authorizing user.",
-				RiskLevel:   "low",
+				ActionType:      "slack.send_dm",
+				Name:            "Send Direct Message",
+				Description:     "Send a direct message to a Slack user as the authorizing user.",
+				RiskLevel:       "low",
 				DisplayTemplate: "Send DM to {{user_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -415,10 +416,11 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.update_message",
-				Name:        "Update Message",
-				Description: "Edit an existing message you are allowed to change.",
-				RiskLevel:   "medium",
+				ActionType:      "slack.update_message",
+				OperationType:   "edit",
+				Name:            "Update Message",
+				Description:     "Edit an existing message you are allowed to change.",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Edit message in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -450,10 +452,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.delete_message",
-				Name:        "Delete Message",
-				Description: "Delete a message you are allowed to remove.",
-				RiskLevel:   "high",
+				ActionType:      "slack.delete_message",
+				Name:            "Delete Message",
+				Description:     "Delete a message you are allowed to remove.",
+				RiskLevel:       "high",
 				DisplayTemplate: "Delete message in {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -480,10 +482,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.list_users",
-				Name:        "List Users",
-				Description: "List workspace users visible to the authorizing user",
-				RiskLevel:   "low",
+				ActionType:      "slack.list_users",
+				Name:            "List Users",
+				Description:     "List workspace users visible to the authorizing user",
+				RiskLevel:       "low",
 				DisplayTemplate: "List Slack users",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -503,10 +505,10 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "slack.search_messages",
-				Name:        "Search Messages",
-				Description: "Search messages across Slack channels (requires search:read)",
-				RiskLevel:   "low",
+				ActionType:      "slack.search_messages",
+				Name:            "Search Messages",
+				Description:     "Search messages across Slack channels (requires search:read)",
+				RiskLevel:       "low",
 				DisplayTemplate: "Search Slack for {{query}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -533,6 +535,214 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"description": "Sort order: score (relevance) or timestamp",
 							"x-ui": {"label": "Sort by", "help_text": "Sort results by relevance (score) or date (timestamp)"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "slack.remove_reaction",
+				Name:            "Remove Reaction",
+				Description:     "Remove an emoji reaction from a message (reactions.remove).",
+				RiskLevel:       "low",
+				DisplayTemplate: "Remove reaction in {{channel_name}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel", "name"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID containing the message (e.g. C01234567)",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
+								"help_text": "Choose a channel or enter an ID."
+							}
+						},
+						"timestamp": {
+							"type": "string",
+							"description": "Timestamp of the message (e.g. 1234567890.123456)",
+							"x-ui": {"hidden": true}
+						},
+						"name": {
+							"type": "string",
+							"description": "Emoji name without colons (e.g. thumbsup)",
+							"x-ui": {"label": "Emoji", "placeholder": "thumbsup"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "slack.archive_channel",
+				Name:            "Archive Channel",
+				Description:     "Archive a Slack channel (conversations.archive).",
+				RiskLevel:       "high",
+				DisplayTemplate: "Archive {{channel_name}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID to archive",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)"
+							}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "slack.rename_channel",
+				OperationType:   "edit",
+				Name:            "Rename Channel",
+				Description:     "Rename a Slack channel (conversations.rename).",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Rename {{channel_name}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel", "name"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID to rename",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)"
+							}
+						},
+						"name": {
+							"type": "string",
+							"description": "New channel name (lowercase, no spaces)",
+							"x-ui": {"placeholder": "new-channel-name"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "slack.remove_from_channel",
+				Name:            "Remove from Channel",
+				Description:     "Remove a user from a channel (conversations.kick).",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Remove user from {{channel_name}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel", "user"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)"
+							}
+						},
+						"user": {
+							"type": "string",
+							"description": "User ID to remove (e.g. U01234567)",
+							"x-ui": {
+								"widget": "remote-select",
+								"label": "User",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/users",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "User ID (e.g. U01234567)"
+							}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "slack.get_user_profile",
+				Name:            "Get User Profile",
+				Description:     "Fetch a workspace user's profile (users.info).",
+				RiskLevel:       "low",
+				DisplayTemplate: "Get Slack profile for user",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["user_id"],
+					"properties": {
+						"user_id": {
+							"type": "string",
+							"description": "Slack user ID (e.g. U01234567)",
+							"x-ui": {
+								"widget": "remote-select",
+								"label": "User",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/users",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "User ID (e.g. U01234567)"
+							}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "slack.pin_message",
+				Name:            "Pin Message",
+				Description:     "Pin a message in a channel (pins.add).",
+				RiskLevel:       "low",
+				DisplayTemplate: "Pin message in {{channel_name}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel", "ts"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)"
+							}
+						},
+						"ts": {
+							"type": "string",
+							"description": "Message timestamp to pin",
+							"x-ui": {"hidden": true}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "slack.unpin_message",
+				Name:            "Unpin Message",
+				Description:     "Unpin a message in a channel (pins.remove).",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Unpin message in {{channel_name}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel", "ts"],
+					"properties": {
+						"channel": {
+							"type": "string",
+							"description": "Channel ID",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)"
+							}
+						},
+						"ts": {
+							"type": "string",
+							"description": "Message timestamp to unpin",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -658,6 +868,76 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Search messages",
 				Description: "Agent can search messages across channels.",
 				Parameters:  json.RawMessage(`{"query":"*","count":"*","page":"*","sort":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_read_channel_scoped",
+				ActionType:  "slack.read_channel_messages",
+				Name:        "Read one channel only",
+				Description: "Locks channel ID — agent can only read messages from that channel.",
+				Parameters:  json.RawMessage(`{"channel":"C01234567","limit":"*","oldest":"*","latest":"*","cursor":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_send_dm_scoped",
+				ActionType:  "slack.send_dm",
+				Name:        "DM one user only",
+				Description: "Locks recipient user ID — agent can only DM that user.",
+				Parameters:  json.RawMessage(`{"user_id":"U01234567","message":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_create_channel_private",
+				ActionType:  "slack.create_channel",
+				Name:        "Create private channels only",
+				Description: "Agent can create channels but they must be private.",
+				Parameters:  json.RawMessage(`{"name":"*","is_private":true}`),
+			},
+			{
+				ID:          "tpl_slack_remove_reaction",
+				ActionType:  "slack.remove_reaction",
+				Name:        "Remove reactions",
+				Description: "Agent can remove emoji reactions from messages.",
+				Parameters:  json.RawMessage(`{"channel":"*","timestamp":"*","name":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_archive_channel",
+				ActionType:  "slack.archive_channel",
+				Name:        "Archive channels",
+				Description: "Agent can archive Slack channels.",
+				Parameters:  json.RawMessage(`{"channel":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_rename_channel",
+				ActionType:  "slack.rename_channel",
+				Name:        "Rename channels",
+				Description: "Agent can rename channels.",
+				Parameters:  json.RawMessage(`{"channel":"*","name":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_remove_from_channel",
+				ActionType:  "slack.remove_from_channel",
+				Name:        "Remove users from channels",
+				Description: "Agent can remove users from channels.",
+				Parameters:  json.RawMessage(`{"channel":"*","user":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_get_user_profile",
+				ActionType:  "slack.get_user_profile",
+				Name:        "Read user profiles",
+				Description: "Agent can fetch Slack user profiles by user ID.",
+				Parameters:  json.RawMessage(`{"user_id":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_pin_message",
+				ActionType:  "slack.pin_message",
+				Name:        "Pin messages",
+				Description: "Agent can pin messages in channels.",
+				Parameters:  json.RawMessage(`{"channel":"*","ts":"*"}`),
+			},
+			{
+				ID:          "tpl_slack_unpin_message",
+				ActionType:  "slack.unpin_message",
+				Name:        "Unpin messages",
+				Description: "Agent can unpin messages in channels.",
+				Parameters:  json.RawMessage(`{"channel":"*","ts":"*"}`),
 			},
 		},
 	}
