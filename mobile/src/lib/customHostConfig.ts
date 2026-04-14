@@ -11,8 +11,13 @@ let cachedHost: string | null = null;
 let cachedSecret: string | null = null;
 
 /**
- * Hydrate the in-memory cache from SecureStore. Call once at app startup
- * before creating the API client.
+ * Hydrate the in-memory cache from SecureStore during app startup
+ * (see `App.tsx`, which gates rendering on this promise). The API client
+ * in `client.ts` is constructed at module import — well before `App`
+ * runs — so the middleware synchronously reads this in-memory cache via
+ * `getCustomHost()` / `getGatewaySecret()` on each request. Blocking UI
+ * render until hydration completes is what prevents the first request
+ * from firing before the cache is populated.
  */
 export async function loadCustomHostConfig(): Promise<void> {
   cachedHost = (await SecureStore.getItemAsync(CUSTOM_HOST_KEY)) ?? null;
