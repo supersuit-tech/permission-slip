@@ -11,8 +11,8 @@ Before deploying, you'll need:
 | Service | Purpose | Notes |
 |---|---|---|
 | **PostgreSQL 16+** | Application database | Any managed provider works (Supabase, Neon, AWS RDS, self-hosted) |
-| **Supabase project** | User authentication (JWT-based) | Free tier is sufficient. Provides login, MFA, and JWT verification |
-| **Docker** (optional) | Container-based deployment | Only needed if deploying via Docker |
+| **Supabase** | User authentication (JWT-based) | Cloud (free tier) **or** local via `supabase start` — no account needed |
+| **Docker** (optional) | Container-based deployment | Required for local Supabase; optional otherwise |
 
 ## Architecture Overview
 
@@ -35,6 +35,7 @@ Before deploying, you'll need:
 The server handles everything on a single port:
 - API endpoints under `/api/v1/`
 - Health check at `/api/health`
+- Supabase Auth reverse proxy at `/supabase/auth/v1/*` (forwards to `SUPABASE_URL`)
 - React SPA for all other routes
 - Database migrations run automatically on startup
 
@@ -59,6 +60,45 @@ Permission Slip uses [Supabase Auth](https://supabase.com/auth) for user authent
 | **Session timeouts** | Authentication > Sessions | Set timebox and inactivity timeout per your security policy |
 
 > **Note:** You can use Supabase's hosted database as your `DATABASE_URL` too, or use a separate PostgreSQL instance. Either works.
+
+### Alternative: Local Supabase (no cloud account)
+
+If you prefer to run everything locally with zero external accounts, you can use the Supabase CLI to run the full auth stack in Docker:
+
+```bash
+# Clone the repo (contains supabase/config.toml)
+git clone https://github.com/supersuit-tech/permission-slip.git
+cd permission-slip
+
+# Generate a vault encryption key (appends to .env if the key isn't already set)
+grep -q "^VAULT_SECRET_KEY=" .env 2>/dev/null || echo "VAULT_SECRET_KEY=$(openssl rand -hex 32)" >> .env
+
+# Start local Supabase (pulls Docker images on first run)
+supabase start
+
+# Get credentials
+supabase status
+```
+
+This gives you PostgreSQL, Auth (GoTrue), Vault, and Inbucket (email capture) — all running locally. Use the credentials from `supabase status`:
+
+| `supabase status` field | Environment variable | Example |
+|---|---|---|
+| DB URL | `DATABASE_URL` | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
+| API URL | `SUPABASE_URL` | `http://127.0.0.1:54321` |
+| anon key | `VITE_SUPABASE_PUBLISHABLE_KEY` | `eyJhbGci...` |
+
+**Built-in Supabase proxy:** The Go server includes a reverse proxy at `/supabase/auth/v1/*` that forwards Supabase Auth requests to `SUPABASE_URL`. When `VITE_SUPABASE_URL` is omitted at build time, the frontend uses this proxy automatically. This means:
+- No need to expose Supabase ports to the network
+- No CORS configuration needed
+- The frontend works regardless of hostname or IP changes
+- Only port 8080 needs to be reachable
+
+The proxy is deliberately narrow — it **only forwards `/auth/v1/*`** (the Supabase Auth surface, which is all the frontend uses). Requests for other Supabase surfaces (`/rest/v1/`, `/storage/v1/`, `/realtime/v1/`, `/functions/v1/`) return 404. This prevents the proxy from being usable as an open HTTP relay into arbitrary upstream paths.
+
+**Auth emails** are captured by Inbucket at `http://localhost:54324` (no real emails are sent). Check Inbucket for OTP verification codes during signup and login.
+
+> For a complete step-by-step guide with systemd services, notifications, and internet exposure, see the **[Raspberry Pi Quickstart](raspberry-pi-quickstart.md)** — it works on any Linux machine, not just Pis.
 
 ## Step 2: Set Up PostgreSQL
 
@@ -111,11 +151,13 @@ These are inlined into the JavaScript bundle by Vite at build time. They must be
 
 | Variable | Description | Example |
 |---|---|---|
-| `VITE_SUPABASE_URL` | Supabase project URL (frontend auth) | `https://abcdefgh.supabase.co` |
-| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key | From Supabase dashboard |
+| `VITE_SUPABASE_URL` | Supabase project URL (frontend auth). **Optional** — when omitted, the frontend uses the built-in `/supabase` reverse proxy (see below). | `https://abcdefgh.supabase.co` |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase publishable key | From Supabase dashboard or `supabase status` |
 | `VITE_SENTRY_DSN` | Frontend error tracking (optional) | `https://key@o0.ingest.sentry.io/0` |
 
 > The publishable key is safe to include in the build — it's a public key visible in client-side JavaScript by design. (Supabase previously called this the "anon key.")
+
+**Supabase reverse proxy:** The Go server proxies `/supabase/auth/v1/*` to `SUPABASE_URL` at runtime. When `VITE_SUPABASE_URL` is omitted from the build, the frontend automatically uses this proxy. Only the Supabase Auth surface is forwarded — other Supabase surfaces (rest, storage, realtime, functions) return 404 to prevent the proxy from being used as an open HTTP relay. This is the recommended approach for self-hosted deployments because it eliminates hostname/IP dependencies in the frontend build and avoids CORS issues. Cloud Supabase deployments should still set `VITE_SUPABASE_URL` for direct browser-to-Supabase communication.
 
 ### Web Push Notifications (VAPID)
 
@@ -455,7 +497,7 @@ Migrations run automatically on startup. If they fail, check database connectivi
 |---|---|---|---|
 | `DATABASE_URL` | Yes | Runtime | PostgreSQL connection string |
 | `SUPABASE_URL` | Yes | Runtime | Supabase project URL (JWT + auth) |
-| `VITE_SUPABASE_URL` | Yes | Build | Supabase URL for frontend auth |
+| `VITE_SUPABASE_URL` | No | Build | Supabase URL for frontend auth (omit for self-hosted — uses built-in proxy) |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Yes | Build | Supabase publishable key |
 | `BASE_URL` | Recommended | Runtime | Public deployment URL |
 | `ALLOWED_ORIGINS` | Recommended | Runtime | CORS allowed origins (comma-separated, exact match, no trailing slash). Same-origin only when unset. |
