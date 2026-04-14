@@ -29,6 +29,7 @@ import { AddActionConfigDialog } from "./AddActionConfigDialog";
 import { EditActionConfigDialog } from "./EditActionConfigDialog";
 import { DeleteActionConfigDialog } from "./DeleteActionConfigDialog";
 import { RecommendedTemplatesDialog } from "./RecommendedTemplatesDialog";
+import { templateIsApplied } from "./templateMatching";
 
 interface ActionConfigurationsSectionProps {
   agentId: number;
@@ -74,7 +75,11 @@ export function ActionConfigurationsSection({
   );
   const hasRecommendedTemplates =
     !templatesLoading &&
-    templates.some((t) => actionTypeSet.has(t.action_type));
+    templates.some(
+      (t) =>
+        actionTypeSet.has(t.action_type) &&
+        !templateIsApplied(t, configs),
+    );
 
   const hasWildcardConfig = configs.some(
     (c) => c.action_type === WILDCARD_ACTION_TYPE,
@@ -268,6 +273,7 @@ export function ActionConfigurationsSection({
         agentId={agentId}
         connectorId={connectorId}
         actions={actions}
+        existingConfigs={configs}
         onCustomize={(template, approvalMode) => {
           openAddDialog(template, approvalMode);
         }}
