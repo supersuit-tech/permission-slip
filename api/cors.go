@@ -51,7 +51,7 @@ func CORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 			// to the next handler so application-level OPTIONS endpoints still work.
 			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
 				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, X-Gateway-Secret")
 				w.Header().Set("Access-Control-Max-Age", "86400")
 				w.WriteHeader(http.StatusNoContent)
 				return

@@ -24,6 +24,7 @@ import { useUpdateNotificationPreferences } from "../../hooks/useUpdateNotificat
 import Constants from "expo-constants";
 import { useDeleteAccount } from "../../hooks/useDeleteAccount";
 import { colors } from "../../theme/colors";
+import CustomServerSettings from "./CustomServerSettings";
 
 const GIT_COMMIT_HASH: string =
   (Constants.expoConfig?.extra?.gitCommitHash as string) ?? "unknown";
@@ -189,6 +190,14 @@ export default function SettingsScreen(_props: Props) {
             <Text style={styles.destructiveActionText}>Delete Account</Text>
           )}
         </TouchableOpacity>
+      </View>
+
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Server</Text>
+        <Text style={styles.sectionDescription}>
+          Connect to a self-hosted Permission Slip instance.
+        </Text>
+        <CustomServerSettings />
       </View>
 
       <View style={styles.section}>
