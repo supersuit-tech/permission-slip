@@ -7,12 +7,8 @@
 //
 // # Context JSON contract
 //
-// The Approval.Context field must be a JSON object with these optional keys:
-//
-//	{
-//	    "execution_count": 3,    // int — how many times the standing approval has been used
-//	    "max_executions": 10     // int — total allowed uses (0 = unlimited)
-//	}
+// The Approval.Context field may be empty or a JSON object with optional keys
+// for future extensions. Execution quotas are not tracked in notifications.
 //
 // The Approval.Action field should contain the standard action JSON with a
 // "type" key and optional "parameters" object. Parameter values are included
@@ -36,59 +32,18 @@ import (
 	"time"
 )
 
-// standingExecutionInfo holds the fields extracted from the Context JSON
+// standingExecutionInfo holds the fields extracted from the approval payload
 // for a standing approval execution notification.
 type standingExecutionInfo struct {
-	ExecutionCount int    // how many times the standing approval has been used
-	MaxExecutions  int    // total allowed executions (0 = unlimited)
-	AgentName      string // resolved display name
-	ActionType     string // e.g. "github.issues.create"
+	AgentName  string // resolved display name
+	ActionType string // e.g. "github.issues.create"
 }
 
-// extractStandingExecutionInfo extracts execution metadata from the
-// approval's Action and Context JSON. The Context is expected to contain
-// "execution_count" and "max_executions" integers.
 func extractStandingExecutionInfo(approval Approval) standingExecutionInfo {
-	info := standingExecutionInfo{
+	return standingExecutionInfo{
 		AgentName:  AgentDisplayName(approval.AgentName, approval.AgentID),
 		ActionType: extractActionType(approval.Action),
 	}
-
-	if len(approval.Context) == 0 {
-		return info
-	}
-
-	var ctx map[string]json.RawMessage
-	if json.Unmarshal(approval.Context, &ctx) != nil {
-		return info
-	}
-
-	if raw, ok := ctx["execution_count"]; ok {
-		var n int
-		if json.Unmarshal(raw, &n) == nil {
-			info.ExecutionCount = n
-		}
-	}
-	if raw, ok := ctx["max_executions"]; ok {
-		var n int
-		if json.Unmarshal(raw, &n) == nil {
-			info.MaxExecutions = n
-		}
-	}
-
-	return info
-}
-
-// executionCountLabel returns a human-readable execution count string
-// like "3 of 10" or "3" (when unlimited).
-func (info standingExecutionInfo) executionCountLabel() string {
-	if info.MaxExecutions > 0 && info.ExecutionCount > 0 {
-		return fmt.Sprintf("%d of %d", info.ExecutionCount, info.MaxExecutions)
-	}
-	if info.ExecutionCount > 0 {
-		return fmt.Sprintf("%d", info.ExecutionCount)
-	}
-	return ""
 }
 
 // buildStandingExecutionPushContent constructs push notification content for
@@ -101,9 +56,6 @@ func buildStandingExecutionPushContent(approval Approval) PushContent {
 	body := info.ActionType
 	if body == "" {
 		body = "an action"
-	}
-	if info.ExecutionCount > 0 {
-		body = fmt.Sprintf("%s (#%d)", body, info.ExecutionCount)
 	}
 
 	return PushContent{
@@ -204,7 +156,7 @@ func buildStandingExecutionSubject(approval Approval) string {
 }
 
 // buildStandingExecutionPlainBody returns the plain-text email body with
-// agent name, action type, parameter summary, execution count, and timestamp.
+// agent name, action type, parameter summary, and timestamp.
 func buildStandingExecutionPlainBody(approval Approval) string {
 	info := extractStandingExecutionInfo(approval)
 
@@ -220,10 +172,6 @@ func buildStandingExecutionPlainBody(approval Approval) string {
 		b.WriteString(fmt.Sprintf("Parameters: %s\n", paramSummary))
 	}
 
-	if countLabel := info.executionCountLabel(); countLabel != "" {
-		b.WriteString(fmt.Sprintf("Executions: %s\n", countLabel))
-	}
-
 	b.WriteString(fmt.Sprintf("Time: %s\n", approval.CreatedAt.UTC().Format(time.RFC1123)))
 
 	if approval.ApprovalURL != "" {
@@ -236,7 +184,7 @@ func buildStandingExecutionPlainBody(approval Approval) string {
 }
 
 // formatStandingExecutionSMS builds a concise SMS for a standing approval
-// execution. Format: "[AgentName] ran [action_type] (3 of 10 uses). View: [url]"
+// execution. Format: "[AgentName] ran [action_type]. View: [url]"
 func formatStandingExecutionSMS(a Approval) string {
 	info := extractStandingExecutionInfo(a)
 
@@ -246,10 +194,6 @@ func formatStandingExecutionSMS(a Approval) string {
 	}
 
 	msg := fmt.Sprintf("[Permission Slip] %s ran %s", info.AgentName, actionPart)
-
-	if countLabel := info.executionCountLabel(); countLabel != "" {
-		msg += fmt.Sprintf(" (%s uses)", countLabel)
-	}
 
 	if a.ApprovalURL != "" {
 		return fmt.Sprintf("%s. View: %s", msg, a.ApprovalURL)
@@ -281,9 +225,6 @@ func buildStandingExecutionHTMLBody(approval Approval) string {
 	}
 	if paramSummary := summarizeParameters(approval.Action); paramSummary != "" {
 		b.WriteString(emailDetailRow("Parameters", html.EscapeString(paramSummary)))
-	}
-	if countLabel := info.executionCountLabel(); countLabel != "" {
-		b.WriteString(emailDetailRow("Executions", html.EscapeString(countLabel)))
 	}
 	b.WriteString(emailDetailRow("Time", html.EscapeString(approval.CreatedAt.UTC().Format(time.RFC1123))))
 	b.WriteString(`</table>`)

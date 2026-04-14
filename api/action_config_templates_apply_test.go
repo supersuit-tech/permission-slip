@@ -205,9 +205,6 @@ func TestApplyActionConfigTemplate_ApprovalModeAutoApprove_OverridesPlainTemplat
 	if resp.StandingApproval.ExpiresAt != nil {
 		t.Fatal("expected nil expires_at (sensible default: no expiry)")
 	}
-	if resp.StandingApproval.MaxExecutions != nil {
-		t.Fatal("expected nil max_executions (sensible default: unlimited)")
-	}
 }
 
 func TestApplyActionConfigTemplate_ApprovalModeRequiresApproval_OverridesStandingTemplate(t *testing.T) {

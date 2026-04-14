@@ -47,9 +47,8 @@ type agentRequestApprovalResponse struct {
 	// ── Auto-approved fields (status="approved") ──
 	// Present only when a standing approval matched and the action was
 	// executed immediately. No polling needed — the result is inline.
-	Result              *json.RawMessage `json:"result,omitempty"`              // Connector execution output (may be null if connector returns no data).
-	StandingApprovalID  string           `json:"standing_approval_id,omitempty"` // Which standing approval authorized this execution (useful for audit tracking).
-	ExecutionsRemaining *int             `json:"executions_remaining,omitempty"` // Remaining uses of this standing approval; absent = unlimited.
+	Result             *json.RawMessage `json:"result,omitempty"`               // Connector execution output (may be null if connector returns no data).
+	StandingApprovalID string           `json:"standing_approval_id,omitempty"` // Which standing approval authorized this execution (useful for audit tracking).
 }
 
 type agentCancelApprovalResponse struct {

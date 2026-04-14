@@ -142,7 +142,6 @@ LinkedStandingApprovalSummary:
     - standing_approval_id
     - action_type
     - status
-    - execution_count
   properties:
     standing_approval_id:
       type: string
@@ -158,15 +157,6 @@ LinkedStandingApprovalSummary:
       format: date-time
       nullable: true
       description: When the standing approval expires, or null if it lasts until revoked.
-    max_executions:
-      type: integer
-      nullable: true
-      minimum: 1
-      description: Execution cap, if any.
-    execution_count:
-      type: integer
-      minimum: 0
-      description: Executions recorded so far.
 
 CreateActionConfigRequest:
   type: object

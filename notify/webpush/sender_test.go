@@ -103,7 +103,7 @@ func TestBuildBody_StandingExecution(t *testing.T) {
 		ApprovalID:  "appr_standing_001",
 		AgentName:   "Deploy Bot",
 		Action:      json.RawMessage(`{"type":"github.issues.create"}`),
-		Context:     json.RawMessage(`{"execution_count":3,"max_executions":10}`),
+		Context:     json.RawMessage(`{}`),
 		ApprovalURL: "https://app.test/activity",
 		Type:        notify.NotificationTypeStandingExecution,
 	}
@@ -112,8 +112,8 @@ func TestBuildBody_StandingExecution(t *testing.T) {
 	if body.Title != "Deploy Bot auto-executed" {
 		t.Errorf("expected title 'Deploy Bot auto-executed', got %q", body.Title)
 	}
-	if body.Body != "github.issues.create (#3)" {
-		t.Errorf("expected body 'github.issues.create (#3)', got %q", body.Body)
+	if body.Body != "github.issues.create" {
+		t.Errorf("expected body 'github.issues.create', got %q", body.Body)
 	}
 	if body.URL != "https://app.test/activity" {
 		t.Errorf("expected activity URL, got %q", body.URL)

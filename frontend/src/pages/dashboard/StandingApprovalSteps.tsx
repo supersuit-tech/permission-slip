@@ -190,47 +190,18 @@ export function StepConstraints({
 }
 
 export function StepLimits({
-  maxExecutions,
-  onMaxExecutionsChange,
   expiresAt,
   onExpiresAtChange,
-  currentExecutionCount,
   noExpiry,
   onNoExpiryChange,
 }: {
-  maxExecutions: string;
-  onMaxExecutionsChange: (value: string) => void;
   expiresAt: string;
   onExpiresAtChange: (value: string) => void;
-  /** When editing an existing approval, the number of times it has already been used. */
-  currentExecutionCount?: number;
   noExpiry?: boolean;
   onNoExpiryChange?: (value: boolean) => void;
 }) {
   return (
     <div className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="sa-max-executions">Max Executions</Label>
-        <Input
-          id="sa-max-executions"
-          type="number"
-          min={currentExecutionCount != null ? String(currentExecutionCount) : "1"}
-          step="1"
-          placeholder="Unlimited"
-          value={maxExecutions}
-          onChange={(e) => onMaxExecutionsChange(e.target.value)}
-        />
-        {currentExecutionCount != null && currentExecutionCount > 0 ? (
-          <p className="text-muted-foreground text-sm">
-            Already used {currentExecutionCount} time{currentExecutionCount !== 1 ? "s" : ""} — minimum is {currentExecutionCount}. Leave empty for unlimited.
-          </p>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            Leave empty for unlimited executions.
-          </p>
-        )}
-      </div>
-
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <Label htmlFor="sa-expires-at">Expires At</Label>

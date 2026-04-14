@@ -96,12 +96,6 @@ StandingApprovalTemplateSpec:
       description: |
         Number of days until the standing approval expires. `null` means no
         expiry (until revoked).
-    max_executions:
-      type: integer
-      nullable: true
-      minimum: 1
-      description: |
-        Optional cap on executions. `null` means unlimited within the window.
 
 ApplyActionConfigTemplateRequest:
   type: object

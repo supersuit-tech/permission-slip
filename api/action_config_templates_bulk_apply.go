@@ -392,14 +392,6 @@ func applyOneTemplateCore(
 			expiresAt = &t
 		}
 
-		var maxExec *int
-		if spec.MaxExecutions != nil {
-			if *spec.MaxExecutions < 1 {
-				return &applyOneResult{errorCode: string(ErrInvalidRequest)}, fmt.Errorf("template standing_approval has invalid max_executions")
-			}
-			maxExec = spec.MaxExecutions
-		}
-
 		saID, err := generatePrefixedID("sa_", 16)
 		if err != nil {
 			return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("internal error")
@@ -414,7 +406,6 @@ func applyOneTemplateCore(
 			ActionVersion:               "1",
 			Constraints:                 standingBytes,
 			SourceActionConfigurationID: &srcID,
-			MaxExecutions:               maxExec,
 			StartsAt:                    startsAt,
 			ExpiresAt:                   expiresAt,
 		})

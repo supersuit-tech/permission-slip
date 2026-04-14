@@ -25,7 +25,6 @@ const (
 	ErrConnectorNotFound            ErrorCode = "connector_not_found"
 	ErrCredentialsNotFound          ErrorCode = "credentials_not_found"
 	ErrNoMatchingStanding           ErrorCode = "no_matching_standing_approval"
-	ErrStandingExhausted            ErrorCode = "standing_approval_exhausted"
 	ErrConstraintViolation          ErrorCode = "constraint_violation"
 	ErrStandingExpired              ErrorCode = "standing_approval_expired"
 	ErrAgentAlreadyRegistered       ErrorCode = "agent_already_registered"

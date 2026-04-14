@@ -46,8 +46,7 @@ func TestExecuteStandingApproval_Success(t *testing.T) {
 		t.Error("expected non-zero executed_at")
 	}
 
-	// Verify execution_count was incremented.
-	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", saID, "execution_count", "1")
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 1)
 }
 
 func TestExecuteStandingApproval_IncrementsCount(t *testing.T) {
@@ -71,7 +70,7 @@ func TestExecuteStandingApproval_IncrementsCount(t *testing.T) {
 		}
 	}
 
-	testhelper.RequireRowValue(t, tx, "standing_approvals", "standing_approval_id", saID, "execution_count", "2")
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 2)
 }
 
 func TestExecuteStandingApproval_EmitsAuditEvent(t *testing.T) {

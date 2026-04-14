@@ -502,7 +502,6 @@ func TestCreateStandingApproval_Success(t *testing.T) {
 		"action_version": "1",
 		"constraints": {"recipient_pattern": "*@company.com"},
 		"source_action_configuration_id": %q,
-		"max_executions": 50,
 		"expires_at": "%s"
 	}`, agentID, acID, expiresAt)
 
@@ -527,12 +526,6 @@ func TestCreateStandingApproval_Success(t *testing.T) {
 	}
 	if resp.Status != "active" {
 		t.Errorf("expected status 'active', got %q", resp.Status)
-	}
-	if resp.MaxExecutions == nil || *resp.MaxExecutions != 50 {
-		t.Errorf("expected max_executions 50, got %v", resp.MaxExecutions)
-	}
-	if resp.ExecutionCount != 0 {
-		t.Errorf("expected execution_count 0, got %d", resp.ExecutionCount)
 	}
 	if resp.Constraints == nil {
 		t.Error("expected constraints to be non-nil")

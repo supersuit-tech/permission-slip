@@ -87,13 +87,11 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 
 	// Execute the action via connector.
 	//
-	// NOTE: The execution slot was already consumed by RecordStandingApprovalExecutionByAgent
+	// NOTE: The execution record was already written by RecordStandingApprovalExecutionByAgent
 	// above. If the connector fails (network timeout, upstream 503, payment gateway error),
-	// the slot is permanently consumed even though no action succeeded. This is intentional:
-	// reversing the atomic CTE would require a compensating transaction and could mask abuse
-	// (an agent retrying indefinitely to bypass rate limits). The trade-off is that transient
-	// failures erode the execution quota. To mitigate, we include executions_remaining in
-	// error responses so agents can observe quota consumption and refresh approvals if needed.
+	// the record remains even though no action succeeded. This is intentional: reversing
+	// the atomic CTE would require a compensating transaction and could mask abuse (an agent
+	// retrying indefinitely to bypass rate limits).
 	result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, exec.UserID, actionType, params, pp)
 
 	// Emit audit event (best-effort).
@@ -107,19 +105,8 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 		log.Printf("[%s] AutoApprove: connector execution: %v", TraceID(r.Context()), execErr)
 		CaptureConnectorError(r.Context(), execErr, cc)
 		resp := InternalError("Failed to execute connector action")
-		// Include executions_remaining so agents can track quota erosion on failure.
-		// The execution slot was consumed by RecordStandingApprovalExecutionByAgent
-		// before the connector call, so agents need visibility into remaining quota
-		// even when the action itself failed.
-		if exec.MaxExecutions != nil {
-			remaining := *exec.MaxExecutions - exec.ExecutionCount
-			if remaining < 0 {
-				remaining = 0
-			}
-			resp.Error.Details = map[string]any{
-				"standing_approval_id": sa.StandingApprovalID,
-				"executions_remaining": remaining,
-			}
+		resp.Error.Details = map[string]any{
+			"standing_approval_id": sa.StandingApprovalID,
 		}
 		RespondError(w, r, http.StatusInternalServerError, resp)
 		return true
@@ -133,25 +120,15 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 		actionResultPtr = &result.Data
 	}
 
-	var executionsRemaining *int
-	if exec.MaxExecutions != nil {
-		remaining := *exec.MaxExecutions - exec.ExecutionCount
-		if remaining < 0 {
-			remaining = 0
-		}
-		executionsRemaining = &remaining
-	}
-
 	// Update agent's last_active_at (best-effort).
 	if err := db.TouchAgentLastActive(r.Context(), deps.DB, agent.AgentID); err != nil {
 		log.Printf("[%s] AutoApprove: failed to update last_active_at for agent %d: %v", TraceID(r.Context()), agent.AgentID, err)
 	}
 
 	RespondJSON(w, http.StatusOK, agentRequestApprovalResponse{
-		Status:              "approved",
-		Result:              actionResultPtr,
-		StandingApprovalID:  sa.StandingApprovalID,
-		ExecutionsRemaining: executionsRemaining,
+		Status:             "approved",
+		Result:             actionResultPtr,
+		StandingApprovalID: sa.StandingApprovalID,
 	})
 	return true
 }

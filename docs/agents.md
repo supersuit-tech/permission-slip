@@ -308,8 +308,6 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
             {
               "standing_approval_id": "sa_def456",
               "constraints": { "recipient_pattern": "*@mycompany.com" },
-              "max_executions": 100,
-              "executions_remaining": 88,
               "expires_at": "2026-05-15T00:00:00Z"
             }
           ]
@@ -507,13 +505,11 @@ When a standing approval matches, the response returns `status: "approved"` with
 {
   "status": "approved",
   "result": { "message_id": "msg_def456" },
-  "standing_approval_id": "sa_def456",
-  "executions_remaining": 87
+  "standing_approval_id": "sa_def456"
 }
 ```
 
 - **`standing_approval_id`** — identifies which pre-approval authorized this execution (useful for audit tracking and logging).
-- **`executions_remaining`** — how many more times this standing approval can be used. `null` means unlimited. Track this value to avoid hitting the limit unexpectedly.
 - **Idempotency** — if you receive `status: "approved"`, the action has already executed. Do not retry with the same `request_id` — you'll get `409 Conflict`.
 - **CLI `executed` field** — when using the CLI (`permission-slip request`), auto-approved responses include `"executed": true` to signal that the action has already completed and no polling or further action is needed. A `409 duplicate_request_id` is also returned as `{ "status": "duplicate", "executed": true }` with exit code `0`.
 

@@ -321,7 +321,7 @@ describe("CreateStandingApprovalDialog", () => {
 
     await waitFor(() => {
       expect(screen.getByText(/Step 2 of 2/)).toBeInTheDocument();
-      expect(screen.getByText(/Set Limits/)).toBeInTheDocument();
+      expect(screen.getByText(/Expiry/)).toBeInTheDocument();
     });
 
     await user.click(screen.getByText("Create"));

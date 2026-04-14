@@ -374,7 +374,7 @@ const STEP_LABELS: Record<Step, string> = {
   1: "Pick Agent",
   2: "Pick Action",
   3: "Set Constraints",
-  4: "Set Limits",
+  4: "Expiry",
 };
 
 function CreateStandingApprovalWizard({
@@ -398,7 +398,6 @@ function CreateStandingApprovalWizard({
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
   const [manualConstraintsJson, setManualConstraintsJson] = useState("");
-  const [maxExecutions, setMaxExecutions] = useState("");
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
 
@@ -495,16 +494,6 @@ function CreateStandingApprovalWizard({
 
           {step === 4 && (
             <StepLimits
-              maxExecutions={maxExecutions}
-              onMaxExecutionsChange={(value) => {
-                if (value === "") {
-                  setMaxExecutions("");
-                  return;
-                }
-                const intValue = parseInt(value, 10);
-                if (Number.isNaN(intValue) || intValue < 1) return;
-                setMaxExecutions(String(intValue));
-              }}
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
               noExpiry={noExpiry}
@@ -623,12 +612,11 @@ export const Step4Limits: Story = {
     connectorName: "Google Calendar",
     connectorLogo: GOOGLE_LOGO,
   },
-  name: "Step 4 – Limits",
+  name: "Step 4 – Expiry",
 };
 
 // ---------------------------------------------------------------------------
 // Edit mode wizard — starts at step 3, pre-filled, shows "Save" button
-// and "already used N times" hint on step 4
 // ---------------------------------------------------------------------------
 
 function EditStandingApprovalWizard() {
@@ -644,7 +632,6 @@ function EditStandingApprovalWizard() {
     calendar_id: "fixed",
     attendees: "wildcard",
   });
-  const [maxExecutions, setMaxExecutions] = useState("20");
   const [noExpiry, setNoExpiry] = useState(false);
   const [expiresAt, setExpiresAt] = useState(() => {
     const d = new Date();
@@ -652,9 +639,6 @@ function EditStandingApprovalWizard() {
     const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
     return local.toISOString().slice(0, 16);
   });
-
-  // Simulated execution count for the existing approval
-  const currentExecutionCount = 7;
 
   return (
     <Dialog open>
@@ -708,19 +692,8 @@ function EditStandingApprovalWizard() {
 
           {step === 4 && (
             <StepLimits
-              maxExecutions={maxExecutions}
-              onMaxExecutionsChange={(value) => {
-                if (value === "") {
-                  setMaxExecutions("");
-                  return;
-                }
-                const intValue = parseInt(value, 10);
-                if (Number.isNaN(intValue) || intValue < 1) return;
-                setMaxExecutions(String(intValue));
-              }}
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
-              currentExecutionCount={currentExecutionCount}
               noExpiry={noExpiry}
               onNoExpiryChange={setNoExpiry}
             />
@@ -759,7 +732,7 @@ function EditStandingApprovalWizard() {
   );
 }
 
-/** Edit mode — pre-filled constraints and limits, "Save" button, execution count hint. */
+/** Edit mode — pre-filled constraints and expiry, "Save" button. */
 export const EditMode: StoryObj = {
   render: () => <EditStandingApprovalWizard />,
   name: "Edit Mode",

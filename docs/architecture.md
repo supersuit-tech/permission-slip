@@ -395,9 +395,7 @@ erDiagram
         string action_type "email.read | email.send"
         string action_version "1"
         json constraints "same schema as ACTION_CONFIG"
-        string status "active | expired | revoked | exhausted"
-        int max_executions "null = unlimited"
-        int execution_count "current count"
+        string status "active | expired | revoked"
         timestamp starts_at
         timestamp expires_at "null = no expiration"
         timestamp created_at

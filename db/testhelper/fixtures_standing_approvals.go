@@ -95,11 +95,6 @@ func InsertStandingApprovalExecutionWithParams(t *testing.T, d db.DBTX, saID str
 		`INSERT INTO standing_approval_executions (standing_approval_id, parameters)
 		 VALUES ($1, $2)`,
 		saID, params)
-	mustExec(t, d,
-		`UPDATE standing_approvals
-		 SET execution_count = execution_count + 1
-		 WHERE standing_approval_id = $1`,
-		saID)
 }
 
 // StandingApprovalOpts holds optional fields for InsertStandingApprovalFull.
@@ -108,7 +103,6 @@ type StandingApprovalOpts struct {
 	Status                      string
 	Constraints                 []byte
 	SourceActionConfigurationID *string
-	MaxExecutions               *int
 	StartsAt                    time.Time
 	ExpiresAt                   time.Time
 }
@@ -134,7 +128,24 @@ func InsertStandingApprovalFull(t *testing.T, d db.DBTX, saID string, agentID in
 		sourceID = &id
 	}
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, max_executions, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, sourceID, opts.MaxExecutions, opts.StartsAt, opts.ExpiresAt)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, sourceID, opts.StartsAt, opts.ExpiresAt)
+}
+
+// RequireStandingApprovalExecutionCount asserts the number of rows in
+// standing_approval_executions for the given standing approval.
+func RequireStandingApprovalExecutionCount(t *testing.T, d db.DBTX, standingApprovalID string, want int) {
+	t.Helper()
+	ctx := context.Background()
+	var n int
+	if err := d.QueryRow(ctx,
+		`SELECT COUNT(*) FROM standing_approval_executions WHERE standing_approval_id = $1`,
+		standingApprovalID,
+	).Scan(&n); err != nil {
+		t.Fatalf("count executions for %s: %v", standingApprovalID, err)
+	}
+	if n != want {
+		t.Fatalf("expected %d standing_approval_executions rows for %s, got %d", want, standingApprovalID, n)
+	}
 }

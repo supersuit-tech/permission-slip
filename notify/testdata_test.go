@@ -29,7 +29,7 @@ func testStandingExecutionApproval() Approval {
 		AgentID:     42,
 		AgentName:   "Deploy Bot",
 		Action:      json.RawMessage(`{"type":"github.issues.create","parameters":{"repo":"acme/app","title":"Deploy v2.1"}}`),
-		Context:     json.RawMessage(`{"execution_count":3,"max_executions":10}`),
+		Context:     json.RawMessage(`{}`),
 		ApprovalURL: "https://app.example.com/activity",
 		CreatedAt:   time.Date(2026, 3, 14, 12, 0, 0, 0, time.UTC),
 		Type:        NotificationTypeStandingExecution,

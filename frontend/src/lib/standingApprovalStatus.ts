@@ -4,7 +4,6 @@ export type StandingApprovalRowStatus =
   | "none"
   | "active"
   | "expired"
-  | "exhausted"
   | "revoked";
 
 /**
@@ -29,8 +28,6 @@ export function standingApprovalRowStatus(
       return "active";
     case "expired":
       return "expired";
-    case "exhausted":
-      return "exhausted";
     case "revoked":
       return "revoked";
     default:
@@ -48,8 +45,6 @@ export function standingApprovalStatusLabel(
       return "None";
     case "expired":
       return "Expired";
-    case "exhausted":
-      return "Exhausted";
     case "revoked":
       return "Revoked";
     default:

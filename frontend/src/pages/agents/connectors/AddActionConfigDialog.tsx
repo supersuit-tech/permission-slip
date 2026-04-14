@@ -230,7 +230,6 @@ export function AddActionConfigDialog({
           action_version: "1",
           constraints,
           source_action_configuration_id: ac.id,
-          max_executions: standingSpec?.max_executions ?? null,
           starts_at: startsAt.toISOString(),
           expires_at: expiresAt,
         });

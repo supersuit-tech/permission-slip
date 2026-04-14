@@ -14,8 +14,6 @@ const mockStandingApprovals = [
     action_type: "email.send",
     agent_id: 1,
     status: "active" as const,
-    execution_count: 3,
-    max_executions: 10,
     expires_at: null,
     constraints: { to: { $pattern: "*@mycompany.com" }, subject: "*" },
     source_action_configuration_id: "ac_config1",

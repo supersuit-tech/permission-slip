@@ -144,8 +144,6 @@ agentCapabilities:
                               constraints:
                                 recipient_pattern: "*@mycompany.com"
                                 max_recipients: 5
-                              max_executions: 100
-                              executions_remaining: 88
                               expires_at: "2026-05-15T00:00:00Z"
                           action_configurations:
                             - configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
@@ -175,8 +173,6 @@ agentCapabilities:
                               constraints:
                                 sender: "*@github.com"
                                 max_results: 10
-                              max_executions: null
-                              executions_remaining: null
                               expires_at: "2026-02-28T00:00:00Z"
                           action_configurations: []
                     - id: "stripe"
@@ -249,14 +245,10 @@ agentCapabilities:
                             - standing_approval_id: "sa_read01"
                               constraints:
                                 sender: "*@github.com"
-                              max_executions: null
-                              executions_remaining: null
                               expires_at: "2026-03-15T00:00:00Z"
                             - standing_approval_id: "sa_read02"
                               constraints:
                                 sender: "*@linear.app"
-                              max_executions: 50
-                              executions_remaining: 50
                               expires_at: "2026-03-01T00:00:00Z"
                           action_configurations: []
 

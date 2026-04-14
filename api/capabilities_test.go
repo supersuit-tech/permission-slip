@@ -51,11 +51,9 @@ func TestGetCapabilities_HappyPath(t *testing.T) {
 
 	// Add a standing approval.
 	saID := testhelper.GenerateID(t, "sa_")
-	maxExec := 100
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:    "email.send",
-		MaxExecutions: &maxExec,
-		Constraints:   []byte(`{"recipient_pattern":"*@mycompany.com"}`),
+		ActionType:  "email.send",
+		Constraints: []byte(`{"recipient_pattern":"*@mycompany.com"}`),
 	})
 
 	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
@@ -109,9 +107,6 @@ func TestGetCapabilities_HappyPath(t *testing.T) {
 	}
 	if a.StandingApprovals[0].StandingApprovalID != saID {
 		t.Errorf("expected standing_approval_id %q, got %q", saID, a.StandingApprovals[0].StandingApprovalID)
-	}
-	if a.StandingApprovals[0].MaxExecutions == nil || *a.StandingApprovals[0].MaxExecutions != 100 {
-		t.Error("expected max_executions=100")
 	}
 }
 

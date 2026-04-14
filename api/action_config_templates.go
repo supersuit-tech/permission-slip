@@ -23,8 +23,7 @@ type actionConfigTemplateResponse struct {
 }
 
 type standingApprovalTemplateSubResponse struct {
-	DurationDays  *int `json:"duration_days,omitempty"`
-	MaxExecutions *int `json:"max_executions,omitempty"`
+	DurationDays *int `json:"duration_days,omitempty"`
 }
 
 type actionConfigTemplateListResponse struct {

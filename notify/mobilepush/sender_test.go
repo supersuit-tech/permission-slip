@@ -410,7 +410,7 @@ func TestSendBatch_StandingExecution_UsesCorrectCategory(t *testing.T) {
 		ApprovalID:  "appr_standing_001",
 		AgentName:   "Deploy Bot",
 		Action:      json.RawMessage(`{"type":"github.issues.create"}`),
-		Context:     json.RawMessage(`{"execution_count":3,"max_executions":10}`),
+		Context:     json.RawMessage(`{}`),
 		ApprovalURL: "https://app.test/activity",
 		Type:        notify.NotificationTypeStandingExecution,
 	}

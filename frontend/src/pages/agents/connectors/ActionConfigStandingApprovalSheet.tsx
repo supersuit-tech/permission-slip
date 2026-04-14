@@ -72,16 +72,12 @@ export function ActionConfigStandingApprovalSheet({
   const isWildcardAction = config.action_type === "*";
   const isEditActive = primary?.status === "active";
 
-  const [maxExecutions, setMaxExecutions] = useState("");
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAtLocal);
 
   useEffect(() => {
     if (!open) return;
     if (isEditActive && primary) {
-      setMaxExecutions(
-        primary.max_executions != null ? String(primary.max_executions) : "",
-      );
       setNoExpiry(!primary.expires_at);
       if (primary.expires_at) {
         const d = new Date(primary.expires_at);
@@ -91,7 +87,6 @@ export function ActionConfigStandingApprovalSheet({
         setExpiresAt(defaultExpiresAtLocal());
       }
     } else {
-      setMaxExecutions("");
       setNoExpiry(true);
       setExpiresAt(defaultExpiresAtLocal());
     }
@@ -131,23 +126,10 @@ export function ActionConfigStandingApprovalSheet({
       return;
     }
 
-    const maxExecParsed =
-      maxExecutions.trim() === "" ? null : Number.parseInt(maxExecutions, 10);
-    if (
-      maxExecutions.trim() !== "" &&
-      (Number.isNaN(maxExecParsed) || maxExecParsed! < 1)
-    ) {
-      toast.error(
-        "Max executions must be a positive integer or empty for unlimited",
-      );
-      return;
-    }
-
     if (isEditActive && primary) {
       try {
         await updateStandingApproval(primary.standing_approval_id, {
           constraints: primary.constraints as Record<string, unknown>,
-          max_executions: maxExecParsed,
           expires_at: noExpiry ? null : new Date(expiresAt).toISOString(),
         });
         toast.success("Standing approval updated");
@@ -174,7 +156,6 @@ export function ActionConfigStandingApprovalSheet({
         action_version: "1",
         constraints,
         source_action_configuration_id: config.id,
-        max_executions: maxExecParsed,
         ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
       });
       toast.success("Standing approval created");
@@ -202,8 +183,8 @@ export function ActionConfigStandingApprovalSheet({
           <SheetTitle>Standing approval</SheetTitle>
           <SheetDescription>
             {isEditActive
-              ? "Adjust execution limits and expiration for this configuration."
-              : "Auto-approve requests that match this configuration, with optional limits."}
+              ? "Adjust expiration for this configuration."
+              : "Auto-approve requests that match this configuration, with optional expiry."}
           </SheetDescription>
         </SheetHeader>
         <form
@@ -228,22 +209,8 @@ export function ActionConfigStandingApprovalSheet({
             </p>
           )}
           <StepLimits
-            maxExecutions={maxExecutions}
-            onMaxExecutionsChange={(value) => {
-              if (value === "") {
-                setMaxExecutions("");
-                return;
-              }
-              const intValue = parseInt(value, 10);
-              const minAllowed = isEditActive && primary ? primary.execution_count : 1;
-              if (Number.isNaN(intValue) || intValue < minAllowed) return;
-              setMaxExecutions(String(intValue));
-            }}
             expiresAt={expiresAt}
             onExpiresAtChange={setExpiresAt}
-            currentExecutionCount={
-              isEditActive && primary ? primary.execution_count : undefined
-            }
             noExpiry={noExpiry}
             onNoExpiryChange={setNoExpiry}
           />
