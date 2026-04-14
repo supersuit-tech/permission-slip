@@ -38,122 +38,38 @@ export function QuickSetupPanel({
     <div className="bg-muted/40 space-y-3 rounded-lg border border-input p-3">
       <p className="text-sm font-semibold">Quick setup</p>
       <div className="space-y-2">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Label
-            htmlFor="quick-read"
-            className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
-          >
-            Read actions
-          </Label>
-          <Select
-            value={quickRead}
-            onValueChange={(v) => onQuickReadChange(v as ApprovalMode)}
-            disabled={disabled}
-          >
-            <SelectTrigger
-              id="quick-read"
-              data-testid="quick-setup-read"
-              size="sm"
-              className="max-w-[11rem] min-w-0 flex-1"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {approvalModeOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Label
-            htmlFor="quick-write"
-            className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
-          >
-            Write actions
-          </Label>
-          <Select
-            value={quickWrite}
-            onValueChange={(v) => onQuickWriteChange(v as ApprovalMode)}
-            disabled={disabled}
-          >
-            <SelectTrigger
-              id="quick-write"
-              data-testid="quick-setup-write"
-              size="sm"
-              className="max-w-[11rem] min-w-0 flex-1"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {approvalModeOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Label
-            htmlFor="quick-edit"
-            className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
-          >
-            Edit actions
-          </Label>
-          <Select
-            value={quickEdit}
-            onValueChange={(v) => onQuickEditChange(v as ApprovalMode)}
-            disabled={disabled}
-          >
-            <SelectTrigger
-              id="quick-edit"
-              data-testid="quick-setup-edit"
-              size="sm"
-              className="max-w-[11rem] min-w-0 flex-1"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {approvalModeOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Label
-            htmlFor="quick-delete"
-            className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
-          >
-            Delete actions
-          </Label>
-          <Select
-            value={quickDelete}
-            onValueChange={(v) => onQuickDeleteChange(v as ApprovalMode)}
-            disabled={disabled}
-          >
-            <SelectTrigger
-              id="quick-delete"
-              data-testid="quick-setup-delete"
-              size="sm"
-              className="max-w-[11rem] min-w-0 flex-1"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {approvalModeOptions.map((o) => (
-                <SelectItem key={o.value} value={o.value}>
-                  {o.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <QuickSetupRow
+          id="quick-read"
+          testId="quick-setup-read"
+          label="Read actions"
+          value={quickRead}
+          onChange={onQuickReadChange}
+          disabled={disabled}
+        />
+        <QuickSetupRow
+          id="quick-write"
+          testId="quick-setup-write"
+          label="Write actions"
+          value={quickWrite}
+          onChange={onQuickWriteChange}
+          disabled={disabled}
+        />
+        <QuickSetupRow
+          id="quick-edit"
+          testId="quick-setup-edit"
+          label="Edit actions"
+          value={quickEdit}
+          onChange={onQuickEditChange}
+          disabled={disabled}
+        />
+        <QuickSetupRow
+          id="quick-delete"
+          testId="quick-setup-delete"
+          label="Delete actions"
+          value={quickDelete}
+          onChange={onQuickDeleteChange}
+          disabled={disabled}
+        />
       </div>
       <Button
         type="button"
@@ -165,6 +81,54 @@ export function QuickSetupPanel({
       >
         Apply
       </Button>
+    </div>
+  );
+}
+
+function QuickSetupRow({
+  id,
+  testId,
+  label,
+  value,
+  onChange,
+  disabled,
+}: {
+  id: string;
+  testId: string;
+  label: string;
+  value: ApprovalMode;
+  onChange: (v: ApprovalMode) => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <Label
+        htmlFor={id}
+        className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
+      >
+        {label}
+      </Label>
+      <Select
+        value={value}
+        onValueChange={(v) => onChange(v as ApprovalMode)}
+        disabled={disabled}
+      >
+        <SelectTrigger
+          id={id}
+          data-testid={testId}
+          size="sm"
+          className="max-w-[11rem] min-w-0 flex-1"
+        >
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {approvalModeOptions.map((o) => (
+            <SelectItem key={o.value} value={o.value}>
+              {o.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }

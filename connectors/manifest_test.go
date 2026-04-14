@@ -817,3 +817,66 @@ func TestParseManifest_XUIAllWidgetTypes(t *testing.T) {
 		})
 	}
 }
+
+// TestToDBManifest_StandingApprovalDefaults exercises the rule that
+// templates without an explicit standing_approval get a never-expire default
+// only when the underlying action is not classified as delete. Delete-typed
+// templates must stay nil so the UI can default to "requires approval".
+func TestToDBManifest_StandingApprovalDefaults(t *testing.T) {
+	t.Parallel()
+
+	m := &ConnectorManifest{
+		ID:   "x",
+		Name: "X",
+		Actions: []ManifestAction{
+			{ActionType: "x.get_thing", Name: "Get"},                                // inferred read
+			{ActionType: "x.create_thing", Name: "Create"},                          // inferred write
+			{ActionType: "x.update_thing", Name: "Update"},                          // inferred edit
+			{ActionType: "x.delete_thing", Name: "Delete"},                          // inferred delete
+			{ActionType: "x.close_thing", Name: "Close"},                            // inferred delete (close verb)
+			{ActionType: "x.archive_thing", Name: "Arch"},                           // inferred delete (archive verb)
+			{ActionType: "x.purge_thing", OperationType: "delete", Name: "Purge"},   // explicit delete
+			{ActionType: "x.custom_delete", OperationType: "write", Name: "Custom"}, // manifest override
+		},
+		Templates: []ManifestTemplate{
+			{ID: "tpl_x_get", ActionType: "x.get_thing", Name: "R", Parameters: json.RawMessage(`{}`)},
+			{ID: "tpl_x_create", ActionType: "x.create_thing", Name: "W", Parameters: json.RawMessage(`{}`)},
+			{ID: "tpl_x_update", ActionType: "x.update_thing", Name: "E", Parameters: json.RawMessage(`{}`)},
+			{ID: "tpl_x_delete", ActionType: "x.delete_thing", Name: "D", Parameters: json.RawMessage(`{}`)},
+			{ID: "tpl_x_close", ActionType: "x.close_thing", Name: "C", Parameters: json.RawMessage(`{}`)},
+			{ID: "tpl_x_archive", ActionType: "x.archive_thing", Name: "A", Parameters: json.RawMessage(`{}`)},
+			{ID: "tpl_x_purge", ActionType: "x.purge_thing", Name: "P", Parameters: json.RawMessage(`{}`)},
+			// Override: the manifest classified this action as write, so the default should apply.
+			{ID: "tpl_x_custom", ActionType: "x.custom_delete", Name: "X", Parameters: json.RawMessage(`{}`)},
+			// Explicit standing_approval should always round-trip, even on delete actions.
+			{
+				ID: "tpl_x_delete_explicit", ActionType: "x.delete_thing", Name: "DE",
+				Parameters:       json.RawMessage(`{}`),
+				StandingApproval: &ManifestStandingApproval{},
+			},
+		},
+	}
+
+	db := m.ToDBManifest()
+
+	byID := make(map[string][]byte, len(db.Templates))
+	for _, t := range db.Templates {
+		byID[t.ID] = t.StandingApprovalSpec
+	}
+
+	wantDefault := []string{"tpl_x_get", "tpl_x_create", "tpl_x_update", "tpl_x_custom", "tpl_x_delete_explicit"}
+	for _, id := range wantDefault {
+		spec := byID[id]
+		if len(spec) == 0 {
+			t.Errorf("template %s: StandingApprovalSpec is empty; want never-expire default", id)
+		}
+	}
+
+	wantNil := []string{"tpl_x_delete", "tpl_x_close", "tpl_x_archive", "tpl_x_purge"}
+	for _, id := range wantNil {
+		spec := byID[id]
+		if len(spec) != 0 {
+			t.Errorf("template %s (delete): StandingApprovalSpec = %q, want empty", id, spec)
+		}
+	}
+}

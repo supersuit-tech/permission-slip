@@ -1160,7 +1160,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 						"per_page": {
 							"type": "integer",
 							"default": 30,
-							"description": "Results per page (max 100)",
+							"description": "Results per page fetched from GitHub (max 100). When include_pull_requests is false, pull requests are filtered client-side, so the actual returned count may be lower than per_page.",
 							"x-ui": {"label": "Results per page"}
 						},
 						"page": {

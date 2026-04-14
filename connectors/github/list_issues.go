@@ -89,6 +89,10 @@ func (a *listIssuesAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
+	// GitHub's /issues endpoint returns both issues and pull requests. When the
+	// caller opts out of PRs, filter them client-side. This means the returned
+	// count may be less than per_page — callers paginating until an empty page
+	// should not use len(response) < per_page as a stop signal.
 	if !params.IncludePullRequests {
 		filtered := ghResp[:0]
 		for _, item := range ghResp {

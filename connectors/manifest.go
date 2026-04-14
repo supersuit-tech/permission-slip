@@ -676,18 +676,33 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 			OAuthScopes:     c.OAuthScopes,
 		})
 	}
+	// Index action operation types so template defaults can consider whether
+	// the underlying action is destructive.
+	actionOps := make(map[string]OperationType, len(m.Actions))
+	for _, a := range m.Actions {
+		op := OperationType(a.OperationType)
+		if op == "" {
+			op = InferOperationType(a.ActionType)
+		}
+		actionOps[a.ActionType] = op
+	}
+
 	for _, tpl := range m.Templates {
 		sa := tpl.StandingApproval
-		if sa == nil {
+		if sa == nil && actionOps[tpl.ActionType] != OperationDelete {
 			// Empty spec = never-expire standing approval when template is applied (no duration_days).
+			// Delete-typed actions are excluded so destructive templates default to "requires approval"
+			// in the UI unless the manifest explicitly opts in via StandingApproval.
 			sa = new(ManifestStandingApproval)
 		}
 		var standingSpec []byte
-		b, err := json.Marshal(sa)
-		if err != nil {
-			log.Printf("warning: failed to marshal standing_approval for template %s: %v", tpl.ID, err)
-		} else {
-			standingSpec = b
+		if sa != nil {
+			b, err := json.Marshal(sa)
+			if err != nil {
+				log.Printf("warning: failed to marshal standing_approval for template %s: %v", tpl.ID, err)
+			} else {
+				standingSpec = b
+			}
 		}
 		out.Templates = append(out.Templates, db.ExternalConnectorTemplate{
 			ID:                   tpl.ID,
