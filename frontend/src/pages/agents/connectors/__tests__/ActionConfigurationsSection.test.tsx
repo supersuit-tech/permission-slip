@@ -395,6 +395,75 @@ describe("ActionConfigurationsSection", () => {
     });
   });
 
+  it("hides Recommended Templates button when every matching template is already configured", async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "tpl_1",
+                connector_id: "github",
+                action_type: "github.create_issue",
+                name: "Matches existing",
+                description: null,
+                parameters: {
+                  repo: "supersuit-tech/webapp",
+                  title: "*",
+                  body: "*",
+                },
+                created_at: "2026-01-01T00:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    // mockConfigs[0].parameters equals the template parameters above
+    renderSection({ configs: mockConfigs });
+
+    await waitFor(() => {
+      expect(mockGet).toHaveBeenCalled();
+    });
+    expect(
+      screen.queryByRole("button", { name: "Recommended Templates" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps Recommended Templates button visible when an applied config diverges from the template", async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "tpl_1",
+                connector_id: "github",
+                action_type: "github.create_issue",
+                name: "Still recommended",
+                description: null,
+                // Different params than mockConfigs[0]
+                parameters: { repo: "*", title: "*" },
+                created_at: "2026-01-01T00:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    renderSection({ configs: mockConfigs });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Recommended Templates" }),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("hides recommended triggers when API returns no matching templates", async () => {
     let resolveTemplates: (v: unknown) => void;
     const templatesPromise = new Promise((resolve) => {

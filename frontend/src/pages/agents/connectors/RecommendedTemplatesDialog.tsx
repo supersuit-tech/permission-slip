@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
+import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import { useApplyActionConfigTemplate } from "@/hooks/useApplyActionConfigTemplate";
 import { useBulkApplyActionConfigTemplates } from "@/hooks/useBulkApplyActionConfigTemplates";
@@ -24,6 +25,7 @@ import {
   type OperationTypeUI,
 } from "./recommendedTemplatesTypes";
 import { useRecommendedTemplateSelection } from "./useRecommendedTemplateSelection";
+import { templateIsApplied } from "./templateMatching";
 
 export type { ApprovalMode, OperationTypeUI };
 
@@ -33,6 +35,13 @@ export interface RecommendedTemplatesDialogProps {
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
+  /**
+   * Existing action configurations for this agent. Templates that are
+   * semantically equivalent to any of these (same action_type and
+   * deep-equal parameters) are hidden from the dialog to avoid
+   * encouraging duplicate adds.
+   */
+  existingConfigs?: ActionConfiguration[];
   onCustomize: (template: ActionConfigTemplate, approvalMode: ApprovalMode) => void;
 }
 
@@ -49,6 +58,7 @@ export function RecommendedTemplatesDialog({
   agentId,
   connectorId,
   actions,
+  existingConfigs,
   onCustomize,
 }: RecommendedTemplatesDialogProps) {
   const { templates, isLoading, error } =
@@ -86,8 +96,15 @@ export function RecommendedTemplatesDialog({
     [operationTypeByActionType],
   );
 
-  const liveTemplates = useMemo(
-    () => templates.filter((t) => actionTypeSet.has(t.action_type)),
+  const liveTemplates = useMemo(() => {
+    const configs = existingConfigs ?? [];
+    return templates.filter(
+      (t) =>
+        actionTypeSet.has(t.action_type) && !templateIsApplied(t, configs),
+    );
+  }, [templates, actionTypeSet, existingConfigs]);
+  const hasConnectorMatchingTemplates = useMemo(
+    () => templates.some((t) => actionTypeSet.has(t.action_type)),
     [templates, actionTypeSet],
   );
 
@@ -261,7 +278,9 @@ export function RecommendedTemplatesDialog({
           <p className="text-destructive py-4 text-sm">{error}</p>
         ) : groupedByOperation.length === 0 ? (
           <p className="text-muted-foreground py-4 text-sm">
-            No recommended templates are available for this connector.
+            {hasConnectorMatchingTemplates
+              ? "You've already configured everything we recommend for this connector."
+              : "No recommended templates are available for this connector."}
           </p>
         ) : (
           <>

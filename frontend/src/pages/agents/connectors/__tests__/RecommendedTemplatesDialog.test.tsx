@@ -10,6 +10,7 @@ import {
 } from "../../../../api/__mocks__/client";
 import { RecommendedTemplatesDialog } from "../RecommendedTemplatesDialog";
 import type { ConnectorAction } from "../../../../hooks/useConnectorDetail";
+import type { ActionConfiguration } from "../../../../hooks/useActionConfigs";
 
 vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
@@ -718,6 +719,123 @@ describe("RecommendedTemplatesDialog", () => {
       tpl_a: "auto_approve",
       tpl_edit: "requires_approval",
       tpl_del: "auto_approve",
+    });
+  });
+
+  it("hides templates that are already equivalent to an existing config", async () => {
+    const matchingConfig: ActionConfiguration = {
+      id: "ac_match",
+      agent_id: 42,
+      connector_id: "github",
+      action_type: "github.create_issue",
+      parameters: { repo: "*", title: "*" },
+      status: "active",
+      name: "Already added",
+      description: null,
+      created_at: "2026-02-20T10:00:00Z",
+      updated_at: "2026-02-20T10:00:00Z",
+    };
+
+    render(
+      <RecommendedTemplatesDialog
+        open
+        onOpenChange={vi.fn()}
+        agentId={42}
+        connectorId="github"
+        actions={actions}
+        existingConfigs={[matchingConfig]}
+        onCustomize={onCustomize}
+      />,
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Merge main")).toBeInTheDocument();
+    });
+    // tpl_a matches the existing config — should be filtered out.
+    expect(screen.queryByText("All open")).not.toBeInTheDocument();
+  });
+
+  it("still shows templates when the existing config has different parameters", async () => {
+    // Same action_type but different params — should NOT be filtered.
+    const divergedConfig: ActionConfiguration = {
+      id: "ac_diverged",
+      agent_id: 42,
+      connector_id: "github",
+      action_type: "github.create_issue",
+      parameters: { repo: "supersuit-tech/webapp", title: "*" },
+      status: "active",
+      name: "Customized",
+      description: null,
+      created_at: "2026-02-20T10:00:00Z",
+      updated_at: "2026-02-20T10:00:00Z",
+    };
+
+    render(
+      <RecommendedTemplatesDialog
+        open
+        onOpenChange={vi.fn()}
+        agentId={42}
+        connectorId="github"
+        actions={actions}
+        existingConfigs={[divergedConfig]}
+        onCustomize={onCustomize}
+      />,
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("All open")).toBeInTheDocument();
+    });
+  });
+
+  it("shows already-configured empty state when every matching template is applied", async () => {
+    const configs: ActionConfiguration[] = [
+      {
+        id: "ac_1",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "github.create_issue",
+        parameters: { repo: "*", title: "*" },
+        status: "active",
+        name: "c1",
+        description: null,
+        created_at: "2026-02-20T10:00:00Z",
+        updated_at: "2026-02-20T10:00:00Z",
+      },
+      {
+        id: "ac_2",
+        agent_id: 42,
+        connector_id: "github",
+        action_type: "github.merge_pr",
+        parameters: { repo: "supersuit-tech/webapp", pr: 1 },
+        status: "active",
+        name: "c2",
+        description: null,
+        created_at: "2026-02-20T10:00:00Z",
+        updated_at: "2026-02-20T10:00:00Z",
+      },
+    ];
+
+    render(
+      <RecommendedTemplatesDialog
+        open
+        onOpenChange={vi.fn()}
+        agentId={42}
+        connectorId="github"
+        actions={actions}
+        existingConfigs={configs}
+        onCustomize={onCustomize}
+      />,
+      { wrapper },
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "You've already configured everything we recommend for this connector.",
+        ),
+      ).toBeInTheDocument();
     });
   });
 
