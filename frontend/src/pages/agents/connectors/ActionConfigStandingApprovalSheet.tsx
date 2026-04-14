@@ -69,7 +69,6 @@ export function ActionConfigStandingApprovalSheet({
 
   const primary = pickPrimaryStandingApproval(standingRows);
   const rowStatus = standingApprovalRowStatus(standingRows);
-  const isWildcardAction = config.action_type === "*";
   const isEditActive = primary?.status === "active";
 
   const [noExpiry, setNoExpiry] = useState(true);
@@ -108,12 +107,6 @@ export function ActionConfigStandingApprovalSheet({
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (isWildcardAction) {
-      toast.error(
-        "Standing approvals cannot be created for enable-all (* wildcard) configurations.",
-      );
-      return;
-    }
     if (config.status !== "active") {
       toast.error(
         "Enable this action configuration before adding a standing approval.",
@@ -172,7 +165,6 @@ export function ActionConfigStandingApprovalSheet({
 
   const canSubmit =
     !isPending &&
-    !isWildcardAction &&
     config.status === "active" &&
     (noExpiry || !!expiresAt);
 
@@ -195,12 +187,6 @@ export function ActionConfigStandingApprovalSheet({
             <p className="text-muted-foreground text-xs">
               Current status: {rowStatus}. Create a new standing approval to replace
               the inactive one.
-            </p>
-          )}
-          {isWildcardAction && (
-            <p className="text-muted-foreground text-sm">
-              Enable-all configurations cover every action with free parameters — standing
-              approvals are tied to a specific action configuration.
             </p>
           )}
           {config.status !== "active" && (
