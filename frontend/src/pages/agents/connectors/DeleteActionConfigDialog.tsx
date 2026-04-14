@@ -12,7 +12,6 @@ import {
 import { useDeleteActionConfig } from "@/hooks/useDeleteActionConfig";
 import { useLinkedStandingApprovalsForConfig } from "@/hooks/useLinkedStandingApprovalsForConfig";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
-import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 
 interface DeleteActionConfigDialogProps {
   open: boolean;
@@ -59,21 +58,10 @@ export function DeleteActionConfigDialog({
         <DialogHeader>
           <DialogTitle>Delete Action Configuration</DialogTitle>
           <DialogDescription>
-            {config.action_type === WILDCARD_ACTION_TYPE ? (
-              <>
-                This will permanently delete the enable-all configuration{" "}
-                <strong>{config.name}</strong>. The agent will lose access to{" "}
-                <strong>all actions</strong> on this connector. This action is
-                irreversible.
-              </>
-            ) : (
-              <>
-                This will permanently delete the configuration{" "}
-                <strong>{config.name}</strong> ({config.action_type}). The agent
-                will no longer be able to reference this configuration. This
-                action is irreversible.
-              </>
-            )}
+            This will permanently delete the configuration{" "}
+            <strong>{config.name}</strong> ({config.action_type}). The agent
+            will no longer be able to reference this configuration. This
+            action is irreversible.
             {linkedCount > 0 && (
               <>
                 {" "}

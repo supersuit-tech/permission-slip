@@ -11,7 +11,6 @@ import {
   standingApprovalRowStatus,
   standingApprovalStatusLabel,
 } from "@/lib/standingApprovalStatus";
-import { WILDCARD_ACTION_TYPE } from "./ActionConfigFormFields";
 import { ActionConfigStandingApprovalSheet } from "./ActionConfigStandingApprovalSheet";
 
 interface ActionConfigRowProps {
@@ -33,10 +32,7 @@ export function ActionConfigRow({
   onEdit,
   onDelete,
 }: ActionConfigRowProps) {
-  const isWildcardConfig = config.action_type === WILDCARD_ACTION_TYPE;
-  const action = isWildcardConfig
-    ? null
-    : actions.find((a) => a.action_type === config.action_type);
+  const action = actions.find((a) => a.action_type === config.action_type);
 
   const paramEntries = Object.entries(config.parameters);
   const isDisabled = config.status === "disabled";
@@ -69,28 +65,15 @@ export function ActionConfigRow({
         </div>
       </TableCell>
       <TableCell>
-        {isWildcardConfig ? (
-          <div>
-            <Badge className="bg-primary/10 text-primary border-primary/20 border">
-              All Actions
-            </Badge>
-            <p className="text-muted-foreground mt-0.5 font-mono text-xs">*</p>
-          </div>
-        ) : (
-          <div>
-            <p className="text-sm">{action?.name ?? config.action_type}</p>
-            <p className="text-muted-foreground font-mono text-xs">
-              {config.action_type}
-            </p>
-          </div>
-        )}
+        <div>
+          <p className="text-sm">{action?.name ?? config.action_type}</p>
+          <p className="text-muted-foreground font-mono text-xs">
+            {config.action_type}
+          </p>
+        </div>
       </TableCell>
       <TableCell>
-        {isWildcardConfig ? (
-          <span className="text-muted-foreground text-xs italic">
-            All parameters — agent chooses freely
-          </span>
-        ) : paramEntries.length > 0 ? (
+        {paramEntries.length > 0 ? (
           <div className="space-y-0.5">
             {paramEntries.map(([key, value]) => (
               <ParameterPill key={key} name={key} value={value} />
