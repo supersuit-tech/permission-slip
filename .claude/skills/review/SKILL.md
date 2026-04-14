@@ -210,7 +210,7 @@ Only flag **real issues**. Do not invent problems or pad the review. If you can'
 
 ### 2d. Submit Review
 
-**Always** submit a PR review, even when there are no findings (use an empty `comments` array). This ensures every round leaves a visible review event on the PR timeline.
+**Only submit a PR review when there are findings.** If the round produced zero inline comments, skip the API call entirely — do not post an empty review. Record the clean round locally (for the final summary's Review History table and the `CONSECUTIVE_CLEAN_ROUNDS` counter) and proceed to Step 2e.
 
 If there are findings, submit a PR review with inline comments:
 
@@ -281,22 +281,11 @@ For Rounds 2+:
 *Automated review by `/review` — Round {N} of {MAX_TURNS}*
 ```
 
-If there are **no findings** in a round:
-
-```markdown
-## Review Round {N}/{MAX_TURNS}
-
-No new issues found.
-
-{If rounds 2+: "All prior comments have been addressed." or "No new commits since last round — no additional issues found on re-examination."}
-
----
-*Automated review by `/review` — Round {N} of {MAX_TURNS}*
-```
+If there are **no findings** in a round, do not post a review for that round (see Step 2d). The clean round is still reflected in the final summary's Review History table.
 
 ### 2e. Early Exit Check
 
-After submitting the review, update `CONSECUTIVE_CLEAN_ROUNDS`:
+After the round completes (whether a review was submitted or skipped), update `CONSECUTIVE_CLEAN_ROUNDS`:
 - If this round had **no findings** and **no new commits** since the previous round → increment `CONSECUTIVE_CLEAN_ROUNDS`.
 - Otherwise (new findings were posted OR new commits were detected) → reset `CONSECUTIVE_CLEAN_ROUNDS` to 0.
 
@@ -352,7 +341,7 @@ Summary format:
 
 - **Strictly read-only** — NEVER modify files, create branches, make commits, or push code. This skill only reads and comments.
 - **Use `COMMENT` event** — never `APPROVE` or `REQUEST_CHANGES`. The skill provides findings; humans make approval decisions.
-- **Don't invent problems** — only flag real, substantive issues. If a round has no findings, say so and move on. Padding reviews with nitpicks erodes trust.
+- **Don't invent problems** — only flag real, substantive issues. If a round has no findings, skip the review submission entirely for that round (no empty review comment) and move on. Padding reviews with nitpicks erodes trust.
 - **Be specific** — every comment must explain what's wrong, WHY it matters (the consequence), and how to fix it. Suggest code when possible.
 - **Use dual-prefix format** — `**[Severity · Category]**` (e.g., `**[High · Architecture]**`) on every inline comment for scannability. Severity levels: Critical, High, Medium, Low.
 - **Read source files for context** — not just diff hunks. Many issues (DRY violations, architectural problems) are invisible without file-level context. For files over 500 lines, read diff hunks ±30 lines of context instead of the full file to avoid exhausting the context window.
