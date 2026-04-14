@@ -356,6 +356,8 @@ cloudflared tunnel run --url http://localhost:8080 permission-slip
 
 After setting up a tunnel, update `BASE_URL` and `ALLOWED_ORIGINS` in your `.env` to your public URL (e.g., `https://permissions.yourdomain.com`) and restart Permission Slip.
 
+> **Strongly recommended:** Once your Pi is reachable from the internet, anyone who learns the hostname can hit the login page. Pair the tunnel with a **gateway secret** so a leaked hostname alone isn't enough to reach the app. See [Lock Down the Tunnel with a Gateway Secret](#lock-down-the-tunnel-with-a-gateway-secret) below.
+
 **Tailscale (good for personal use):**
 
 ```bash
@@ -364,6 +366,44 @@ sudo tailscale up
 ```
 
 Access via your Tailscale IP or MagicDNS hostname. No config changes needed since it's a private network.
+
+### Lock Down the Tunnel with a Gateway Secret
+
+When Permission Slip is exposed through Cloudflare Tunnel (or any other public URL), set a **gateway secret** so the app rejects any request that doesn't present a matching header. This protects the login page itself from being probed by anyone who discovers your hostname.
+
+1. Generate a secret and add it to your `.env`:
+
+   ```bash
+   echo "GATEWAY_SECRET=$(openssl rand -hex 32)" >> ~/permission-slip/.env
+   ```
+
+2. Restart Permission Slip so it picks up the new env var:
+
+   ```bash
+   docker restart permission-slip
+   # Or: sudo systemctl restart permission-slip
+   ```
+
+   With `GATEWAY_SECRET` set, any request without a matching `X-Gateway-Secret` header returns `403 Forbidden` — including browser traffic, so the web UI will stop working until you configure clients.
+
+3. Configure the **mobile app**:
+
+   - Open **Settings → Server**, enable **Custom Server**
+   - Set the server URL to your public URL (e.g., `https://permissions.yourdomain.com`)
+   - Paste the same `GATEWAY_SECRET` value into the gateway secret field
+   - Save and restart the app
+
+   The app stores the secret in the platform keystore (iOS Keychain / Android EncryptedSharedPreferences) and injects the header on every request.
+
+4. For **curl / scripts**, always send the header:
+
+   ```bash
+   curl -H "X-Gateway-Secret: $GATEWAY_SECRET" https://permissions.yourdomain.com/api/health
+   ```
+
+> **Note:** With `GATEWAY_SECRET` enabled, the web UI won't work from a browser (browsers can't inject custom headers). Use the mobile app, or leave `GATEWAY_SECRET` unset and rely on Tailscale/VPN for access control if you need the web UI.
+
+See the [Self-Hosted Deployment Guide — Private Deployments: Gateway Secret](deployment-self-hosted.md#private-deployments-gateway-secret) for the full reference.
 
 ## Troubleshooting
 
