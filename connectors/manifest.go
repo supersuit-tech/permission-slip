@@ -677,17 +677,14 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 		})
 	}
 	for _, tpl := range m.Templates {
-		sa := tpl.StandingApproval
-		if sa == nil {
-			// Empty spec = never-expire standing approval when template is applied (no duration_days).
-			sa = new(ManifestStandingApproval)
-		}
 		var standingSpec []byte
-		b, err := json.Marshal(sa)
-		if err != nil {
-			log.Printf("warning: failed to marshal standing_approval for template %s: %v", tpl.ID, err)
-		} else {
-			standingSpec = b
+		if tpl.StandingApproval != nil {
+			b, err := json.Marshal(tpl.StandingApproval)
+			if err != nil {
+				log.Printf("warning: failed to marshal standing_approval for template %s: %v", tpl.ID, err)
+			} else {
+				standingSpec = b
+			}
 		}
 		out.Templates = append(out.Templates, db.ExternalConnectorTemplate{
 			ID:                   tpl.ID,
