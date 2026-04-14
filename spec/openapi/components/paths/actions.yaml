@@ -13,7 +13,7 @@ execute:
       2. **Permission Slip matches**: Finds an active standing approval for this agent + action type + constraints
       3. **Permission Slip validates**: Verifies parameters fall within standing approval constraints
       4. **Permission Slip executes**: Calls the external service API using stored credentials
-      5. **Result returned**: Returns `StandingApprovalExecuteResponse` with `standing_approval_id` and `executions_remaining`
+      5. **Result returned**: Returns `StandingApprovalExecuteResponse` with `standing_approval_id`
 
       ## One-off Approvals
 
@@ -29,8 +29,6 @@ execute:
       - **Standing approval match**: Active standing approval for this agent + action type
       - **Constraint compliance**: Parameters fall within standing approval constraints
       - **Expiration**: Standing approval has not expired (or has no expiration)
-      - **Execution count**: Max executions not exceeded (if set)
-
       ## Credential Lookup
 
       Permission Slip determines which external service to call based on the action type
@@ -46,7 +44,7 @@ execute:
       ## Error Handling
 
       If the external service returns an error, Permission Slip returns a `502 Bad Gateway`
-      with details about the upstream failure. The execution count is still incremented to
+      with details about the upstream failure. An execution record may still be written to
       prevent unbounded retry loops; the agent should use a new `request_id` for each
       retry attempt.
 
@@ -111,7 +109,6 @@ execute:
                         subject: "PR merged"
                         sender: "noreply@github.com"
                   standing_approval_id: "sa_abc123"
-                  executions_remaining: null
 
               email_sent_standing:
                 summary: "Standing approval: Email sent successfully"
@@ -120,7 +117,6 @@ execute:
                     message_id: "msg_abc123"
                     delivery_status: "queued"
                   standing_approval_id: "sa_def456"
-                  executions_remaining: 47
 
       '400':
         description: Invalid request
@@ -165,25 +161,12 @@ execute:
                     trace_id: "trace_xyz789"
 
       '403':
-        description: Standing approval exhausted or constraint violation
+        description: Constraint violation
         content:
           application/json:
             schema:
               $ref: '../schemas/errors.yaml#/ErrorResponse'
             examples:
-              standing_approval_exhausted:
-                summary: Standing approval execution count exceeded
-                value:
-                  error:
-                    code: "standing_approval_exhausted"
-                    message: "Standing approval max execution count has been reached"
-                    retryable: false
-                    details:
-                      standing_approval_id: "sa_abc123"
-                      max_executions: 100
-                      execution_count: 100
-                    trace_id: "trace_xyz789"
-
               constraint_violation:
                 summary: Parameters violate standing approval constraints
                 value:

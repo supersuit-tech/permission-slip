@@ -250,21 +250,18 @@ Pre-authorized rules that let agents act without per-request approval, within co
 | `action_type` | text | NOT NULL, max 128 chars |
 | `action_version` | text | NOT NULL, DEFAULT '1', max 10 chars |
 | `constraints` | jsonb | max 64 KB |
-| `status` | text | NOT NULL, CHECK IN ('active', 'expired', 'revoked', 'exhausted') |
-| `max_executions` | int | CHECK > 0 (nullable; NULL = unlimited) |
-| `execution_count` | int | NOT NULL, DEFAULT 0, CHECK >= 0 |
+| `status` | text | NOT NULL, CHECK IN ('active', 'expired', 'revoked') |
 | `starts_at` | timestamptz | NOT NULL |
 | `expires_at` | timestamptz | NOT NULL, CHECK >= starts_at, CHECK duration <= 90 days |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
 | `revoked_at` | timestamptz | |
 | `expired_at` | timestamptz | |
-| `exhausted_at` | timestamptz | |
 
 **Indexes:** `idx_standing_approvals_agent_action_status` on `(agent_id, action_type, status)`
 
 ### `standing_approval_executions`
 
-Per-execution records for standing approvals. Each row represents a single execution with its own timestamp and parameters, enabling accurate audit trail entries. The parent `standing_approvals.execution_count` counter is still incremented alongside each insert for quick aggregate access. Agent and user ownership are derived from the parent `standing_approvals` row via JOIN (not stored here) to prevent cross-tenant inconsistency.
+Per-execution records for standing approvals. Each row represents a single execution with its own timestamp and parameters, enabling accurate audit trail entries. Agent and user ownership are derived from the parent `standing_approvals` row via JOIN (not stored here) to prevent cross-tenant inconsistency.
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -531,8 +528,8 @@ Helpers are split by responsibility:
 | `InsertAgentConnector(t, pool, agentID, approverID, connectorID)` | `fixtures_agent_connectors.go` | Enables a connector for an agent |
 | `InsertStandingApproval(t, pool, saID, agentID, userID)` | `fixtures_standing_approvals.go` | Creates an active standing approval |
 | `InsertStandingApprovalWithStatus(t, pool, ..., status)` | `fixtures_standing_approvals.go` | Creates a standing approval with specific status |
-| `InsertStandingApprovalExecution(t, pool, saID)` | `fixtures_standing_approvals.go` | Records a standing approval execution (also bumps execution_count) |
-| `InsertStandingApprovalExecutionWithParams(t, pool, saID, params)` | `fixtures_standing_approvals.go` | Records a standing approval execution with parameters (also bumps execution_count) |
+| `InsertStandingApprovalExecution(t, pool, saID)` | `fixtures_standing_approvals.go` | Records a standing approval execution |
+| `InsertStandingApprovalExecutionWithParams(t, pool, saID, params)` | `fixtures_standing_approvals.go` | Records a standing approval execution with parameters |
 | `InsertActionConfig(t, pool, configID, agentID, userID, connectorID, actionType)` | `fixtures_action_configurations.go` | Creates an active action configuration with minimal defaults |
 | `InsertActionConfigFull(t, pool, configID, agentID, userID, connectorID, actionType, opts)` | `fixtures_action_configurations.go` | Creates an action configuration with full control over all fields |
 
@@ -560,7 +557,7 @@ Tests are split by domain. Each domain file owns its own schema assertions, CASC
 - `approvals_test.go` — schema, cascades, CHECK constraints, indexes, consumed tokens, pg_cron jobs
 - `credentials_test.go` — schema, cascades, unique constraints (including NULL label), indexes
 - `agent_connectors_test.go` — schema, cascades, indexes
-- `standing_approvals_test.go` — schema, cascades, CHECK constraints (status, 90-day max, execution_count, max_executions), indexes, standing_approval_executions table
+- `standing_approvals_test.go` — schema, cascades, CHECK constraints (status, 90-day max), indexes, standing_approval_executions table
 - `action_configurations_test.go` — schema, cascades, CHECK constraints (status, parameters size), credential SET NULL behavior, CRUD function tests (create, get, list, update, delete), user scoping
 - `audit_events_test.go` — ListAuditEvents query: all event types, filters (agent_id, event_type, outcome), pagination, user isolation, ordering
 - `subscriptions_test.go` — schema, CRUD, UNIQUE constraints

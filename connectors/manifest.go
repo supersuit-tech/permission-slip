@@ -77,10 +77,9 @@ type ManifestOAuthProvider struct {
 }
 
 // ManifestStandingApproval declares optional auto-approval behavior when a
-// template is applied: duration and execution cap are manifest-authored only.
+// template is applied: duration is manifest-authored only.
 type ManifestStandingApproval struct {
-	DurationDays  *int `json:"duration_days"`
-	MaxExecutions *int `json:"max_executions"`
+	DurationDays *int `json:"duration_days"`
 }
 
 // ManifestTemplate describes a predefined configuration preset for an action.
@@ -334,9 +333,6 @@ func (m *ConnectorManifest) Validate() error {
 			sa := tpl.StandingApproval
 			if sa.DurationDays != nil && *sa.DurationDays <= 0 {
 				return fmt.Errorf("manifest validation: templates[%d].standing_approval.duration_days must be a positive integer or null", i)
-			}
-			if sa.MaxExecutions != nil && *sa.MaxExecutions < 1 {
-				return fmt.Errorf("manifest validation: templates[%d].standing_approval.max_executions must be at least 1 or null", i)
 			}
 		}
 	}

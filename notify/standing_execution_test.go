@@ -7,8 +7,6 @@ import (
 	"time"
 )
 
-// ── extractStandingExecutionInfo tests ──────────────────────────────────────
-
 func TestExtractStandingExecutionInfo_Full(t *testing.T) {
 	t.Parallel()
 	a := testStandingExecutionApproval()
@@ -19,12 +17,6 @@ func TestExtractStandingExecutionInfo_Full(t *testing.T) {
 	}
 	if info.ActionType != "github.issues.create" {
 		t.Errorf("expected action type 'github.issues.create', got %q", info.ActionType)
-	}
-	if info.ExecutionCount != 3 {
-		t.Errorf("expected execution count 3, got %d", info.ExecutionCount)
-	}
-	if info.MaxExecutions != 10 {
-		t.Errorf("expected max executions 10, got %d", info.MaxExecutions)
 	}
 }
 
@@ -40,49 +32,6 @@ func TestExtractStandingExecutionInfo_NoContext(t *testing.T) {
 
 	if info.AgentName != "Agent #99" {
 		t.Errorf("expected fallback agent name, got %q", info.AgentName)
-	}
-	if info.ExecutionCount != 0 {
-		t.Errorf("expected 0 execution count, got %d", info.ExecutionCount)
-	}
-}
-
-func TestExtractStandingExecutionInfo_Unlimited(t *testing.T) {
-	t.Parallel()
-	a := Approval{
-		AgentName: "Bot",
-		Action:    json.RawMessage(`{"type":"test"}`),
-		Context:   json.RawMessage(`{"execution_count":5,"max_executions":0}`),
-		Type:      NotificationTypeStandingExecution,
-	}
-	info := extractStandingExecutionInfo(a)
-	if info.executionCountLabel() != "5" {
-		t.Errorf("expected '5' for unlimited, got %q", info.executionCountLabel())
-	}
-}
-
-func TestExecutionCountLabel_WithMax(t *testing.T) {
-	t.Parallel()
-	info := standingExecutionInfo{ExecutionCount: 3, MaxExecutions: 10}
-	if info.executionCountLabel() != "3 of 10" {
-		t.Errorf("expected '3 of 10', got %q", info.executionCountLabel())
-	}
-}
-
-func TestExecutionCountLabel_ZeroCountWithMax(t *testing.T) {
-	t.Parallel()
-	// When execution_count is 0 but max_executions is set, the label should
-	// be empty — not "0 of 10" which contradicts the notification.
-	info := standingExecutionInfo{ExecutionCount: 0, MaxExecutions: 10}
-	if info.executionCountLabel() != "" {
-		t.Errorf("expected empty label for zero count, got %q", info.executionCountLabel())
-	}
-}
-
-func TestExecutionCountLabel_NoCount(t *testing.T) {
-	t.Parallel()
-	info := standingExecutionInfo{}
-	if info.executionCountLabel() != "" {
-		t.Errorf("expected empty label, got %q", info.executionCountLabel())
 	}
 }
 
@@ -122,7 +71,6 @@ func TestBuildEmailPlainBody_StandingExecution(t *testing.T) {
 		"Deploy Bot",
 		"github.issues.create",
 		"Parameters:",
-		"3 of 10",
 		"auto-approved via a standing approval",
 		"https://app.example.com/activity",
 	}
@@ -138,7 +86,6 @@ func TestBuildEmailPlainBody_StandingExecution_NoSensitiveData(t *testing.T) {
 	a := Approval{
 		AgentName: "Bot",
 		Action:    json.RawMessage(`{"type":"email.send","parameters":{"api_key":"sk-secret123"}}`),
-		Context:   json.RawMessage(`{"execution_count":1,"max_executions":5}`),
 		CreatedAt: time.Now(),
 		Type:      NotificationTypeStandingExecution,
 	}
@@ -161,7 +108,6 @@ func TestBuildEmailHTMLBody_StandingExecution(t *testing.T) {
 		"Deploy Bot",                          // agent name
 		"github.issues.create",                // action type
 		"Parameters",                          // parameter summary row
-		"3 of 10",                             // execution count
 		"View Activity",                       // CTA button
 		"https://app.example.com/activity",    // URL
 		"auto-approved via a standing approval", // footer
@@ -178,7 +124,6 @@ func TestBuildEmailHTMLBody_StandingExecution_EscapesHTML(t *testing.T) {
 	a := Approval{
 		AgentName: `<script>alert("xss")</script>`,
 		Action:    json.RawMessage(`{"type":"test"}`),
-		Context:   json.RawMessage(`{"execution_count":1}`),
 		CreatedAt: time.Now(),
 		Type:      NotificationTypeStandingExecution,
 	}
@@ -196,7 +141,6 @@ func TestBuildEmailHTMLBody_StandingExecution_NoURL(t *testing.T) {
 	a := Approval{
 		AgentName: "Bot",
 		Action:    json.RawMessage(`{"type":"test"}`),
-		Context:   json.RawMessage(`{"execution_count":1}`),
 		CreatedAt: time.Now(),
 		Type:      NotificationTypeStandingExecution,
 	}
@@ -216,7 +160,6 @@ func TestFormatSMSBody_StandingExecution(t *testing.T) {
 	checks := []string{
 		"Deploy Bot",
 		"github.issues.create",
-		"3 of 10 uses",
 		"View:",
 		"https://app.example.com/activity",
 	}
@@ -232,30 +175,25 @@ func TestFormatSMSBody_StandingExecution_NoURL(t *testing.T) {
 	a := Approval{
 		AgentName: "Bot",
 		Action:    json.RawMessage(`{"type":"test"}`),
-		Context:   json.RawMessage(`{"execution_count":2,"max_executions":5}`),
 		Type:      NotificationTypeStandingExecution,
 	}
 	body := formatSMSBody(a)
 	if strings.Contains(body, "View:") {
 		t.Error("expected no View URL")
 	}
-	if !strings.Contains(body, "2 of 5 uses") {
-		t.Errorf("expected execution count, got: %s", body)
-	}
 }
 
-func TestFormatSMSBody_StandingExecution_Unlimited(t *testing.T) {
+func TestFormatSMSBody_StandingExecution_WithURL(t *testing.T) {
 	t.Parallel()
 	a := Approval{
 		AgentName:   "Bot",
 		Action:      json.RawMessage(`{"type":"test"}`),
-		Context:     json.RawMessage(`{"execution_count":7}`),
 		ApprovalURL: "https://example.com/activity",
 		Type:        NotificationTypeStandingExecution,
 	}
 	body := formatSMSBody(a)
-	if !strings.Contains(body, "7 uses") {
-		t.Errorf("expected execution count, got: %s", body)
+	if !strings.Contains(body, "View: https://example.com/activity") {
+		t.Errorf("expected View URL in SMS, got: %s", body)
 	}
 }
 
@@ -269,8 +207,8 @@ func TestBuildPushContent_StandingExecution(t *testing.T) {
 	if c.Title != "Deploy Bot auto-executed" {
 		t.Errorf("expected title 'Deploy Bot auto-executed', got %q", c.Title)
 	}
-	if c.Body != "github.issues.create (#3)" {
-		t.Errorf("expected body 'github.issues.create (#3)', got %q", c.Body)
+	if c.Body != "github.issues.create" {
+		t.Errorf("expected body 'github.issues.create', got %q", c.Body)
 	}
 	if c.URL != "https://app.example.com/activity" {
 		t.Errorf("expected activity URL, got %q", c.URL)
@@ -422,11 +360,10 @@ func TestBuildPushContent_StandingExecution_NoAction(t *testing.T) {
 	t.Parallel()
 	a := Approval{
 		AgentName: "Bot",
-		Context:   json.RawMessage(`{"execution_count":1}`),
 		Type:      NotificationTypeStandingExecution,
 	}
 	c := BuildPushContent(a)
-	if c.Body != "an action (#1)" {
+	if c.Body != "an action" {
 		t.Errorf("expected fallback body, got %q", c.Body)
 	}
 }

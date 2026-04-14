@@ -26,8 +26,6 @@ type standingApprovalResponse struct {
 	Constraints                 any        `json:"constraints"`
 	SourceActionConfigurationID *string    `json:"source_action_configuration_id"`
 	Status                      string     `json:"status"`
-	MaxExecutions               *int       `json:"max_executions"`
-	ExecutionCount              int        `json:"execution_count"`
 	StartsAt                    time.Time  `json:"starts_at"`
 	ExpiresAt                   *time.Time `json:"expires_at"`
 	CreatedAt                   time.Time  `json:"created_at"`
@@ -52,14 +50,12 @@ type createStandingApprovalRequest struct {
 	ActionVersion               string          `json:"action_version"`
 	Constraints                 json.RawMessage `json:"constraints"`
 	SourceActionConfigurationID *string         `json:"source_action_configuration_id" validate:"required"`
-	MaxExecutions               *int            `json:"max_executions" validate:"omitempty,gte=1"`
 	StartsAt                    *time.Time      `json:"starts_at"`
 	ExpiresAt                   *time.Time      `json:"expires_at"`
 }
 
 type updateStandingApprovalRequest struct {
 	Constraints   json.RawMessage `json:"constraints"`
-	MaxExecutions *int            `json:"max_executions" validate:"omitempty,gte=1"`
 	ExpiresAt     *time.Time      `json:"expires_at"`
 	// ExpiresAtSet is true when the JSON payload explicitly included the "expires_at" key
 	// (even if the value was null). This distinguishes "field omitted" (preserve existing)
@@ -95,7 +91,6 @@ var validStandingApprovalStatusFilters = map[string]bool{
 	"active":    true,
 	"expired":   true,
 	"revoked":   true,
-	"exhausted": true,
 	"all":       true,
 }
 
@@ -128,7 +123,7 @@ func handleListStandingApprovals(deps *Deps) http.HandlerFunc {
 			statusFilter = "active"
 		}
 		if !validStandingApprovalStatusFilters[statusFilter] {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Invalid status filter; must be one of: active, expired, revoked, exhausted, all"))
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Invalid status filter; must be one of: active, expired, revoked, all"))
 			return
 		}
 
@@ -337,7 +332,6 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			ActionVersion:               req.ActionVersion,
 			Constraints:                 constraintsBytes,
 			SourceActionConfigurationID: &sourceConfigIDPtr,
-			MaxExecutions:               req.MaxExecutions,
 			StartsAt:                    startsAt,
 			ExpiresAt:                   req.ExpiresAt,
 		})
@@ -415,8 +409,6 @@ func handleStandingApprovalError(w http.ResponseWriter, r *http.Request, err err
 			resp.Error.Details = map[string]any{"status": saErr.Status}
 		}
 		RespondError(w, r, http.StatusGone, resp)
-	case db.StandingApprovalErrMaxExecutionsTooLow:
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "max_executions cannot be less than the current execution count"))
 	default:
 		return false
 	}
@@ -528,8 +520,7 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Fetch the existing approval to validate max_executions against current
-		// execution_count and to preserve expires_at when the field is omitted.
+		// Fetch the existing approval to preserve expires_at when the field is omitted.
 		existing, err := db.GetStandingApprovalByIDAndUser(r.Context(), deps.DB, saID, profile.ID)
 		if err != nil {
 			log.Printf("[%s] UpdateStandingApproval: fetch existing: %v", TraceID(r.Context()), err)
@@ -556,13 +547,6 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			req.ExpiresAt = existing.ExpiresAt
 		}
 
-		// Prevent setting max_executions below the current execution count, which
-		// would leave the approval active in the dashboard but unreachable by agents.
-		if req.MaxExecutions != nil && *req.MaxExecutions < existing.ExecutionCount {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "max_executions cannot be less than the current execution count"))
-			return
-		}
-
 		constraintsBytes, err := validateStandingApprovalConstraints(req.Constraints)
 		if err != nil {
 			resp := BadRequest(ErrInvalidConstraints, err.Error())
@@ -577,7 +561,6 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			StandingApprovalID: saID,
 			UserID:             profile.ID,
 			Constraints:        constraintsBytes,
-			MaxExecutions:      req.MaxExecutions,
 			ExpiresAt:          req.ExpiresAt,
 		})
 		if err != nil {
@@ -643,8 +626,6 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 		ActionVersion:               sa.ActionVersion,
 		SourceActionConfigurationID: sa.SourceActionConfigurationID,
 		Status:                      sa.Status,
-		MaxExecutions:               sa.MaxExecutions,
-		ExecutionCount:              sa.ExecutionCount,
 		StartsAt:                    sa.StartsAt,
 		ExpiresAt:                   sa.ExpiresAt,
 		CreatedAt:                   sa.CreatedAt,

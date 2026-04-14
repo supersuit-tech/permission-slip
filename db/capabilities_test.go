@@ -82,12 +82,10 @@ func TestGetAgentCapabilities_MultipleConnectors(t *testing.T) {
 	testhelper.InsertAgentConnectorCredential(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, conn1, cred1)
 
 	// Add a standing approval for email.send
-	maxExec := 100
 	constraints := json.RawMessage(`{"recipient_pattern":"*@mycompany.com"}`)
 	testhelper.InsertStandingApprovalFull(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:    "email.send",
-		Constraints:   constraints,
-		MaxExecutions: &maxExec,
+		ActionType:  "email.send",
+		Constraints: constraints,
 	})
 
 	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
@@ -163,85 +161,8 @@ func TestGetAgentCapabilities_MultipleConnectors(t *testing.T) {
 	if sa.ActionType != "email.send" {
 		t.Errorf("expected action_type=email.send, got %q", sa.ActionType)
 	}
-	if sa.MaxExecutions == nil || *sa.MaxExecutions != 100 {
-		t.Errorf("expected max_executions=100, got %v", sa.MaxExecutions)
-	}
-	if sa.ExecutionsRemaining == nil || *sa.ExecutionsRemaining != 100 {
-		t.Errorf("expected executions_remaining=100, got %v", sa.ExecutionsRemaining)
-	}
 	if sa.Constraints == nil {
 		t.Error("expected constraints to be non-nil")
-	}
-}
-
-func TestGetAgentCapabilities_StandingApprovals_ExecutionsRemaining(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-
-	uid := testhelper.GenerateUID(t)
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-
-	connID := testhelper.GenerateID(t, "conn_")
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, "test.action", "Test")
-	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
-
-	// Standing approval with max_executions=10 and 3 executions used
-	maxExec := 10
-	saID := testhelper.GenerateID(t, "sa_")
-	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:    "test.action",
-		MaxExecutions: &maxExec,
-	})
-	// Record 3 executions
-	for range 3 {
-		testhelper.InsertStandingApprovalExecution(t, tx, saID)
-	}
-
-	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
-	if err != nil {
-		t.Fatalf("GetAgentCapabilities: %v", err)
-	}
-	if len(caps.StandingApprovals) != 1 {
-		t.Fatalf("expected 1 standing approval, got %d", len(caps.StandingApprovals))
-	}
-	sa := caps.StandingApprovals[0]
-	if sa.ExecutionsRemaining == nil || *sa.ExecutionsRemaining != 7 {
-		t.Errorf("expected executions_remaining=7, got %v", sa.ExecutionsRemaining)
-	}
-}
-
-func TestGetAgentCapabilities_StandingApprovals_Unlimited(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-
-	uid := testhelper.GenerateUID(t)
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-
-	connID := testhelper.GenerateID(t, "conn_")
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertConnectorAction(t, tx, connID, "test.action", "Test")
-	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
-
-	// Standing approval with no max_executions (unlimited)
-	testhelper.InsertStandingApprovalFull(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:    "test.action",
-		MaxExecutions: nil,
-	})
-
-	caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
-	if err != nil {
-		t.Fatalf("GetAgentCapabilities: %v", err)
-	}
-	if len(caps.StandingApprovals) != 1 {
-		t.Fatalf("expected 1 standing approval, got %d", len(caps.StandingApprovals))
-	}
-	sa := caps.StandingApprovals[0]
-	if sa.MaxExecutions != nil {
-		t.Errorf("expected max_executions=nil (unlimited), got %v", sa.MaxExecutions)
-	}
-	if sa.ExecutionsRemaining != nil {
-		t.Errorf("expected executions_remaining=nil (unlimited), got %v", sa.ExecutionsRemaining)
 	}
 }
 

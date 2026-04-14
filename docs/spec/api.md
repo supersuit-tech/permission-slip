@@ -733,8 +733,6 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", timestamp="1707
             {
               "standing_approval_id": "sa_def456",
               "constraints": { "recipient_pattern": "*@mycompany.com" },
-              "max_executions": 100,
-              "executions_remaining": 88,
               "expires_at": "2026-05-15T00:00:00Z"
             }
           ]
@@ -788,8 +786,6 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", timestamp="1707
     - `standing_approvals` (array): Active standing approvals for this action type. If non-empty, the agent can execute immediately under matching constraints. If empty, one-off approval is required.
       - `standing_approval_id` (string): Standing approval identifier
       - `constraints` (object): Parameter constraint boundaries
-      - `max_executions` (integer or null): Execution cap (`null` = unlimited)
-      - `executions_remaining` (integer or null): Remaining executions (`null` = unlimited)
       - `expires_at` (string): ISO 8601 expiration timestamp
 
 **Agent Workflow After Calling This Endpoint:**
@@ -1036,9 +1032,8 @@ When a matching standing approval exists, the action is auto-approved and execut
 - `status` (string, required): Approval status (`approved`)
 - `result` (object, required): Action result from the external service
 - `standing_approval_id` (string, required): Which standing approval authorized this execution
-- `executions_remaining` (integer, optional): Remaining executions. Present only when the standing approval has a finite `max_executions`; absent when unlimited.
 
-> **Execution slot consumption on error:** When a standing approval matches, the execution slot is consumed _before_ the connector action runs. If the connector fails (network timeout, upstream error, etc.), the slot is still consumed. On untyped 500 errors, the response includes `executions_remaining` and `standing_approval_id` in the error `details` so agents can track quota erosion. Agents should monitor `executions_remaining` and request a new standing approval if the quota runs low due to transient failures.
+> **Execution record on connector failure:** When a standing approval matches, an execution record may be written before the connector action completes. If the connector fails (network timeout, upstream error, etc.), that record can still exist. Untyped 500 errors may include `standing_approval_id` in the error `details` for correlation.
 
 **Error Responses:**
 
@@ -1499,8 +1494,6 @@ X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", 
         "max_results": 10
       },
       "status": "active",
-      "max_executions": null,
-      "execution_count": 42,
       "starts_at": "2026-02-10T00:00:00Z",
       "expires_at": "2026-03-12T00:00:00Z"
     },
@@ -1512,8 +1505,6 @@ X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", 
         "to": "*@mycompany.com"
       },
       "status": "active",
-      "max_executions": 50,
-      "execution_count": 3,
       "starts_at": "2026-02-14T00:00:00Z",
       "expires_at": "2026-02-21T00:00:00Z"
     }
@@ -1529,8 +1520,6 @@ X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", 
   - `action_version` (string): Action version
   - `constraints` (object or null): Parameter bounds enforced at execution time
   - `status` (string): Always `active` (only active standing approvals are returned)
-  - `max_executions` (integer or null): Execution cap (`null` = unlimited)
-  - `execution_count` (integer): Number of times this standing approval has been used
   - `starts_at` (string): ISO 8601 timestamp when the approval became active
   - `expires_at` (string): ISO 8601 timestamp when the approval expires (max 90 days from `starts_at`)
 
@@ -1552,16 +1541,15 @@ Standing approval matching and execution is handled automatically by `POST /v1/a
 2. **Match standing approval:** Find an active standing approval for this agent + action type
 3. **Validate constraints:** Verify parameters fall within the standing approval's constraint bounds
 4. **Check expiration:** Verify standing approval has not expired
-5. **Check execution count:** If `max_executions` is set, verify count has not been exceeded
-6. **Execute action:** Call external service API using stored credentials
-7. **Increment execution count** and **create audit log entry**
-8. **Return result** to agent with `status: "approved"`
+5. **Execute action:** Call external service API using stored credentials
+6. **Create execution record** and **create audit log entry**
+7. **Return result** to agent with `status: "approved"`
 
 If a matching standing approval is found, the response includes the action result inline (see the auto-approved response format in the [POST /v1/approvals/request](#post-v1approvalsrequest) section above).
 
 **Fallthrough Behavior:**
 
-If no standing approval matches (wrong action type, parameters outside constraints, expired, or exhausted), Permission Slip creates a pending approval as usual and returns `status: "pending"`. The agent then proceeds with the standard one-off approval flow (user review, confirmation code, token).
+If no standing approval matches (wrong action type, parameters outside constraints, or expired), Permission Slip creates a pending approval as usual and returns `status: "pending"`. The agent then proceeds with the standard one-off approval flow (user review, confirmation code, token).
 
 ---
 
@@ -1882,7 +1870,6 @@ For rate limiting errors, include:
 | `approval_already_resolved` | 409 | `false` | Approval already approved/denied/cancelled |
 | `registration_expired` | 410 | `false` | Registration TTL elapsed |
 | `approval_expired` | 410 | `false` | Approval TTL elapsed |
-| `standing_approval_exhausted` | 403 | `false` | Standing approval execution count exceeded |
 | `constraint_violation` | 403 | `false` | Parameters violate standing approval constraints |
 | `no_matching_standing_approval` | 404 | `false` | No active standing approval matches this agent/action/parameters |
 | `standing_approval_expired` | 410 | `false` | Standing approval has expired |

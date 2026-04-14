@@ -114,9 +114,8 @@ ApprovalRequestResponse:
     Response after submitting an approval request. Two possible outcomes:
 
     **Auto-approved** (`status: "approved"`): A matching standing approval was found.
-    The action was executed immediately. The response includes `result`,
-    `standing_approval_id`, and optionally `executions_remaining`. No `approval_id`
-    or `approval_url` is returned.
+    The action was executed immediately. The response includes `result` and
+    `standing_approval_id`. No `approval_id` or `approval_url` is returned.
 
     **Pending** (`status: "pending"`): No standing approval matched. A pending approval
     was created. The agent should poll `GET /v1/approvals/{approval_id}/status` for the
@@ -178,14 +177,6 @@ ApprovalRequestResponse:
       description: |
         ID of the standing approval that matched. Present only when `status` is `approved`.
       example: "sa_abc123"
-
-    executions_remaining:
-      type: integer
-      description: |
-        Number of executions remaining on the standing approval.
-        Present only when `status` is `approved` and the standing approval has a
-        finite `max_executions`. Absent when unlimited.
-      example: 47
 
   example:
     approval_id: "appr_xyz789"

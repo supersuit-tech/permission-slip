@@ -51,8 +51,6 @@ type linkedStandingApprovalSummary struct {
 	ActionType         string     `json:"action_type"`
 	Status             string     `json:"status"`
 	ExpiresAt          *time.Time `json:"expires_at,omitempty"`
-	MaxExecutions      *int       `json:"max_executions,omitempty"`
-	ExecutionCount     int        `json:"execution_count"`
 }
 
 type actionConfigListResponse struct {
@@ -485,8 +483,6 @@ func standingApprovalSummariesFromDB(sas []db.StandingApproval) []linkedStanding
 			ActionType:         sa.ActionType,
 			Status:             sa.Status,
 			ExpiresAt:          sa.ExpiresAt,
-			MaxExecutions:      sa.MaxExecutions,
-			ExecutionCount:     sa.ExecutionCount,
 		})
 	}
 	sort.Slice(out, func(i, j int) bool {

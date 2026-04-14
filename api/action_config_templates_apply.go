@@ -24,8 +24,7 @@ type applyActionConfigTemplateResponse struct {
 }
 
 type standingApprovalTemplateSpec struct {
-	DurationDays  *int `json:"duration_days"`
-	MaxExecutions *int `json:"max_executions"`
+	DurationDays *int `json:"duration_days"`
 }
 
 func handleApplyActionConfigTemplate(deps *Deps) http.HandlerFunc {
@@ -221,15 +220,6 @@ func handleApplyActionConfigTemplate(deps *Deps) http.HandlerFunc {
 				expiresAt = &t
 			}
 
-			var maxExec *int
-			if spec.MaxExecutions != nil {
-				if *spec.MaxExecutions < 1 {
-					RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "template standing_approval has invalid max_executions"))
-					return
-				}
-				maxExec = spec.MaxExecutions
-			}
-
 			saID, err := generatePrefixedID("sa_", 16)
 			if err != nil {
 				log.Printf("[%s] ApplyActionConfigTemplate: generate sa id: %v", TraceID(r.Context()), err)
@@ -247,7 +237,6 @@ func handleApplyActionConfigTemplate(deps *Deps) http.HandlerFunc {
 				ActionVersion:               "1",
 				Constraints:                 standingBytes,
 				SourceActionConfigurationID: &srcID,
-				MaxExecutions:               maxExec,
 				StartsAt:                    startsAt,
 				ExpiresAt:                   expiresAt,
 			})

@@ -1312,10 +1312,10 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 	// Standing approvals (2 active, 1 expired) — after action configs (FK)
 	// ---------------------------------------------------------------
 	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, max_executions, constraints, source_action_configuration_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8, $9)`,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8)`,
 		"sa-everything-1", claude, userHasEverything,
-		"github.create_issue", 100,
+		"github.create_issue",
 		`{"repo": "supersuit-tech/permission-slip", "title": "*"}`,
 		"ac-claude-create-issue",
 		now.Add(-7*24*time.Hour),

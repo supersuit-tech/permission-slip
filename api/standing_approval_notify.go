@@ -39,14 +39,8 @@ func NotifyStandingApprovalExecution(ctx context.Context, deps *Deps, exec *db.S
 	agentName := extractAgentName(agent)
 	activityURL := fmt.Sprintf("%s/activity", deps.BaseURL)
 
-	// Build the context JSON with execution count and max executions.
-	execContext := map[string]int{
-		"execution_count": exec.ExecutionCount,
-	}
-	if exec.MaxExecutions != nil {
-		execContext["max_executions"] = *exec.MaxExecutions
-	}
-	contextJSON, _ := json.Marshal(execContext)
+	// Standing execution templates do not use Context; omit empty object noise.
+	var contextJSON json.RawMessage
 
 	// Build the action JSON with type and parameters for the notification
 	// templates (used for parameter summary in emails).
@@ -57,7 +51,7 @@ func NotifyStandingApprovalExecution(ctx context.Context, deps *Deps, exec *db.S
 		AgentID:     exec.AgentID,
 		AgentName:   agentName,
 		Action:      actionJSON,
-		Context:     contextJSON,
+		Context: contextJSON,
 		ApprovalURL: activityURL,
 		CreatedAt:   time.Now(),
 		Type:        notify.NotificationTypeStandingExecution,

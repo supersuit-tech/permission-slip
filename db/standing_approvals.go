@@ -20,21 +20,18 @@ type StandingApproval struct {
 	Constraints                 []byte // raw JSONB
 	SourceActionConfigurationID *string
 	Status                      string
-	MaxExecutions               *int
-	ExecutionCount              int
 	StartsAt                    time.Time
 	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
 	CreatedAt                   time.Time
 	RevokedAt                   *time.Time
 	ExpiredAt                   *time.Time
-	ExhaustedAt                 *time.Time
 }
 
 // standingApprovalColumns is the canonical column list for SELECT on the standing_approvals table.
 // Keep in sync with scanStandingApproval.
 const standingApprovalColumns = `standing_approval_id, agent_id, user_id, action_type, action_version,
-	constraints, source_action_configuration_id, status, max_executions, execution_count,
-	starts_at, expires_at, created_at, revoked_at, expired_at, exhausted_at`
+	constraints, source_action_configuration_id, status,
+	starts_at, expires_at, created_at, revoked_at, expired_at`
 
 // MaxStandingApprovalListSize is the maximum number of standing approvals returned per page.
 const MaxStandingApprovalListSize = 100
@@ -61,8 +58,8 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 	var sa StandingApproval
 	err := row.Scan(
 		&sa.StandingApprovalID, &sa.AgentID, &sa.UserID, &sa.ActionType, &sa.ActionVersion,
-		&sa.Constraints, &sa.SourceActionConfigurationID, &sa.Status, &sa.MaxExecutions, &sa.ExecutionCount,
-		&sa.StartsAt, &sa.ExpiresAt, &sa.CreatedAt, &sa.RevokedAt, &sa.ExpiredAt, &sa.ExhaustedAt,
+		&sa.Constraints, &sa.SourceActionConfigurationID, &sa.Status,
+		&sa.StartsAt, &sa.ExpiresAt, &sa.CreatedAt, &sa.RevokedAt, &sa.ExpiredAt,
 	)
 	if err != nil {
 		return nil, err
@@ -101,12 +98,11 @@ type StandingApprovalError struct {
 func (e *StandingApprovalError) Error() string { return e.Code }
 
 const (
-	StandingApprovalErrNotFound            = "not_found"
-	StandingApprovalErrAlreadyRevoked      = "already_revoked"
-	StandingApprovalErrNotActive           = "not_active"
-	StandingApprovalErrAgentNotFound       = "agent_not_found"
-	StandingApprovalErrDuplicateRequest    = "duplicate_request"
-	StandingApprovalErrMaxExecutionsTooLow = "max_executions_too_low"
+	StandingApprovalErrNotFound         = "not_found"
+	StandingApprovalErrAlreadyRevoked   = "already_revoked"
+	StandingApprovalErrNotActive        = "not_active"
+	StandingApprovalErrAgentNotFound     = "agent_not_found"
+	StandingApprovalErrDuplicateRequest  = "duplicate_request"
 )
 
 // CreateStandingApprovalParams holds the parameters for creating a standing approval.
@@ -118,7 +114,6 @@ type CreateStandingApprovalParams struct {
 	ActionVersion               string
 	Constraints                 []byte // raw JSONB, may be nil
 	SourceActionConfigurationID *string
-	MaxExecutions               *int
 	StartsAt                    time.Time
 	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
 }
@@ -133,12 +128,12 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 			SELECT 1 FROM agents WHERE agent_id = $2 AND approver_id = $3
 		)
 		INSERT INTO standing_approvals
-		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, source_action_configuration_id, status, max_executions, starts_at, expires_at)
-		 SELECT $1, $2, $3, $4, $5, $6, $7, 'active', $8, $9, $10
+		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, source_action_configuration_id, status, starts_at, expires_at)
+		 SELECT $1, $2, $3, $4, $5, $6, $7, 'active', $8, $9
 		 WHERE EXISTS (SELECT 1 FROM agent_check)
 		 RETURNING `+standingApprovalColumns,
 		p.StandingApprovalID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion,
-		p.Constraints, p.SourceActionConfigurationID, p.MaxExecutions, p.StartsAt, p.ExpiresAt,
+		p.Constraints, p.SourceActionConfigurationID, p.StartsAt, p.ExpiresAt,
 	)
 	sa, err := scanStandingApproval(row)
 	if err != nil {
@@ -463,38 +458,34 @@ type StandingApprovalExecution struct {
 	AgentMeta          []byte // raw JSONB from agents.metadata, may be nil
 	Parameters         []byte // raw JSONB, may be nil
 	ExecutedAt         time.Time
-	// MaxExecutions and ExecutionCount are populated by
-	// RecordStandingApprovalExecutionByAgent only.
-	MaxExecutions  *int
-	ExecutionCount int
 }
 
-// RecordStandingApprovalExecution atomically increments the parent standing
-// approval's execution_count and inserts an execution record. Both operations
-// run in a single CTE so they succeed or fail together. The UPDATE enforces
-// user_id and status='active' to prevent unauthorized or stale executions.
+// RecordStandingApprovalExecution inserts an execution record after locking the
+// parent standing approval row. The lock enforces user_id and status='active'
+// to prevent unauthorized or stale executions.
 // Returns a domain error via diagnoseStandingApprovalFailure if no matching row.
 func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingApprovalID string, userID string, parameters []byte) (*StandingApprovalExecution, error) {
 	var e StandingApprovalExecution
 
 	err := db.QueryRow(ctx,
-		`WITH updated AS (
-			UPDATE standing_approvals
-			SET execution_count = execution_count + 1
+		`WITH locked AS (
+			SELECT standing_approval_id, agent_id, user_id, action_type
+			FROM standing_approvals
 			WHERE standing_approval_id = $1 AND user_id = $2 AND status = 'active'
 			  AND (expires_at IS NULL OR expires_at > now())
-			RETURNING standing_approval_id, agent_id, user_id, action_type
+			FOR UPDATE
 		),
 		ins AS (
 			INSERT INTO standing_approval_executions (standing_approval_id, parameters)
 			SELECT standing_approval_id, $3
-			FROM updated
+			FROM locked
 			RETURNING id, standing_approval_id, parameters, executed_at
 		)
-		SELECT ins.id, ins.standing_approval_id, updated.agent_id, updated.user_id::text,
-		       updated.action_type, a.metadata, ins.parameters, ins.executed_at
-		FROM ins, updated
-		LEFT JOIN agents a ON a.agent_id = updated.agent_id`,
+		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id::text,
+		       locked.action_type, a.metadata, ins.parameters, ins.executed_at
+		FROM ins
+		JOIN locked ON locked.standing_approval_id = ins.standing_approval_id
+		LEFT JOIN agents a ON a.agent_id = locked.agent_id`,
 		standingApprovalID, userID, parameters,
 	).Scan(&e.ExecutionID, &e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType, &e.AgentMeta, &e.Parameters, &e.ExecutedAt)
 	if err == nil {
@@ -527,25 +518,19 @@ type UpdateStandingApprovalParams struct {
 	StandingApprovalID string
 	UserID             string
 	Constraints        []byte // raw JSONB
-	MaxExecutions      *int
 	ExpiresAt          *time.Time // nil means no expiry (until revoked)
 }
 
-// UpdateStandingApproval updates the constraints, max_executions, and expires_at of an active
+// UpdateStandingApproval updates the constraints and expires_at of an active
 // standing approval belonging to the given user. Returns the updated approval, or a domain error.
-//
-// The UPDATE atomically guards against setting max_executions below the current
-// execution_count — even in the presence of concurrent executions between the
-// caller's pre-flight validation and this write.
 func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprovalParams) (*StandingApproval, error) {
 	row := db.QueryRow(ctx,
 		`UPDATE standing_approvals
-		 SET constraints = $3, max_executions = $4, expires_at = $5
+		 SET constraints = $3, expires_at = $4
 		 WHERE standing_approval_id = $1 AND user_id = $2
 		   AND status = 'active'
-		   AND ($4::int IS NULL OR $4::int >= execution_count)
 		 RETURNING `+standingApprovalColumns,
-		p.StandingApprovalID, p.UserID, p.Constraints, p.MaxExecutions, p.ExpiresAt,
+		p.StandingApprovalID, p.UserID, p.Constraints, p.ExpiresAt,
 	)
 	updated, err := scanStandingApproval(row)
 	if err == nil {
@@ -555,17 +540,12 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 		return nil, err
 	}
 
-	// Diagnose why the UPDATE matched zero rows. Check for the max_executions
-	// race before falling back to generic status diagnosis.
 	sa, err := GetStandingApprovalByIDAndUser(ctx, db, p.StandingApprovalID, p.UserID)
 	if err != nil {
 		return nil, err
 	}
 	if sa == nil {
 		return nil, &StandingApprovalError{Code: StandingApprovalErrNotFound}
-	}
-	if sa.Status == "active" && p.MaxExecutions != nil && *p.MaxExecutions < sa.ExecutionCount {
-		return nil, &StandingApprovalError{Code: StandingApprovalErrMaxExecutionsTooLow}
 	}
 	if sa.Status == "revoked" {
 		return nil, &StandingApprovalError{Code: StandingApprovalErrAlreadyRevoked, Status: sa.Status}
@@ -584,12 +564,10 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 		   SELECT `+standingApprovalColumns+`, 1 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = $2 AND status = 'active'
 		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
-		     AND (max_executions IS NULL OR execution_count < max_executions)
 		   UNION ALL
 		   SELECT `+standingApprovalColumns+`, 2 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = '*' AND action_type != $2 AND status = 'active'
 		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
-		     AND (max_executions IS NULL OR execution_count < max_executions)
 		 ) combined
 		 ORDER BY priority, created_at DESC, standing_approval_id DESC
 		 LIMIT 100`,
@@ -614,10 +592,10 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 	return approvals, nil
 }
 
-// RecordStandingApprovalExecutionByAgent atomically increments the standing
-// approval's execution_count and inserts an execution record, scoped by
-// agent_id. This is used by the auto-approval logic in POST /approvals/request
-// where authentication is via agent signature rather than user session.
+// RecordStandingApprovalExecutionByAgent inserts an execution record after locking
+// the standing approval row, scoped by agent_id. This is used by the auto-approval
+// logic in POST /approvals/request where authentication is via agent signature
+// rather than user session.
 //
 // The requestID is stored in the execution record and enforced via a unique
 // index on (standing_approval_id, request_id) for idempotency. A duplicate
@@ -626,32 +604,30 @@ func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standi
 	var e StandingApprovalExecution
 
 	err := db.QueryRow(ctx,
-		`WITH updated AS (
-			UPDATE standing_approvals
-			SET execution_count = execution_count + 1
+		`WITH locked AS (
+			SELECT standing_approval_id, agent_id, user_id, action_type
+			FROM standing_approvals
 			WHERE standing_approval_id = $1
 			  AND agent_id = $2
 			  AND status = 'active'
 			  AND starts_at <= now()
 			  AND (expires_at IS NULL OR expires_at > now())
-			  AND (max_executions IS NULL OR execution_count < max_executions)
-			RETURNING standing_approval_id, agent_id, user_id, action_type, max_executions, execution_count
+			FOR UPDATE
 		),
 		ins AS (
 			INSERT INTO standing_approval_executions (standing_approval_id, parameters, request_id)
 			SELECT standing_approval_id, $3, $4
-			FROM updated
+			FROM locked
 			RETURNING id, standing_approval_id, parameters, executed_at
 		)
-		SELECT ins.id, ins.standing_approval_id, updated.agent_id, updated.user_id::text,
-		       updated.action_type, a.metadata, ins.parameters, ins.executed_at,
-		       updated.max_executions, updated.execution_count
-		FROM ins, updated
-		LEFT JOIN agents a ON a.agent_id = updated.agent_id`,
+		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id::text,
+		       locked.action_type, a.metadata, ins.parameters, ins.executed_at
+		FROM ins
+		JOIN locked ON locked.standing_approval_id = ins.standing_approval_id
+		LEFT JOIN agents a ON a.agent_id = locked.agent_id`,
 		standingApprovalID, agentID, parameters, requestID,
 	).Scan(&e.ExecutionID, &e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType,
-		&e.AgentMeta, &e.Parameters, &e.ExecutedAt,
-		&e.MaxExecutions, &e.ExecutionCount)
+		&e.AgentMeta, &e.Parameters, &e.ExecutedAt)
 	if err == nil {
 		return &e, nil
 	}

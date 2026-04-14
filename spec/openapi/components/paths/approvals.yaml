@@ -14,7 +14,7 @@ request:
 
       1. **Parameters validated**: Against standing approval constraints
       2. **Action executed**: Immediately via the connector using stored credentials
-      3. **Result returned**: Response has `status: "approved"` with `result`, `standing_approval_id`, and `executions_remaining`
+      3. **Result returned**: Response has `status: "approved"` with `result` and `standing_approval_id`
       4. **No polling needed**: The agent has the result immediately
 
       ## One-off Approval (No Standing Approval Match)
@@ -166,7 +166,6 @@ request:
                     message_id: "msg_abc123"
                     delivery_status: "queued"
                   standing_approval_id: "sa_abc123"
-                  executions_remaining: 47
       
       '400':
         description: Invalid request or unsupported action type

@@ -1193,8 +1193,6 @@ paths:
                                 constraints:
                                   recipient_pattern: '*@mycompany.com'
                                   max_recipients: 5
-                                max_executions: 100
-                                executions_remaining: 88
                                 expires_at: '2026-05-15T00:00:00Z'
                             action_configurations:
                               - configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
@@ -1224,8 +1222,6 @@ paths:
                                 constraints:
                                   sender: '*@github.com'
                                   max_results: 10
-                                max_executions: null
-                                executions_remaining: null
                                 expires_at: '2026-02-28T00:00:00Z'
                             action_configurations: []
                       - id: stripe
@@ -1296,14 +1292,10 @@ paths:
                               - standing_approval_id: sa_read01
                                 constraints:
                                   sender: '*@github.com'
-                                max_executions: null
-                                executions_remaining: null
                                 expires_at: '2026-03-15T00:00:00Z'
                               - standing_approval_id: sa_read02
                                 constraints:
                                   sender: '*@linear.app'
-                                max_executions: 50
-                                executions_remaining: 50
                                 expires_at: '2026-03-01T00:00:00Z'
                             action_configurations: []
         '400':
@@ -2198,7 +2190,7 @@ paths:
 
         1. **Parameters validated**: Against standing approval constraints
         2. **Action executed**: Immediately via the connector using stored credentials
-        3. **Result returned**: Response has `status: "approved"` with `result`, `standing_approval_id`, and `executions_remaining`
+        3. **Result returned**: Response has `status: "approved"` with `result` and `standing_approval_id`
         4. **No polling needed**: The agent has the result immediately
 
         ## One-off Approval (No Standing Approval Match)
@@ -2343,7 +2335,6 @@ paths:
                       message_id: msg_abc123
                       delivery_status: queued
                     standing_approval_id: sa_abc123
-                    executions_remaining: 47
         '400':
           description: Invalid request or unsupported action type
           content:
@@ -3930,12 +3921,12 @@ paths:
         - **Agent startup**: Agent queries its standing approvals to understand what it can do
         - **Flow selection**: Agent checks if a standing approval covers a desired action before
           deciding whether to use `POST /v1/actions/execute` (standing) or `POST /v1/approvals/request` (one-off)
-        - **Status monitoring**: Agent checks remaining executions or expiration times
+        - **Status monitoring**: Agent checks expiration times
 
         ## Filtering
 
-        Only standing approvals with status `active` are returned by default. Expired,
-        revoked, and exhausted standing approvals are excluded.
+        Only standing approvals with status `active` are returned by default. Expired
+        and revoked standing approvals are excluded.
 
         ## Security
 
@@ -3988,8 +3979,6 @@ paths:
                       sender: '*@github.com'
                       max_results: 10
                     status: active
-                    max_executions: null
-                    execution_count: 42
                     starts_at: '2026-02-14T00:00:00Z'
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
@@ -4004,8 +3993,6 @@ paths:
                       recipient_pattern: '*@mycompany.com'
                       max_recipients: 5
                     status: active
-                    max_executions: 100
-                    execution_count: 12
                     starts_at: '2026-02-14T00:00:00Z'
                     expires_at: '2026-05-15T00:00:00Z'
                     created_at: '2026-02-14T10:35:00Z'
@@ -4077,7 +4064,6 @@ paths:
               - active
               - expired
               - revoked
-              - exhausted
               - all
             default: active
           example: active
@@ -4128,8 +4114,6 @@ paths:
                     constraints:
                       sender: '*@github.com'
                     status: active
-                    max_executions: null
-                    execution_count: 42
                     starts_at: '2026-02-14T00:00:00Z'
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
@@ -4197,7 +4181,6 @@ paths:
               constraints:
                 recipient_pattern: '*@mycompany.com'
               source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-              max_executions: 100
               expires_at: '2026-03-14T00:00:00Z'
       responses:
         '201':
@@ -4325,7 +4308,7 @@ paths:
                     status: revoked
                   trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '410':
-          description: Standing approval no longer active (expired or exhausted)
+          description: Standing approval no longer active (expired or revoked)
           content:
             application/json:
               schema:
@@ -4349,17 +4332,13 @@ paths:
       operationId: updateStandingApproval
       summary: Update Standing Approval
       description: |
-        Update the constraints, max_executions, and expires_at of an active standing approval.
+        Update the constraints and expires_at of an active standing approval.
         The standing approval must belong to the authenticated user and be in `active` status.
-        Agent and action type cannot be changed — only constraints and limits.
+        Agent and action type cannot be changed — only constraints and expiry.
 
         **Duration policy**: The total lifespan from the approval's original `starts_at` may not exceed
         the maximum allowed window (90 days). Expiry headroom shrinks as the approval ages — this is
         not a rolling window from the time of the update call.
-
-        **Execution count**: `max_executions` cannot be set below the approval's current
-        `execution_count`. The update is rejected atomically at the database level to prevent
-        a race condition where concurrent executions could otherwise create a zombie approval.
 
         Emits a `standing_approval.updated` audit event on success.
       tags:
@@ -4377,7 +4356,6 @@ paths:
             example:
               constraints:
                 recipient_pattern: '*@mycompany.com'
-              max_executions: 200
               expires_at: '2026-04-14T00:00:00Z'
       responses:
         '200':
@@ -4413,7 +4391,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '410':
-          description: Standing approval no longer active (expired or exhausted)
+          description: Standing approval no longer active (expired or revoked)
           content:
             application/json:
               schema:
@@ -4431,7 +4409,7 @@ paths:
       description: |
         Record an execution of an active standing approval. The standing approval
         must belong to the authenticated user and be in `active` status. Atomically
-        increments the execution count and creates an execution record.
+        creates an execution record.
 
         Emits a `standing_approval.executed` audit event on success.
       tags:
@@ -4501,7 +4479,7 @@ paths:
                     status: revoked
                   trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '410':
-          description: Standing approval no longer active (expired or exhausted)
+          description: Standing approval no longer active (expired or revoked)
           content:
             application/json:
               schema:
@@ -6815,9 +6793,8 @@ components:
         Response after submitting an approval request. Two possible outcomes:
 
         **Auto-approved** (`status: "approved"`): A matching standing approval was found.
-        The action was executed immediately. The response includes `result`,
-        `standing_approval_id`, and optionally `executions_remaining`. No `approval_id`
-        or `approval_url` is returned.
+        The action was executed immediately. The response includes `result` and
+        `standing_approval_id`. No `approval_id` or `approval_url` is returned.
 
         **Pending** (`status: "pending"`): No standing approval matched. A pending approval
         was created. The agent should poll `GET /v1/approvals/{approval_id}/status` for the
@@ -6872,13 +6849,6 @@ components:
           description: |
             ID of the standing approval that matched. Present only when `status` is `approved`.
           example: sa_abc123
-        executions_remaining:
-          type: integer
-          description: |
-            Number of executions remaining on the standing approval.
-            Present only when `status` is `approved` and the standing approval has a
-            finite `max_executions`. Absent when unlimited.
-          example: 47
       example:
         approval_id: appr_xyz789
         approval_url: https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
@@ -8102,7 +8072,6 @@ components:
         - action_type
         - constraints
         - status
-        - execution_count
         - starts_at
         - created_at
         - source_action_configuration_id
@@ -8165,30 +8134,13 @@ components:
             - active
             - expired
             - revoked
-            - exhausted
           description: |
             Current status of the standing approval.
 
             - **active**: Agent can execute actions under this standing approval
             - **expired**: Duration elapsed; agent must request a new standing approval or use one-off
             - **revoked**: User manually cancelled this standing approval
-            - **exhausted**: Max execution count reached
           example: active
-        max_executions:
-          type: integer
-          minimum: 1
-          nullable: true
-          description: |
-            Maximum number of times the agent can execute under this standing approval.
-            `null` means unlimited — the agent can execute as many times as it wants
-            within the duration.
-          example: null
-        execution_count:
-          type: integer
-          minimum: 0
-          description: |
-            Number of times this standing approval has been used so far.
-          example: 42
         starts_at:
           type: string
           format: date-time
@@ -8238,8 +8190,6 @@ components:
           sender: '*@github.com'
           max_results: 10
         status: active
-        max_executions: null
-        execution_count: 42
         starts_at: '2026-02-14T00:00:00Z'
         expires_at: '2026-02-21T00:00:00Z'
         created_at: '2026-02-14T10:30:00Z'
@@ -8312,7 +8262,6 @@ components:
       required:
         - result
         - standing_approval_id
-        - executions_remaining
       properties:
         result:
           type: object
@@ -8331,14 +8280,6 @@ components:
           description: |
             Which standing approval authorized this execution.
           example: sa_abc123
-        executions_remaining:
-          type: integer
-          minimum: 0
-          nullable: true
-          description: |
-            Number of executions remaining under this standing approval.
-            `null` means unlimited.
-          example: null
       example:
         result:
           emails:
@@ -8346,7 +8287,6 @@ components:
               subject: PR merged
               sender: noreply@github.com
         standing_approval_id: sa_abc123
-        executions_remaining: null
     StandingApprovalListResponse:
       type: object
       required:
@@ -8386,8 +8326,6 @@ components:
               sender: '*@github.com'
               max_results: 10
             status: active
-            max_executions: null
-            execution_count: 42
             starts_at: '2026-02-14T00:00:00Z'
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
@@ -8428,8 +8366,6 @@ components:
               sender: '*@github.com'
               max_results: 10
             status: active
-            max_executions: null
-            execution_count: 42
             starts_at: '2026-02-14T00:00:00Z'
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
@@ -8486,12 +8422,6 @@ components:
             `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
             enforce the pattern — only non-empty and max 128 characters.
           example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-        max_executions:
-          type: integer
-          minimum: 1
-          nullable: true
-          description: Maximum number of executions. Null means unlimited.
-          example: 100
         starts_at:
           type: string
           format: date-time
@@ -8512,7 +8442,6 @@ components:
         constraints:
           recipient_pattern: '*@mycompany.com'
         source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-        max_executions: 100
         expires_at: null
     RevokeStandingApprovalResponse:
       type: object
@@ -8545,12 +8474,6 @@ components:
             Updated constraint boundaries. Must be non-empty with at least one non-wildcard value.
           example:
             recipient_pattern: '*@mycompany.com'
-        max_executions:
-          type: integer
-          minimum: 1
-          nullable: true
-          description: Updated maximum number of executions. Null means unlimited.
-          example: 200
         expires_at:
           type: string
           format: date-time
@@ -8563,7 +8486,6 @@ components:
       example:
         constraints:
           recipient_pattern: '*@mycompany.com'
-        max_executions: 200
         expires_at: null
     UserExecuteStandingApprovalRequest:
       type: object
@@ -9084,8 +9006,6 @@ components:
                     constraints:
                       recipient_pattern: '*@mycompany.com'
                       max_recipients: 5
-                    max_executions: 100
-                    executions_remaining: 88
                     expires_at: '2026-05-15T00:00:00Z'
                 action_configurations:
                   - configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
@@ -9335,8 +9255,6 @@ components:
           - standing_approval_id: sa_def456
             constraints:
               recipient_pattern: '*@mycompany.com'
-            max_executions: 100
-            executions_remaining: 88
             expires_at: '2026-05-15T00:00:00Z'
         action_configurations:
           - configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
@@ -9351,7 +9269,6 @@ components:
       required:
         - standing_approval_id
         - constraints
-        - executions_remaining
         - expires_at
       properties:
         standing_approval_id:
@@ -9378,23 +9295,6 @@ components:
           example:
             recipient_pattern: '*@mycompany.com'
             max_recipients: 5
-        max_executions:
-          type: integer
-          minimum: 1
-          nullable: true
-          description: |
-            Maximum number of executions allowed under this standing approval.
-            `null` means unlimited.
-          example: 100
-        executions_remaining:
-          type: integer
-          minimum: 0
-          nullable: true
-          description: |
-            Number of executions remaining. `null` means unlimited (when
-            `max_executions` is null). When this reaches `0`, the standing
-            approval is exhausted and the agent must use one-off approval.
-          example: 88
         expires_at:
           type: string
           format: date-time
@@ -9408,8 +9308,6 @@ components:
         constraints:
           recipient_pattern: '*@mycompany.com'
           max_recipients: 5
-        max_executions: 100
-        executions_remaining: 88
         expires_at: '2026-05-15T00:00:00Z'
     ActionConfigCapability:
       type: object
@@ -11430,7 +11328,6 @@ components:
             - agent_limit_reached
             - standing_approval_limit_reached
             - credential_limit_reached
-            - standing_approval_exhausted
             - constraint_violation
             - standing_approval_expired
             - subscription_not_found
@@ -11733,12 +11630,6 @@ components:
           description: |
             Number of days until the standing approval expires. `null` means no
             expiry (until revoked).
-        max_executions:
-          type: integer
-          nullable: true
-          minimum: 1
-          description: |
-            Optional cap on executions. `null` means unlimited within the window.
     BulkApplyActionConfigTemplateRequest:
       type: object
       required:
@@ -11781,7 +11672,6 @@ components:
         - standing_approval_id
         - action_type
         - status
-        - execution_count
       properties:
         standing_approval_id:
           type: string
@@ -11797,15 +11687,6 @@ components:
           format: date-time
           nullable: true
           description: When the standing approval expires, or null if it lasts until revoked.
-        max_executions:
-          type: integer
-          nullable: true
-          minimum: 1
-          description: Execution cap, if any.
-        execution_count:
-          type: integer
-          minimum: 0
-          description: Executions recorded so far.
     BulkApplyResultError:
       type: object
       required:

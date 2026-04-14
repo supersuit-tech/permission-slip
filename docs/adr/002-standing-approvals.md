@@ -98,7 +98,6 @@ Created ──> Active ──> Expired
 2. **Active:** Agent can execute the action freely within constraints.
 3. **Expired:** Duration elapsed. Agent must request a new standing approval or fall back to one-off.
 4. **Revoked:** User manually cancels at any time. Takes effect immediately.
-5. **Exhausted:** Max execution count reached. Same as expired.
 
 ---
 
@@ -110,9 +109,8 @@ Standing approvals **do not relax constraints** — they relax the approval prom
 2. **Standing approval matched** (agent + action type + active status)
 3. **Parameters validated against constraints** (same rules as ADR-001 Decision 4)
 4. **TTL checked** (standing approval not expired)
-5. **Execution count checked** (if max_executions set, not exceeded)
-6. **Action executed** via connector with stored credentials
-7. **Audit log entry created** (every execution, not just the standing approval creation)
+5. **Action executed** via connector with stored credentials
+6. **Audit log entry created** (every execution, not just the standing approval creation)
 
 If parameters violate constraints, the request is **rejected immediately** — same as the one-off flow. The standing approval doesn't make constraint violations pass.
 
@@ -148,17 +146,6 @@ Users set the duration to any value up to a **90-day maximum**. This cap prevent
 
 ---
 
-### Max executions
-
-| Setting | Behavior |
-|---|---|
-| Unlimited (default) | No cap — agent can execute as many times as it wants within the duration |
-| N (positive integer) | Standing approval becomes `exhausted` after N executions |
-
-**Use case for capped executions:** "Send up to 5 summary emails this week" — the user wants to pre-approve a finite batch without being prompted for each one, but doesn't want the agent sending 500 emails.
-
----
-
 ### Security considerations
 
 **Standing approvals shift risk.** Instead of reviewing each action in real-time, the user is making a forward-looking trust decision. This is acceptable when:
@@ -174,7 +161,6 @@ Users set the duration to any value up to a **90-day maximum**. This cap prevent
 The web interface SHOULD warn users when creating standing approvals with:
 - No recipient constraints on `email.send`
 - Maximum duration (90 days) on write actions
-- Unlimited executions on write actions
 - Multiple broad standing approvals for the same agent
 
 ---
@@ -189,9 +175,7 @@ STANDING_APPROVAL {
     string  action_type           "email.read | email.send"
     string  action_version        "1"
     json    constraints           "same schema as ACTION_CONFIG"
-    string  status                "active | expired | revoked | exhausted"
-    int     max_executions        "null = unlimited"
-    int     execution_count       "current count"
+    string  status                "active | expired | revoked"
     timestamp starts_at
     timestamp expires_at          "NOT NULL, max 90 days from starts_at"
     timestamp created_at
@@ -209,14 +193,14 @@ Every execution under a standing approval also writes to `AUDIT_LOG` with `event
 - **Reduces approval fatigue.** Repetitive, predictable actions shouldn't require a prompt every time.
 - **Constraints are still enforced.** This relaxes the *approval prompt*, not the *security boundary*.
 - **90-day cap prevents permanent delegation.** Users must periodically re-evaluate standing approvals, preventing security drift from "set and forget" grants.
-- **User controls the risk window.** Duration (up to 90 days), execution caps, and instant revocation are all user-defined.
+- **User controls the risk window.** Duration (up to 90 days) and instant revocation are user-defined.
 - **Progressive trust.** Users start with one-off approvals, then graduate to standing approvals for actions they trust — the system grows with the user's confidence.
 
 ## Alternatives considered
 
 - **Longer TTL on single-use tokens.** Doesn't solve the problem — you'd need 288 tokens per day for a 5-minute check. And single-use means one execution per token.
-- **Batch approvals (approve N actions at once).** Awkward UX — user has to approve a specific count upfront. Standing approvals with `max_executions` subsume this.
-- **Auto-approve rules as a separate concept.** Standing approvals already cover this — a standing approval with 90-day duration and unlimited executions is functionally an auto-approve rule, but managed through the same UI with periodic renewal.
+- **Batch approvals (approve N actions at once).** Awkward UX — user has to approve a specific count upfront. Standing approvals handle recurring automation via duration and constraints instead.
+- **Auto-approve rules as a separate concept.** Standing approvals already cover this — a standing approval with 90-day duration is functionally an auto-approve rule, but managed through the same UI with periodic renewal.
 - **Refresh tokens.** Adds complexity (refresh flow, token rotation) for something that standing approvals handle more cleanly at the authorization layer rather than the token layer.
 
 ## Consequences
