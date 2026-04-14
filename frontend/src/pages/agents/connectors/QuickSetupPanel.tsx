@@ -12,9 +12,11 @@ import { approvalModeOptions, type ApprovalMode } from "./recommendedTemplatesTy
 export function QuickSetupPanel({
   quickRead,
   quickWrite,
+  quickEdit,
   quickDelete,
   onQuickReadChange,
   onQuickWriteChange,
+  onQuickEditChange,
   onQuickDeleteChange,
   onApply,
   disabled,
@@ -22,9 +24,11 @@ export function QuickSetupPanel({
 }: {
   quickRead: ApprovalMode;
   quickWrite: ApprovalMode;
+  quickEdit: ApprovalMode;
   quickDelete: ApprovalMode;
   onQuickReadChange: (v: ApprovalMode) => void;
   onQuickWriteChange: (v: ApprovalMode) => void;
+  onQuickEditChange: (v: ApprovalMode) => void;
   onQuickDeleteChange: (v: ApprovalMode) => void;
   onApply: () => void;
   disabled: boolean;
@@ -78,6 +82,35 @@ export function QuickSetupPanel({
             <SelectTrigger
               id="quick-write"
               data-testid="quick-setup-write"
+              size="sm"
+              className="max-w-[11rem] min-w-0 flex-1"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {approvalModeOptions.map((o) => (
+                <SelectItem key={o.value} value={o.value}>
+                  {o.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Label
+            htmlFor="quick-edit"
+            className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
+          >
+            Edit actions
+          </Label>
+          <Select
+            value={quickEdit}
+            onValueChange={(v) => onQuickEditChange(v as ApprovalMode)}
+            disabled={disabled}
+          >
+            <SelectTrigger
+              id="quick-edit"
+              data-testid="quick-setup-edit"
               size="sm"
               className="max-w-[11rem] min-w-0 flex-1"
             >

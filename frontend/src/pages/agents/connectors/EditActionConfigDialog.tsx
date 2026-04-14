@@ -19,7 +19,6 @@ import {
   parseParametersSchema,
 } from "./ActionConfigParameterFields";
 import {
-  WILDCARD_ACTION_TYPE,
   NameField,
   DescriptionField,
   StatusSelect,
@@ -61,13 +60,9 @@ export function EditActionConfigDialog({
     inferModesFromConfig(config.parameters),
   );
 
-  const isWildcard = config.action_type === WILDCARD_ACTION_TYPE;
   const action = useMemo(
-    () =>
-      isWildcard
-        ? null
-        : actions.find((a) => a.action_type === config.action_type) ?? null,
-    [actions, config.action_type, isWildcard],
+    () => actions.find((a) => a.action_type === config.action_type) ?? null,
+    [actions, config.action_type],
   );
 
   const schema = useMemo(
@@ -127,11 +122,9 @@ export function EditActionConfigDialog({
           <DialogHeader>
             <DialogTitle>Edit Action Configuration</DialogTitle>
             <DialogDescription>
-              {isWildcard
-                ? "Update the name, description, or status for this enable-all configuration. Parameters cannot be changed on wildcard configurations."
-                : <>Update the configuration for{" "}
-                  <strong>{action?.name ?? config.action_type}</strong>. The action
-                  type and connector cannot be changed.</>}
+              Update the configuration for{" "}
+              <strong>{action?.name ?? config.action_type}</strong>. The action
+              type and connector cannot be changed.
             </DialogDescription>
           </DialogHeader>
 
@@ -139,16 +132,12 @@ export function EditActionConfigDialog({
             {/* Action (read-only) */}
             <div className="space-y-2">
               <Label>Action</Label>
-              {isWildcard ? (
-                <p className="text-sm font-medium">All Actions <span className="text-muted-foreground font-mono text-xs">(*)</span></p>
-              ) : (
-                <p className="text-sm">
-                  {action?.name ?? config.action_type}{" "}
-                  <span className="text-muted-foreground font-mono text-xs">
-                    ({config.action_type})
-                  </span>
-                </p>
-              )}
+              <p className="text-sm">
+                {action?.name ?? config.action_type}{" "}
+                <span className="text-muted-foreground font-mono text-xs">
+                  ({config.action_type})
+                </span>
+              </p>
             </div>
 
             <NameField
@@ -172,14 +161,7 @@ export function EditActionConfigDialog({
               disabled={isPending}
             />
 
-            {isWildcard ? (
-              <div className="space-y-2">
-                <Label>Parameters</Label>
-                <p className="text-muted-foreground text-sm italic">
-                  All parameters — agent chooses freely. Parameters cannot be modified on wildcard configurations.
-                </p>
-              </div>
-            ) : action ? (
+            {action ? (
               <div className="space-y-2">
                 <Label>Parameters</Label>
                 <ActionConfigParameterFields

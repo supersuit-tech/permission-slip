@@ -5,9 +5,6 @@ import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import validation from "@/lib/validation";
 
-/** Reserved action_type value meaning "all actions on this connector". */
-export const WILDCARD_ACTION_TYPE = "*";
-
 const selectClassName =
   "border-input bg-background flex h-9 w-full rounded-md border px-3 py-1 text-sm";
 

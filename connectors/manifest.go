@@ -32,7 +32,7 @@ type ConnectorManifest struct {
 // ManifestAction describes a single action exposed by an external connector.
 type ManifestAction struct {
 	ActionType            string          `json:"action_type"`
-	OperationType         string          `json:"operation_type,omitempty"` // read, write, or delete; inferred from action_type when empty
+	OperationType         string          `json:"operation_type,omitempty"` // read, write, edit, or delete; inferred from action_type when empty
 	Name                  string          `json:"name"`
 	Description           string          `json:"description"`
 	RiskLevel             string          `json:"risk_level"`
@@ -119,6 +119,7 @@ var validRiskLevels = map[string]bool{
 var validOperationTypes = map[string]bool{
 	"read":   true,
 	"write":  true,
+	"edit":   true,
 	"delete": true,
 }
 
@@ -256,7 +257,7 @@ func (m *ConnectorManifest) Validate() error {
 			return fmt.Errorf("manifest validation: actions[%d].name is required", i)
 		}
 		if a.OperationType != "" && !validOperationTypes[a.OperationType] {
-			return fmt.Errorf("manifest validation: actions[%d].operation_type %q must be read, write, or delete", i, a.OperationType)
+			return fmt.Errorf("manifest validation: actions[%d].operation_type %q must be read, write, edit, or delete", i, a.OperationType)
 		}
 		if a.RiskLevel != "" && !validRiskLevels[a.RiskLevel] {
 			return fmt.Errorf("manifest validation: actions[%d].risk_level %q must be low, medium, or high", i, a.RiskLevel)
@@ -676,14 +677,17 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 		})
 	}
 	for _, tpl := range m.Templates {
+		sa := tpl.StandingApproval
+		if sa == nil {
+			// Empty spec = never-expire standing approval when template is applied (no duration_days).
+			sa = new(ManifestStandingApproval)
+		}
 		var standingSpec []byte
-		if tpl.StandingApproval != nil {
-			b, err := json.Marshal(tpl.StandingApproval)
-			if err != nil {
-				log.Printf("warning: failed to marshal standing_approval for template %s: %v", tpl.ID, err)
-			} else {
-				standingSpec = b
-			}
+		b, err := json.Marshal(sa)
+		if err != nil {
+			log.Printf("warning: failed to marshal standing_approval for template %s: %v", tpl.ID, err)
+		} else {
+			standingSpec = b
 		}
 		out.Templates = append(out.Templates, db.ExternalConnectorTemplate{
 			ID:                   tpl.ID,

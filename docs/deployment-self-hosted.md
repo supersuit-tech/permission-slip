@@ -420,6 +420,27 @@ The server listens on plain HTTP. In production, terminate TLS in front of it:
 
 If using a reverse proxy other than Fly.io, set `TRUSTED_PROXY_HEADER` to the header your proxy uses for the real client IP (e.g., `X-Forwarded-For` or `X-Real-IP`). The default is `Fly-Client-IP`.
 
+## Private Deployments: Gateway Secret
+
+For private deployments (home servers, Raspberry Pis, internal-only instances) you can require a shared secret on every request as an outer access gate. This is most useful in combination with a tunnel like Cloudflare Tunnel or Tailscale Funnel, where leaking the tunnel hostname would otherwise expose the login page to the internet.
+
+Set `GATEWAY_SECRET` to a long random string (generate with `openssl rand -hex 32`). When the variable is set, the server rejects any non-preflight request without a matching `X-Gateway-Secret` header and returns `403 Forbidden` before routing, CORS, or auth runs. When the variable is unset, the middleware is a no-op — existing deployments are unaffected.
+
+```bash
+export GATEWAY_SECRET="$(openssl rand -hex 32)"
+```
+
+**Client configuration:**
+
+- **Mobile app:** In Settings → Server, enable **Custom Server**, enter your deployment URL, and paste the gateway secret. The app persists the value in the platform keystore (iOS Keychain / Android EncryptedSharedPreferences) and injects the header on every request. Changes take effect after an app restart.
+- **curl / scripts:** Send `X-Gateway-Secret: <your secret>` with every request.
+- **Web browser:** Because the header can't be injected by the browser, the web UI is not usable with `GATEWAY_SECRET` enabled. Use the mobile app, or put the web UI behind a VPN / Tailscale instead.
+
+**Scope:**
+
+- Genuine CORS preflights (`OPTIONS` with `Access-Control-Request-Method`) are exempt; all other requests are gated, including the health check.
+- The comparison is constant-time over SHA-256 digests to avoid leaking the secret length.
+
 ## Custom Connectors
 
 Permission Slip ships with built-in GitHub, HubSpot, Slack, and PostgreSQL connectors. To add custom connectors:
@@ -465,6 +486,7 @@ Rotate secrets on a regular cadence (every 90 days recommended for API keys and 
 - **`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY`** — rotate in AWS IAM console, deploy new credentials, then delete the old access key.
 - **`VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`** — only rotate if compromised. **Invalidates all push subscriptions** (users must re-subscribe).
 - **`STRIPE_SECRET_KEY` / `STRIPE_WEBHOOK_SECRET`** — roll keys in Stripe dashboard (supports overlap periods), update env var, then revoke old key.
+- **`GATEWAY_SECRET`** — regenerate with `openssl rand -hex 32`. **Every client must be updated simultaneously** (mobile app Settings, scripts, curl) — there is no overlap window. Consider a brief maintenance window when rotating.
 
 For detailed rotation instructions and a full schedule, see the [Production Deployment Guide — Rotating Secrets](deployment-production.md#rotating-secrets).
 
@@ -540,3 +562,4 @@ Migrations run automatically on startup. If they fail, check database connectivi
 | `VITE_STRIPE_PUBLISHABLE_KEY` | For billing | Build | Stripe publishable key (frontend) |
 | `CONNECTORS_DIR` | No | Runtime | Custom connector directory |
 | `CUSTOM_CONNECTORS_JSON` | No | Runtime | Inline connector JSON config |
+| `GATEWAY_SECRET` | No | Runtime | Shared secret for private deployments. When set, every non-preflight request must include a matching `X-Gateway-Secret` header or receive 403. No-op when unset. See [Private Deployments: Gateway Secret](#private-deployments-gateway-secret). |

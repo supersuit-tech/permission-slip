@@ -99,16 +99,15 @@ describe("ActionConfigurationsSection", () => {
     });
   });
 
-  it("shows empty state with Enable All Actions button", () => {
+  it("shows empty state with Add Configuration button", () => {
     renderSection();
     expect(
-      screen.getByText("Enable All Actions"),
+      screen.getByRole("button", { name: /Add Configuration/ }),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Your agent can use any action from this connector/),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Advanced: configure individual actions"),
+      screen.getByText(
+        /Define which actions this agent can use and lock in parameter values/,
+      ),
     ).toBeInTheDocument();
   });
 
@@ -148,14 +147,19 @@ describe("ActionConfigurationsSection", () => {
     expect(wildcardBadges.length).toBe(2); // title and body
   });
 
-  it("hides Add Configuration button in empty state", () => {
-    renderSection();
-    expect(screen.queryByText("Add Configuration")).not.toBeInTheDocument();
-  });
-
   it("shows Add Configuration button when configs exist", () => {
     renderSection({ configs: mockConfigs });
     expect(screen.getByText("Add Configuration")).toBeInTheDocument();
+  });
+
+  it("opens Add dialog when clicking empty-state Add Configuration button", async () => {
+    const user = userEvent.setup();
+    renderSection();
+
+    await user.click(
+      screen.getByRole("button", { name: /Add Configuration/ }),
+    );
+    expect(screen.getByText("Add Action Configuration")).toBeInTheDocument();
   });
 
   it("opens Add dialog when clicking Add Configuration with configs", async () => {
@@ -310,197 +314,6 @@ describe("ActionConfigurationsSection", () => {
     ];
     renderSection({ configs: disabledConfig });
     expect(screen.getByText("Disabled")).toBeInTheDocument();
-  });
-
-  it("calls create with wildcard action_type when clicking Enable All Actions", async () => {
-    const user = userEvent.setup();
-    mockPost.mockResolvedValue({
-      data: {
-        id: "ac_wildcard",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "*",
-        parameters: {},
-        status: "active",
-        name: "All GitHub Actions",
-        created_at: "2026-03-11T10:00:00Z",
-        updated_at: "2026-03-11T10:00:00Z",
-      },
-    });
-
-    renderSection();
-    await user.click(screen.getByText("Enable All Actions"));
-
-    await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith("/v1/action-configurations", {
-        headers: { Authorization: "Bearer token" },
-        body: {
-          agent_id: 42,
-          connector_id: "github",
-          action_type: "*",
-          name: "All GitHub Actions",
-          parameters: {},
-        },
-      });
-    });
-  });
-
-  it("renders wildcard config with All Actions badge", () => {
-    const wildcardConfig: ActionConfiguration[] = [
-      {
-        id: "ac_wildcard",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "*",
-        parameters: {},
-        status: "active",
-        name: "All GitHub Actions",
-        description: null,
-        created_at: "2026-03-11T10:00:00Z",
-        updated_at: "2026-03-11T10:00:00Z",
-      },
-    ];
-    renderSection({ configs: wildcardConfig });
-
-    expect(screen.getByText("All GitHub Actions")).toBeInTheDocument();
-    expect(screen.getByText("All Actions")).toBeInTheDocument();
-    expect(
-      screen.getByText(/All parameters — agent chooses freely/),
-    ).toBeInTheDocument();
-  });
-
-  it("shows Enable All Actions in the header when configs exist and none are wildcard", () => {
-    renderSection({ configs: mockConfigs });
-    expect(
-      screen.getByRole("button", { name: /Enable All Actions/ }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("Add Configuration")).toBeInTheDocument();
-  });
-
-  it("hides header Enable All Actions when wildcard and non-wildcard configs coexist", () => {
-    const mixedConfigs: ActionConfiguration[] = [
-      ...mockConfigs,
-      {
-        id: "ac_wildcard",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "*",
-        parameters: {},
-        status: "active",
-        name: "All GitHub Actions",
-        description: null,
-        created_at: "2026-03-11T10:00:00Z",
-        updated_at: "2026-03-11T10:00:00Z",
-      },
-    ];
-    renderSection({ configs: mixedConfigs });
-    expect(
-      screen.queryByRole("button", { name: /Enable All Actions/ }),
-    ).not.toBeInTheDocument();
-    expect(screen.getByText("Add Configuration")).toBeInTheDocument();
-  });
-
-  it("hides Enable All Actions header button when a wildcard config exists", () => {
-    const wildcardConfig: ActionConfiguration[] = [
-      {
-        id: "ac_wildcard",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "*",
-        parameters: {},
-        status: "active",
-        name: "All GitHub Actions",
-        description: null,
-        created_at: "2026-03-11T10:00:00Z",
-        updated_at: "2026-03-11T10:00:00Z",
-      },
-    ];
-    renderSection({ configs: wildcardConfig });
-    expect(
-      screen.queryByRole("button", { name: /Enable All Actions/ }),
-    ).not.toBeInTheDocument();
-    // The "All Actions" badge in the table row should still be present
-    expect(screen.getByText("All Actions")).toBeInTheDocument();
-  });
-
-  it("calls create with wildcard action_type when clicking header Enable All Actions with existing configs", async () => {
-    const user = userEvent.setup();
-    mockPost.mockResolvedValue({
-      data: {
-        id: "ac_wildcard",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "*",
-        parameters: {},
-        status: "active",
-        name: "All GitHub Actions",
-        created_at: "2026-03-11T10:00:00Z",
-        updated_at: "2026-03-11T10:00:00Z",
-      },
-    });
-
-    renderSection({ configs: mockConfigs });
-    await user.click(screen.getByRole("button", { name: /Enable All Actions/ }));
-
-    await waitFor(() => {
-      expect(mockPost).toHaveBeenCalledWith("/v1/action-configurations", {
-        headers: { Authorization: "Bearer token" },
-        body: {
-          agent_id: 42,
-          connector_id: "github",
-          action_type: "*",
-          name: "All GitHub Actions",
-          parameters: {},
-        },
-      });
-    });
-  });
-
-  it("shows loading spinner and disables header Enable All Actions while create is pending", async () => {
-    const user = userEvent.setup();
-    let resolvePost: (value: unknown) => void;
-    const pending = new Promise((resolve) => {
-      resolvePost = resolve;
-    });
-    mockPost.mockReturnValue(pending);
-
-    renderSection({ configs: mockConfigs });
-    await user.click(screen.getByRole("button", { name: /Enable All Actions/ }));
-
-    const btn = screen.getByRole("button", { name: /Enable All Actions/ });
-    expect(btn).toBeDisabled();
-    expect(btn.querySelector(".animate-spin")).toBeTruthy();
-
-    resolvePost!({
-      data: {
-        id: "ac_wildcard",
-        agent_id: 42,
-        connector_id: "github",
-        action_type: "*",
-        parameters: {},
-        status: "active",
-        name: "All GitHub Actions",
-        created_at: "2026-03-11T10:00:00Z",
-        updated_at: "2026-03-11T10:00:00Z",
-      },
-    });
-
-    await waitFor(() => {
-      expect(btn).not.toBeDisabled();
-    });
-  });
-
-  it("shows advanced option to add custom config in empty state", async () => {
-    const user = userEvent.setup();
-    renderSection();
-
-    // Click the advanced toggle
-    await user.click(
-      screen.getByText("Advanced: configure individual actions"),
-    );
-    expect(
-      screen.getByText("Add Custom Configuration"),
-    ).toBeInTheDocument();
   });
 
   it("hides Recommended Templates triggers while templates are loading", () => {

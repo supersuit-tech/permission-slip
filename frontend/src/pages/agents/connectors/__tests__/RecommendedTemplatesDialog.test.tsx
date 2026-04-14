@@ -56,6 +56,15 @@ const mixedActions: ConnectorAction[] = [
     parameters_schema: {},
   },
   {
+    action_type: "github.update_issue",
+    operation_type: "edit",
+    name: "Update Issue",
+    description: "",
+    risk_level: "low",
+    requires_payment_method: false,
+    parameters_schema: {},
+  },
+  {
     action_type: "github.close_issue",
     operation_type: "delete",
     name: "Close Issue",
@@ -84,6 +93,15 @@ const mixedTemplates = [
     description: "Desc A",
     parameters: { repo: "*", title: "*" },
     standing_approval: { duration_days: 30 },
+    created_at: "2026-01-01T00:00:00Z",
+  },
+  {
+    id: "tpl_edit",
+    connector_id: "github",
+    action_type: "github.update_issue",
+    name: "Edit titles",
+    description: "E",
+    parameters: {},
     created_at: "2026-01-01T00:00:00Z",
   },
   {
@@ -570,13 +588,14 @@ describe("RecommendedTemplatesDialog", () => {
     expect(opts.body.approval_mode).toBe("requires_approval");
   });
 
-  it("renders Read / Write / Delete section headings when operation types differ", async () => {
+  it("renders Read / Write / Edit / Delete section headings when operation types differ", async () => {
     renderMixedDialog();
 
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: "Read actions" })).toBeInTheDocument();
     });
     expect(screen.getByRole("heading", { name: "Write actions" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Edit actions" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Delete actions" })).toBeInTheDocument();
   });
 
@@ -629,6 +648,7 @@ describe("RecommendedTemplatesDialog", () => {
         results: [
           { template_id: "tpl_read", success: true },
           { template_id: "tpl_a", success: true },
+          { template_id: "tpl_edit", success: true },
           { template_id: "tpl_del", success: true },
         ],
       },
@@ -645,6 +665,9 @@ describe("RecommendedTemplatesDialog", () => {
 
     fireEvent.click(screen.getByTestId("quick-setup-write"));
     fireEvent.click(await screen.findByRole("option", { name: "Auto-approve" }));
+
+    fireEvent.click(screen.getByTestId("quick-setup-edit"));
+    fireEvent.click(await screen.findByRole("option", { name: "Requires approval" }));
 
     fireEvent.click(screen.getByTestId("quick-setup-delete"));
     fireEvent.click(await screen.findByRole("option", { name: "Auto-approve" }));
@@ -663,14 +686,19 @@ describe("RecommendedTemplatesDialog", () => {
       within(writeCard as HTMLElement).getByRole("radio", { name: "Auto-approve" }),
     ).toHaveAttribute("aria-checked", "true");
 
+    const editCard = screen.getByText("Edit titles").closest(".rounded-lg")!;
+    expect(
+      within(editCard as HTMLElement).getByRole("radio", { name: "Requires approval" }),
+    ).toHaveAttribute("aria-checked", "true");
+
     const delCard = screen.getByText("Close stale").closest(".rounded-lg")!;
     expect(
       within(delCard as HTMLElement).getByRole("radio", { name: "Auto-approve" }),
     ).toHaveAttribute("aria-checked", "true");
 
-    expect(screen.getByText("3 of 3 selected")).toBeInTheDocument();
+    expect(screen.getByText("4 of 4 selected")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Enable Selected (3)" }));
+    await user.click(screen.getByRole("button", { name: "Enable Selected (4)" }));
 
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalled();
@@ -685,10 +713,11 @@ describe("RecommendedTemplatesDialog", () => {
         };
       },
     ];
-    expect(bulkOpts.body.template_ids).toEqual(["tpl_read", "tpl_a", "tpl_del"]);
+    expect(bulkOpts.body.template_ids).toEqual(["tpl_read", "tpl_a", "tpl_edit", "tpl_del"]);
     expect(bulkOpts.body.approval_modes).toEqual({
       tpl_read: "requires_approval",
       tpl_a: "auto_approve",
+      tpl_edit: "requires_approval",
       tpl_del: "auto_approve",
     });
   });
@@ -824,9 +853,9 @@ describe("RecommendedTemplatesDialog", () => {
     });
     await user.click(writeSelectAll);
 
-    expect(screen.getByText("1 of 3 selected")).toBeInTheDocument();
+    expect(screen.getByText("1 of 4 selected")).toBeInTheDocument();
 
     await user.click(writeSelectAll);
-    expect(screen.getByText("0 of 3 selected")).toBeInTheDocument();
+    expect(screen.getByText("0 of 4 selected")).toBeInTheDocument();
   });
 });

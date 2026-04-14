@@ -33,7 +33,7 @@ type ConnectorDetail struct {
 // ConnectorAction represents a row from the connector_actions table.
 type ConnectorAction struct {
 	ActionType            string
-	OperationType         string // read, write, or delete
+	OperationType         string // read, write, edit, or delete
 	Name                  string
 	Description           *string
 	RiskLevel             *string
@@ -261,7 +261,7 @@ type ExternalConnectorManifest struct {
 // ExternalConnectorAction describes an action from an external connector manifest.
 type ExternalConnectorAction struct {
 	ActionType            string
-	OperationType         string // read, write, or delete
+	OperationType         string // read, write, edit, or delete
 	Name                  string
 	Description           string
 	RiskLevel             string

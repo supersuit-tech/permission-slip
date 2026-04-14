@@ -22,10 +22,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
-				ActionType:  "github.create_issue",
-				Name:        "Create Issue",
-				Description: "Create a new issue in a repository",
-				RiskLevel:   "low",
+				ActionType:      "github.create_issue",
+				Name:            "Create Issue",
+				Description:     "Create a new issue in a repository",
+				RiskLevel:       "low",
 				DisplayTemplate: "Create issue {{title}} in {{owner}}/{{repo}}",
 				Preview: &connectors.ActionPreview{
 					Layout: "record",
@@ -59,10 +59,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.merge_pr",
-				Name:        "Merge Pull Request",
-				Description: "Merge an open pull request",
-				RiskLevel:   "medium",
+				ActionType:      "github.merge_pr",
+				Name:            "Merge Pull Request",
+				Description:     "Merge an open pull request",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Merge PR #{{pull_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -94,10 +94,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.create_pr",
-				Name:        "Create Pull Request",
-				Description: "Create a pull request from a branch",
-				RiskLevel:   "medium",
+				ActionType:      "github.create_pr",
+				Name:            "Create Pull Request",
+				Description:     "Create a pull request from a branch",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create PR {{title}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -143,10 +143,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.add_reviewer",
-				Name:        "Add Reviewer",
-				Description: "Request reviews on a pull request",
-				RiskLevel:   "low",
+				ActionType:      "github.add_reviewer",
+				Name:            "Add Reviewer",
+				Description:     "Request reviews on a pull request",
+				RiskLevel:       "low",
 				DisplayTemplate: "Request review on PR #{{pull_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -177,10 +177,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.create_release",
-				Name:        "Create Release",
-				Description: "Create a tagged release in a repository",
-				RiskLevel:   "medium",
+				ActionType:      "github.create_release",
+				Name:            "Create Release",
+				Description:     "Create a tagged release in a repository",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create release {{tag_name}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -227,10 +227,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.close_issue",
-				Name:        "Close Issue",
-				Description: "Close an issue with an optional comment",
-				RiskLevel:   "medium",
+				ActionType:      "github.close_issue",
+				Name:            "Close Issue",
+				Description:     "Close an issue with an optional comment",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Close issue #{{issue_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -267,10 +267,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.add_label",
-				Name:        "Add Label",
-				Description: "Add labels to an issue or pull request",
-				RiskLevel:   "low",
+				ActionType:      "github.add_label",
+				Name:            "Add Label",
+				Description:     "Add labels to an issue or pull request",
+				RiskLevel:       "low",
 				DisplayTemplate: "Add labels to #{{issue_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -301,10 +301,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.add_comment",
-				Name:        "Add Comment",
-				Description: "Add a comment to an issue or pull request",
-				RiskLevel:   "low",
+				ActionType:      "github.add_comment",
+				Name:            "Add Comment",
+				Description:     "Add a comment to an issue or pull request",
+				RiskLevel:       "low",
 				DisplayTemplate: "Comment on #{{issue_number}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -334,10 +334,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.create_branch",
-				Name:        "Create Branch",
-				Description: "Create a new branch from a ref",
-				RiskLevel:   "low",
+				ActionType:      "github.create_branch",
+				Name:            "Create Branch",
+				Description:     "Create a new branch from a ref",
+				RiskLevel:       "low",
 				DisplayTemplate: "Create branch {{branch_name}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -367,10 +367,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.get_file_contents",
-				Name:        "Get File Contents",
-				Description: "Read file contents from a repository",
-				RiskLevel:   "low",
+				ActionType:      "github.get_file_contents",
+				Name:            "Get File Contents",
+				Description:     "Read file contents from a repository",
+				RiskLevel:       "low",
 				DisplayTemplate: "Read {{path}} from {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -400,10 +400,11 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.create_or_update_file",
-				Name:        "Create or Update File",
-				Description: "Create or update a file in a repository via the Contents API",
-				RiskLevel:   "medium",
+				ActionType:      "github.create_or_update_file",
+				OperationType:   "edit",
+				Name:            "Create or Update File",
+				Description:     "Create or update a file in a repository via the Contents API",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Write {{path}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -448,10 +449,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.list_repos",
-				Name:        "List Repositories",
-				Description: "List repositories for the authenticated user or an organization",
-				RiskLevel:   "low",
+				ActionType:      "github.list_repos",
+				Name:            "List Repositories",
+				Description:     "List repositories for the authenticated user or an organization",
+				RiskLevel:       "low",
 				DisplayTemplate: "List repositories",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -495,10 +496,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.get_repo",
-				Name:        "Get Repository",
-				Description: "Get repository metadata",
-				RiskLevel:   "low",
+				ActionType:      "github.get_repo",
+				Name:            "Get Repository",
+				Description:     "Get repository metadata",
+				RiskLevel:       "low",
 				DisplayTemplate: "Get repo {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -518,10 +519,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.list_pull_requests",
-				Name:        "List Pull Requests",
-				Description: "List pull requests for a repository with optional filtering",
-				RiskLevel:   "low",
+				ActionType:      "github.list_pull_requests",
+				Name:            "List Pull Requests",
+				Description:     "List pull requests for a repository with optional filtering",
+				RiskLevel:       "low",
 				DisplayTemplate: "List PRs in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -582,10 +583,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.trigger_workflow",
-				Name:        "Trigger Workflow",
-				Description: "Trigger a GitHub Actions workflow dispatch event",
-				RiskLevel:   "medium",
+				ActionType:      "github.trigger_workflow",
+				Name:            "Trigger Workflow",
+				Description:     "Trigger a GitHub Actions workflow dispatch event",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Trigger workflow {{workflow_id}} in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -621,10 +622,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.list_workflow_runs",
-				Name:        "List Workflow Runs",
-				Description: "List workflow runs for a repository with optional status, event, and actor filtering",
-				RiskLevel:   "low",
+				ActionType:      "github.list_workflow_runs",
+				Name:            "List Workflow Runs",
+				Description:     "List workflow runs for a repository with optional status, event, and actor filtering",
+				RiskLevel:       "low",
 				DisplayTemplate: "List workflow runs in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -682,10 +683,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.create_webhook",
-				Name:        "Create Webhook",
-				Description: "Create a repository webhook",
-				RiskLevel:   "medium",
+				ActionType:      "github.create_webhook",
+				Name:            "Create Webhook",
+				Description:     "Create a repository webhook",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create webhook in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -734,10 +735,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.search_code",
-				Name:        "Search Code",
-				Description: "Search code across repositories",
-				RiskLevel:   "low",
+				ActionType:      "github.search_code",
+				Name:            "Search Code",
+				Description:     "Search code across repositories",
+				RiskLevel:       "low",
 				DisplayTemplate: "Search code: {{q}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -770,10 +771,10 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.search_issues",
-				Name:        "Search Issues",
-				Description: "Search issues and pull requests across repositories",
-				RiskLevel:   "low",
+				ActionType:      "github.search_issues",
+				Name:            "Search Issues",
+				Description:     "Search issues and pull requests across repositories",
+				RiskLevel:       "low",
 				DisplayTemplate: "Search issues: {{q}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -812,10 +813,482 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "github.create_repo",
-				Name:        "Create Repository",
-				Description: "Create a new repository for the authenticated user or an organization",
-				RiskLevel:   "medium",
+				ActionType:      "github.delete_branch",
+				Name:            "Delete Branch",
+				Description:     "Delete a branch ref in a repository",
+				RiskLevel:       "high",
+				DisplayTemplate: "Delete branch {{branch_name}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "branch_name"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"branch_name": {
+							"type": "string",
+							"description": "Branch name to delete (not a full ref path)",
+							"x-ui": {"label": "Branch", "placeholder": "feature/old-branch"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.delete_file",
+				Name:            "Delete File",
+				Description:     "Delete a file from a repository via the Contents API",
+				RiskLevel:       "high",
+				DisplayTemplate: "Delete {{path}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "path", "message", "sha"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"path": {
+							"type": "string",
+							"description": "File path within the repository (relative, no leading slash)",
+							"x-ui": {"label": "File path", "placeholder": "src/old.ts"}
+						},
+						"message": {
+							"type": "string",
+							"description": "Commit message",
+							"x-ui": {"label": "Commit message"}
+						},
+						"sha": {
+							"type": "string",
+							"description": "Blob SHA of the file to delete (from get_file_contents)",
+							"x-ui": {"label": "File SHA"}
+						},
+						"branch": {
+							"type": "string",
+							"description": "Branch to commit on (defaults to default branch)",
+							"x-ui": {"label": "Branch", "placeholder": "main"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.remove_label",
+				Name:            "Remove Label",
+				Description:     "Remove a single label from an issue or pull request",
+				RiskLevel:       "low",
+				DisplayTemplate: "Remove label {{name}} from #{{issue_number}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "issue_number", "name"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"issue_number": {
+							"type": "integer",
+							"description": "Issue or pull request number",
+							"x-ui": {"label": "Issue number"}
+						},
+						"name": {
+							"type": "string",
+							"description": "Label name to remove",
+							"x-ui": {"label": "Label", "placeholder": "bug"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.close_pr",
+				Name:            "Close Pull Request",
+				Description:     "Close an open pull request without merging",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Close PR #{{pull_number}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "pull_number"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"pull_number": {
+							"type": "integer",
+							"description": "Pull request number",
+							"x-ui": {"label": "PR number"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.update_issue",
+				OperationType:   "edit",
+				Name:            "Update Issue",
+				Description:     "Update an issue title, body, assignees, or state",
+				RiskLevel:       "low",
+				DisplayTemplate: "Update issue #{{issue_number}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "issue_number"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"issue_number": {
+							"type": "integer",
+							"description": "Issue number",
+							"x-ui": {"label": "Issue number"}
+						},
+						"title": {
+							"type": "string",
+							"description": "New title (omit to leave unchanged)",
+							"x-ui": {"label": "Title"}
+						},
+						"body": {
+							"type": "string",
+							"description": "New body (omit to leave unchanged)",
+							"x-ui": {"widget": "textarea", "label": "Body"}
+						},
+						"state": {
+							"type": "string",
+							"enum": ["open", "closed"],
+							"description": "Issue state (omit to leave unchanged)",
+							"x-ui": {"widget": "select", "label": "State"}
+						},
+						"assignees": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "GitHub usernames to set as assignees (omit to leave unchanged)",
+							"x-ui": {"label": "Assignees"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.update_pr",
+				OperationType:   "edit",
+				Name:            "Update Pull Request",
+				Description:     "Update a pull request title, body, base branch, or state",
+				RiskLevel:       "low",
+				DisplayTemplate: "Update PR #{{pull_number}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "pull_number"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"pull_number": {
+							"type": "integer",
+							"description": "Pull request number",
+							"x-ui": {"label": "PR number"}
+						},
+						"title": {
+							"type": "string",
+							"description": "New title (omit to leave unchanged)",
+							"x-ui": {"label": "Title"}
+						},
+						"body": {
+							"type": "string",
+							"description": "New body (omit to leave unchanged)",
+							"x-ui": {"widget": "textarea", "label": "Body"}
+						},
+						"base": {
+							"type": "string",
+							"description": "New base branch (omit to leave unchanged)",
+							"x-ui": {"label": "Base branch", "placeholder": "main"}
+						},
+						"state": {
+							"type": "string",
+							"enum": ["open", "closed"],
+							"description": "PR state (omit to leave unchanged)",
+							"x-ui": {"widget": "select", "label": "State"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.get_issue",
+				Name:            "Get Issue",
+				Description:     "Fetch a single issue by number",
+				RiskLevel:       "low",
+				DisplayTemplate: "Get issue #{{issue_number}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "issue_number"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"issue_number": {
+							"type": "integer",
+							"description": "Issue number",
+							"x-ui": {"label": "Issue number"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.get_pr",
+				Name:            "Get Pull Request",
+				Description:     "Fetch a single pull request by number",
+				RiskLevel:       "low",
+				DisplayTemplate: "Get PR #{{pull_number}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "pull_number"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"pull_number": {
+							"type": "integer",
+							"description": "Pull request number",
+							"x-ui": {"label": "PR number"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.list_issues",
+				Name:            "List Issues",
+				Description:     "List issues for a repository (pull requests excluded unless include_pull_requests is true)",
+				RiskLevel:       "low",
+				DisplayTemplate: "List issues in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"state": {
+							"type": "string",
+							"enum": ["open", "closed", "all"],
+							"default": "open",
+							"description": "Issue state filter",
+							"x-ui": {"widget": "select", "label": "State"}
+						},
+						"labels": {
+							"type": "string",
+							"description": "Comma-separated list of label names",
+							"x-ui": {"label": "Labels", "placeholder": "bug,enhancement"}
+						},
+						"sort": {
+							"type": "string",
+							"enum": ["created", "updated", "comments"],
+							"description": "Sort field",
+							"x-ui": {"widget": "select", "label": "Sort"}
+						},
+						"direction": {
+							"type": "string",
+							"enum": ["asc", "desc"],
+							"description": "Sort direction",
+							"x-ui": {"widget": "select", "label": "Direction"}
+						},
+						"since": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Only issues updated at or after this time (ISO 8601)",
+							"x-ui": {"label": "Since", "widget": "datetime"}
+						},
+						"include_pull_requests": {
+							"type": "boolean",
+							"default": false,
+							"description": "When true, include pull requests in results (GitHub API returns both by default)",
+							"x-ui": {"widget": "toggle", "label": "Include PRs"}
+						},
+						"per_page": {
+							"type": "integer",
+							"default": 30,
+							"description": "Results per page (max 100)",
+							"x-ui": {"label": "Results per page"}
+						},
+						"page": {
+							"type": "integer",
+							"default": 1,
+							"description": "Page number",
+							"x-ui": {"label": "Page"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.list_commits",
+				Name:            "List Commits",
+				Description:     "List commits for a repository",
+				RiskLevel:       "low",
+				DisplayTemplate: "List commits in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"sha": {
+							"type": "string",
+							"description": "SHA or branch to start listing from",
+							"x-ui": {"label": "SHA / branch", "placeholder": "main"}
+						},
+						"path": {
+							"type": "string",
+							"description": "Only commits containing this file path",
+							"x-ui": {"label": "Path", "placeholder": "src/"}
+						},
+						"author": {
+							"type": "string",
+							"description": "Git author email or name",
+							"x-ui": {"label": "Author"}
+						},
+						"per_page": {
+							"type": "integer",
+							"default": 30,
+							"description": "Results per page (max 100)",
+							"x-ui": {"label": "Results per page"}
+						},
+						"page": {
+							"type": "integer",
+							"default": 1,
+							"description": "Page number",
+							"x-ui": {"label": "Page"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.remove_reviewer",
+				Name:            "Remove Reviewer",
+				Description:     "Remove requested reviewers from a pull request",
+				RiskLevel:       "low",
+				DisplayTemplate: "Remove reviewers from PR #{{pull_number}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "pull_number", "reviewers"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"pull_number": {
+							"type": "integer",
+							"description": "Pull request number",
+							"x-ui": {"label": "PR number"}
+						},
+						"reviewers": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "GitHub usernames to remove from requested reviewers",
+							"x-ui": {"label": "Reviewers"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.delete_webhook",
+				Name:            "Delete Webhook",
+				Description:     "Delete a repository webhook by numeric hook ID",
+				RiskLevel:       "high",
+				DisplayTemplate: "Delete webhook {{hook_id}} in {{owner}}/{{repo}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["owner", "repo", "hook_id"],
+					"properties": {
+						"owner": {
+							"type": "string",
+							"description": "Repository owner (user or organization)",
+							"x-ui": {"label": "Owner", "placeholder": "octocat"}
+						},
+						"repo": {
+							"type": "string",
+							"description": "Repository name",
+							"x-ui": {"label": "Repository", "placeholder": "my-repo"}
+						},
+						"hook_id": {
+							"type": "integer",
+							"description": "Numeric webhook ID from GitHub",
+							"x-ui": {"label": "Hook ID"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "github.create_repo",
+				Name:            "Create Repository",
+				Description:     "Create a new repository for the authenticated user or an organization",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create repo {{name}}",
 				Preview: &connectors.ActionPreview{
 					Layout: "record",
@@ -1053,6 +1526,125 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Create private repositories only",
 				Description: "Agent can create repositories but they must be private.",
 				Parameters:  json.RawMessage(`{"name":"*","org":"*","description":"*","private":true,"auto_init":"*"}`),
+			},
+			{
+				ID:          "tpl_github_merge_pr_org",
+				ActionType:  "github.merge_pr",
+				Name:        "Merge PRs in your org",
+				Description: "Merge pull requests only when the repo owner matches your organization pattern.",
+				Parameters:  json.RawMessage(`{"owner":{"$pattern":"your-org-*"},"repo":"*","pull_number":"*","merge_method":"squash"}`),
+			},
+			{
+				ID:          "tpl_github_add_comment_org",
+				ActionType:  "github.add_comment",
+				Name:        "Comment in org repos only",
+				Description: "Add issue/PR comments only in repositories owned by your organization.",
+				Parameters:  json.RawMessage(`{"owner":{"$pattern":"your-org-*"},"repo":"*","issue_number":"*","body":"*"}`),
+			},
+			{
+				ID:          "tpl_github_get_file_contents_org",
+				ActionType:  "github.get_file_contents",
+				Name:        "Read files from org repos only",
+				Description: "Read repository files only when owner matches your organization pattern.",
+				Parameters:  json.RawMessage(`{"owner":{"$pattern":"your-org-*"},"repo":"*","path":"*","ref":"*"}`),
+			},
+			{
+				ID:          "tpl_github_trigger_workflow_repo",
+				ActionType:  "github.trigger_workflow",
+				Name:        "Trigger workflows in one repo",
+				Description: "Locks owner and repository — agent can choose workflow, ref, and inputs.",
+				Parameters:  json.RawMessage(`{"owner":"your-org","repo":"your-repo","workflow_id":"*","ref":"*","inputs":"*"}`),
+			},
+			{
+				ID:          "tpl_github_create_branch_org",
+				ActionType:  "github.create_branch",
+				Name:        "Create branches in org repos only",
+				Description: "Create branches only in repositories owned by your organization.",
+				Parameters:  json.RawMessage(`{"owner":{"$pattern":"your-org-*"},"repo":"*","branch_name":"*","from_ref":"*"}`),
+			},
+			{
+				ID:          "tpl_github_delete_branch",
+				ActionType:  "github.delete_branch",
+				Name:        "Delete branches",
+				Description: "Agent can delete branch refs in any repository.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","branch_name":"*"}`),
+			},
+			{
+				ID:          "tpl_github_delete_file",
+				ActionType:  "github.delete_file",
+				Name:        "Delete files",
+				Description: "Agent can delete files when commit message and file SHA are provided.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","path":"*","message":"*","sha":"*","branch":"*"}`),
+			},
+			{
+				ID:          "tpl_github_remove_label",
+				ActionType:  "github.remove_label",
+				Name:        "Remove labels",
+				Description: "Agent can remove a label from an issue or pull request.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*","name":"*"}`),
+			},
+			{
+				ID:          "tpl_github_close_pr",
+				ActionType:  "github.close_pr",
+				Name:        "Close pull requests",
+				Description: "Agent can close open pull requests without merging.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","pull_number":"*"}`),
+			},
+			{
+				ID:          "tpl_github_update_issue",
+				ActionType:  "github.update_issue",
+				Name:        "Update issues",
+				Description: "Agent can update issue title, body, state, or assignees.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*","title":"*","body":"*","state":"*","assignees":"*"}`),
+			},
+			{
+				ID:          "tpl_github_update_pr",
+				ActionType:  "github.update_pr",
+				Name:        "Update pull requests",
+				Description: "Agent can update PR title, body, base branch, or state.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","pull_number":"*","title":"*","body":"*","base":"*","state":"*"}`),
+			},
+			{
+				ID:          "tpl_github_get_issue",
+				ActionType:  "github.get_issue",
+				Name:        "Get issue details",
+				Description: "Agent can fetch a single issue by number.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","issue_number":"*"}`),
+			},
+			{
+				ID:          "tpl_github_get_pr",
+				ActionType:  "github.get_pr",
+				Name:        "Get pull request details",
+				Description: "Agent can fetch a single pull request by number.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","pull_number":"*"}`),
+			},
+			{
+				ID:          "tpl_github_list_issues",
+				ActionType:  "github.list_issues",
+				Name:        "List issues",
+				Description: "Agent can list repository issues (pull requests excluded by default).",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","state":"*","labels":"*","sort":"*","direction":"*","since":"*","include_pull_requests":"*","per_page":"*","page":"*"}`),
+			},
+			{
+				ID:          "tpl_github_list_commits",
+				ActionType:  "github.list_commits",
+				Name:        "List commits",
+				Description: "Agent can list commits for a repository.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","sha":"*","path":"*","author":"*","per_page":"*","page":"*"}`),
+			},
+			{
+				ID:          "tpl_github_remove_reviewer",
+				ActionType:  "github.remove_reviewer",
+				Name:        "Remove requested reviewers",
+				Description: "Agent can remove users from a PR's requested reviewers list.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","pull_number":"*","reviewers":"*"}`),
+			},
+			{
+				ID:          "tpl_github_delete_webhook",
+				ActionType:  "github.delete_webhook",
+				Name:        "Delete webhooks",
+				Description: "Agent can delete repository webhooks by hook ID.",
+				Parameters:  json.RawMessage(`{"owner":"*","repo":"*","hook_id":"*"}`),
 			},
 		},
 	}
