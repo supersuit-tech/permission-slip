@@ -248,7 +248,31 @@ mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 - `GOPROXY=off` — disables module proxy lookups entirely; all modules must already be in the local cache. The proxy metadata endpoint works but the GCS zip download endpoint is blocked, causing confusing partial failures.
 - `GOFLAGS='-mod=mod'` — allows go.sum to be updated when the go.mod version patch changes expected checksums
 
-**Do NOT** say "tests can't run in this environment" — they can and should. If a module is missing from the cache, download it from GitHub and place it in `$GOPATH/pkg/mod/` manually rather than giving up.
+### Sandbox limitations — DO NOT re-discover these every session
+
+The following are known hard blocks in the Claude Code sandbox. Skip attempts to work around them; they waste time and always fail the same way.
+
+**Backend `go test` / `go vet` / `go build` cannot run in the sandbox as of the Go 1.25+ transitive dependency (currently `cloud.google.com/go/bigquery` v1.74.0).** The sandbox ships Go 1.24.7; any command that does full module graph resolution fails with:
+
+```
+cloud.google.com/go/bigquery@vX.Y.Z requires go >= 1.25.0 (running go 1.24.7; GOTOOLCHAIN=local)
+```
+
+Things that look like they should help but do NOT:
+- `GOTOOLCHAIN=go1.25.0` / `go1.25.0+auto` — toolchain download is `403 Forbidden`.
+- Downgrading bigquery to an older version in `go.mod` — breaks because older bigquery's transitive deps (e.g. `golang.org/x/sync`, `go.uber.org/multierr`) aren't in the module cache, and `git ls-remote` to `go.googlesource.com` is `403`. You trade one error for many worse ones.
+- Deleting `go.sum` entries / using `GOFLAGS=-mod=vendor` — the vendored tree doesn't exist.
+- Restricting the test target to a subpackage (e.g. `go test ./connectors/slack`) — Go still resolves the full module graph, same error.
+
+**What DOES work for verifying backend changes:**
+- `gofmt -l <files>` — format check; succeeds without module resolution.
+- `gofmt -e <file> > /dev/null` — parse-only syntax check per file; catches most typos.
+- `grep` / visual review for type-level correctness.
+- Frontend tests (`cd frontend && npm install && npx vitest run <path>`) and mobile tests (`cd mobile && npm install && npm test -- --ci`) run fine.
+
+**Workflow for backend-only changes:** gofmt-check each changed file, review carefully, push the branch, and rely on CI for the full `go test` pass. Call this out in the PR body so reviewers know backend tests weren't run locally — **do not claim they passed**.
+
+If a future sandbox upgrade lifts this constraint (Go 1.25+ available, or bigquery drops its requirement), remove this section.
 
 ## Frontend & Mobile Setup
 
