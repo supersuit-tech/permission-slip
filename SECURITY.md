@@ -7,7 +7,7 @@ If you discover a security vulnerability in Permission Slip, please report it re
 ### How to report
 
 - **GitHub Private Vulnerability Reporting**: Use the [Security Advisories](https://github.com/supersuit-tech/permission-slip/security/advisories/new) page to submit a private report directly on GitHub.
-- **Email**: Send details to **security@permissionslip.dev**.
+- **Email**: Send details to **support@supersuit.tech**.
 
 ### What to include
 

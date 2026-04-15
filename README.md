@@ -70,6 +70,14 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 | Google | 🟡 Early Preview |
 | Microsoft | 🟡 Early Preview |
 | Slack | 🟡 Early Preview |
+
+<details>
+<summary>🔴 Untested connectors (click to expand)</summary>
+
+These connectors are wired up but have not yet been end-to-end verified. If you try one, we'd love a report — see the "connector report" issue template.
+
+| Connector | Status |
+|-----------|--------|
 | Airtable | 🔴 Untested |
 | Amadeus | 🔴 Untested |
 | Asana | 🔴 Untested |
@@ -116,7 +124,9 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 | Zendesk | 🔴 Untested |
 | Zoom | 🔴 Untested |
 
-Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/permission-slip/issues) to let us know!
+</details>
+
+Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/permission-slip/issues/new?template=connector_report.md) to let us know!
 
 ---
 
@@ -277,6 +287,10 @@ Built by [SuperSuit](https://supersuit.tech) — questions or feedback welcome a
 
 ## 👥 Contributors
 
-<a href="https://github.com/chiedo"><img src="https://github.com/chiedo.png" width="50" height="50" alt="chiedo" style="border-radius:50%"></a>
-<a href="https://github.com/chiedobot"><img src="https://github.com/chiedobot.png" width="50" height="50" alt="chiedobot" style="border-radius:50%"></a>
-<a href="https://github.com/chiedoclaude"><img src="https://github.com/chiedoclaude.png" width="50" height="50" alt="chiedoclaude" style="border-radius:50%"></a>
+Thanks to everyone who has contributed!
+
+<a href="https://github.com/supersuit-tech/permission-slip/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=supersuit-tech/permission-slip" alt="Contributors" />
+</a>
+
+<sub>Made with [contrib.rocks](https://contrib.rocks).</sub>
