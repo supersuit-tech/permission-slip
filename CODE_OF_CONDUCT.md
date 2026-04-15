@@ -7,7 +7,7 @@ spaces (issues, pull requests, discussions, and any community channels).
 ## Reporting
 
 If you experience or witness conduct that violates the Code of Conduct, please
-report it to **conduct@permissionslip.dev**. All reports will be reviewed and
+report it to **support@supersuit.tech**. All reports will be reviewed and
 investigated promptly and confidentially.
 
 Maintainers are obligated to respect the privacy and safety of anyone who
