@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/supersuit-tech/permission-slip/security/advisories/new
+    about: Report a security issue privately via GitHub Security Advisories. Do not open a public issue.
+  - name: Question or discussion
+    url: https://github.com/supersuit-tech/permission-slip/discussions
+    about: Ask questions or discuss ideas with the community.

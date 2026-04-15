@@ -10,7 +10,9 @@ kill_timeout = '30s'
 [env]
   PORT = '8080'
   CLOUDFLARE_INSIGHTS = 'true'
-  POSTHOG_HOST = 'https://hydro.permissionslip.dev'
+  # POSTHOG_HOST is set via Fly secrets for the hosted deployment
+  # (see: fly secrets set POSTHOG_HOST=...). Self-hosters should set
+  # their own value or leave unset to use the PostHog default.
 
 [http_service]
   internal_port = 8080
