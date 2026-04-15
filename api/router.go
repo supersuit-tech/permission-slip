@@ -37,6 +37,7 @@ type Deps struct {
 	DevMode                bool                    // true when MODE=development; disables rate limiting
 	RateLimiter            *RateLimiter            // pre-auth rate limiter (per-IP + global); nil disables
 	AgentRateLimiter       *RateLimiter            // post-auth rate limiter (per verified agent); nil disables
+	VerifyRateLimiter      *RateLimiter            // per-IP rate limiter for POST /agents/{id}/verify; nil disables
 	TrustedProxyHeader     string                  // header to read client IP from behind a reverse proxy (e.g. "Fly-Client-IP"); empty uses RemoteAddr
 	AllowedOrigins         []string                // allowed CORS origins; empty means cross-origin requests are blocked
 	Logger                 *slog.Logger            // structured logger for request logging; if nil, request logging is skipped

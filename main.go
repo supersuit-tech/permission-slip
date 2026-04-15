@@ -168,11 +168,12 @@ func main() {
 	if !deps.DevMode {
 		deps.RateLimiter = api.NewRateLimiter(api.DefaultRateLimiterConfig())
 		deps.AgentRateLimiter = api.NewRateLimiter(api.DefaultAgentRateLimiterConfig())
+		deps.VerifyRateLimiter = api.NewRateLimiter(api.DefaultVerifyRateLimiterConfig())
 		deps.TrustedProxyHeader = os.Getenv("TRUSTED_PROXY_HEADER")
 		if deps.TrustedProxyHeader == "" {
 			deps.TrustedProxyHeader = "Fly-Client-IP"
 		}
-		log.Printf("Rate limiting: enabled (per-IP + per-agent + global, proxy header: %s)", deps.TrustedProxyHeader)
+		log.Printf("Rate limiting: enabled (per-IP + per-agent + per-verify + global, proxy header: %s)", deps.TrustedProxyHeader)
 	} else {
 		log.Println("Rate limiting: disabled (development mode)")
 	}
