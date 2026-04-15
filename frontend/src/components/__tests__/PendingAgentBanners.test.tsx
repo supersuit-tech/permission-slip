@@ -23,7 +23,7 @@ const responseWithPending = {
       agent_id: 2,
       status: "pending",
       metadata: { name: "My Bot" },
-      confirmation_code: "XK7-M9P",
+      confirmation_code: "XK7M9-PQRST",
       expires_at: futureDate,
       created_at: "2026-02-01T00:00:00Z",
     },
@@ -80,7 +80,7 @@ describe("PendingAgentBanners", () => {
           agent_id: 2,
           status: "pending",
           metadata: { name: "Bot A" },
-          confirmation_code: "XK7-M9P",
+          confirmation_code: "XK7M9-PQRST",
           expires_at: futureDate,
           created_at: "2026-02-01T00:00:00Z",
         },
@@ -88,7 +88,7 @@ describe("PendingAgentBanners", () => {
           agent_id: 3,
           status: "pending",
           metadata: { name: "Bot B" },
-          confirmation_code: "AB3-Z4Q",
+          confirmation_code: "AB3Z4-QRSTU",
           expires_at: futureDate,
           created_at: "2026-02-02T00:00:00Z",
         },
@@ -124,7 +124,7 @@ describe("PendingAgentBanners", () => {
     render(<PendingAgentBanners />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("XK7-M9P")).toBeInTheDocument();
+      expect(screen.getByText("XK7M9-PQRST")).toBeInTheDocument();
     });
   });
 
@@ -166,7 +166,7 @@ describe("PendingAgentBanners", () => {
         {
           agent_id: 7,
           status: "pending",
-          confirmation_code: "QR5-ST6",
+          confirmation_code: "QR5ST-6UVWX",
           expires_at: futureDate,
           created_at: "2026-02-01T00:00:00Z",
         },

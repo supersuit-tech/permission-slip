@@ -300,7 +300,7 @@ describe("RegisteredAgentsCard", () => {
         {
           agent_id: 3,
           status: "pending",
-          confirmation_code: "XK7-M9P",
+          confirmation_code: "XK7M9-PQRST",
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
           request_count_30d: 0,
           created_at: "2026-02-20T00:00:00Z",
@@ -320,7 +320,7 @@ describe("RegisteredAgentsCard", () => {
     await user.click(screen.getByRole("radio", { name: "Pending" }));
 
     await waitFor(() => {
-      expect(screen.getByText("XK7-M9P")).toBeInTheDocument();
+      expect(screen.getByText("XK7M9-PQRST")).toBeInTheDocument();
     });
     expect(
       screen.getByRole("button", { name: "Copy confirmation code" })
@@ -333,7 +333,7 @@ describe("RegisteredAgentsCard", () => {
         {
           agent_id: 5,
           status: "pending",
-          confirmation_code: "QR5-ST6",
+          confirmation_code: "QR5ST-6UVWX",
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
           request_count_30d: 0,
           created_at: "2026-02-20T00:00:00Z",
@@ -362,7 +362,7 @@ describe("RegisteredAgentsCard", () => {
         {
           agent_id: 3,
           status: "pending",
-          confirmation_code: "XK7-M9P",
+          confirmation_code: "XK7M9-PQRST",
           expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
           request_count_30d: 0,
           created_at: "2026-02-20T00:00:00Z",

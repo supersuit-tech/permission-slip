@@ -19,7 +19,7 @@ func TestValidationConfigLoads(t *testing.T) {
 		{"CredentialLabelMaxLength", CredentialLabelMaxLength, 255},
 		{"ActionTypeMaxLength", ActionTypeMaxLength, 128},
 		{"ActionVersionMaxLength", ActionVersionMaxLength, 10},
-		{"ConfirmationCodeLength", ConfirmationCodeLength, 6},
+		{"ConfirmationCodeLength", ConfirmationCodeLength, 10},
 		{"EmailOtpCodeLength", EmailOtpCodeLength, 8},
 		{"TotpCodeLength", TotpCodeLength, 6},
 		{"MaxConstraintsBytes", MaxConstraintsBytes, 16384},

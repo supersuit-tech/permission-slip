@@ -20,7 +20,7 @@ const mockAgentsResponse = {
     {
       agent_id: 2,
       status: "pending",
-      confirmation_code: "XK7-M9P",
+      confirmation_code: "XK7M9-PQRST",
       expires_at: "2026-12-31T23:59:59Z",
       request_count_30d: 0,
       created_at: "2026-02-01T00:00:00Z",
@@ -28,7 +28,7 @@ const mockAgentsResponse = {
     {
       agent_id: 3,
       status: "pending",
-      confirmation_code: "AB3-Z4Q",
+      confirmation_code: "AB3Z4-QRSTU",
       expires_at: "2026-12-31T23:59:59Z",
       request_count_30d: 0,
       created_at: "2026-02-02T00:00:00Z",
@@ -107,7 +107,7 @@ describe("usePendingAgents", () => {
           {
             agent_id: 2,
             status: "pending",
-            confirmation_code: "XK7-M9P",
+            confirmation_code: "XK7M9-PQRST",
             expires_at: "2020-01-01T00:00:00Z", // expired
             request_count_30d: 0,
             created_at: "2026-02-01T00:00:00Z",
@@ -115,7 +115,7 @@ describe("usePendingAgents", () => {
           {
             agent_id: 3,
             status: "pending",
-            confirmation_code: "AB3-Z4Q",
+            confirmation_code: "AB3Z4-QRSTU",
             expires_at: "2099-12-31T23:59:59Z", // still active
             request_count_30d: 0,
             created_at: "2026-02-02T00:00:00Z",

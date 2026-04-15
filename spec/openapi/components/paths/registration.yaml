@@ -20,7 +20,7 @@ register:
       3. **Agent POSTs to invite URL**: Sends public key and request ID
       4. **Permission Slip validates**: Verifies the invite code is valid,
          not expired, and not consumed — then creates a pending registration
-      5. **Dashboard shows confirmation code**: User sees a 6-character
+      5. **Dashboard shows confirmation code**: User sees a 10-character
          confirmation code on their dashboard
       6. **User shares confirmation code**: Communicates the code to the agent
          (out-of-band)
@@ -235,20 +235,20 @@ verify:
       ## Verification Flow
 
       1. **Agent registers**: POSTs to invite URL (`POST /invite/{invite_code}`)
-      2. **Code displayed**: Permission Slip shows 6-character confirmation code
-         on the user's dashboard (e.g., `XK7-M9P`)
+      2. **Code displayed**: Permission Slip shows 10-character confirmation code
+         on the user's dashboard (e.g., `XK7M9-PQRST`)
       3. **User provides code**: User communicates code to agent (out-of-band)
       4. **Agent submits code**: Calls this endpoint with code
       5. **Service verifies**: Checks code matches, hasn't expired, attempts < 5
       6. **Registration complete**: Agent is now registered and can make approval requests
-      
+
       ## Confirmation Code Format
-      
-      - **Length**: 6 characters (may include hyphen for readability: `XXX-XXX`)
+
+      - **Length**: 10 characters (may include hyphen for readability: `XXXXX-XXXXX`)
       - **Character set**: Uppercase alphanumeric excluding confusing chars (`0`, `O`, `1`, `I`)
       - **Allowed**: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 characters)
       - **Case-insensitive**: Permission Slip normalizes to uppercase before validation
-      - **Examples**: `XK7-M9P`, `XK7M9P`, `xk7-m9p` (all equivalent)
+      - **Examples**: `XK7M9-PQRST`, `XK7M9PQRST`, `xk7m9-pqrst` (all equivalent)
       
       ## Security
       
@@ -284,19 +284,19 @@ verify:
               summary: Code with hyphen
               value:
                 request_id: "040dacd3-fbf9-42b3-b58f-0d838502b16e"
-                confirmation_code: "XK7-M9P"
-            
+                confirmation_code: "XK7M9-PQRST"
+
             without_hyphen:
               summary: Code without hyphen
               value:
                 request_id: "37c7045e-aef3-4ad3-8ce9-1f78a6d59486"
-                confirmation_code: "XK7M9P"
-            
+                confirmation_code: "XK7M9PQRST"
+
             lowercase:
               summary: Lowercase code (normalized by service)
               value:
                 request_id: "64d245ef-84df-4582-9709-1fe05d5e3b2c"
-                confirmation_code: "xk7-m9p"
+                confirmation_code: "xk7m9-pqrst"
     
     responses:
       '200':
@@ -327,7 +327,7 @@ verify:
                     retryable: false
                     details:
                       field: "confirmation_code"
-                      expected_format: "6 characters from set A-Z2-9"
+                      expected_format: "10 characters from set A-Z2-9"
                     trace_id: "trace_xyz789"
               
               agent_id_mismatch:

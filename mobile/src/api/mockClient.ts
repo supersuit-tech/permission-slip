@@ -146,7 +146,7 @@ const mockClient = {
       const entry = MOCK_APPROVALS.find((a) => a.approval_id === id);
       if (entry) entry.status = action === "approve" ? "approved" : "denied";
       return action === "approve"
-        ? { data: { confirmation_code: "ABC-123" }, error: undefined }
+        ? { data: { confirmation_code: "ABC12-3DEFG" }, error: undefined }
         : { data: {}, error: undefined };
     }
 

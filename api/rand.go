@@ -49,7 +49,8 @@ func generateRandomCode(n int) (string, error) {
 // hashCodeHex returns a hex-encoded hash of a code string.
 // When hmacKey is non-empty, it uses HMAC-SHA256 so that database read access
 // alone is not sufficient to reverse the hash. When hmacKey is empty, it falls
-// back to plain SHA-256.
+// back to plain SHA-256 — this path is only reachable in development/tests,
+// since production config validation requires INVITE_HMAC_KEY >= 32 chars.
 func hashCodeHex(code, hmacKey string) string {
 	if hmacKey != "" {
 		mac := hmac.New(sha256.New, []byte(hmacKey))

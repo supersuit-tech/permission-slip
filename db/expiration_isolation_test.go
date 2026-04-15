@@ -101,7 +101,7 @@ func TestAgentRegistrationTTLBoundary(t *testing.T) {
 	ctx := context.Background()
 
 	agent, err := db.InsertPendingAgent(ctx, tx,
-		uid, "ssh-ed25519 AAAA_ttl_boundary", "AA1-BB2", 300, nil)
+		uid, "ssh-ed25519 AAAA_ttl_boundary", "AA1BB-2CDEF", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
@@ -124,7 +124,7 @@ func TestAgentRegistrationTTLBoundary(t *testing.T) {
 		`UPDATE agents SET expires_at = now() - interval '1 second' WHERE agent_id = $1`, agent.AgentID)
 
 	// Verification should fail with ErrRegistrationExpired.
-	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "AA1BB2")
+	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "AA1BB2CDEF")
 	if err != db.ErrRegistrationExpired {
 		t.Errorf("expected ErrRegistrationExpired, got %v", err)
 	}
@@ -133,18 +133,18 @@ func TestAgentRegistrationTTLBoundary(t *testing.T) {
 	testhelper.MustExec(t, tx,
 		`UPDATE agents SET expires_at = now(), verification_attempts = 0 WHERE agent_id = $1`, agent.AgentID)
 
-	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "AA1BB2")
+	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "AA1BB2CDEF")
 	if err != db.ErrRegistrationExpired {
 		t.Errorf("at boundary (expires_at = now()): expected ErrRegistrationExpired, got %v", err)
 	}
 
 	// Verify that a non-expired agent CAN still be verified.
 	agent2, err := db.InsertPendingAgent(ctx, tx,
-		uid, "ssh-ed25519 AAAA_ttl_boundary_2", "CC3-DD4", 300, nil)
+		uid, "ssh-ed25519 AAAA_ttl_boundary_2", "CC3DD-4FGHJ", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent 2: %v", err)
 	}
-	registered, err := db.VerifyAgentConfirmationCode(ctx, tx, agent2.AgentID, "CC3DD4")
+	registered, err := db.VerifyAgentConfirmationCode(ctx, tx, agent2.AgentID, "CC3DD4FGHJ")
 	if err != nil {
 		t.Fatalf("verification of non-expired agent should succeed: %v", err)
 	}
@@ -168,21 +168,21 @@ func TestLockoutVsExpirationPrecedence(t *testing.T) {
 	ctx := context.Background()
 
 	agent, err := db.InsertPendingAgent(ctx, tx,
-		uid, "ssh-ed25519 AAAA_lockout_exp", "EE5-FF6", 300, nil)
+		uid, "ssh-ed25519 AAAA_lockout_exp", "EE5FF-6GHJK", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
 
 	// Make 5 failed attempts to trigger lockout.
 	for i := 0; i < 5; i++ {
-		_, verifyErr := db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "ZZZZZZ")
+		_, verifyErr := db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "ZZZZZZZZZZ")
 		if verifyErr != db.ErrInvalidConfirmation {
 			t.Fatalf("attempt %d: expected ErrInvalidConfirmation, got %v", i+1, verifyErr)
 		}
 	}
 
 	// Verify lockout is in effect.
-	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "EE5FF6")
+	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "EE5FF6GHJK")
 	if err != db.ErrVerificationLocked {
 		t.Fatalf("expected ErrVerificationLocked after 5 attempts, got %v", err)
 	}
@@ -198,7 +198,7 @@ func TestLockoutVsExpirationPrecedence(t *testing.T) {
 	//   3. attempts >= 5 → ErrVerificationLocked
 	// Since the agent is still 'pending' and expired, ErrRegistrationExpired
 	// should take precedence over ErrVerificationLocked.
-	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "EE5FF6")
+	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "EE5FF6GHJK")
 	if err != db.ErrRegistrationExpired {
 		t.Errorf("expected ErrRegistrationExpired (expiration takes precedence over lockout), got %v", err)
 	}
@@ -216,30 +216,30 @@ func TestConfirmationCodeIsolation(t *testing.T) {
 
 	// Create two pending agents with different confirmation codes.
 	agentA, err := db.InsertPendingAgent(ctx, tx,
-		uid, "ssh-ed25519 AAAA_iso_a", "AA1-BB2", 300, nil)
+		uid, "ssh-ed25519 AAAA_iso_a", "AA1BB-2CDEF", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent A: %v", err)
 	}
 	agentB, err := db.InsertPendingAgent(ctx, tx,
-		uid, "ssh-ed25519 AAAA_iso_b", "CC3-DD4", 300, nil)
+		uid, "ssh-ed25519 AAAA_iso_b", "CC3DD-4FGHJ", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent B: %v", err)
 	}
 
 	// Try to verify agent B using agent A's code — should fail.
-	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agentB.AgentID, "AA1BB2")
+	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agentB.AgentID, "AA1BB2CDEF")
 	if err != db.ErrInvalidConfirmation {
 		t.Errorf("using agent A's code on agent B: expected ErrInvalidConfirmation, got %v", err)
 	}
 
 	// Try to verify agent A using agent B's code — should fail.
-	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agentA.AgentID, "CC3DD4")
+	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agentA.AgentID, "CC3DD4FGHJ")
 	if err != db.ErrInvalidConfirmation {
 		t.Errorf("using agent B's code on agent A: expected ErrInvalidConfirmation, got %v", err)
 	}
 
 	// Verify each agent with its own code — should succeed.
-	regA, err := db.VerifyAgentConfirmationCode(ctx, tx, agentA.AgentID, "AA1BB2")
+	regA, err := db.VerifyAgentConfirmationCode(ctx, tx, agentA.AgentID, "AA1BB2CDEF")
 	if err != nil {
 		t.Fatalf("verify agent A with own code: %v", err)
 	}
@@ -247,7 +247,7 @@ func TestConfirmationCodeIsolation(t *testing.T) {
 		t.Errorf("agent A: expected 'registered', got %q", regA.Status)
 	}
 
-	regB, err := db.VerifyAgentConfirmationCode(ctx, tx, agentB.AgentID, "CC3DD4")
+	regB, err := db.VerifyAgentConfirmationCode(ctx, tx, agentB.AgentID, "CC3DD4FGHJ")
 	if err != nil {
 		t.Fatalf("verify agent B with own code: %v", err)
 	}

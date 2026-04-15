@@ -245,7 +245,7 @@ func TestResponseFields_PendingAgent(t *testing.T) {
 
 	// Set a confirmation code on the pending agent for the test.
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET confirmation_code = 'AB3-CD4' WHERE agent_id = $1`, agentID)
+		`UPDATE agents SET confirmation_code = 'AB3CD-4EFGH' WHERE agent_id = $1`, agentID)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -269,8 +269,8 @@ func TestResponseFields_PendingAgent(t *testing.T) {
 	if resp["confirmation_code"] == nil {
 		t.Error("expected confirmation_code to be present for pending agent")
 	}
-	if resp["confirmation_code"] != "AB3-CD4" {
-		t.Errorf("expected confirmation_code 'AB3-CD4', got %v", resp["confirmation_code"])
+	if resp["confirmation_code"] != "AB3CD-4EFGH" {
+		t.Errorf("expected confirmation_code 'AB3CD-4EFGH', got %v", resp["confirmation_code"])
 	}
 	if resp["registered_at"] != nil {
 		t.Error("expected registered_at to be null for pending agent")
@@ -657,7 +657,7 @@ func TestConcurrentVerificationAttemptCounting(t *testing.T) {
 
 	// Create a pending agent.
 	agent, err := db.InsertPendingAgent(context.Background(), pool,
-		uid, "ssh-ed25519 AAAAtest_concurrent_verify", "XY3-ZW4", 900, nil)
+		uid, "ssh-ed25519 AAAAtest_concurrent_verify", "XY3ZW-4ABCD", 900, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}

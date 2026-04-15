@@ -108,7 +108,7 @@ describe("useApproveApproval", () => {
         approval_id: "appr_abc123",
         status: "approved",
         approved_at: "2026-03-02T13:25:00Z",
-        confirmation_code: "RK3-P7M",
+        confirmation_code: "RK3P7-MNPQR",
       },
       error: undefined,
     });
@@ -141,7 +141,7 @@ describe("useApproveApproval", () => {
       },
     );
     expect(result).toEqual(
-      expect.objectContaining({ confirmation_code: "RK3-P7M" }),
+      expect.objectContaining({ confirmation_code: "RK3P7-MNPQR" }),
     );
   });
 

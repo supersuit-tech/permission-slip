@@ -488,14 +488,19 @@ func emitApprovalAuditEvent(ctx context.Context, d db.DBTX, userID string, appr 
 	}, false)
 }
 
-// generateConfirmationCodePlaintext produces a 6-character confirmation code
-// formatted as "XXX-XXX". No hash is computed — the plaintext is stored
-// directly. Used by the agent registration flow where codes are short-lived
-// and displayed on the dashboard.
+// generateConfirmationCodePlaintext produces a 10-character confirmation code
+// formatted as "XXXXX-XXXXX" (~50 bits of entropy). No hash is computed — the
+// plaintext is stored directly. Used by the agent registration flow where
+// codes are short-lived and displayed on the dashboard.
+//
+// The hyphen sits at the midpoint to make verbal sharing easier; callers that
+// need to compare codes should normalize via normalizeConfirmationCode (strip
+// hyphens, uppercase) first.
 func generateConfirmationCodePlaintext() (string, error) {
 	raw, err := generateRandomCode(shared.ConfirmationCodeLength)
 	if err != nil {
 		return "", err
 	}
-	return raw[:3] + "-" + raw[3:], nil
+	mid := shared.ConfirmationCodeLength / 2
+	return raw[:mid] + "-" + raw[mid:], nil
 }

@@ -61,9 +61,9 @@ func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 		"SUPABASE_JWT_SECRET":       "",
 		"SUPABASE_JWKS_URL":         "",
 		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"INVITE_HMAC_KEY":           "test-key",
+		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":                  "https://example.com",
-		"OAUTH_STATE_SECRET":        "test-oauth-state-secret",
+		"OAUTH_STATE_SECRET":        "test-oauth-state-secret-32chars!",
 		"GOOGLE_CLIENT_ID":          "test-google-id",
 		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
 		"MICROSOFT_CLIENT_ID":       "test-msft-id",
@@ -142,9 +142,9 @@ func TestValidateConfig_SupabaseURLSuffices(t *testing.T) {
 		"SUPABASE_URL":        "http://localhost:54321",
 		"SUPABASE_JWT_SECRET": "",
 		"SUPABASE_JWKS_URL":   "",
-		"INVITE_HMAC_KEY":     "test-key",
+		"INVITE_HMAC_KEY":     "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":            "https://example.com",
-		"OAUTH_STATE_SECRET":  "test-oauth-state-secret",
+		"OAUTH_STATE_SECRET":  "test-oauth-state-secret-32chars!",
 		"VAPID_PUBLIC_KEY":    "BExamplePublicKey",
 		"VAPID_PRIVATE_KEY":   "examplePrivateKey",
 		"VAPID_SUBJECT":       "mailto:test@example.com",
@@ -161,9 +161,9 @@ func TestValidateConfig_JWTSecretSuffices(t *testing.T) {
 		"MODE":                "",
 		"DATABASE_URL":        "postgres://localhost/test",
 		"SUPABASE_URL":        "",
-		"SUPABASE_JWT_SECRET": "my-secret",
+		"SUPABASE_JWT_SECRET": "my-secret-that-is-32-chars-long!",
 		"SUPABASE_JWKS_URL":   "",
-		"INVITE_HMAC_KEY":     "test-key",
+		"INVITE_HMAC_KEY":     "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":            "https://example.com",
 		"VAPID_PUBLIC_KEY":    "BExamplePublicKey",
 		"VAPID_PRIVATE_KEY":   "examplePrivateKey",
@@ -177,8 +177,11 @@ func TestValidateConfig_JWTSecretSuffices(t *testing.T) {
 }
 
 func TestValidateConfig_OptionalWarnings(t *testing.T) {
+	// INVITE_HMAC_KEY is required in production (errors out), so this test
+	// runs in development mode where it falls back to a warning. BASE_URL
+	// is always optional.
 	setEnvForTest(t, map[string]string{
-		"MODE":              "",
+		"MODE":              "development",
 		"DATABASE_URL":      "postgres://localhost/test",
 		"SUPABASE_URL":      "http://localhost:54321",
 		"INVITE_HMAC_KEY":   "",
@@ -212,9 +215,9 @@ func TestValidateConfig_AllValid(t *testing.T) {
 		"DATABASE_URL":              "postgres://localhost/test",
 		"SUPABASE_URL":              "http://localhost:54321",
 		"SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
-		"INVITE_HMAC_KEY":           "test-key",
+		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":                  "https://example.com",
-		"OAUTH_STATE_SECRET":        "test-oauth-state-secret",
+		"OAUTH_STATE_SECRET":        "test-oauth-state-secret-32chars!",
 		"VAPID_PUBLIC_KEY":          "BExamplePublicKey",
 		"VAPID_PRIVATE_KEY":         "examplePrivateKey",
 		"VAPID_SUBJECT":             "mailto:test@example.com",
@@ -244,7 +247,7 @@ func TestValidateConfig_NoVAPIDKeysInProduction_WebPushDisabled(t *testing.T) {
 		"MODE":              "",
 		"DATABASE_URL":      "postgres://localhost/test",
 		"SUPABASE_URL":      "http://localhost:54321",
-		"INVITE_HMAC_KEY":   "test-key",
+		"INVITE_HMAC_KEY":   "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":          "https://example.com",
 		"VAPID_PUBLIC_KEY":  "",
 		"VAPID_PRIVATE_KEY": "",
@@ -429,8 +432,8 @@ func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 		"STRIPE_WEBHOOK_SECRET":     "whsec_xxx",
 		"STRIPE_PRICE_ID_REQUEST":   "price_xxx",
 		"BASE_URL":                  "https://example.com",
-		"INVITE_HMAC_KEY":           "test-key",
-		"OAUTH_STATE_SECRET":        "test-oauth-state-secret",
+		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
+		"OAUTH_STATE_SECRET":        "test-oauth-state-secret-32chars!",
 		"VAPID_PUBLIC_KEY":          "",
 		"VAPID_PRIVATE_KEY":         "",
 		"VAPID_SUBJECT":             "",
@@ -515,7 +518,7 @@ func TestValidateConfig_VAPIDSubjectAcceptsHTTPS(t *testing.T) {
 		"VAPID_PUBLIC_KEY":  "BExamplePublicKey",
 		"VAPID_PRIVATE_KEY": "examplePrivateKey",
 		"VAPID_SUBJECT":     "https://example.com/contact",
-		"INVITE_HMAC_KEY":   "test-key",
+		"INVITE_HMAC_KEY":   "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":          "https://example.com",
 	})
 
@@ -537,7 +540,7 @@ func TestValidateConfig_OAuthWarnings_MissingGoogleCredentials(t *testing.T) {
 		"SALESFORCE_CLIENT_ID":      "test-sf-id",
 		"SALESFORCE_CLIENT_SECRET":  "test-sf-secret",
 		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"INVITE_HMAC_KEY":           "test-key",
+		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":                  "https://example.com",
 	})
 
@@ -572,7 +575,7 @@ func TestValidateConfig_OAuthWarnings_MissingMicrosoftCredentials(t *testing.T) 
 		"SALESFORCE_CLIENT_ID":      "test-sf-id",
 		"SALESFORCE_CLIENT_SECRET":  "test-sf-secret",
 		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"INVITE_HMAC_KEY":           "test-key",
+		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":                  "https://example.com",
 	})
 

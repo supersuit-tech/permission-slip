@@ -298,11 +298,11 @@ func TestNormalizeConfirmationCode(t *testing.T) {
 		input    string
 		expected string
 	}{
-		{"XK7-M9P", "XK7M9P"},
-		{"XK7M9P", "XK7M9P"},
-		{"xk7-m9p", "XK7M9P"},
-		{"xk7m9p", "XK7M9P"},
-		{"Xk7-M9p", "XK7M9P"},
+		{"XK7M9-PQRST", "XK7M9PQRST"},
+		{"XK7M9PQRST", "XK7M9PQRST"},
+		{"xk7m9-pqrst", "XK7M9PQRST"},
+		{"xk7m9pqrst", "XK7M9PQRST"},
+		{"Xk7M9-Pqrst", "XK7M9PQRST"},
 		{"---", ""},
 		{"", ""},
 	}

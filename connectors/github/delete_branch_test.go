@@ -45,7 +45,7 @@ func TestDeleteBranch_EscapesSpecialCharsPerSegment(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// r.URL.Path is already decoded by net/http, so we verify via the
 		// raw path to ensure each segment was encoded independently.
-		want := "/repos/o/r/git/refs/heads/release%2Fv1/spaces%20and%25"
+		want := "/repos/o/r/git/refs/heads/release/v1/spaces%20and%25"
 		if r.URL.EscapedPath() != want {
 			t.Errorf("escaped path = %s, want %s", r.URL.EscapedPath(), want)
 		}

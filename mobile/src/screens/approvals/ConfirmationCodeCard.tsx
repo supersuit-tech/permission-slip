@@ -1,6 +1,6 @@
 /**
  * Displays the confirmation code after an approval in a large, prominent card.
- * The code is shown in XXX-XXX format with a copy-to-clipboard button.
+ * The code is shown in XXXXX-XXXXX format with a copy-to-clipboard button.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";

@@ -536,8 +536,8 @@ func TestApproveApproval_Success(t *testing.T) {
 	if resp.ConfirmationCode == "" {
 		t.Error("expected confirmation_code to be set")
 	}
-	if len(resp.ConfirmationCode) != 7 || resp.ConfirmationCode[3] != '-' {
-		t.Errorf("expected confirmation_code in XXX-XXX format, got %q", resp.ConfirmationCode)
+	if len(resp.ConfirmationCode) != 11 || resp.ConfirmationCode[5] != '-' {
+		t.Errorf("expected confirmation_code in XXXXX-XXXXX format, got %q", resp.ConfirmationCode)
 	}
 
 	// Execution should have been attempted (no connector in test → "error").
