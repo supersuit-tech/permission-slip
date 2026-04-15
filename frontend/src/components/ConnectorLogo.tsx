@@ -1,5 +1,5 @@
 import { Plug } from "lucide-react";
-import DOMPurify from "dompurify";
+import DOMPurify, { type Config as DOMPurifyConfig } from "dompurify";
 import { cn } from "@/lib/utils";
 
 interface ConnectorLogoProps {
@@ -14,13 +14,15 @@ interface ConnectorLogoProps {
 // compromised connector manifest, untrusted third-party connectors, or any
 // future user-supplied logos requires stripping scripts, event handlers, and
 // external references before rendering.
-const SVG_SANITIZER_CONFIG = {
+// DOMPurify's Config type expects mutable string[] fields, so this is a
+// plain object rather than `as const`.
+const SVG_SANITIZER_CONFIG: DOMPurifyConfig = {
   USE_PROFILES: { svg: true, svgFilters: true },
   // No MathML — connector logos are never math.
   // No <foreignObject> or <script> by default under the svg profile.
   FORBID_TAGS: ["script", "foreignObject"],
   FORBID_ATTR: ["onload", "onerror", "onclick", "href", "xlink:href"],
-} as const;
+};
 
 function sanitizeSVG(raw: string): string {
   return DOMPurify.sanitize(raw, SVG_SANITIZER_CONFIG);
