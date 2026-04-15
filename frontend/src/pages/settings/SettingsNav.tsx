@@ -4,9 +4,11 @@ import {
   Shield,
   CreditCard,
   Settings,
+  Smartphone,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsFullyConfigured } from "@/hooks/useIsFullyConfigured";
 
 interface SettingsNavItem {
   label: string;
@@ -21,8 +23,12 @@ const settingsNavItems: SettingsNavItem[] = [
   { label: "Account", path: "/settings/account", icon: Settings },
 ];
 
+const IOS_APP_URL =
+  "https://apps.apple.com/us/app/permission-slip/id6761718603";
+
 export function SettingsNav() {
   const { pathname } = useLocation();
+  const { isFullyConfigured } = useIsFullyConfigured();
 
   return (
     <>
@@ -50,6 +56,19 @@ export function SettingsNav() {
               </li>
             );
           })}
+          {isFullyConfigured && (
+            <li>
+              <a
+                href={IOS_APP_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+              >
+                <Smartphone className="size-4" aria-hidden="true" />
+                iPhone App
+              </a>
+            </li>
+          )}
         </ul>
       </nav>
 
@@ -78,6 +97,17 @@ export function SettingsNav() {
             </Link>
           );
         })}
+        {isFullyConfigured && (
+          <a
+            href={IOS_APP_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex shrink-0 items-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent/50 hover:text-foreground"
+          >
+            <Smartphone className="size-4" aria-hidden="true" />
+            iPhone App
+          </a>
+        )}
       </nav>
     </>
   );

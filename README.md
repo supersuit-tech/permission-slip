@@ -27,6 +27,8 @@ Permission Slip is an open-source approval layer for [Openclaw](https://openclaw
 
 **[permissionslip.dev](https://www.permissionslip.dev)** — hosted, no setup required.
 
+Get the **[iPhone app](https://apps.apple.com/us/app/permission-slip/id6761718603)** to approve requests on the go.
+
 Or **[self-host it](docs/deployment-self-hosted.md)** on Docker, Fly.io, or bare metal. Even runs on a [Raspberry Pi 5](docs/raspberry-pi-quickstart.md) in under 30 minutes.
 
 ---
@@ -52,6 +54,7 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 - 🙈 **Zero credential exposure** — Openclaw never sees your API keys or passwords
 - 📋 **Full audit trail** — every request, approval, and execution logged
 - 🔌 **OAuth 2.0 connections** — Google, Microsoft, Dropbox, and custom providers; PKCE where required; tokens encrypted at rest with automatic refresh
+- 📱 **iPhone app** — approve on the go from your phone
 - 🏠 **Self-hostable** — your data, your infrastructure
 - 📦 **Single binary deployment** — Go server with embedded React frontend
 
