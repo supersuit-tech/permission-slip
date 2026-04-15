@@ -30,6 +30,9 @@ import (
 // Returns a *ValidationError suitable for returning from an action's validate()
 // method.
 func ValidateExternalURL(raw, fieldName string) error {
+	if raw == "" {
+		return &ValidationError{Message: fmt.Sprintf("%s must include a host", fieldName)}
+	}
 	u, err := url.Parse(raw)
 	if err != nil {
 		return &ValidationError{Message: fmt.Sprintf("%s is not a valid URL: %v", fieldName, err)}
