@@ -39,22 +39,7 @@ jobs:
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
       - name: Run backend tests
-        run: |
-          set +e
-          go test -v ./... 2>&1 | tee /tmp/test-output.log
-          EXIT_CODE=${PIPESTATUS[0]}
-          if [ $EXIT_CODE -ne 0 ]; then
-            # Surface failing tests as annotations so they show up on the check run
-            # (CI logs aren't always readable from automation; this gives us a
-            # fallback signal via the annotations API). Delete this block once
-            # CI is stable.
-            grep -E "^--- FAIL:|^FAIL\t" /tmp/test-output.log | head -50 | while IFS= read -r line; do
-              echo "::error::${line}"
-            done
-            # Also dump first 30 FAIL lines with some context for human reviewers.
-            grep -B1 -A5 -E "^--- FAIL:" /tmp/test-output.log | head -300 || true
-          fi
-          exit $EXIT_CODE
+        run: go test ./...
 
   frontend:
     name: Frontend Tests
