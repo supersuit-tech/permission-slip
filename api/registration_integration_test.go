@@ -135,7 +135,7 @@ func TestIntegration_HappyPath_InviteToVerify(t *testing.T) {
 	// Use the verify endpoint again — it should return 409 (already registered),
 	// proving the signature was accepted and the agent was found.
 	authReq := signedJSONRequest(t, http.MethodPost, verifyPath,
-		verifyRequestBody("auth-check", "AAA-BBB"), privKey, regResp.AgentID)
+		verifyRequestBody("auth-check", "AAABB-CDEFG"), privKey, regResp.AgentID)
 
 	authW := httptest.NewRecorder()
 	router.ServeHTTP(authW, authReq)

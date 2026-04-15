@@ -126,7 +126,7 @@ func TestLockoutVsExpirationPrecedence_HTTP(t *testing.T) {
 	submitWrongVerifyCodes(t, router, reg, 5)
 
 	// 6th attempt — agent should be locked out (410 with verification_locked).
-	r, _ := signedVerifyRequest(t, reg, "ZZZ-ZZZ", "lockexp-check")
+	r, _ := signedVerifyRequest(t, reg, "ZZZZZ-ZZZZZ", "lockexp-check")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 

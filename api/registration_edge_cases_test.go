@@ -164,7 +164,7 @@ func TestVerifyRegistration_ConfirmationCodeNormalization(t *testing.T) {
 		{
 			name: "wrong code entirely",
 			transform: func(_ string) string {
-				return "ZZZ-ZZZ"
+				return "ZZZZZ-ZZZZZ"
 			},
 			wantStatus: http.StatusUnauthorized,
 		},
@@ -173,7 +173,7 @@ func TestVerifyRegistration_ConfirmationCodeNormalization(t *testing.T) {
 			transform: func(code string) string {
 				return code + "!"
 			},
-			wantStatus: http.StatusBadRequest, // length check fails after normalization (7+ chars)
+			wantStatus: http.StatusBadRequest, // length check fails after normalization (>10 chars)
 		},
 	}
 

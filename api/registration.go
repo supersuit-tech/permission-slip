@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/db"
+	"github.com/supersuit-tech/permission-slip/shared"
 )
 
 const (
@@ -115,12 +116,20 @@ func handleRegisterAgent(deps *Deps) http.HandlerFunc {
 		}
 
 		// Verify the request signature against the submitted public key.
-		if _, err := VerifyRegistrationSignature(req.PublicKey, r, bodyBytes); err != nil {
+		sig, err := VerifyRegistrationSignature(req.PublicKey, r, bodyBytes)
+		if err != nil {
 			if errors.Is(err, ErrSigTimestampExpired) {
 				RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrTimestampExpired, "Signature timestamp expired"))
 				return
 			}
 			RespondError(w, r, http.StatusUnauthorized, Unauthorized(ErrInvalidSignature, "Signature verification failed"))
+			return
+		}
+
+		// Replay protection: pre-registration has no agent_id yet, so record
+		// with agent_id=0. The (signature_hash) primary key is enough to
+		// reject duplicate submissions of the same signed registration body.
+		if !consumeSignatureOrReject(w, r, deps, sig, 0) {
 			return
 		}
 
@@ -315,10 +324,18 @@ func handleVerifyRegistration(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Validate confirmation code format (6 chars from safe set, optional hyphen).
+		// Validate confirmation code format (10 chars from safe set, optional hyphen).
 		normalized := normalizeConfirmationCode(req.ConfirmationCode)
-		if len(normalized) != 6 {
+		if len(normalized) != shared.ConfirmationCodeLength {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Invalid confirmation code format"))
+			return
+		}
+
+		// Pre-auth IP-scoped rate limit on this endpoint specifically. The general
+		// pre-auth limiter is generous (50 r/s); this one is much tighter to
+		// frustrate brute-force enumeration of confirmation codes from a single
+		// origin even before the signature check runs.
+		if !checkVerifyAttemptRateLimit(w, r, deps, agentID) {
 			return
 		}
 
@@ -357,7 +374,9 @@ func handleVerifyRegistration(deps *Deps) http.HandlerFunc {
 				RespondError(w, r, http.StatusGone, resp)
 			case errors.Is(verifyErr, db.ErrInvalidConfirmation):
 				resp := Unauthorized(ErrInvalidCode, "Incorrect confirmation code")
+				attemptsUsed := 0
 				if registered != nil {
+					attemptsUsed = registered.VerificationAttempts
 					attemptsRemaining := 5 - registered.VerificationAttempts
 					if attemptsRemaining < 0 {
 						attemptsRemaining = 0
@@ -366,6 +385,12 @@ func handleVerifyRegistration(deps *Deps) http.HandlerFunc {
 						"attempts_remaining": attemptsRemaining,
 					}
 				}
+				// Log failed confirmation attempts to Sentry as a warning so
+				// brute-force / enumeration patterns surface in monitoring.
+				CaptureMessage(r.Context(), SeverityWarning, fmt.Sprintf(
+					"agent verify: incorrect confirmation code (agent_id=%d, attempt=%d)",
+					agentID, attemptsUsed,
+				))
 				RespondError(w, r, http.StatusUnauthorized, resp)
 			default:
 				log.Printf("[%s] VerifyRegistration: %v", TraceID(r.Context()), verifyErr)

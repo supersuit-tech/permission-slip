@@ -32,6 +32,12 @@ func (p *createWebhookParams) validate() error {
 	if p.URL == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: url"}
 	}
+	// Reject webhook URLs targeting internal/metadata endpoints. GitHub itself
+	// also blocks many of these, but enforcing at our edge prevents our
+	// integration from being used to probe a caller's internal network.
+	if err := connectors.ValidateExternalURL(p.URL, "url"); err != nil {
+		return err
+	}
 	if err := requireNonEmptyStrings(p.Events, "events"); err != nil {
 		return err
 	}

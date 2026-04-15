@@ -695,7 +695,7 @@ func seedUserHasAgents(ctx context.Context, tx db.DBTX, supa *supabaseClient) {
 		 RETURNING agent_id`,
 		"pk-seed-pending-setup", userHasAgents,
 		`{"name": "New Agent (Pending)"}`,
-		"XK7-M9P",
+		"XK7M9-PQRST",
 		now.Add(1*time.Hour),
 		now.Add(-1*time.Hour))
 
@@ -942,7 +942,7 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		 RETURNING agent_id`,
 		"pk-seed-everything-pending", userHasEverything,
 		`{"name": "New CI Runner (Pending)"}`,
-		"AB3-CD5",
+		"AB3CD-5EFGH",
 		now.Add(1*time.Hour),
 		now.Add(-30*time.Minute))
 

@@ -300,7 +300,7 @@ paths:
         3. **Agent POSTs to invite URL**: Sends public key and request ID
         4. **Permission Slip validates**: Verifies the invite code is valid,
            not expired, and not consumed — then creates a pending registration
-        5. **Dashboard shows confirmation code**: User sees a 6-character
+        5. **Dashboard shows confirmation code**: User sees a 10-character
            confirmation code on their dashboard
         6. **User shares confirmation code**: Communicates the code to the agent
            (out-of-band)
@@ -496,8 +496,8 @@ paths:
         ## Verification Flow
 
         1. **Agent registers**: POSTs to invite URL (`POST /invite/{invite_code}`)
-        2. **Code displayed**: Permission Slip shows 6-character confirmation code
-           on the user's dashboard (e.g., `XK7-M9P`)
+        2. **Code displayed**: Permission Slip shows 10-character confirmation code
+           on the user's dashboard (e.g., `XK7M9-PQRST`)
         3. **User provides code**: User communicates code to agent (out-of-band)
         4. **Agent submits code**: Calls this endpoint with code
         5. **Service verifies**: Checks code matches, hasn't expired, attempts < 5
@@ -505,11 +505,11 @@ paths:
 
         ## Confirmation Code Format
 
-        - **Length**: 6 characters (may include hyphen for readability: `XXX-XXX`)
+        - **Length**: 10 characters (may include hyphen for readability: `XXXXX-XXXXX`)
         - **Character set**: Uppercase alphanumeric excluding confusing chars (`0`, `O`, `1`, `I`)
         - **Allowed**: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 characters)
         - **Case-insensitive**: Permission Slip normalizes to uppercase before validation
-        - **Examples**: `XK7-M9P`, `XK7M9P`, `xk7-m9p` (all equivalent)
+        - **Examples**: `XK7M9-PQRST`, `XK7M9PQRST`, `xk7m9-pqrst` (all equivalent)
 
         ## Security
 
@@ -541,17 +541,17 @@ paths:
                 summary: Code with hyphen
                 value:
                   request_id: 040dacd3-fbf9-42b3-b58f-0d838502b16e
-                  confirmation_code: XK7-M9P
+                  confirmation_code: XK7M9-PQRST
               without_hyphen:
                 summary: Code without hyphen
                 value:
                   request_id: 37c7045e-aef3-4ad3-8ce9-1f78a6d59486
-                  confirmation_code: XK7M9P
+                  confirmation_code: XK7M9PQRST
               lowercase:
                 summary: Lowercase code (normalized by service)
                 value:
                   request_id: 64d245ef-84df-4582-9709-1fe05d5e3b2c
-                  confirmation_code: xk7-m9p
+                  confirmation_code: xk7m9-pqrst
       responses:
         '200':
           description: Registration verified successfully
@@ -580,7 +580,7 @@ paths:
                       retryable: false
                       details:
                         field: confirmation_code
-                        expected_format: 6 characters from set A-Z2-9
+                        expected_format: 10 characters from set A-Z2-9
                       trace_id: trace_xyz789
                 agent_id_mismatch:
                   summary: Agent ID in path doesn't match signature header
@@ -2934,7 +2934,7 @@ paths:
                     approval_id: appr_xyz789
                     status: approved
                     approved_at: '2026-02-21T10:30:00Z'
-                    confirmation_code: RK3-P7M
+                    confirmation_code: RK3P7-MNPQR
                     execution_status: success
                     execution_result:
                       message_id: msg_abc123
@@ -2945,7 +2945,7 @@ paths:
                     approval_id: appr_xyz789
                     status: approved
                     approved_at: '2026-02-21T10:30:00Z'
-                    confirmation_code: RK3-P7M
+                    confirmation_code: RK3P7-MNPQR
                     execution_status: error
                     execution_result:
                       error: upstream_error
@@ -6634,26 +6634,27 @@ components:
           example: 040dacd3-fbf9-42b3-b58f-0d838502b16e
         confirmation_code:
           type: string
-          pattern: ^[A-Za-z2-9]{3}-?[A-Za-z2-9]{3}$
-          minLength: 6
-          maxLength: 7
+          pattern: ^[A-Za-z2-9]{5}-?[A-Za-z2-9]{5}$
+          minLength: 10
+          maxLength: 11
           description: |
-            6-character confirmation code shown to approver after they approve the registration.
+            10-character confirmation code shown to approver after they approve the registration.
 
             **Format**:
-            - 6 characters from set: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 chars)
+            - 10 characters from set: `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 chars)
             - Excluded confusing characters: `0`, `O`, `1`, `I`
-            - May include hyphen for readability: `XXX-XXX` or `XXXXXX`
+            - May include hyphen for readability: `XXXXX-XXXXX` or `XXXXXXXXXX`
             - Case-insensitive (Permission Slip normalizes to uppercase)
 
-            **Security**: Permission Slip enforces a 5 attempt limit. After 5 failed attempts, 
-            registration expires and agent must re-register.
+            **Security**: Permission Slip enforces a 5 attempt limit. After 5 failed attempts,
+            registration expires and agent must re-register. Per-agent and per-IP rate
+            limits further restrict brute-force attempts.
 
-            **Examples**: `XK7-M9P`, `XK7M9P`, `xk7-m9p` (all equivalent)
-          example: XK7-M9P
+            **Examples**: `XK7M9-PQRST`, `XK7M9PQRST`, `xk7m9-pqrst` (all equivalent)
+          example: XK7M9-PQRST
       example:
         request_id: 040dacd3-fbf9-42b3-b58f-0d838502b16e
-        confirmation_code: XK7-M9P
+        confirmation_code: XK7M9-PQRST
     VerifyRegistrationResponse:
       type: object
       required:
@@ -7023,11 +7024,11 @@ components:
         confirmation_code:
           type: string
           description: |
-            Ephemeral confirmation code in `XXX-XXX` format. Displayed to the
+            Ephemeral confirmation code in `XXXXX-XXXXX` format. Displayed to the
             approver as a visual receipt and shared with the agent to confirm
             the approval. Generated at approval time and not persisted.
-          pattern: ^[A-Z2-9]{3}-[A-Z2-9]{3}$
-          example: RK3-P7M
+          pattern: ^[A-Z2-9]{5}-[A-Z2-9]{5}$
+          example: RK3P7-MNPQR
         execution_status:
           $ref: '#/components/schemas/ExecutionStatus'
         execution_result:
@@ -8832,7 +8833,7 @@ components:
             Confirmation code for pending agents. Shown to the approver on
             the dashboard so they can share it with the agent. Cleared after
             successful verification. Only present when status is "pending".
-          example: XK7-M9P
+          example: XK7M9-PQRST
         expires_at:
           type: string
           format: date-time

@@ -88,6 +88,13 @@ func TestCreateWebhook_MissingParams(t *testing.T) {
 		{"missing url", `{"owner":"o","repo":"r","events":["push"]}`},
 		{"missing events", `{"owner":"o","repo":"r","url":"https://example.com"}`},
 		{"empty events", `{"owner":"o","repo":"r","url":"https://example.com","events":[]}`},
+		// SSRF defense-in-depth: webhook URLs must not target internal or
+		// metadata endpoints, even though GitHub itself also refuses.
+		{"http scheme", `{"owner":"o","repo":"r","url":"http://example.com/hook","events":["push"]}`},
+		{"localhost host", `{"owner":"o","repo":"r","url":"https://localhost/hook","events":["push"]}`},
+		{"loopback literal", `{"owner":"o","repo":"r","url":"https://127.0.0.1/hook","events":["push"]}`},
+		{"private RFC1918", `{"owner":"o","repo":"r","url":"https://10.0.0.5/hook","events":["push"]}`},
+		{"metadata endpoint", `{"owner":"o","repo":"r","url":"https://169.254.169.254/latest","events":["push"]}`},
 	}
 
 	for _, tt := range tests {

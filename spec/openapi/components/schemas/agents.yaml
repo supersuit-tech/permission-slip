@@ -31,7 +31,7 @@ AgentSummary:
         Confirmation code for pending agents. Shown to the approver on
         the dashboard so they can share it with the agent. Cleared after
         successful verification. Only present when status is "pending".
-      example: "XK7-M9P"
+      example: "XK7M9-PQRST"
     expires_at:
       type: string
       format: date-time

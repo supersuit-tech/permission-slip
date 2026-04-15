@@ -156,11 +156,37 @@ func validateConfig() (errs []configError, warnings []configError) {
 			message: "not set; account deletion will not remove the Supabase auth user (recommended: set for production)",
 		})
 	}
-	if os.Getenv("INVITE_HMAC_KEY") == "" {
-		warnings = append(warnings, configError{
+	// INVITE_HMAC_KEY — required in production. Without it, invite code hashes
+	// stored in the DB are plain SHA-256, which can be reversed via rainbow
+	// tables since the codeword format is public (PS-XXXX-YYYY).
+	//
+	// In production, the key is mandatory and must be at least 32 chars.
+	// In development, it is optional (plain SHA-256 fallback is fine for tests).
+	inviteHMACKey := os.Getenv("INVITE_HMAC_KEY")
+	switch {
+	case inviteHMACKey == "":
+		ce := configError{
 			envVar:  "INVITE_HMAC_KEY",
-			message: "not set; invite codes will use plain SHA-256 (recommended: set for production)",
-		})
+			message: "required in production to HMAC invite code hashes; generate with: openssl rand -hex 32",
+		}
+		if devMode {
+			warnings = append(warnings, configError{
+				envVar:  "INVITE_HMAC_KEY",
+				message: "not set; invite codes will use plain SHA-256 (required for production — generate with: openssl rand -hex 32)",
+			})
+		} else {
+			errs = append(errs, ce)
+		}
+	case len(inviteHMACKey) < 32:
+		ce := configError{
+			envVar:  "INVITE_HMAC_KEY",
+			message: "too short; must be at least 32 characters (generate with: openssl rand -hex 32)",
+		}
+		if devMode {
+			warnings = append(warnings, ce)
+		} else {
+			errs = append(errs, ce)
+		}
 	}
 	if os.Getenv("BASE_URL") == "" {
 		msg := "not set; invite URLs will not be generated"
@@ -176,10 +202,36 @@ func validateConfig() (errs []configError, warnings []configError) {
 	// OAuth state secret — required in production when SUPABASE_JWT_SECRET is
 	// not set (e.g. JWKS-based auth with Supabase CLI v2+). Without either
 	// secret, OAuth CSRF state tokens cannot be signed and all flows will fail.
-	if os.Getenv("OAUTH_STATE_SECRET") == "" && !hasJWTSecret {
+	oauthStateSecret := os.Getenv("OAUTH_STATE_SECRET")
+	if oauthStateSecret == "" && !hasJWTSecret {
 		ce := configError{
 			envVar:  "OAUTH_STATE_SECRET",
 			message: "not set and SUPABASE_JWT_SECRET is empty — OAuth flows will fail (generate with: openssl rand -hex 32)",
+		}
+		if devMode {
+			warnings = append(warnings, ce)
+		} else {
+			errs = append(errs, ce)
+		}
+	} else if oauthStateSecret != "" && len(oauthStateSecret) < 32 {
+		ce := configError{
+			envVar:  "OAUTH_STATE_SECRET",
+			message: "too short; must be at least 32 characters (generate with: openssl rand -hex 32)",
+		}
+		if devMode {
+			warnings = append(warnings, ce)
+		} else {
+			errs = append(errs, ce)
+		}
+	}
+
+	// SUPABASE_JWT_SECRET — when set, enforce a 32-char minimum. HS256 JWT
+	// signing with a short secret is trivially brute-forced offline.
+	jwtSecret := os.Getenv("SUPABASE_JWT_SECRET")
+	if jwtSecret != "" && len(jwtSecret) < 32 {
+		ce := configError{
+			envVar:  "SUPABASE_JWT_SECRET",
+			message: "too short; must be at least 32 characters (generate with: openssl rand -hex 32)",
 		}
 		if devMode {
 			warnings = append(warnings, ce)

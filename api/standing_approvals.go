@@ -55,8 +55,8 @@ type createStandingApprovalRequest struct {
 }
 
 type updateStandingApprovalRequest struct {
-	Constraints   json.RawMessage `json:"constraints"`
-	ExpiresAt     *time.Time      `json:"expires_at"`
+	Constraints json.RawMessage `json:"constraints"`
+	ExpiresAt   *time.Time      `json:"expires_at"`
 	// ExpiresAtSet is true when the JSON payload explicitly included the "expires_at" key
 	// (even if the value was null). This distinguishes "field omitted" (preserve existing)
 	// from "field set to null" (clear expiry → until revoked).
@@ -88,10 +88,10 @@ type executeStandingApprovalResponse struct {
 }
 
 var validStandingApprovalStatusFilters = map[string]bool{
-	"active":    true,
-	"expired":   true,
-	"revoked":   true,
-	"all":       true,
+	"active":  true,
+	"expired": true,
+	"revoked": true,
+	"all":     true,
 }
 
 var actionVersionPattern = regexp.MustCompile(`^\d+$`)
@@ -455,6 +455,17 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 			log.Printf("[%s] ExecuteStandingApproval: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to execute standing approval"))
+			return
+		}
+
+		// Defense-in-depth: re-verify that the caller still owns the agent the
+		// standing approval references. RecordStandingApprovalExecution already
+		// scopes by user_id, but the stored agent_id was bound at creation time
+		// — re-checking ownership here protects against edge cases where agent
+		// ownership changes after the standing approval is created (and keeps
+		// the execution path consistent with every other connector-action entry
+		// point, all of which call requireAgentOwnership).
+		if !requireAgentOwnership(w, r, deps, exec.AgentID, profile.ID) {
 			return
 		}
 

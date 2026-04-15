@@ -360,11 +360,11 @@ ApproveApprovalResponse:
     confirmation_code:
       type: string
       description: |
-        Ephemeral confirmation code in `XXX-XXX` format. Displayed to the
+        Ephemeral confirmation code in `XXXXX-XXXXX` format. Displayed to the
         approver as a visual receipt and shared with the agent to confirm
         the approval. Generated at approval time and not persisted.
-      pattern: "^[A-Z2-9]{3}-[A-Z2-9]{3}$"
-      example: "RK3-P7M"
+      pattern: "^[A-Z2-9]{5}-[A-Z2-9]{5}$"
+      example: "RK3P7-MNPQR"
     execution_status:
       $ref: './shared.yaml#/ExecutionStatus'
     execution_result:

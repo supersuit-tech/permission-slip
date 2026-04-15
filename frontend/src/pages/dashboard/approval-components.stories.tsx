@@ -25,7 +25,7 @@ export const NoLevel: RiskStory = { args: { level: null } };
 export const ConfirmationCode: StoryObj<typeof ConfirmationCodeBanner> = {
   render: () => (
     <div className="w-[400px]">
-      <ConfirmationCodeBanner code="A7X-3KM" />
+      <ConfirmationCodeBanner code="A7X3K-MNPQR" />
     </div>
   ),
 };
@@ -33,7 +33,7 @@ export const ConfirmationCode: StoryObj<typeof ConfirmationCodeBanner> = {
 export const ConfirmationCodeCopyable: StoryObj<typeof ConfirmationCodeBanner> = {
   render: () => (
     <div className="w-[400px]">
-      <ConfirmationCodeBanner code="B9Y-2LP" copyable />
+      <ConfirmationCodeBanner code="B9Y2L-PRSTU" copyable />
     </div>
   ),
 };
@@ -42,7 +42,7 @@ export const ConfirmationCodeCustomDescription: StoryObj<typeof ConfirmationCode
   render: () => (
     <div className="w-[400px]">
       <ConfirmationCodeBanner
-        code="Z1W-8QR"
+        code="Z1W8Q-RSTUV"
         description="Enter this code in your agent's terminal to complete registration"
       />
     </div>

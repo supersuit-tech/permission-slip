@@ -824,7 +824,7 @@ approveApproval:
                   approval_id: "appr_xyz789"
                   status: "approved"
                   approved_at: "2026-02-21T10:30:00Z"
-                  confirmation_code: "RK3-P7M"
+                  confirmation_code: "RK3P7-MNPQR"
                   execution_status: "success"
                   execution_result:
                     message_id: "msg_abc123"
@@ -835,7 +835,7 @@ approveApproval:
                   approval_id: "appr_xyz789"
                   status: "approved"
                   approved_at: "2026-02-21T10:30:00Z"
-                  confirmation_code: "RK3-P7M"
+                  confirmation_code: "RK3P7-MNPQR"
                   execution_status: "error"
                   execution_result:
                     error: "upstream_error"

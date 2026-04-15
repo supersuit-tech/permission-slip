@@ -1,4 +1,5 @@
 import { Plug } from "lucide-react";
+import DOMPurify from "dompurify";
 import { cn } from "@/lib/utils";
 
 interface ConnectorLogoProps {
@@ -6,6 +7,23 @@ interface ConnectorLogoProps {
   logoSvg?: string | null;
   className?: string;
   size?: "sm" | "md" | "lg";
+}
+
+// Sanitize inline connector SVG strings before injecting them into the DOM.
+// Connector logos are bundled at build time, but defense-in-depth against a
+// compromised connector manifest, untrusted third-party connectors, or any
+// future user-supplied logos requires stripping scripts, event handlers, and
+// external references before rendering.
+const SVG_SANITIZER_CONFIG = {
+  USE_PROFILES: { svg: true, svgFilters: true },
+  // No MathML — connector logos are never math.
+  // No <foreignObject> or <script> by default under the svg profile.
+  FORBID_TAGS: ["script", "foreignObject"],
+  FORBID_ATTR: ["onload", "onerror", "onclick", "href", "xlink:href"],
+} as const;
+
+function sanitizeSVG(raw: string): string {
+  return DOMPurify.sanitize(raw, SVG_SANITIZER_CONFIG);
 }
 
 const sizeClasses = {
@@ -47,7 +65,7 @@ export function ConnectorLogo({
           className,
         )}
         aria-hidden="true"
-        dangerouslySetInnerHTML={{ __html: logoSvg }}
+        dangerouslySetInnerHTML={{ __html: sanitizeSVG(logoSvg) }}
       />
     );
   }

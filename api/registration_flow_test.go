@@ -264,7 +264,7 @@ func signedVerifyRequest(t *testing.T, reg inviteRegistration, confirmCode, requ
 func submitWrongVerifyCodes(t *testing.T, router http.Handler, reg inviteRegistration, n int) {
 	t.Helper()
 	for i := range n {
-		r, _ := signedVerifyRequest(t, reg, "ZZZ-ZZZ", fmt.Sprintf("wrong-%d", i))
+		r, _ := signedVerifyRequest(t, reg, "ZZZZZ-ZZZZZ", fmt.Sprintf("wrong-%d", i))
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, r)
 		if w.Code != http.StatusUnauthorized {
@@ -320,7 +320,7 @@ func TestVerifyRegistration_WrongCode(t *testing.T) {
 
 	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
 
-	r, _ := signedVerifyRequest(t, reg, "AAA-BBB", "verify-wrong")
+	r, _ := signedVerifyRequest(t, reg, "AAABB-CDEFG", "verify-wrong")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -351,7 +351,7 @@ func TestVerifyRegistration_Lockout(t *testing.T) {
 	submitWrongVerifyCodes(t, router, reg, 5)
 
 	// 6th attempt (wrong code) should be locked out (410 Gone).
-	r, _ := signedVerifyRequest(t, reg, "ZZZ-ZZZ", "lock-final")
+	r, _ := signedVerifyRequest(t, reg, "ZZZZZ-ZZZZZ", "lock-final")
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 

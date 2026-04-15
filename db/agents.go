@@ -349,9 +349,10 @@ func VerifyAgentConfirmationCode(ctx context.Context, db DBTX, agentID int64, su
 	// Constant-time comparison of plaintext codes.
 	// Normalize the stored code the same way (strip hyphens, uppercase) for
 	// a fair comparison. Note: the normalization itself is not constant-time,
-	// but operates on fixed-length values (always 7 chars stored, always the
-	// same hyphen position) so there's nothing to leak. The 5-attempt lockout
-	// makes timing attacks infeasible regardless.
+	// but operates on fixed-length values (the stored code is always
+	// shared.ConfirmationCodeLength chars plus a hyphen at a fixed position),
+	// so there's nothing to leak. The 5-attempt lockout makes timing attacks
+	// infeasible regardless.
 	storedCode := ""
 	if a.ConfirmationCode != nil {
 		storedCode = strings.ToUpper(strings.ReplaceAll(*a.ConfirmationCode, "-", ""))

@@ -48,6 +48,32 @@ func CaptureError(ctx context.Context, err error) {
 	hub.CaptureException(err)
 }
 
+// Severity aliases for CaptureMessage so callers don't have to depend on the
+// sentry-go package directly.
+const (
+	SeverityInfo    = sentry.LevelInfo
+	SeverityWarning = sentry.LevelWarning
+	SeverityError   = sentry.LevelError
+)
+
+// CaptureMessage reports a non-error message (e.g. a security-relevant event
+// like a failed confirmation code attempt) to Sentry at the given severity.
+// The trace ID from ctx is attached as a tag so the message can be correlated
+// with logs. If Sentry is not initialized (no DSN), this is a no-op.
+func CaptureMessage(ctx context.Context, level sentry.Level, msg string) {
+	hub := sentry.GetHubFromContext(ctx)
+	if hub == nil {
+		hub = sentry.CurrentHub().Clone()
+	}
+	hub.WithScope(func(scope *sentry.Scope) {
+		if traceID := TraceID(ctx); traceID != "" {
+			scope.SetTag("trace_id", traceID)
+		}
+		scope.SetLevel(level)
+		hub.CaptureMessage(msg)
+	})
+}
+
 // ConnectorContext carries connector-specific metadata for Sentry error reports.
 type ConnectorContext struct {
 	ConnectorID string

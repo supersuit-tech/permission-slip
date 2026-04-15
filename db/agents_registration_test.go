@@ -15,7 +15,7 @@ func TestInsertPendingAgent_Success(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	agent, err := db.InsertPendingAgent(context.Background(), tx,
-		uid, "ssh-ed25519 AAAA_test_key", "XK7-M9P", 300, nil)
+		uid, "ssh-ed25519 AAAA_test_key", "XK7M9-PQRST", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
@@ -31,8 +31,8 @@ func TestInsertPendingAgent_Success(t *testing.T) {
 	if agent.ApproverID != uid {
 		t.Errorf("expected approver_id %q, got %q", uid, agent.ApproverID)
 	}
-	if agent.ConfirmationCode == nil || *agent.ConfirmationCode != "XK7-M9P" {
-		t.Errorf("expected confirmation_code 'XK7-M9P', got %v", agent.ConfirmationCode)
+	if agent.ConfirmationCode == nil || *agent.ConfirmationCode != "XK7M9-PQRST" {
+		t.Errorf("expected confirmation_code 'XK7M9-PQRST', got %v", agent.ConfirmationCode)
 	}
 	if agent.ExpiresAt == nil {
 		t.Error("expected non-nil expires_at")
@@ -50,7 +50,7 @@ func TestInsertPendingAgent_WithMetadata(t *testing.T) {
 
 	metadata := []byte(`{"name":"test-agent","version":"1.0.0"}`)
 	agent, err := db.InsertPendingAgent(context.Background(), tx,
-		uid, "ssh-ed25519 AAAA_test_key_2", "AB2-CD3", 300, metadata)
+		uid, "ssh-ed25519 AAAA_test_key_2", "AB2CD-3EFGH", 300, metadata)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
@@ -66,13 +66,13 @@ func TestVerifyAgentConfirmationCode_Success(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	agent, err := db.InsertPendingAgent(context.Background(), tx,
-		uid, "ssh-ed25519 AAAA_test_key_3", "XX3-YY4", 300, nil)
+		uid, "ssh-ed25519 AAAA_test_key_3", "XX3YY-4ZWVU", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
 
-	// Submit normalized code (uppercase, no hyphens) — matches stored "XX3-YY4".
-	registered, err := db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "XX3YY4")
+	// Submit normalized code (uppercase, no hyphens) — matches stored "XX3YY-4ZWVU".
+	registered, err := db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "XX3YY4ZWVU")
 	if err != nil {
 		t.Fatalf("VerifyAgentConfirmationCode: %v", err)
 	}
@@ -97,12 +97,12 @@ func TestVerifyAgentConfirmationCode_WrongCode(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	agent, err := db.InsertPendingAgent(context.Background(), tx,
-		uid, "ssh-ed25519 AAAA_test_key_4", "AA2-BB3", 300, nil)
+		uid, "ssh-ed25519 AAAA_test_key_4", "AA2BB-3CDEF", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
 
-	result, err := db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "ZZZZZZ")
+	result, err := db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "ZZZZZZZZZZ")
 	if err == nil {
 		t.Fatal("expected error for wrong code")
 	}
@@ -121,7 +121,7 @@ func TestVerifyAgentConfirmationCode_NotFound(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	result, err := db.VerifyAgentConfirmationCode(context.Background(), tx, 999999, "ABCDEF")
+	result, err := db.VerifyAgentConfirmationCode(context.Background(), tx, 999999, "ABCDEFGHJK")
 	if err != nil {
 		t.Fatalf("expected nil error for not found, got %v", err)
 	}
@@ -137,21 +137,21 @@ func TestVerifyAgentConfirmationCode_Lockout(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	agent, err := db.InsertPendingAgent(context.Background(), tx,
-		uid, "ssh-ed25519 AAAA_test_key_5", "CC4-DD5", 300, nil)
+		uid, "ssh-ed25519 AAAA_test_key_5", "CC4DD-5EFGH", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
 
 	// Make 5 failed attempts.
 	for i := 0; i < 5; i++ {
-		_, verifyErr := db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "ZZZZZZ")
+		_, verifyErr := db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "ZZZZZZZZZZ")
 		if verifyErr != db.ErrInvalidConfirmation {
 			t.Fatalf("attempt %d: expected ErrInvalidConfirmation, got %v", i+1, verifyErr)
 		}
 	}
 
 	// 6th attempt should return ErrVerificationLocked.
-	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "CC4DD5")
+	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "CC4DD5EFGH")
 	if err != db.ErrVerificationLocked {
 		t.Errorf("expected ErrVerificationLocked, got %v", err)
 	}
@@ -164,7 +164,7 @@ func TestVerifyAgentConfirmationCode_Expired(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	agent, err := db.InsertPendingAgent(context.Background(), tx,
-		uid, "ssh-ed25519 AAAA_test_key_6", "EE5-FF6", 300, nil)
+		uid, "ssh-ed25519 AAAA_test_key_6", "EE5FF-6GHJK", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
@@ -172,7 +172,7 @@ func TestVerifyAgentConfirmationCode_Expired(t *testing.T) {
 	// Backdate expires_at to the past.
 	testhelper.MustExec(t, tx, `UPDATE agents SET expires_at = now() - interval '1 hour' WHERE agent_id = $1`, agent.AgentID)
 
-	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "EE5FF6")
+	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "EE5FF6GHJK")
 	if err != db.ErrRegistrationExpired {
 		t.Errorf("expected ErrRegistrationExpired, got %v", err)
 	}
@@ -185,19 +185,19 @@ func TestVerifyAgentConfirmationCode_AlreadyRegistered(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	agent, err := db.InsertPendingAgent(context.Background(), tx,
-		uid, "ssh-ed25519 AAAA_test_key_7", "GG6-HH7", 300, nil)
+		uid, "ssh-ed25519 AAAA_test_key_7", "GG6HH-7JKLM", 300, nil)
 	if err != nil {
 		t.Fatalf("InsertPendingAgent: %v", err)
 	}
 
 	// First verify should succeed.
-	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "GG6HH7")
+	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "GG6HH7JKLM")
 	if err != nil {
 		t.Fatalf("first verify: %v", err)
 	}
 
 	// Second verify should return ErrAgentNotPending.
-	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "GG6HH7")
+	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "GG6HH7JKLM")
 	if err != db.ErrAgentNotPending {
 		t.Errorf("expected ErrAgentNotPending, got %v", err)
 	}

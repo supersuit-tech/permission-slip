@@ -320,6 +320,13 @@ func requireAgentSignature(w http.ResponseWriter, r *http.Request, deps *Deps, a
 		return nil, nil, false
 	}
 
+	// Replay protection: record the verified signature hash so it cannot be
+	// replayed within the ±5-minute timestamp window. This runs AFTER rate
+	// limiting so replayed requests still count against the attacker's quota.
+	if !consumeSignatureOrReject(w, r, deps, sig, agent.AgentID) {
+		return nil, nil, false
+	}
+
 	return agent, sig, true
 }
 
