@@ -11,6 +11,15 @@ try {
   // Git not available at build time — leave as "unknown"
 }
 
+let gitCommitTimestamp = "unknown";
+try {
+  gitCommitTimestamp = execSync("git log -1 --format=%cI HEAD", {
+    encoding: "utf-8",
+  }).trim();
+} catch {
+  // Git not available at build time — leave as "unknown"
+}
+
 const config: ExpoConfig = {
   name: "Permission Slip",
   slug: "permission-slip",
@@ -82,6 +91,7 @@ const config: ExpoConfig = {
   },
   extra: {
     gitCommitHash,
+    gitCommitTimestamp,
     eas: {
       projectId,
     },

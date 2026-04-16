@@ -29,6 +29,20 @@ import CustomServerSettings from "./CustomServerSettings";
 const GIT_COMMIT_HASH: string =
   (Constants.expoConfig?.extra?.gitCommitHash as string) ?? "unknown";
 
+const GIT_COMMIT_TIMESTAMP: string =
+  (Constants.expoConfig?.extra?.gitCommitTimestamp as string) ?? "unknown";
+
+function formatCommitTimestamp(iso: string): string {
+  if (iso === "unknown") return "";
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return "";
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
 const PRIVACY_POLICY_URL = "https://app.permissionslip.dev/policy/privacy";
 const TERMS_OF_SERVICE_URL = "https://app.permissionslip.dev/policy/terms";
 
@@ -238,6 +252,9 @@ export default function SettingsScreen(_props: Props) {
       <View style={styles.buildInfo}>
         <Text style={styles.buildInfoText} testID="git-commit-hash">
           Build {GIT_COMMIT_HASH.slice(0, 7)}
+          {formatCommitTimestamp(GIT_COMMIT_TIMESTAMP)
+            ? ` · ${formatCommitTimestamp(GIT_COMMIT_TIMESTAMP)}`
+            : ""}
         </Text>
       </View>
     </ScrollView>
