@@ -41,7 +41,10 @@ jest.mock("expo-constants", () => ({
   __esModule: true,
   default: {
     expoConfig: {
-      extra: { gitCommitHash: "abc1234def5678" },
+      extra: {
+        gitCommitHash: "abc1234def5678",
+        gitCommitTimestamp: "2026-04-16T10:30:00+00:00",
+      },
     },
   },
 }));
@@ -314,6 +317,7 @@ describe("SettingsScreen", () => {
     expect(hashNodes.length).toBeGreaterThanOrEqual(1);
     const textContent = hashNodes[0]?.children?.join("") ?? "";
     expect(textContent).toContain("abc1234");
+    expect(textContent).toContain("Apr 16, 2026");
   });
 
   it("opens terms of service URL when tapped", async () => {
