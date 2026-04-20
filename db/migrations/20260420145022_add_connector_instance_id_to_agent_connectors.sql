@@ -31,7 +31,12 @@ CREATE OR REPLACE FUNCTION trg_agent_connectors_before_insert()
 RETURNS trigger AS $$
 BEGIN
     IF NEW.label IS NULL THEN
-        SELECT name INTO STRICT NEW.label FROM connectors WHERE id = NEW.connector_id;
+        SELECT c.name INTO NEW.label FROM connectors c WHERE c.id = NEW.connector_id;
+        IF NEW.label IS NULL THEN
+            -- Match FK violation so API maps to connector_not_found (STRICT would raise P0002 / ErrNoRows).
+            RAISE EXCEPTION 'insert or update on table "agent_connectors" violates foreign key constraint'
+                USING ERRCODE = '23503';
+        END IF;
     END IF;
     -- First row for (agent, connector) must be the default instance (column default is false).
     IF NOT EXISTS (
