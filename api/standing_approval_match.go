@@ -15,7 +15,7 @@ import (
 // response was written (either success or error), false if no standing approval
 // matched and the caller should fall through to the pending approval flow.
 func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps *Deps, agent *db.Agent, actionType string, params json.RawMessage, requestID string, pp *paymentParams) bool {
-	approvals, err := db.FindActiveStandingApprovalsForAgent(r.Context(), deps.DB, agent.AgentID, actionType)
+	approvals, err := db.FindActiveStandingApprovalsForAgent(r.Context(), deps.DB, agent.AgentID, actionType, "")
 	if err != nil {
 		log.Printf("[%s] AutoApprove: find standing approvals: %v", TraceID(r.Context()), err)
 		CaptureError(r.Context(), err)

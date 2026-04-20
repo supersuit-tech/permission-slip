@@ -1524,11 +1524,16 @@ paths:
       operationId: assignAgentConnectorCredential
       summary: Assign Credential to Agent Connector
       description: |
+        **Deprecated:** targets the **default** connector instance only. Prefer
+        `PUT /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential`
+        for per-instance bindings.
+
         Assign a credential or OAuth connection to an agent-connector pair. This determines
         which credential the agent uses when executing actions through this connector.
 
         Exactly one of `credential_id` or `oauth_connection_id` must be provided.
         If a credential is already assigned, it is replaced (upsert behavior).
+      deprecated: true
       tags:
         - Agents
       security:
@@ -1580,8 +1585,12 @@ paths:
       operationId: removeAgentConnectorCredential
       summary: Remove Credential from Agent Connector
       description: |
+        **Deprecated:** removes the binding for the **default** instance only. Prefer
+        `DELETE .../instances/{instance_id}/credential` for per-instance removal.
+
         Remove the credential binding for an agent-connector pair. After removal,
         the agent falls back to user-global credential resolution for this connector.
+      deprecated: true
       tags:
         - Agents
       security:
@@ -1616,7 +1625,11 @@ paths:
       operationId: getAgentConnectorCredential
       summary: Get Agent Connector Credential
       description: |
+        **Deprecated:** returns the binding for the **default** instance only. Prefer
+        `GET .../instances/{instance_id}/credential` for a specific instance.
+
         Get the current credential binding for an agent-connector pair.
+      deprecated: true
       tags:
         - Agents
       security:
@@ -1751,6 +1764,331 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances:
+    get:
+      operationId: listAgentConnectorInstances
+      summary: List connector instances for an agent
+      description: |
+        Returns all instances of a connector type enabled for the agent (including the default instance).
+
+        Requires session authentication (Supabase JWT).
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      responses:
+        '200':
+          description: Instances listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorInstanceListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent not found or not owned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      operationId: createAgentConnectorInstance
+      summary: Create an additional connector instance
+      description: |
+        Creates a new labeled instance for this connector type. The first instance for a connector
+        is created when the connector is enabled; this endpoint adds further instances.
+
+        Requires session authentication (Supabase JWT).
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentConnectorInstanceRequest'
+      responses:
+        '201':
+          description: Instance created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorInstance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent or connector not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}:
+    get:
+      operationId: getAgentConnectorInstance
+      summary: Get a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Instance found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorInstance'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      operationId: patchAgentConnectorInstance
+      summary: Rename a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchAgentConnectorInstanceRequest'
+      responses:
+        '200':
+          description: Instance updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorInstance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      operationId: deleteAgentConnectorInstance
+      summary: Delete a non-default connector instance
+      description: |
+        Deletes an additional instance. The default instance cannot be deleted; disable the connector type instead.
+
+        Active standing approvals scoped to this instance are revoked.
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '204':
+          description: Instance deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential:
+    put:
+      operationId: assignAgentConnectorInstanceCredential
+      summary: Assign credential to a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignCredentialRequest'
+      responses:
+        '200':
+          description: Credential assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorCredentialResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      operationId: removeAgentConnectorInstanceCredential
+      summary: Remove credential from a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Binding removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      operationId: getAgentConnectorInstanceCredential
+      summary: Get credential binding for a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Binding (possibly empty)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorCredentialResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/calendars:
+    get:
+      operationId: listAgentConnectorInstanceCalendars
+      summary: List calendars for a specific connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Calendars listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorCalendarListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/channels:
+    get:
+      operationId: listAgentConnectorInstanceChannels
+      summary: List channels for a specific connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Channels listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorChannelListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/users:
+    get:
+      operationId: listAgentConnectorInstanceUsers
+      summary: List users for a specific connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Users listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorUserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
         '503':
@@ -9555,6 +9893,60 @@ components:
         connector_id: gmail
         disabled_at: '2026-02-18T12:00:00Z'
         revoked_standing_approvals: 2
+    AgentConnectorInstance:
+      type: object
+      required:
+        - connector_instance_id
+        - agent_id
+        - connector_id
+        - label
+        - is_default
+        - enabled_at
+      properties:
+        connector_instance_id:
+          type: string
+          format: uuid
+          description: Surrogate identifier for this connector instance on the agent.
+        agent_id:
+          type: integer
+          format: int64
+        connector_id:
+          type: string
+          maxLength: 128
+        label:
+          type: string
+          description: Human-readable label unique per agent and connector type.
+        is_default:
+          type: boolean
+          description: True for the default instance used when no instance is specified (legacy routes).
+        enabled_at:
+          type: string
+          format: date-time
+    AgentConnectorInstanceListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentConnectorInstance'
+    CreateAgentConnectorInstanceRequest:
+      type: object
+      required:
+        - label
+      properties:
+        label:
+          type: string
+          description: Display label for the new instance (unique per agent and connector).
+    PatchAgentConnectorInstanceRequest:
+      type: object
+      required:
+        - label
+      properties:
+        label:
+          type: string
+          description: New display label for the instance.
     CreateRegistrationInviteRequest:
       type: object
       description: Request to create a registration invite.
@@ -11388,12 +11780,14 @@ components:
             - token_already_used
             - insufficient_scope
             - invalid_parameters
+            - connector_instance_required
             - agent_not_found
             - approver_not_found
             - approval_not_found
             - credential_not_found
             - connector_not_found
             - agent_connector_not_found
+            - connector_instance_not_found
             - credentials_not_found
             - no_matching_standing_approval
             - agent_limit_reached
@@ -12164,6 +12558,16 @@ components:
         maxLength: 128
         pattern: ^[a-z][a-z0-9_.-]*$
       example: gmail
+    ConnectorInstanceId:
+      name: instance_id
+      in: path
+      required: true
+      description: |
+        Connector instance UUID (`connector_instance_id` from list/create instance responses).
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
     InviteCode:
       name: invite_code
       in: path

@@ -162,6 +162,24 @@ paths:
   /v1/agents/{agent_id}/connectors/{connector_id}/users:
     $ref: './components/paths/agent_connectors.yaml#/agentConnectorUsers'
 
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances:
+    $ref: './components/paths/agent_connector_instances.yaml#/agentConnectorInstances'
+
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}:
+    $ref: './components/paths/agent_connector_instances.yaml#/agentConnectorInstanceById'
+
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential:
+    $ref: './components/paths/agent_connector_instances.yaml#/agentConnectorInstanceCredential'
+
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/calendars:
+    $ref: './components/paths/agent_connector_instances.yaml#/agentConnectorInstanceCalendars'
+
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/channels:
+    $ref: './components/paths/agent_connector_instances.yaml#/agentConnectorInstanceChannels'
+
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/users:
+    $ref: './components/paths/agent_connector_instances.yaml#/agentConnectorInstanceUsers'
+
   /v1/registration-invites:
     $ref: './components/paths/registration_invites.yaml#/createRegistrationInvite'
 
@@ -479,6 +497,14 @@ components:
       $ref: './components/schemas/agent_connectors.yaml#/AgentConnectorResponse'
     DisableAgentConnectorResponse:
       $ref: './components/schemas/agent_connectors.yaml#/DisableAgentConnectorResponse'
+    AgentConnectorInstance:
+      $ref: './components/schemas/agent_connector_instances.yaml#/AgentConnectorInstance'
+    AgentConnectorInstanceListResponse:
+      $ref: './components/schemas/agent_connector_instances.yaml#/AgentConnectorInstanceListResponse'
+    CreateAgentConnectorInstanceRequest:
+      $ref: './components/schemas/agent_connector_instances.yaml#/CreateAgentConnectorInstanceRequest'
+    PatchAgentConnectorInstanceRequest:
+      $ref: './components/schemas/agent_connector_instances.yaml#/PatchAgentConnectorInstanceRequest'
 
     # Registration Invites
     CreateRegistrationInviteRequest:
@@ -668,6 +694,8 @@ components:
       $ref: './components/parameters/common.yaml#/CredentialId'
     ConnectorId:
       $ref: './components/parameters/common.yaml#/ConnectorId'
+    ConnectorInstanceId:
+      $ref: './components/parameters/common.yaml#/ConnectorInstanceId'
     InviteCode:
       $ref: './components/parameters/common.yaml#/InviteCode'
     StandingApprovalId:

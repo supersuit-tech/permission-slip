@@ -1,0 +1,335 @@
+agentConnectorInstances:
+  get:
+    operationId: listAgentConnectorInstances
+    summary: List connector instances for an agent
+    description: |
+      Returns all instances of a connector type enabled for the agent (including the default instance).
+
+      Requires session authentication (Supabase JWT).
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+    responses:
+      '200':
+        description: Instances listed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connector_instances.yaml#/AgentConnectorInstanceListResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        description: Agent not found or not owned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  post:
+    operationId: createAgentConnectorInstance
+    summary: Create an additional connector instance
+    description: |
+      Creates a new labeled instance for this connector type. The first instance for a connector
+      is created when the connector is enabled; this endpoint adds further instances.
+
+      Requires session authentication (Supabase JWT).
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/agent_connector_instances.yaml#/CreateAgentConnectorInstanceRequest'
+    responses:
+      '201':
+        description: Instance created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connector_instances.yaml#/AgentConnectorInstance'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        description: Agent or connector not found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+      '409':
+        $ref: '../responses/errors.yaml#/Conflict'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+agentConnectorInstanceById:
+  get:
+    operationId: getAgentConnectorInstance
+    summary: Get a connector instance
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    responses:
+      '200':
+        description: Instance found
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connector_instances.yaml#/AgentConnectorInstance'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  patch:
+    operationId: patchAgentConnectorInstance
+    summary: Rename a connector instance
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/agent_connector_instances.yaml#/PatchAgentConnectorInstanceRequest'
+    responses:
+      '200':
+        description: Instance updated
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connector_instances.yaml#/AgentConnectorInstance'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../responses/errors.yaml#/Conflict'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  delete:
+    operationId: deleteAgentConnectorInstance
+    summary: Delete a non-default connector instance
+    description: |
+      Deletes an additional instance. The default instance cannot be deleted; disable the connector type instead.
+
+      Active standing approvals scoped to this instance are revoked.
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    responses:
+      '204':
+        description: Instance deleted
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+agentConnectorInstanceCredential:
+  put:
+    operationId: assignAgentConnectorInstanceCredential
+    summary: Assign credential to a connector instance
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/agent_connectors.yaml#/AssignCredentialRequest'
+    responses:
+      '200':
+        description: Credential assigned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorCredentialResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  delete:
+    operationId: removeAgentConnectorInstanceCredential
+    summary: Remove credential from a connector instance
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    responses:
+      '200':
+        description: Binding removed
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  example: removed
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+  get:
+    operationId: getAgentConnectorInstanceCredential
+    summary: Get credential binding for a connector instance
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    responses:
+      '200':
+        description: Binding (possibly empty)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorCredentialResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+agentConnectorInstanceCalendars:
+  get:
+    operationId: listAgentConnectorInstanceCalendars
+    summary: List calendars for a specific connector instance
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    responses:
+      '200':
+        description: Calendars listed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorCalendarListResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+agentConnectorInstanceChannels:
+  get:
+    operationId: listAgentConnectorInstanceChannels
+    summary: List channels for a specific connector instance
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    responses:
+      '200':
+        description: Channels listed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorChannelListResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+agentConnectorInstanceUsers:
+  get:
+    operationId: listAgentConnectorInstanceUsers
+    summary: List users for a specific connector instance
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+      - $ref: '../parameters/common.yaml#/ConnectorId'
+      - $ref: '../parameters/common.yaml#/ConnectorInstanceId'
+    responses:
+      '200':
+        description: Users listed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_connectors.yaml#/AgentConnectorUserListResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'

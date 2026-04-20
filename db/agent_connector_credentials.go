@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -12,26 +13,41 @@ import (
 // join table. Each row binds exactly one credential (either a static credential
 // or an OAuth connection) to an agent+connector pair.
 type AgentConnectorCredential struct {
-	ID                string
-	AgentID           int64
-	ConnectorID       string
-	ApproverID        string
-	CredentialID      *string
-	OAuthConnectionID *string
-	CreatedAt         time.Time
+	ID                  string
+	AgentID             int64
+	ConnectorID         string
+	ConnectorInstanceID string
+	ApproverID          string
+	CredentialID        *string
+	OAuthConnectionID   *string
+	CreatedAt           time.Time
 }
 
-// GetAgentConnectorCredential returns the credential binding for an
-// agent+connector pair, or nil if no binding exists.
+// GetAgentConnectorCredential returns the credential binding for the default
+// agent+connector instance, or nil if no binding exists.
+//
+// Deprecated: prefer GetAgentConnectorCredentialByInstance when the instance is known.
 func GetAgentConnectorCredential(ctx context.Context, db DBTX, agentID int64, connectorID string) (*AgentConnectorCredential, error) {
+	defaultInst, err := GetDefaultAgentConnectorInstanceByAgent(ctx, db, agentID, connectorID)
+	if err != nil {
+		return nil, err
+	}
+	if defaultInst == nil {
+		return nil, nil
+	}
+	return GetAgentConnectorCredentialByInstance(ctx, db, agentID, connectorID, defaultInst.ConnectorInstanceID)
+}
+
+// GetAgentConnectorCredentialByInstance returns the credential binding for a specific connector instance.
+func GetAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, agentID int64, connectorID, connectorInstanceID string) (*AgentConnectorCredential, error) {
 	var acc AgentConnectorCredential
 	err := db.QueryRow(ctx, `
-		SELECT id, agent_id, connector_id, approver_id,
+		SELECT id, agent_id, connector_id, connector_instance_id, approver_id,
 		       credential_id, oauth_connection_id, created_at
 		FROM agent_connector_credentials
-		WHERE agent_id = $1 AND connector_id = $2`,
-		agentID, connectorID,
-	).Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ApproverID,
+		WHERE agent_id = $1 AND connector_id = $2 AND connector_instance_id = $3::uuid`,
+		agentID, connectorID, connectorInstanceID,
+	).Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ConnectorInstanceID, &acc.ApproverID,
 		&acc.CredentialID, &acc.OAuthConnectionID, &acc.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
@@ -55,23 +71,53 @@ type UpsertAgentConnectorCredentialParams struct {
 }
 
 // UpsertAgentConnectorCredential creates or replaces the credential binding
-// for an agent+connector pair. The unique index on (agent_id, connector_id, connector_instance_id)
-// ensures at most one binding per instance; omitted instance resolves to the default via trigger.
+// for the default agent+connector instance.
 func UpsertAgentConnectorCredential(ctx context.Context, db DBTX, p UpsertAgentConnectorCredentialParams) (*AgentConnectorCredential, error) {
+	defaultInst, err := GetDefaultAgentConnectorInstance(ctx, db, p.AgentID, p.ApproverID, p.ConnectorID)
+	if err != nil {
+		return nil, err
+	}
+	if defaultInst == nil {
+		return nil, fmt.Errorf("connector not enabled for agent: no default instance")
+	}
+	return UpsertAgentConnectorCredentialByInstance(ctx, db, UpsertAgentConnectorCredentialByInstanceParams{
+		ID:                  p.ID,
+		AgentID:             p.AgentID,
+		ConnectorID:         p.ConnectorID,
+		ConnectorInstanceID: defaultInst.ConnectorInstanceID,
+		ApproverID:          p.ApproverID,
+		CredentialID:        p.CredentialID,
+		OAuthConnectionID:   p.OAuthConnectionID,
+	})
+}
+
+// UpsertAgentConnectorCredentialByInstanceParams holds parameters for upserting a credential on a specific instance.
+type UpsertAgentConnectorCredentialByInstanceParams struct {
+	ID                  string
+	AgentID             int64
+	ConnectorID         string
+	ConnectorInstanceID string
+	ApproverID          string
+	CredentialID        *string
+	OAuthConnectionID   *string
+}
+
+// UpsertAgentConnectorCredentialByInstance creates or replaces the credential binding for a specific instance.
+func UpsertAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, p UpsertAgentConnectorCredentialByInstanceParams) (*AgentConnectorCredential, error) {
 	var acc AgentConnectorCredential
 	err := db.QueryRow(ctx, `
 		INSERT INTO agent_connector_credentials
-		    (id, agent_id, connector_id, approver_id, credential_id, oauth_connection_id)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		    (id, agent_id, connector_id, connector_instance_id, approver_id, credential_id, oauth_connection_id)
+		VALUES ($1, $2, $3, $4::uuid, $5, $6, $7)
 		ON CONFLICT (agent_id, connector_id, connector_instance_id) DO UPDATE
 		    SET credential_id = EXCLUDED.credential_id,
 		        oauth_connection_id = EXCLUDED.oauth_connection_id,
 		        approver_id = EXCLUDED.approver_id
-		RETURNING id, agent_id, connector_id, approver_id,
+		RETURNING id, agent_id, connector_id, connector_instance_id, approver_id,
 		          credential_id, oauth_connection_id, created_at`,
-		p.ID, p.AgentID, p.ConnectorID, p.ApproverID,
+		p.ID, p.AgentID, p.ConnectorID, p.ConnectorInstanceID, p.ApproverID,
 		p.CredentialID, p.OAuthConnectionID,
-	).Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ApproverID,
+	).Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ConnectorInstanceID, &acc.ApproverID,
 		&acc.CredentialID, &acc.OAuthConnectionID, &acc.CreatedAt)
 	if err != nil {
 		return nil, err
@@ -79,14 +125,24 @@ func UpsertAgentConnectorCredential(ctx context.Context, db DBTX, p UpsertAgentC
 	return &acc, nil
 }
 
-// DeleteAgentConnectorCredential removes the credential binding for an
-// agent+connector pair. Returns true if a row was deleted, false if no
-// binding existed.
+// DeleteAgentConnectorCredential removes the credential binding for the default instance.
 func DeleteAgentConnectorCredential(ctx context.Context, db DBTX, agentID int64, approverID string, connectorID string) (bool, error) {
+	defaultInst, err := GetDefaultAgentConnectorInstance(ctx, db, agentID, approverID, connectorID)
+	if err != nil {
+		return false, err
+	}
+	if defaultInst == nil {
+		return false, nil
+	}
+	return DeleteAgentConnectorCredentialByInstance(ctx, db, agentID, approverID, connectorID, defaultInst.ConnectorInstanceID)
+}
+
+// DeleteAgentConnectorCredentialByInstance removes the credential binding for a specific instance.
+func DeleteAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID string) (bool, error) {
 	tag, err := db.Exec(ctx, `
 		DELETE FROM agent_connector_credentials
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3`,
-		agentID, approverID, connectorID,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	if err != nil {
 		return false, err

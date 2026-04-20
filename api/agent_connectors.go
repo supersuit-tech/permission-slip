@@ -159,12 +159,21 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 		// agent_connectors → agent_connector_credentials will remove it.
 		var credBinding *db.AgentConnectorCredential
 		if deleteCredentials {
-			credBinding, err = db.GetAgentConnectorCredential(r.Context(), tx, agentID, connectorID)
-			if err != nil {
-				log.Printf("[%s] DisableAgentConnector: get credential: %v", TraceID(r.Context()), err)
-				CaptureError(r.Context(), err)
+			defaultInst, instErr := db.GetDefaultAgentConnectorInstance(r.Context(), tx, agentID, userID, connectorID)
+			if instErr != nil {
+				log.Printf("[%s] DisableAgentConnector: get default instance: %v", TraceID(r.Context()), instErr)
+				CaptureError(r.Context(), instErr)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
 				return
+			}
+			if defaultInst != nil {
+				credBinding, err = db.GetAgentConnectorCredentialByInstance(r.Context(), tx, agentID, connectorID, defaultInst.ConnectorInstanceID)
+				if err != nil {
+					log.Printf("[%s] DisableAgentConnector: get credential: %v", TraceID(r.Context()), err)
+					CaptureError(r.Context(), err)
+					RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
+					return
+				}
 			}
 		}
 
