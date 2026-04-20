@@ -13,7 +13,8 @@ func TestAgentConnectorsSchema(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 
 	testhelper.RequireColumns(t, tx, "agent_connectors", []string{
-		"agent_id", "approver_id", "connector_id", "enabled_at",
+		"agent_id", "approver_id", "connector_id", "connector_instance_id",
+		"label", "is_default", "enabled_at",
 	})
 }
 
@@ -34,7 +35,7 @@ func TestAgentConnectorsDuplicateInsert(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "user_"+uid[:8])
 	testhelper.InsertConnector(t, tx, connID)
 
-	testhelper.RequireUniqueViolation(t, tx, "(agent_id, connector_id)",
+	testhelper.RequireUniqueViolation(t, tx, "(agent_id, connector_id, label)",
 		func() error {
 			testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 			return nil

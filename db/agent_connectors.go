@@ -99,7 +99,7 @@ func EnableAgentConnector(ctx context.Context, db DBTX, agentID int64, approverI
 			INSERT INTO agent_connectors (agent_id, approver_id, connector_id)
 			SELECT $1, $2, $3
 			WHERE EXISTS (SELECT 1 FROM agent_check)
-			ON CONFLICT (agent_id, connector_id) DO NOTHING
+			ON CONFLICT (agent_id, connector_id, label) DO NOTHING
 			RETURNING agent_id, connector_id, enabled_at
 		)
 		SELECT agent_id, connector_id, enabled_at FROM inserted
@@ -140,7 +140,7 @@ func DisableAgentConnector(ctx context.Context, db DBTX, agentID int64, approver
 		WITH deleted AS (
 			DELETE FROM agent_connectors
 			WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
-			RETURNING agent_id, connector_id
+			RETURNING agent_id, connector_id, connector_instance_id
 		), revoked AS (
 			UPDATE standing_approvals
 			SET status = 'revoked', revoked_at = now()
@@ -155,8 +155,8 @@ func DisableAgentConnector(ctx context.Context, db DBTX, agentID int64, approver
 			RETURNING 1
 		)
 		SELECT
-			(SELECT agent_id FROM deleted),
-			(SELECT connector_id FROM deleted),
+			(SELECT agent_id FROM deleted LIMIT 1),
+			(SELECT connector_id FROM deleted LIMIT 1),
 			now(),
 			(SELECT count(*) FROM revoked)`,
 		agentID, approverID, connectorID,

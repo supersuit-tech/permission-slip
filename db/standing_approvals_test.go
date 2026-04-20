@@ -41,6 +41,7 @@ func TestStandingApprovalsSchema(t *testing.T) {
 		"action_version", "constraints", "status",
 		"starts_at", "expires_at", "created_at",
 		"revoked_at", "expired_at",
+		"connector_instance_id",
 	})
 }
 
@@ -48,6 +49,7 @@ func TestStandingApprovalsIndex(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireIndex(t, tx, "standing_approvals", "idx_standing_approvals_agent_action_status")
+	testhelper.RequireIndex(t, tx, "standing_approvals", "idx_standing_approvals_agent_action_status_connector_instance")
 	testhelper.RequireIndex(t, tx, "standing_approvals", "idx_standing_approvals_source_config_active")
 }
 
@@ -181,4 +183,3 @@ func TestStandingApprovalExecutionsCascadeOnProfileDelete(t *testing.T) {
 		"standing_approval_id = '"+saID+"'",
 	)
 }
-
