@@ -7,7 +7,13 @@ import { AuthProvider } from "../../../../auth/AuthContext";
 import { ThemeProvider } from "../../../../components/ThemeContext";
 import { Toaster } from "../../../../components/ui/sonner";
 import { setupAuthMocks } from "../../../../auth/__tests__/fixtures";
-import { mockGet, resetClientMocks } from "../../../../api/__mocks__/client";
+import {
+  mockGet,
+  mockPost,
+  mockPatch,
+  mockDelete,
+  resetClientMocks,
+} from "../../../../api/__mocks__/client";
 import { ConnectorConfigPage } from "../ConnectorConfigPage";
 
 vi.mock("../../../../lib/supabaseClient");
@@ -114,6 +120,9 @@ describe("ConnectorConfigPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     resetClientMocks();
+    mockPost.mockResolvedValue({ data: {} });
+    mockPatch.mockResolvedValue({ data: {} });
+    mockDelete.mockResolvedValue({ data: {} });
     setupAuthMocks({ authenticated: true });
   });
 
@@ -140,9 +149,43 @@ describe("ConnectorConfigPage", () => {
       if (path === "/v1/action-configurations") {
         return Promise.resolve({ data: mockActionConfigsResponse });
       }
+      if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/instances") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                connector_instance_id: "00000000-0000-0000-0000-000000000001",
+                agent_id: 42,
+                connector_id: "github",
+                label: "GitHub",
+                is_default: true,
+                enabled_at: "2026-02-18T10:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      if (
+        path ===
+        "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential"
+      ) {
+        return Promise.resolve({
+          data: {
+            agent_id: 42,
+            connector_id: "github",
+            credential_id: "cred_123",
+            oauth_connection_id: null,
+          },
+        });
+      }
       if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/credential") {
         return Promise.resolve({
-          data: { agent_id: 42, connector_id: "github", credential_id: "cred_123", oauth_connection_id: null },
+          data: {
+            agent_id: 42,
+            connector_id: "github",
+            credential_id: "cred_123",
+            oauth_connection_id: null,
+          },
         });
       }
       if (path === "/v1/oauth/connections") {
@@ -250,9 +293,43 @@ describe("ConnectorConfigPage", () => {
       if (path === "/v1/credentials") {
         return Promise.resolve({ data: { credentials: [] } });
       }
+      if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/instances") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                connector_instance_id: "00000000-0000-0000-0000-000000000001",
+                agent_id: 42,
+                connector_id: "github",
+                label: "GitHub",
+                is_default: true,
+                enabled_at: "2026-02-18T10:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      if (
+        path ===
+        "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential"
+      ) {
+        return Promise.resolve({
+          data: {
+            agent_id: 42,
+            connector_id: "github",
+            credential_id: null,
+            oauth_connection_id: null,
+          },
+        });
+      }
       if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/credential") {
         return Promise.resolve({
-          data: { agent_id: 42, connector_id: "github", credential_id: null, oauth_connection_id: null },
+          data: {
+            agent_id: 42,
+            connector_id: "github",
+            credential_id: null,
+            oauth_connection_id: null,
+          },
         });
       }
       if (path === "/v1/oauth/connections") {

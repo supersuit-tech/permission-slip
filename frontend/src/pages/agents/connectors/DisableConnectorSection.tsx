@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dialog";
 import { useDisableAgentConnector } from "@/hooks/useDisableAgentConnector";
 import { useDisconnectOAuth } from "@/hooks/useDisconnectOAuth";
+import { useConnectorInstanceBindingsSummary } from "@/hooks/useConnectorInstanceBindingsSummary";
 import { providerLabel } from "@/lib/labels";
 
 interface DisableConnectorSectionProps {
@@ -28,23 +29,9 @@ interface DisableConnectorSectionProps {
   /**
    * OAuth provider ID (e.g. "github") from the connector spec.
    * When set, the "Remove" option is shown and its description mentions
-   * disconnecting OAuth. Does NOT drive the actual disconnect call —
-   * see `oauthConnectionId` for that.
+   * disconnecting OAuth.
    */
   oauthProvider?: string;
-  /**
-   * The specific OAuth connection ID currently bound to this connector
-   * (e.g. "oconn_abc123"). Passed to `useDisconnectOAuth` on Remove so
-   * the correct connection is disconnected. If undefined, the OAuth
-   * disconnect step is skipped silently.
-   */
-  oauthConnectionId?: string;
-  /**
-   * True when an API key credential is assigned to this connector.
-   * When true (and `oauthProvider` is not set), the "Remove" option is
-   * shown so the user can permanently delete the saved API key.
-   */
-  hasApiKeyCredential?: boolean;
 }
 
 export function DisableConnectorSection({
@@ -52,8 +39,6 @@ export function DisableConnectorSection({
   connectorId,
   connectorName,
   oauthProvider,
-  oauthConnectionId,
-  hasApiKeyCredential = false,
 }: DisableConnectorSectionProps) {
   const [disableConfirmOpen, setDisableConfirmOpen] = useState(false);
   const [removeConfirmOpen, setRemoveConfirmOpen] = useState(false);
@@ -62,6 +47,14 @@ export function DisableConnectorSection({
     useDisableAgentConnector();
   const { disconnect } = useDisconnectOAuth();
   const navigate = useNavigate();
+
+  const { data: bindingsSummary } = useConnectorInstanceBindingsSummary(
+    agentId,
+    connectorId,
+  );
+  const instanceCount = bindingsSummary?.instanceCount ?? 1;
+  const oauthConnectionIds = bindingsSummary?.oauthConnectionIds ?? [];
+  const hasApiKeyCredential = bindingsSummary?.hasApiKeyCredential ?? false;
 
   async function handleDisable() {
     try {
@@ -84,10 +77,13 @@ export function DisableConnectorSection({
   async function handleRemove() {
     setIsRemoving(true);
     try {
-      // Step 1: disable the connector and delete any API key credentials.
       let disableResult: Awaited<ReturnType<typeof disableConnector>>;
       try {
-        disableResult = await disableConnector({ agentId, connectorId, deleteCredentials: true });
+        disableResult = await disableConnector({
+          agentId,
+          connectorId,
+          deleteCredentials: true,
+        });
       } catch {
         toast.error("Failed to disable connector");
         return;
@@ -99,17 +95,23 @@ export function DisableConnectorSection({
           ? ` ${revoked} standing approval${revoked === 1 ? "" : "s"} revoked.`
           : "";
 
-      // Step 2: disconnect OAuth (best-effort — connector is already disabled).
-      // oauthConnectionId is the specific connection to disconnect; skip if not bound.
-      if (oauthConnectionId) {
-        try {
-          await disconnect(oauthConnectionId);
-          toast.success(
-            `Connector removed and OAuth disconnected.${revokedSuffix}`,
-          );
-        } catch {
+      if (oauthProvider && oauthConnectionIds.length > 0) {
+        let anyFailed = false;
+        for (const id of oauthConnectionIds) {
+          try {
+            await disconnect(id);
+          } catch {
+            anyFailed = true;
+          }
+        }
+        if (anyFailed) {
           toast.warning(
-            `Connector disabled and API keys deleted, but OAuth disconnect failed.${revokedSuffix} You can disconnect manually from Settings.`,
+            `Connector disabled.${revokedSuffix} Some OAuth connections could not be disconnected — you can remove them from Settings.`,
+          );
+        } else {
+          const n = oauthConnectionIds.length;
+          toast.success(
+            `Connector removed and ${n} OAuth connection${n === 1 ? "" : "s"} disconnected.${revokedSuffix}`,
           );
         }
       } else {
@@ -122,6 +124,11 @@ export function DisableConnectorSection({
       setIsRemoving(false);
     }
   }
+
+  const instanceWarning =
+    instanceCount > 1
+      ? ` This will remove all ${instanceCount} configured instances for this connector type on this agent.`
+      : "";
 
   return (
     <>
@@ -161,10 +168,13 @@ export function DisableConnectorSection({
                   <p className="text-muted-foreground text-sm">
                     {oauthProvider ? (
                       <>
-                        Disable the connector, disconnect the{" "}
-                        {providerLabel(oauthProvider)} OAuth connection, and
-                        permanently delete any saved API keys. You will need to
-                        re-authorize and re-add credentials when re-enabling.
+                        Disable the connector, disconnect{" "}
+                        {oauthConnectionIds.length > 1
+                          ? "all linked OAuth connections"
+                          : `the ${providerLabel(oauthProvider)} OAuth connection`}
+                        , and permanently delete any saved API keys. You will
+                        need to re-authorize and re-add credentials when
+                        re-enabling.
                       </>
                     ) : (
                       <>
@@ -190,7 +200,6 @@ export function DisableConnectorSection({
         </CardContent>
       </Card>
 
-      {/* Disable confirmation */}
       <Dialog open={disableConfirmOpen} onOpenChange={setDisableConfirmOpen}>
         <DialogContent>
           <DialogHeader>
@@ -199,6 +208,7 @@ export function DisableConnectorSection({
               This will disable the <strong>{connectorName}</strong> connector
               for this agent. Any active standing approvals for actions from
               this connector will be automatically revoked.
+              {instanceWarning}
               {oauthProvider && " Your OAuth connection is preserved."}
             </DialogDescription>
           </DialogHeader>
@@ -222,7 +232,6 @@ export function DisableConnectorSection({
         </DialogContent>
       </Dialog>
 
-      {/* Remove confirmation */}
       <Dialog open={removeConfirmOpen} onOpenChange={(open) => !isRemoving && setRemoveConfirmOpen(open)}>
         <DialogContent>
           <DialogHeader>
@@ -231,18 +240,34 @@ export function DisableConnectorSection({
               {oauthProvider ? (
                 <>
                   This will disable the <strong>{connectorName}</strong>{" "}
-                  connector, disconnect the{" "}
-                  <strong>{providerLabel(oauthProvider)}</strong> OAuth
-                  connection, and permanently delete any saved API keys.
-                  Standing approvals will be revoked. You will need to
-                  re-authorize and re-add credentials when re-enabling.
+                  connector
+                  {instanceWarning}
+                  {", "}
+                  disconnect{" "}
+                  {oauthConnectionIds.length > 1 ? (
+                    <>
+                      <strong>{oauthConnectionIds.length}</strong> OAuth
+                      connections ({providerLabel(oauthProvider)})
+                    </>
+                  ) : (
+                    <>
+                      the <strong>{providerLabel(oauthProvider)}</strong> OAuth
+                      connection
+                    </>
+                  )}
+                  , and permanently delete any saved API keys. Standing
+                  approvals will be revoked. You will need to re-authorize and
+                  re-add credentials when re-enabling.
                 </>
               ) : (
                 <>
                   This will disable the <strong>{connectorName}</strong>{" "}
-                  connector and permanently delete the saved API key. Standing
-                  approvals will be revoked. You will need to re-add credentials
-                  when re-enabling.
+                  connector
+                  {instanceWarning}
+                  {" "}
+                  and permanently delete the saved API key. Standing approvals
+                  will be revoked. You will need to re-add credentials when
+                  re-enabling.
                 </>
               )}
             </DialogDescription>

@@ -91,6 +91,56 @@ func TestCreateAgentConnectorInstance_RequiresConnectorEnabled(t *testing.T) {
 	}
 }
 
+func TestSetDefaultAgentConnectorInstance_SwitchesDefault(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	inst2, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID:     agentID,
+		ApproverID:  uid,
+		ConnectorID: connID,
+		Label:       "Sales",
+	})
+	if err != nil {
+		t.Fatalf("CreateAgentConnectorInstance: %v", err)
+	}
+
+	def1, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || def1 == nil {
+		t.Fatalf("default before: err=%v inst=%v", err, def1)
+	}
+	if !def1.IsDefault {
+		t.Error("expected def1 is_default")
+	}
+	if def1.ConnectorInstanceID == inst2.ConnectorInstanceID {
+		t.Fatal("second instance should not start as default")
+	}
+
+	updated, err := db.SetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID, inst2.ConnectorInstanceID)
+	if err != nil {
+		t.Fatalf("SetDefaultAgentConnectorInstance: %v", err)
+	}
+	if updated == nil || !updated.IsDefault {
+		t.Fatalf("expected updated default: %+v", updated)
+	}
+
+	def2, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || def2 == nil {
+		t.Fatalf("default after: err=%v inst=%v", err, def2)
+	}
+	if def2.ConnectorInstanceID != inst2.ConnectorInstanceID {
+		t.Fatalf("expected Sales instance default, got %s", def2.ConnectorInstanceID)
+	}
+}
+
 func TestCreateAgentConnectorInstance_DuplicateLabel(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

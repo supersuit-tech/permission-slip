@@ -29,7 +29,8 @@ type createAgentConnectorInstanceRequest struct {
 }
 
 type patchAgentConnectorInstanceRequest struct {
-	Label string `json:"label"`
+	Label     *string `json:"label,omitempty"`
+	IsDefault *bool   `json:"is_default,omitempty"`
 }
 
 func init() {
@@ -242,25 +243,59 @@ func handlePatchAgentConnectorInstance(deps *Deps) http.HandlerFunc {
 		if !DecodeJSONOrReject(w, r, &req) {
 			return
 		}
-
-		inst, err := db.RenameAgentConnectorInstance(r.Context(), deps.DB, agentID, userID, connectorID, instanceID, req.Label)
-		if err != nil {
-			if errors.Is(err, db.ErrAgentConnectorInstanceLabelRequired) || errors.Is(err, db.ErrAgentConnectorInstanceLabelTooLong) {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "label must be 1–256 characters"))
-				return
-			}
-			var instErr *db.AgentConnectorInstanceError
-			if errors.As(err, &instErr) && instErr.Code == db.AgentConnectorInstanceErrDuplicateLabel {
-				RespondError(w, r, http.StatusConflict, Conflict(ErrConstraintViolation, "An instance with this label already exists"))
-				return
-			}
-			log.Printf("[%s] RenameAgentConnectorInstance: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to rename connector instance"))
+		if req.Label == nil && req.IsDefault == nil {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Provide label and/or is_default"))
 			return
 		}
+		if req.IsDefault != nil && !*req.IsDefault {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "is_default may only be set to true"))
+			return
+		}
+
+		ctx := r.Context()
+		var inst *db.AgentConnectorInstance
+
+		if req.Label != nil {
+			var err error
+			inst, err = db.RenameAgentConnectorInstance(ctx, deps.DB, agentID, userID, connectorID, instanceID, *req.Label)
+			if err != nil {
+				if errors.Is(err, db.ErrAgentConnectorInstanceLabelRequired) || errors.Is(err, db.ErrAgentConnectorInstanceLabelTooLong) {
+					RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "label must be 1–256 characters"))
+					return
+				}
+				var instErr *db.AgentConnectorInstanceError
+				if errors.As(err, &instErr) && instErr.Code == db.AgentConnectorInstanceErrDuplicateLabel {
+					RespondError(w, r, http.StatusConflict, Conflict(ErrConstraintViolation, "An instance with this label already exists"))
+					return
+				}
+				log.Printf("[%s] RenameAgentConnectorInstance: %v", TraceID(ctx), err)
+				CaptureError(ctx, err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to rename connector instance"))
+				return
+			}
+			if inst == nil {
+				RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorInstanceNotFound, "Connector instance not found"))
+				return
+			}
+		}
+
+		if req.IsDefault != nil && *req.IsDefault {
+			def, err := db.SetDefaultAgentConnectorInstance(ctx, deps.DB, agentID, userID, connectorID, instanceID)
+			if err != nil {
+				log.Printf("[%s] SetDefaultAgentConnectorInstance: %v", TraceID(ctx), err)
+				CaptureError(ctx, err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update default connector instance"))
+				return
+			}
+			if def == nil {
+				RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorInstanceNotFound, "Connector instance not found"))
+				return
+			}
+			inst = def
+		}
+
 		if inst == nil {
-			RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorInstanceNotFound, "Connector instance not found"))
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update connector instance"))
 			return
 		}
 		RespondJSON(w, http.StatusOK, toAgentConnectorInstanceResponse(*inst))
