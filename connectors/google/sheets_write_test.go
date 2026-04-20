@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
@@ -222,5 +223,110 @@ func TestSheetsWriteRange_InvalidJSON(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+// TestSheetsWriteRange_InvalidRange_ListsAvailableTabs verifies that when the
+// Google Sheets API returns "Unable to parse range", the connector remaps the
+// error to a ValidationError listing the spreadsheet's actual tab titles.
+func TestSheetsWriteRange_InvalidRange_ListsAvailableTabs(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut && r.URL.Path == "/spreadsheets/ss-1/values/Sheet1!A1:C3":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"code": 400, "message": "Unable to parse range: Sheet1!A1:C3"},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/spreadsheets/ss-1":
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(sheetsSpreadsheetResponse{
+				Sheets: []struct {
+					Properties sheetsProperties `json:"properties"`
+				}{
+					{Properties: sheetsProperties{Title: "Dashboard"}},
+				},
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", "", srv.URL)
+	action := &sheetsWriteRangeAction{conn: conn}
+
+	params, _ := json.Marshal(sheetsWriteRangeParams{
+		SpreadsheetID: "ss-1",
+		Range:         "Sheet1!A1:C3",
+		Values:        [][]any{{"a", "b", "c"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.sheets_write_range",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid range")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Fatalf("expected ValidationError, got %T: %v", err, err)
+	}
+	msg := err.Error()
+	for _, want := range []string{`"Sheet1!A1:C3"`, `"Dashboard"`} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("expected error message to contain %s, got: %s", want, msg)
+		}
+	}
+}
+
+// TestSheetsWriteRange_InvalidRange_ListFailureFallsBack verifies that if the
+// follow-up tab list lookup fails, the original ExternalError is returned.
+func TestSheetsWriteRange_InvalidRange_ListFailureFallsBack(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPut:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"code": 400, "message": "Unable to parse range: Sheet1!A1"},
+			})
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"code": 500, "message": "backend error"},
+			})
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", "", srv.URL)
+	action := &sheetsWriteRangeAction{conn: conn}
+
+	params, _ := json.Marshal(sheetsWriteRangeParams{
+		SpreadsheetID: "ss-1",
+		Range:         "Sheet1!A1",
+		Values:        [][]any{{"v"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.sheets_write_range",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if connectors.IsValidationError(err) {
+		t.Fatalf("expected original ExternalError to be preserved, got ValidationError: %v", err)
+	}
+	if !connectors.IsExternalError(err) {
+		t.Fatalf("expected ExternalError, got %T: %v", err, err)
 	}
 }
