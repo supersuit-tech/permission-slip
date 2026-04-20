@@ -58,6 +58,8 @@ func RegisterProfileRoutes(mux *http.ServeMux, deps *Deps) {
 	// Notification preferences (sub-resource of profile)
 	mux.Handle("GET /profile/notification-preferences", requireProfile(handleGetNotificationPreferences(deps)))
 	mux.Handle("PUT /profile/notification-preferences", requireProfile(handleUpdateNotificationPreferences(deps)))
+	mux.Handle("GET /profile/notification-type-preferences", requireProfile(handleGetNotificationTypePreferences(deps)))
+	mux.Handle("PUT /profile/notification-type-preferences", requireProfile(handleUpdateNotificationTypePreferences(deps)))
 
 	// Data retention policy
 	mux.Handle("GET /profile/data-retention", requireProfile(handleGetDataRetention(deps)))

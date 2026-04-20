@@ -52,9 +52,14 @@ const profileNoContact: MockProfile = {
   created_at: "2026-01-01T00:00:00Z",
 };
 
+const defaultTypePreferences = [
+  { notification_type: "standing_execution" as const, enabled: true },
+];
+
 function mockApiFetch(
   profile = profileWithContact,
   preferences = allEnabled,
+  typePreferences = defaultTypePreferences,
 ) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
@@ -63,6 +68,9 @@ function mockApiFetch(
     }
     if (url === "/v1/profile/notification-preferences") {
       return Promise.resolve({ data: { preferences } });
+    }
+    if (url === "/v1/profile/notification-type-preferences") {
+      return Promise.resolve({ data: { preferences: typePreferences } });
     }
     return Promise.resolve({ data: null });
   });
@@ -141,8 +149,8 @@ describe("NotificationSection", () => {
       const unchecked = switches.filter(
         (s) => s.getAttribute("data-state") === "unchecked",
       );
-      // email + mobile-push enabled + product updates unchecked
-      expect(checked).toHaveLength(2);
+      // email + mobile-push + standing execution enabled + product updates unchecked
+      expect(checked).toHaveLength(3);
       expect(unchecked).toHaveLength(1);
     });
   });
@@ -357,5 +365,58 @@ describe("NotificationSection", () => {
     // SMS should have a toggle (available=true), not "Coming soon"
     expect(screen.getByRole("switch", { name: /sms notifications/i })).toBeInTheDocument();
     expect(screen.queryByText("Coming soon")).not.toBeInTheDocument();
+  });
+
+  it("renders Notify me about and auto-approval toggle", async () => {
+    mockApiFetch();
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getByText("Notify me about")).toBeInTheDocument();
+    });
+    expect(
+      screen.getByRole("switch", { name: /auto-approval execution notifications/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("calls update for notification type when auto-approval toggle is clicked", async () => {
+    mockApiFetch();
+    mockPut.mockImplementation((url: string) => {
+      if (url === "/v1/profile/notification-type-preferences") {
+        return Promise.resolve({
+          data: {
+            preferences: [
+              { notification_type: "standing_execution", enabled: false },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: { preferences: [] } });
+    });
+    const user = userEvent.setup();
+
+    render(<NotificationSection />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("switch", { name: /auto-approval execution notifications/i }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(
+      screen.getByRole("switch", { name: /auto-approval execution notifications/i }),
+    );
+
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalledWith(
+        "/v1/profile/notification-type-preferences",
+        expect.objectContaining({
+          body: {
+            preferences: [{ notification_type: "standing_execution", enabled: false }],
+          },
+        }),
+      );
+    });
   });
 });

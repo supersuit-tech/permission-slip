@@ -21,6 +21,11 @@ import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAuth } from "../../auth/AuthContext";
 import { useNotificationPreferences } from "../../hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "../../hooks/useUpdateNotificationPreferences";
+import {
+  NOTIFICATION_TYPE_STANDING_EXECUTION,
+  useNotificationTypePreferences,
+} from "../../hooks/useNotificationTypePreferences";
+import { useUpdateNotificationTypePreferences } from "../../hooks/useUpdateNotificationTypePreferences";
 import Constants from "expo-constants";
 import { useDeleteAccount } from "../../hooks/useDeleteAccount";
 import { colors } from "../../theme/colors";
@@ -53,8 +58,15 @@ export default function SettingsScreen(_props: Props) {
   const { signOut, user } = useAuth();
   const { preferences, isLoading, error, refetch } =
     useNotificationPreferences();
+  const {
+    preferences: typePreferences,
+    isLoading: isLoadingTypePrefs,
+    error: typePrefsError,
+  } = useNotificationTypePreferences();
   const { updatePreferences, isUpdating } =
     useUpdateNotificationPreferences();
+  const { updatePreferences: updateTypePreferences, isUpdating: isUpdatingType } =
+    useUpdateNotificationTypePreferences();
   const { deleteAccount, isDeleting } = useDeleteAccount();
 
   const contentContainerStyle = useMemo(
@@ -64,6 +76,11 @@ export default function SettingsScreen(_props: Props) {
 
   const mobilePushPref = preferences.find((p) => p.channel === "mobile-push");
   const mobilePushEnabled = mobilePushPref?.enabled ?? true;
+
+  const standingPref = typePreferences.find(
+    (p) => p.notification_type === NOTIFICATION_TYPE_STANDING_EXECUTION,
+  );
+  const standingExecutionEnabled = standingPref?.enabled ?? true;
 
   const handleToggleMobilePush = useCallback(async () => {
     try {
@@ -77,6 +94,22 @@ export default function SettingsScreen(_props: Props) {
       );
     }
   }, [mobilePushEnabled, updatePreferences]);
+
+  const handleToggleStandingExecution = useCallback(async () => {
+    try {
+      await updateTypePreferences([
+        {
+          notification_type: NOTIFICATION_TYPE_STANDING_EXECUTION,
+          enabled: !standingExecutionEnabled,
+        },
+      ]);
+    } catch {
+      Alert.alert(
+        "Error",
+        "Failed to update notification preference. Please try again.",
+      );
+    }
+  }, [standingExecutionEnabled, updateTypePreferences]);
 
   const handleSignOut = useCallback(() => {
     Alert.alert("Sign out", "Are you sure you want to sign out?", [
@@ -118,7 +151,7 @@ export default function SettingsScreen(_props: Props) {
           Control how you receive approval request notifications on this device.
         </Text>
 
-        {isLoading ? (
+        {isLoading || isLoadingTypePrefs ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator
               size="small"
@@ -126,9 +159,9 @@ export default function SettingsScreen(_props: Props) {
               testID="prefs-loading"
             />
           </View>
-        ) : error ? (
+        ) : error || typePrefsError ? (
           <View style={styles.errorContainer}>
-            <Text style={styles.errorText}>{error}</Text>
+            <Text style={styles.errorText}>{error ?? typePrefsError}</Text>
             <TouchableOpacity
               style={styles.retryButton}
               accessibilityRole="button"
@@ -160,6 +193,31 @@ export default function SettingsScreen(_props: Props) {
                 accessibilityRole="switch"
                 accessibilityState={{ checked: mobilePushEnabled }}
               />
+            </View>
+            <Text style={styles.subsectionTitle}>Notify me about</Text>
+            <View style={[styles.card, styles.cardSpaced]}>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabel}>
+                  <Text style={styles.toggleTitle}>Auto-approval executions</Text>
+                  <Text style={styles.toggleDescription}>
+                    When an action runs automatically because it matched a
+                    standing approval.
+                  </Text>
+                </View>
+                <Switch
+                  testID="standing-execution-toggle"
+                  value={standingExecutionEnabled}
+                  onValueChange={handleToggleStandingExecution}
+                  disabled={isUpdating || isUpdatingType}
+                  trackColor={{
+                    false: colors.gray300,
+                    true: colors.primary,
+                  }}
+                  accessibilityLabel="Auto-approval execution notifications"
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: standingExecutionEnabled }}
+                />
+              </View>
             </View>
           </View>
         )}
@@ -314,6 +372,18 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.gray200,
+  },
+  cardSpaced: {
+    marginTop: 12,
+  },
+  subsectionTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.gray500,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginTop: 16,
+    marginBottom: 8,
   },
   toggleRow: {
     flexDirection: "row",
