@@ -75,6 +75,80 @@ func TestAddSlide_Success(t *testing.T) {
 	}
 }
 
+func TestAddSlide_WithTitle(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body slidesBatchUpdateRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if len(body.Requests) != 2 {
+			t.Fatalf("expected 2 requests (createSlide + insertText), got %d", len(body.Requests))
+		}
+		cs := body.Requests[0].CreateSlide
+		if cs == nil {
+			t.Fatal("expected createSlide in first request")
+		}
+		if len(cs.PlaceholderIdMappings) != 1 {
+			t.Fatalf("expected 1 placeholder mapping, got %d", len(cs.PlaceholderIdMappings))
+		}
+		if cs.PlaceholderIdMappings[0].LayoutPlaceholder.Type != "TITLE" {
+			t.Errorf("expected TITLE placeholder, got %q", cs.PlaceholderIdMappings[0].LayoutPlaceholder.Type)
+		}
+		it := body.Requests[1].InsertText
+		if it == nil {
+			t.Fatal("expected insertText in second request")
+		}
+		if it.Text != "Hello World" {
+			t.Errorf("expected title text 'Hello World', got %q", it.Text)
+		}
+		// The placeholder objectId must be unique per call (not a fixed constant)
+		// and must match between the mapping and the insertText request.
+		mappingID := cs.PlaceholderIdMappings[0].ObjectId
+		if it.ObjectId != mappingID {
+			t.Errorf("insertText objectId %q must match placeholderIdMapping objectId %q", it.ObjectId, mappingID)
+		}
+		if mappingID == "" {
+			t.Error("expected non-empty placeholder objectId")
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(slidesBatchUpdateResponse{
+			Replies: []slidesBatchReply{
+				{CreateSlide: &createSlideReply{ObjectID: "slide-title-001"}},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTestWithSlides(srv.Client(), "", "", srv.URL)
+	action := &addSlideAction{conn: conn}
+
+	params, _ := json.Marshal(addSlideParams{
+		PresentationID: "pres-abc-123",
+		Layout:         "TITLE_ONLY",
+		Title:          "Hello World",
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.add_slide",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data map[string]string
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["slide_id"] != "slide-title-001" {
+		t.Errorf("expected slide_id 'slide-title-001', got %q", data["slide_id"])
+	}
+}
+
 func TestAddSlide_WithLayout(t *testing.T) {
 	t.Parallel()
 

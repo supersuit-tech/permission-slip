@@ -534,7 +534,7 @@ Appends or inserts text into an existing Google Doc using the Docs API batchUpda
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `document_id` | string | Yes | — | The ID of the Google Doc to update |
-| `text` | string | Yes | — | Text to insert into the document |
+| `content` | string | Yes | — | Text to insert into the document |
 | `index` | integer | No | end | Character index to insert at (1-based). Defaults to end of document. |
 
 **Response:**

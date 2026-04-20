@@ -35,7 +35,7 @@ func TestUpdateDocument_SuccessAppend(t *testing.T) {
 			t.Fatal("expected InsertText request")
 		}
 		if req.InsertText.Text != "appended text" {
-			t.Errorf("expected text 'appended text', got %q", req.InsertText.Text)
+			t.Errorf("expected content 'appended text', got %q", req.InsertText.Text)
 		}
 		if req.InsertText.EndOfSegmentLocation == nil {
 			t.Error("expected EndOfSegmentLocation for append")
@@ -54,7 +54,7 @@ func TestUpdateDocument_SuccessAppend(t *testing.T) {
 
 	params, _ := json.Marshal(updateDocumentParams{
 		DocumentID: "doc-abc-123",
-		Text:       "appended text",
+		Content:    "appended text",
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -107,7 +107,7 @@ func TestUpdateDocument_SuccessInsertAtIndex(t *testing.T) {
 
 	params, _ := json.Marshal(updateDocumentParams{
 		DocumentID: "doc-abc-123",
-		Text:       "inserted text",
+		Content:    "inserted text",
 		Index:      5,
 	})
 
@@ -150,7 +150,7 @@ func TestUpdateDocument_MissingDocumentID(t *testing.T) {
 	}
 }
 
-func TestUpdateDocument_MissingText(t *testing.T) {
+func TestUpdateDocument_MissingContent(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
@@ -164,7 +164,7 @@ func TestUpdateDocument_MissingText(t *testing.T) {
 		Credentials: validCreds(),
 	})
 	if err == nil {
-		t.Fatal("expected error for missing text")
+		t.Fatal("expected error for missing content")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
@@ -179,7 +179,7 @@ func TestUpdateDocument_NegativeIndex(t *testing.T) {
 
 	params, _ := json.Marshal(map[string]any{
 		"document_id": "doc-123",
-		"text":        "hello",
+		"content":     "hello",
 		"index":       -1,
 	})
 
@@ -210,7 +210,7 @@ func TestUpdateDocument_AuthFailure(t *testing.T) {
 	conn := newForTestDocs(srv.Client(), srv.URL, "")
 	action := &updateDocumentAction{conn: conn}
 
-	params, _ := json.Marshal(updateDocumentParams{DocumentID: "doc-123", Text: "hello"})
+	params, _ := json.Marshal(updateDocumentParams{DocumentID: "doc-123", Content: "hello"})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "google.update_document",
@@ -237,7 +237,7 @@ func TestUpdateDocument_RateLimit(t *testing.T) {
 	conn := newForTestDocs(srv.Client(), srv.URL, "")
 	action := &updateDocumentAction{conn: conn}
 
-	params, _ := json.Marshal(updateDocumentParams{DocumentID: "doc-123", Text: "hello"})
+	params, _ := json.Marshal(updateDocumentParams{DocumentID: "doc-123", Content: "hello"})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "google.update_document",

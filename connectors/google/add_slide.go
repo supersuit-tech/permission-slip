@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -21,21 +22,22 @@ type addSlideParams struct {
 	PresentationID string `json:"presentation_id"`
 	Layout         string `json:"layout"`
 	InsertionIndex *int   `json:"insertion_index,omitempty"`
+	Title          string `json:"title,omitempty"`
 }
 
 // validSlideLayouts lists the allowed predefined layout values for the
 // Google Slides API CreateSlideRequest. See:
 // https://developers.google.com/slides/api/reference/rest/v1/presentations/request#PredefinedLayout
 var validSlideLayouts = map[string]bool{
-	"BLANK":            true,
-	"TITLE":            true,
-	"TITLE_AND_BODY":   true,
-	"SECTION_HEADER":   true,
-	"ONE_COLUMN_TEXT":  true,
-	"MAIN_POINT":      true,
-	"BIG_NUMBER":      true,
-	"CAPTION_ONLY":    true,
-	"TITLE_ONLY":      true,
+	"BLANK":                         true,
+	"TITLE":                         true,
+	"TITLE_AND_BODY":                true,
+	"SECTION_HEADER":                true,
+	"ONE_COLUMN_TEXT":               true,
+	"MAIN_POINT":                    true,
+	"BIG_NUMBER":                    true,
+	"CAPTION_ONLY":                  true,
+	"TITLE_ONLY":                    true,
 	"SECTION_TITLE_AND_DESCRIPTION": true,
 	"TITLE_AND_TWO_COLUMNS":         true,
 }
@@ -67,16 +69,34 @@ type slidesBatchUpdateRequest struct {
 }
 
 type slidesBatchRequest struct {
-	CreateSlide *createSlideRequest `json:"createSlide,omitempty"`
+	CreateSlide *createSlideRequest  `json:"createSlide,omitempty"`
+	InsertText  *slidesInsertTextReq `json:"insertText,omitempty"`
 }
 
 type createSlideRequest struct {
-	SlideLayoutReference *slideLayoutReference `json:"slideLayoutReference,omitempty"`
-	InsertionIndex       *int                  `json:"insertionIndex,omitempty"`
+	SlideLayoutReference  *slideLayoutReference       `json:"slideLayoutReference,omitempty"`
+	InsertionIndex        *int                        `json:"insertionIndex,omitempty"`
+	PlaceholderIdMappings []slidePlaceholderIDMapping `json:"placeholderIdMappings,omitempty"`
 }
 
 type slideLayoutReference struct {
 	PredefinedLayout string `json:"predefinedLayout"`
+}
+
+type slidePlaceholderIDMapping struct {
+	LayoutPlaceholder slidePlaceholderRef `json:"layoutPlaceholder"`
+	ObjectId          string              `json:"objectId"`
+}
+
+type slidePlaceholderRef struct {
+	Type  string `json:"type"`
+	Index int    `json:"index"`
+}
+
+type slidesInsertTextReq struct {
+	ObjectId       string `json:"objectId"`
+	InsertionIndex int    `json:"insertionIndex"`
+	Text           string `json:"text"`
 }
 
 // slidesBatchUpdateResponse is the Google Slides API batchUpdate response.
@@ -112,10 +132,32 @@ func (a *addSlideAction) Execute(ctx context.Context, req connectors.ActionReque
 		createReq.InsertionIndex = params.InsertionIndex
 	}
 
+	requests := []slidesBatchRequest{{CreateSlide: createReq}}
+
+	if params.Title != "" {
+		// Generate a unique ID per call — the Slides API requires object IDs to
+		// be unique within a presentation, so a fixed constant would fail on any
+		// second titled slide. The Google Slides API applies batchUpdate requests
+		// sequentially, so InsertText safely references the placeholder created
+		// in the preceding CreateSlide request:
+		// https://developers.google.com/slides/api/reference/rest/v1/presentations/batchUpdate
+		titleID := fmt.Sprintf("ps_title_%x", time.Now().UnixNano())
+		createReq.PlaceholderIdMappings = []slidePlaceholderIDMapping{
+			{
+				LayoutPlaceholder: slidePlaceholderRef{Type: "TITLE", Index: 0},
+				ObjectId:          titleID,
+			},
+		}
+		requests = append(requests, slidesBatchRequest{
+			InsertText: &slidesInsertTextReq{
+				ObjectId: titleID,
+				Text:     params.Title,
+			},
+		})
+	}
+
 	body := slidesBatchUpdateRequest{
-		Requests: []slidesBatchRequest{
-			{CreateSlide: createReq},
-		},
+		Requests: requests,
 	}
 
 	var resp slidesBatchUpdateResponse

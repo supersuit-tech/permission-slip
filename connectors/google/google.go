@@ -149,6 +149,7 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.sheets_write_range":    &sheetsWriteRangeAction{conn: c},
 		"google.sheets_append_rows":    &sheetsAppendRowsAction{conn: c},
 		"google.sheets_list_sheets":    &sheetsListSheetsAction{conn: c},
+		"google.create_spreadsheet":    &createSpreadsheetAction{conn: c},
 		"google.create_document":       &createDocumentAction{conn: c},
 		"google.get_document":          &getDocumentAction{conn: c},
 		"google.update_document":       &updateDocumentAction{conn: c},

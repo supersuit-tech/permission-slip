@@ -81,6 +81,47 @@ func TestSheetsAppendRows_Success(t *testing.T) {
 	}
 }
 
+func TestSheetsAppendRows_ColumnOnlyRangeNormalized(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Column-only range "Sheet1!A:C" must be normalized to "Sheet1" before
+		// hitting the API — the append endpoint rejects column-only ranges.
+		if r.URL.Path != "/spreadsheets/spreadsheet-456/values/Sheet1:append" {
+			t.Errorf("expected normalized path .../values/Sheet1:append, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(sheetsAppendValuesResponse{
+			SpreadsheetID: "spreadsheet-456",
+			Updates: struct {
+				UpdatedRange   string `json:"updatedRange"`
+				UpdatedRows    int    `json:"updatedRows"`
+				UpdatedColumns int    `json:"updatedColumns"`
+				UpdatedCells   int    `json:"updatedCells"`
+			}{UpdatedRange: "Sheet1!A2:C2", UpdatedRows: 1, UpdatedColumns: 3, UpdatedCells: 3},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", "", srv.URL)
+	action := &sheetsAppendRowsAction{conn: conn}
+
+	params, _ := json.Marshal(sheetsAppendRowsParams{
+		SpreadsheetID: "spreadsheet-456",
+		Range:         "Sheet1!A:C",
+		Values:        [][]any{{"Demo Row", "Yes", "Yes"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.sheets_append_rows",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSheetsAppendRows_MissingSpreadsheetID(t *testing.T) {
 	t.Parallel()
 
@@ -218,13 +259,16 @@ func TestSheetsAppendRows_InvalidJSON(t *testing.T) {
 func TestSheetsAppendRows_InvalidRange_ListsAvailableTabs(t *testing.T) {
 	t.Parallel()
 
+	// Use a cell-anchor range (not column-only) so normalizeAppendRange passes
+	// it through unchanged, allowing the API to return its "Unable to parse
+	// range" 400 and exercise the remapInvalidRangeError path.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
-		case r.Method == http.MethodPost && r.URL.Path == "/spreadsheets/spreadsheet-999/values/Sheet1!A:C:append":
+		case r.Method == http.MethodPost && r.URL.Path == "/spreadsheets/spreadsheet-999/values/NoSuchTab!A1:append":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusBadRequest)
 			json.NewEncoder(w).Encode(map[string]any{
-				"error": map[string]any{"code": 400, "message": "Unable to parse range: Sheet1!A:C"},
+				"error": map[string]any{"code": 400, "message": "Unable to parse range: NoSuchTab!A1"},
 			})
 		case r.Method == http.MethodGet && r.URL.Path == "/spreadsheets/spreadsheet-999":
 			w.Header().Set("Content-Type", "application/json")
@@ -248,7 +292,7 @@ func TestSheetsAppendRows_InvalidRange_ListsAvailableTabs(t *testing.T) {
 
 	params, _ := json.Marshal(sheetsAppendRowsParams{
 		SpreadsheetID: "spreadsheet-999",
-		Range:         "Sheet1!A:C",
+		Range:         "NoSuchTab!A1",
 		Values:        [][]any{{"a", "b", "c"}},
 	})
 
@@ -264,7 +308,7 @@ func TestSheetsAppendRows_InvalidRange_ListsAvailableTabs(t *testing.T) {
 		t.Fatalf("expected ValidationError, got %T: %v", err, err)
 	}
 	msg := err.Error()
-	for _, want := range []string{`"Sheet1!A:C"`, `"Data"`, `"Summary"`} {
+	for _, want := range []string{`"NoSuchTab!A1"`, `"Data"`, `"Summary"`} {
 		if !strings.Contains(msg, want) {
 			t.Errorf("expected error message to contain %s, got: %s", want, msg)
 		}

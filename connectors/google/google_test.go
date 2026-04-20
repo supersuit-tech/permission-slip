@@ -49,6 +49,7 @@ func TestGoogleConnector_Actions(t *testing.T) {
 		"google.send_email_reply",
 		"google.read_email",
 		"google.archive_email",
+		"google.create_spreadsheet",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -116,8 +117,8 @@ func TestGoogleConnector_Manifest(t *testing.T) {
 	if m.Name != "Google" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Google")
 	}
-	if len(m.Actions) != 29 {
-		t.Fatalf("Manifest().Actions has %d items, want 29", len(m.Actions))
+	if len(m.Actions) != 30 {
+		t.Fatalf("Manifest().Actions has %d items, want 30", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -153,6 +154,7 @@ func TestGoogleConnector_Manifest(t *testing.T) {
 		"google.send_email_reply",
 		"google.read_email",
 		"google.archive_email",
+		"google.create_spreadsheet",
 	} {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
