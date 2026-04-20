@@ -8,9 +8,6 @@
 - After making the first commit on a branch, automatically create a pull request using `gh pr create`. Use a concise title and include a descriptive body with a summary and test plan. For subsequent commits, push to the existing PR branch.
 - **Link PRs to issues.** When a PR addresses a GitHub issue, include `Closes #<issue>` in the PR body so the issue is automatically closed when the PR merges. Don't wait to be asked.
 - **Never open draft PRs.** Always open PRs as ready for review.
-- When suggesting a PR body or GitHub issue that includes a checklist, **split the checklist into two sections** based on who should handle each item:
-  - `### Developer` — items that can be automated or handled by `/watch` (e.g., add tests, fix lint, update docs, add error handling, run checks).
-  - `### Manual Testing` — items that require manual verification, design review, or hands-on testing that can't be automated.
 - Always include the pull request URL at the end of every message where a PR already exists, formatted exactly as: `Pull request: <url>` — no bold, no markdown link syntax, just the plain text and URL so the link doesn't break.
 - Whenever you bring up a problem, always suggest a recommendation for how to address it.
 - When asked to review for improvements or issues: fix anything you're confident should be fixed (commit & push), then mention any additional findings that are more subjective or optional so the user can decide.
