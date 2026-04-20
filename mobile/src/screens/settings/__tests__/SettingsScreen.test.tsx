@@ -92,6 +92,7 @@ let mockTypePrefsReturn = {
 };
 
 jest.mock("../../../hooks/useNotificationTypePreferences", () => ({
+  NOTIFICATION_TYPE_STANDING_EXECUTION: "standing_execution",
   useNotificationTypePreferences: () => mockTypePrefsReturn,
 }));
 

@@ -21,7 +21,10 @@ import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAuth } from "../../auth/AuthContext";
 import { useNotificationPreferences } from "../../hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "../../hooks/useUpdateNotificationPreferences";
-import { useNotificationTypePreferences } from "../../hooks/useNotificationTypePreferences";
+import {
+  NOTIFICATION_TYPE_STANDING_EXECUTION,
+  useNotificationTypePreferences,
+} from "../../hooks/useNotificationTypePreferences";
 import { useUpdateNotificationTypePreferences } from "../../hooks/useUpdateNotificationTypePreferences";
 import Constants from "expo-constants";
 import { useDeleteAccount } from "../../hooks/useDeleteAccount";
@@ -75,7 +78,7 @@ export default function SettingsScreen(_props: Props) {
   const mobilePushEnabled = mobilePushPref?.enabled ?? true;
 
   const standingPref = typePreferences.find(
-    (p) => p.notification_type === "standing_execution",
+    (p) => p.notification_type === NOTIFICATION_TYPE_STANDING_EXECUTION,
   );
   const standingExecutionEnabled = standingPref?.enabled ?? true;
 
@@ -96,7 +99,7 @@ export default function SettingsScreen(_props: Props) {
     try {
       await updateTypePreferences([
         {
-          notification_type: "standing_execution",
+          notification_type: NOTIFICATION_TYPE_STANDING_EXECUTION,
           enabled: !standingExecutionEnabled,
         },
       ]);

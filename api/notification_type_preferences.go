@@ -85,16 +85,37 @@ func handleUpdateNotificationTypePreferences(deps *Deps) http.HandlerFunc {
 			seen[p.NotificationType] = true
 		}
 
+		ctx := r.Context()
+		tx, owned, err := db.BeginOrContinue(ctx, deps.DB)
+		if err != nil {
+			log.Printf("[%s] handleUpdateNotificationTypePreferences: begin tx: %v", TraceID(ctx), err)
+			CaptureError(ctx, err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update notification type preferences"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(ctx, tx)
+		}
+
 		for _, p := range req.Preferences {
-			if err := db.UpsertNotificationTypePreference(r.Context(), deps.DB, profile.ID, p.NotificationType, p.Enabled); err != nil {
-				log.Printf("[%s] handleUpdateNotificationTypePreferences: upsert %q: %v", TraceID(r.Context()), p.NotificationType, err)
-				CaptureError(r.Context(), err)
+			if err := db.UpsertNotificationTypePreference(ctx, tx, profile.ID, p.NotificationType, p.Enabled); err != nil {
+				log.Printf("[%s] handleUpdateNotificationTypePreferences: upsert %q: %v", TraceID(ctx), p.NotificationType, err)
+				CaptureError(ctx, err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update notification type preferences"))
 				return
 			}
 		}
 
-		prefs, err := db.GetNotificationTypePreferences(r.Context(), deps.DB, profile.ID)
+		if owned {
+			if err := db.CommitTx(ctx, tx); err != nil {
+				log.Printf("[%s] handleUpdateNotificationTypePreferences: commit: %v", TraceID(ctx), err)
+				CaptureError(ctx, err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update notification type preferences"))
+				return
+			}
+		}
+
+		prefs, err := db.GetNotificationTypePreferences(ctx, deps.DB, profile.ID)
 		if err != nil {
 			log.Printf("[%s] handleUpdateNotificationTypePreferences: re-fetch: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)

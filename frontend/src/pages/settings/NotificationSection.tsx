@@ -6,7 +6,10 @@ import { useUpdateProfile } from "@/hooks/useUpdateProfile";
 import { trackEvent, PostHogEvents } from "@/lib/posthog";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "@/hooks/useUpdateNotificationPreferences";
-import { useNotificationTypePreferences } from "@/hooks/useNotificationTypePreferences";
+import {
+  NOTIFICATION_TYPE_STANDING_EXECUTION,
+  useNotificationTypePreferences,
+} from "@/hooks/useNotificationTypePreferences";
 import { useUpdateNotificationTypePreferences } from "@/hooks/useUpdateNotificationTypePreferences";
 import type { components } from "@/api/schema";
 import { Switch } from "@/components/ui/switch";
@@ -48,11 +51,11 @@ export function NotificationSection() {
     useUpdateNotificationPreferences();
   const {
     updatePreferences: updateTypePreferences,
-    isLoading: isUpdatingTypePrefs,
+    isUpdating: isUpdatingTypePrefs,
   } = useUpdateNotificationTypePreferences();
 
   const standingExecutionPref = typePreferences.find(
-    (p) => p.notification_type === "standing_execution",
+    (p) => p.notification_type === NOTIFICATION_TYPE_STANDING_EXECUTION,
   );
   const standingExecutionEnabled = standingExecutionPref?.enabled ?? true;
 
@@ -83,7 +86,7 @@ export function NotificationSection() {
     try {
       await updateTypePreferences([
         {
-          notification_type: "standing_execution",
+          notification_type: NOTIFICATION_TYPE_STANDING_EXECUTION,
           enabled,
         },
       ]);

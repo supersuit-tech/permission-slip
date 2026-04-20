@@ -14,6 +14,9 @@ export type NotificationTypePreference =
 export const NOTIFICATION_TYPE_PREFS_KEY =
   "notification-type-preferences" as const;
 
+/** Matches OpenAPI enum and backend `db.NotificationTypeStandingExecution`. */
+export const NOTIFICATION_TYPE_STANDING_EXECUTION = "standing_execution" as const;
+
 export function useNotificationTypePreferences() {
   const { session } = useAuth();
   const accessToken = session?.access_token;

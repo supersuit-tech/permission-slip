@@ -59,9 +59,10 @@ func NotifyStandingApprovalExecution(ctx context.Context, deps *Deps, exec *db.S
 
 	enabled, err := db.IsNotificationTypeEnabled(ctx, deps.DB, exec.UserID, db.NotificationTypeStandingExecution)
 	if err != nil {
-		log.Printf("notify: standing execution: failed to load notification type preference for user %s: %v", exec.UserID, err)
+		log.Printf("notify: standing execution: failed to load notification type preference for user %s: %v — defaulting to enabled", exec.UserID, err)
 		CaptureError(ctx, err)
-		return
+		// Fail open: missing rows already default to enabled; on read errors, do the same.
+		enabled = true
 	}
 	if !enabled {
 		log.Printf("notify: skipping standing execution notification for user %s — notification type disabled", exec.UserID)

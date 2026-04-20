@@ -2,11 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
+import { getApiErrorMessage } from "@/api/errors";
 
 export type NotificationTypePreference =
   components["schemas"]["NotificationTypePreference"];
 
 export const NOTIFICATION_TYPE_PREFS_QUERY_KEY = "notification-type-preferences" as const;
+
+/** Matches OpenAPI enum and `db.NotificationTypeStandingExecution`. */
+export const NOTIFICATION_TYPE_STANDING_EXECUTION = "standing_execution" as const;
 
 /**
  * Fetches per-notification-type preferences (e.g. auto-approval execution notifications).
@@ -26,7 +30,14 @@ export function useNotificationTypePreferences() {
           headers: { Authorization: `Bearer ${accessToken}` },
         },
       );
-      if (error) throw new Error("Failed to load notification type preferences");
+      if (error) {
+        throw new Error(
+          getApiErrorMessage(
+            error,
+            "Failed to load notification type preferences",
+          ),
+        );
+      }
       return data;
     },
     enabled: !!accessToken,

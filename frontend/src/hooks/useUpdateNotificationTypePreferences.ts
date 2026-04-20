@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
+import { getApiErrorMessage } from "@/api/errors";
 import { NOTIFICATION_TYPE_PREFS_QUERY_KEY } from "./useNotificationTypePreferences";
 
 type NotificationTypePreferenceUpdate =
@@ -27,10 +28,17 @@ export function useUpdateNotificationTypePreferences() {
           body: { preferences },
         },
       );
-      if (error) throw new Error("Failed to update notification type preferences");
+      if (error) {
+        throw new Error(
+          getApiErrorMessage(
+            error,
+            "Failed to update notification type preferences",
+          ),
+        );
+      }
       return data;
     },
-    onSuccess: () => {
+    onSettled: () => {
       queryClient.invalidateQueries({
         queryKey: [NOTIFICATION_TYPE_PREFS_QUERY_KEY],
       });
@@ -39,7 +47,7 @@ export function useUpdateNotificationTypePreferences() {
 
   return {
     updatePreferences: mutation.mutateAsync,
-    isLoading: mutation.isPending,
+    isUpdating: mutation.isPending,
     error: mutation.error,
   };
 }
