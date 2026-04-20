@@ -34,8 +34,9 @@ func (e *AgentConnectorError) Error() string { return string(e.Code) }
 type AgentConnectorErrCode string
 
 const (
-	AgentConnectorErrAgentNotFound     AgentConnectorErrCode = "agent_not_found"
-	AgentConnectorErrConnectorNotFound AgentConnectorErrCode = "connector_not_found"
+	AgentConnectorErrAgentNotFound       AgentConnectorErrCode = "agent_not_found"
+	AgentConnectorErrConnectorNotFound   AgentConnectorErrCode = "connector_not_found"
+	AgentConnectorErrConnectorNotEnabled AgentConnectorErrCode = "connector_not_enabled"
 )
 
 // ListAgentConnectors returns enabled connectors for an agent, scoped to the approver.

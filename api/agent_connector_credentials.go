@@ -22,6 +22,53 @@ type agentConnectorCredentialResponse struct {
 	OAuthConnectionID *string `json:"oauth_connection_id,omitempty"`
 }
 
+// validateAssignCredentialRequest checks the assign body and ownership; returns HTTP status and error response if invalid.
+func validateAssignCredentialRequest(w http.ResponseWriter, r *http.Request, deps *Deps, userID, connectorID string, req *assignCredentialRequest) bool {
+	// Exactly one of credential_id or oauth_connection_id must be provided.
+	if (req.CredentialID == nil) == (req.OAuthConnectionID == nil) {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "provide exactly one of credential_id or oauth_connection_id"))
+		return false
+	}
+
+	if req.CredentialID != nil {
+		cred, err := db.GetCredentialByID(r.Context(), deps.DB, *req.CredentialID)
+		if err != nil {
+			log.Printf("[%s] AssignCredential: credential check: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify credential"))
+			return false
+		}
+		if cred == nil || cred.UserID != userID {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Credential not found"))
+			return false
+		}
+		if cred.Service != connectorID {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+				fmt.Sprintf("credential service %q does not match connector %q", cred.Service, connectorID)))
+			return false
+		}
+	}
+	if req.OAuthConnectionID != nil {
+		conn, err := db.GetOAuthConnectionByID(r.Context(), deps.DB, *req.OAuthConnectionID)
+		if err != nil {
+			log.Printf("[%s] AssignCredential: oauth check: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify OAuth connection"))
+			return false
+		}
+		if conn == nil || conn.UserID != userID {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "OAuth connection not found"))
+			return false
+		}
+		if conn.Provider != connectorID {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
+				fmt.Sprintf("OAuth connection provider %q does not match connector %q", conn.Provider, connectorID)))
+			return false
+		}
+	}
+	return true
+}
+
 func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID := Profile(r.Context()).ID
@@ -45,48 +92,8 @@ func handleAssignAgentConnectorCredential(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Exactly one of credential_id or oauth_connection_id must be provided.
-		if (req.CredentialID == nil) == (req.OAuthConnectionID == nil) {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "provide exactly one of credential_id or oauth_connection_id"))
+		if !validateAssignCredentialRequest(w, r, deps, userID, connectorID, &req) {
 			return
-		}
-
-		// Validate ownership and service match for static credentials.
-		if req.CredentialID != nil {
-			cred, err := db.GetCredentialByID(r.Context(), deps.DB, *req.CredentialID)
-			if err != nil {
-				log.Printf("[%s] AssignCredential: credential check: %v", TraceID(r.Context()), err)
-				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify credential"))
-				return
-			}
-			if cred == nil || cred.UserID != userID {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Credential not found"))
-				return
-			}
-			if cred.Service != connectorID {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
-					fmt.Sprintf("credential service %q does not match connector %q", cred.Service, connectorID)))
-				return
-			}
-		}
-		if req.OAuthConnectionID != nil {
-			conn, err := db.GetOAuthConnectionByID(r.Context(), deps.DB, *req.OAuthConnectionID)
-			if err != nil {
-				log.Printf("[%s] AssignCredential: oauth check: %v", TraceID(r.Context()), err)
-				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify OAuth connection"))
-				return
-			}
-			if conn == nil || conn.UserID != userID {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "OAuth connection not found"))
-				return
-			}
-			if conn.Provider != connectorID {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest,
-					fmt.Sprintf("OAuth connection provider %q does not match connector %q", conn.Provider, connectorID)))
-				return
-			}
 		}
 
 		bindingID, err := generatePrefixedID("acc_", 16)

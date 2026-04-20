@@ -258,6 +258,27 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("look up agent connector credential: %w", err)
 	}
+	return resolveCredentialsFromAgentConnectorBinding(ctx, deps, userID, binding)
+}
+
+// resolveCredentialsForConnectorInstance resolves credentials for a specific connector instance (same rules as resolveCredentialsWithFallback).
+func resolveCredentialsForConnectorInstance(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+	if len(reqCreds) == 0 {
+		return connectors.NewCredentials(nil), nil
+	}
+	if agentID == 0 {
+		return connectors.Credentials{}, &connectors.ValidationError{
+			Message: "no credential assigned — assign a credential to this connector before running actions",
+		}
+	}
+	binding, err := db.GetAgentConnectorCredentialByInstance(ctx, deps.DB, agentID, connectorID, connectorInstanceID)
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("look up agent connector credential: %w", err)
+	}
+	return resolveCredentialsFromAgentConnectorBinding(ctx, deps, userID, binding)
+}
+
+func resolveCredentialsFromAgentConnectorBinding(ctx context.Context, deps *Deps, userID string, binding *db.AgentConnectorCredential) (connectors.Credentials, error) {
 	if binding == nil {
 		return connectors.Credentials{}, &connectors.ValidationError{
 			Message: "no credential assigned — go to the agent's connector settings and assign a credential",

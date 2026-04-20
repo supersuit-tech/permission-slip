@@ -33,6 +33,7 @@ Error:
         - token_already_used
         - insufficient_scope
         - invalid_parameters
+        - connector_instance_required
         # 404 Not Found
         - agent_not_found
         - approver_not_found
@@ -40,6 +41,7 @@ Error:
         - credential_not_found
         - connector_not_found
         - agent_connector_not_found
+        - connector_instance_not_found
         - credentials_not_found
         - no_matching_standing_approval
         # 403 Forbidden (plan limits)

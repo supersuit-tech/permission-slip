@@ -19,6 +19,7 @@ type StandingApproval struct {
 	ActionVersion               string
 	Constraints                 []byte // raw JSONB
 	SourceActionConfigurationID *string
+	ConnectorInstanceID         *string // nil = type-wide (legacy); non-nil = instance-scoped
 	Status                      string
 	StartsAt                    time.Time
 	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
@@ -30,7 +31,7 @@ type StandingApproval struct {
 // standingApprovalColumns is the canonical column list for SELECT on the standing_approvals table.
 // Keep in sync with scanStandingApproval.
 const standingApprovalColumns = `standing_approval_id, agent_id, user_id, action_type, action_version,
-	constraints, source_action_configuration_id, status,
+	constraints, source_action_configuration_id, connector_instance_id, status,
 	starts_at, expires_at, created_at, revoked_at, expired_at`
 
 // MaxStandingApprovalListSize is the maximum number of standing approvals returned per page.
@@ -58,7 +59,7 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 	var sa StandingApproval
 	err := row.Scan(
 		&sa.StandingApprovalID, &sa.AgentID, &sa.UserID, &sa.ActionType, &sa.ActionVersion,
-		&sa.Constraints, &sa.SourceActionConfigurationID, &sa.Status,
+		&sa.Constraints, &sa.SourceActionConfigurationID, &sa.ConnectorInstanceID, &sa.Status,
 		&sa.StartsAt, &sa.ExpiresAt, &sa.CreatedAt, &sa.RevokedAt, &sa.ExpiredAt,
 	)
 	if err != nil {
@@ -101,8 +102,8 @@ const (
 	StandingApprovalErrNotFound         = "not_found"
 	StandingApprovalErrAlreadyRevoked   = "already_revoked"
 	StandingApprovalErrNotActive        = "not_active"
-	StandingApprovalErrAgentNotFound     = "agent_not_found"
-	StandingApprovalErrDuplicateRequest  = "duplicate_request"
+	StandingApprovalErrAgentNotFound    = "agent_not_found"
+	StandingApprovalErrDuplicateRequest = "duplicate_request"
 )
 
 // CreateStandingApprovalParams holds the parameters for creating a standing approval.
@@ -114,6 +115,7 @@ type CreateStandingApprovalParams struct {
 	ActionVersion               string
 	Constraints                 []byte // raw JSONB, may be nil
 	SourceActionConfigurationID *string
+	ConnectorInstanceID         *string
 	StartsAt                    time.Time
 	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
 }
@@ -128,12 +130,12 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 			SELECT 1 FROM agents WHERE agent_id = $2 AND approver_id = $3
 		)
 		INSERT INTO standing_approvals
-		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, source_action_configuration_id, status, starts_at, expires_at)
-		 SELECT $1, $2, $3, $4, $5, $6, $7, 'active', $8, $9
+		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, source_action_configuration_id, connector_instance_id, status, starts_at, expires_at)
+		 SELECT $1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10
 		 WHERE EXISTS (SELECT 1 FROM agent_check)
 		 RETURNING `+standingApprovalColumns,
 		p.StandingApprovalID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion,
-		p.Constraints, p.SourceActionConfigurationID, p.StartsAt, p.ExpiresAt,
+		p.Constraints, p.SourceActionConfigurationID, p.ConnectorInstanceID, p.StartsAt, p.ExpiresAt,
 	)
 	sa, err := scanStandingApproval(row)
 	if err != nil {
@@ -517,7 +519,7 @@ func diagnoseStandingApprovalFailure(ctx context.Context, db DBTX, saID, userID 
 type UpdateStandingApprovalParams struct {
 	StandingApprovalID string
 	UserID             string
-	Constraints        []byte // raw JSONB
+	Constraints        []byte     // raw JSONB
 	ExpiresAt          *time.Time // nil means no expiry (until revoked)
 }
 
@@ -556,22 +558,33 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 // FindActiveStandingApprovalsForAgent returns all active standing approvals for
 // the given agent and action type, ordered by most recently created first.
 // Exact action_type matches are returned before wildcard ("*") matches.
+// If connectorInstanceID is non-empty, only rows with NULL connector_instance_id
+// (type-wide) or matching connector_instance_id are included.
 // Returns an empty slice if no match is found.
-func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID int64, actionType string) ([]*StandingApproval, error) {
+func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID int64, actionType string, connectorInstanceID string) ([]*StandingApproval, error) {
+	instanceFilter := `1=1`
+	args := []any{agentID, actionType}
+	if connectorInstanceID != "" {
+		instanceFilter = `(connector_instance_id IS NULL OR connector_instance_id = $3::uuid)`
+		args = append(args, connectorInstanceID)
+	}
+
 	rows, err := db.Query(ctx,
 		`SELECT `+standingApprovalColumns+`
 		 FROM (
 		   SELECT `+standingApprovalColumns+`, 1 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = $2 AND status = 'active'
 		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
+		     AND `+instanceFilter+`
 		   UNION ALL
 		   SELECT `+standingApprovalColumns+`, 2 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = '*' AND action_type != $2 AND status = 'active'
 		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
+		     AND `+instanceFilter+`
 		 ) combined
 		 ORDER BY priority, created_at DESC, standing_approval_id DESC
 		 LIMIT 100`,
-		agentID, actionType,
+		args...,
 	)
 	if err != nil {
 		return nil, err

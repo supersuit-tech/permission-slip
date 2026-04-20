@@ -217,12 +217,17 @@ agentConnectorCredential:
     operationId: assignAgentConnectorCredential
     summary: Assign Credential to Agent Connector
     description: |
+      **Deprecated:** targets the **default** connector instance only. Prefer
+      `PUT /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential`
+      for per-instance bindings.
+
       Assign a credential or OAuth connection to an agent-connector pair. This determines
       which credential the agent uses when executing actions through this connector.
 
       Exactly one of `credential_id` or `oauth_connection_id` must be provided.
       If a credential is already assigned, it is replaced (upsert behavior).
 
+    deprecated: true
     tags:
       - Agents
 
@@ -284,9 +289,13 @@ agentConnectorCredential:
     operationId: removeAgentConnectorCredential
     summary: Remove Credential from Agent Connector
     description: |
+      **Deprecated:** removes the binding for the **default** instance only. Prefer
+      `DELETE .../instances/{instance_id}/credential` for per-instance removal.
+
       Remove the credential binding for an agent-connector pair. After removal,
       the agent falls back to user-global credential resolution for this connector.
 
+    deprecated: true
     tags:
       - Agents
 
@@ -329,8 +338,12 @@ agentConnectorCredential:
     operationId: getAgentConnectorCredential
     summary: Get Agent Connector Credential
     description: |
+      **Deprecated:** returns the binding for the **default** instance only. Prefer
+      `GET .../instances/{instance_id}/credential` for a specific instance.
+
       Get the current credential binding for an agent-connector pair.
 
+    deprecated: true
     tags:
       - Agents
 

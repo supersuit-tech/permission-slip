@@ -71,7 +71,19 @@ func handleListAgentConnectorUsers(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		creds, err := resolveCredentialsWithFallback(r.Context(), deps, agentID, userID, listAction, connectorID, reqCreds)
+		defaultInst, err := db.GetDefaultAgentConnectorInstance(r.Context(), deps.DB, agentID, userID, connectorID)
+		if err != nil {
+			log.Printf("[%s] ListAgentConnectorUsers default instance: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to resolve connector instance"))
+			return
+		}
+		if defaultInst == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorNotFound, "Connector not enabled for this agent"))
+			return
+		}
+
+		creds, err := resolveCredentialsForConnectorInstance(r.Context(), deps, agentID, userID, listAction, connectorID, defaultInst.ConnectorInstanceID, reqCreds)
 		if err != nil {
 			if handleConnectorError(w, r, err, connErrCtx) {
 				return

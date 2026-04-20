@@ -57,13 +57,13 @@ const (
 	ErrSMSRequiresPaidPlan          ErrorCode = "sms_requires_paid_plan"
 	ErrChannelNotConfigured         ErrorCode = "channel_not_configured"
 	// OAuth
-	ErrOAuthProviderNotFound       ErrorCode = "oauth_provider_not_found"
-	ErrOAuthProviderUnconfigured   ErrorCode = "oauth_provider_unconfigured"
-	ErrOAuthConnectionNotFound     ErrorCode = "oauth_connection_not_found"
-	ErrOAuthConnectionExists       ErrorCode = "oauth_connection_exists"
-	ErrOAuthStateMismatch          ErrorCode = "oauth_state_mismatch"
-	ErrOAuthExchangeFailed         ErrorCode = "oauth_exchange_failed"
-	ErrOAuthRefreshFailed          ErrorCode = "oauth_refresh_failed"
+	ErrOAuthProviderNotFound     ErrorCode = "oauth_provider_not_found"
+	ErrOAuthProviderUnconfigured ErrorCode = "oauth_provider_unconfigured"
+	ErrOAuthConnectionNotFound   ErrorCode = "oauth_connection_not_found"
+	ErrOAuthConnectionExists     ErrorCode = "oauth_connection_exists"
+	ErrOAuthStateMismatch        ErrorCode = "oauth_state_mismatch"
+	ErrOAuthExchangeFailed       ErrorCode = "oauth_exchange_failed"
+	ErrOAuthRefreshFailed        ErrorCode = "oauth_refresh_failed"
 	// Payment Methods
 	ErrPaymentMethodNotFound ErrorCode = "payment_method_not_found"
 	ErrPaymentMethodRequired ErrorCode = "payment_method_required"
@@ -77,4 +77,7 @@ const (
 
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
+
+	ErrConnectorInstanceRequired ErrorCode = "connector_instance_required"
+	ErrConnectorInstanceNotFound ErrorCode = "connector_instance_not_found"
 )

@@ -110,6 +110,17 @@ ConnectorId:
     pattern: '^[a-z][a-z0-9_.-]*$'
   example: "gmail"
 
+ConnectorInstanceId:
+  name: instance_id
+  in: path
+  required: true
+  description: |
+    Connector instance UUID (`connector_instance_id` from list/create instance responses).
+  schema:
+    type: string
+    format: uuid
+  example: "550e8400-e29b-41d4-a716-446655440000"
+
 PushSubscriptionId:
   name: subscription_id
   in: path

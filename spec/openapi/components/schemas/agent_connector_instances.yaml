@@ -1,0 +1,61 @@
+AgentConnectorInstance:
+  type: object
+  required:
+    - connector_instance_id
+    - agent_id
+    - connector_id
+    - label
+    - is_default
+    - enabled_at
+  properties:
+    connector_instance_id:
+      type: string
+      format: uuid
+      description: Surrogate identifier for this connector instance on the agent.
+    agent_id:
+      type: integer
+      format: int64
+    connector_id:
+      type: string
+      maxLength: 128
+    label:
+      type: string
+      description: Human-readable label unique per agent and connector type.
+    is_default:
+      type: boolean
+      description: True for the default instance used when no instance is specified (legacy routes).
+    enabled_at:
+      type: string
+      format: date-time
+
+AgentConnectorInstanceListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/AgentConnectorInstance'
+
+CreateAgentConnectorInstanceRequest:
+  type: object
+  required:
+    - label
+  properties:
+    label:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: Display label for the new instance (unique per agent and connector).
+
+PatchAgentConnectorInstanceRequest:
+  type: object
+  required:
+    - label
+  properties:
+    label:
+      type: string
+      minLength: 1
+      maxLength: 256
+      description: New display label for the instance.

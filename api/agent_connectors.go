@@ -155,13 +155,13 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 			defer db.RollbackTx(r.Context(), tx) //nolint:errcheck // best-effort cleanup
 		}
 
-		// Look up credential binding before disabling — the cascade from
-		// agent_connectors → agent_connector_credentials will remove it.
-		var credBinding *db.AgentConnectorCredential
+		// Look up all credential bindings before disabling — the cascade from
+		// agent_connectors → agent_connector_credentials removes every instance row.
+		var credBindings []db.AgentConnectorCredential
 		if deleteCredentials {
-			credBinding, err = db.GetAgentConnectorCredential(r.Context(), tx, agentID, connectorID)
+			credBindings, err = db.ListAgentConnectorCredentialsForAgentConnector(r.Context(), tx, agentID, userID, connectorID)
 			if err != nil {
-				log.Printf("[%s] DisableAgentConnector: get credential: %v", TraceID(r.Context()), err)
+				log.Printf("[%s] DisableAgentConnector: list credentials: %v", TraceID(r.Context()), err)
 				CaptureError(r.Context(), err)
 				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to disable connector"))
 				return
@@ -182,12 +182,18 @@ func handleDisableAgentConnector(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if deleteCredentials && credBinding != nil && credBinding.CredentialID != nil {
-			if err := deleteCredentialAndVault(r.Context(), tx, *credBinding.CredentialID, userID, deps.Vault); err != nil {
-				log.Printf("[%s] DisableAgentConnector: delete credential: %v", TraceID(r.Context()), err)
-				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
-				return
+		if deleteCredentials {
+			for i := range credBindings {
+				b := credBindings[i]
+				if b.CredentialID == nil {
+					continue
+				}
+				if err := deleteCredentialAndVault(r.Context(), tx, *b.CredentialID, userID, deps.Vault); err != nil {
+					log.Printf("[%s] DisableAgentConnector: delete credential: %v", TraceID(r.Context()), err)
+					CaptureError(r.Context(), err)
+					RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to delete credential"))
+					return
+				}
 			}
 		}
 
