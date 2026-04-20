@@ -216,6 +216,52 @@ func GetDefaultAgentConnectorInstanceByAgent(ctx context.Context, db DBTX, agent
 	return inst, nil
 }
 
+// SetDefaultAgentConnectorInstance marks the given instance as the default for
+// (agent, connector) and clears is_default on sibling instances.
+func SetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID string) (*AgentConnectorInstance, error) {
+	tx, owned, err := BeginOrContinue(ctx, db)
+	if err != nil {
+		return nil, err
+	}
+	if owned {
+		defer RollbackTx(ctx, tx) //nolint:errcheck // commit path clears
+	}
+
+	_, err = tx.Exec(ctx, `
+		UPDATE agent_connectors
+		SET is_default = false
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
+		  AND is_default
+		  AND connector_instance_id <> $4::uuid`,
+		agentID, approverID, connectorID, connectorInstanceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	row := tx.QueryRow(ctx, `
+		UPDATE agent_connectors
+		SET is_default = true
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid
+		RETURNING connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at`,
+		agentID, approverID, connectorID, connectorInstanceID,
+	)
+	inst, err := scanAgentConnectorInstance(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if owned {
+		if err := CommitTx(ctx, tx); err != nil {
+			return nil, err
+		}
+	}
+	return inst, nil
+}
+
 // RenameAgentConnectorInstance updates the label for an instance.
 func RenameAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID, newLabel string) (*AgentConnectorInstance, error) {
 	label := strings.TrimSpace(newLabel)

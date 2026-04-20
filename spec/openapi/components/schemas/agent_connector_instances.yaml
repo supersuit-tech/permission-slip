@@ -51,11 +51,15 @@ CreateAgentConnectorInstanceRequest:
 
 PatchAgentConnectorInstanceRequest:
   type: object
-  required:
-    - label
+  description: >-
+    At least one of `label` or `is_default` must be provided.
+    When `is_default` is true, this instance becomes the default for the agent and connector type.
   properties:
     label:
       type: string
       minLength: 1
       maxLength: 256
       description: New display label for the instance.
+    is_default:
+      type: boolean
+      description: When true, marks this instance as the default (only value accepted; omit to leave default unchanged).

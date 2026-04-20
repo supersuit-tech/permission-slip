@@ -6,11 +6,10 @@ import { useAgent } from "@/hooks/useAgent";
 import { useActionConfigs } from "@/hooks/useActionConfigs";
 import { useConnectorDetail } from "@/hooks/useConnectorDetail";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
-import { useAgentConnectorCredential } from "@/hooks/useAgentConnectorCredential";
 import { ConnectorOverviewSection } from "./ConnectorOverviewSection";
 import { ConnectorActionsDialog } from "./ConnectorActionsDialog";
 import { ActionConfigurationsSection } from "./ActionConfigurationsSection";
-import { ConnectorCredentialsSection } from "./ConnectorCredentialsSection";
+import { ConnectorInstancesSection } from "./ConnectorInstancesSection";
 import { DisableConnectorSection } from "./DisableConnectorSection";
 
 export function ConnectorConfigPage() {
@@ -46,11 +45,6 @@ export function ConnectorConfigPage() {
     error: configsError,
     refetch: refetchConfigs,
   } = useActionConfigs(agentId);
-
-  const { binding: credentialBinding } = useAgentConnectorCredential(
-    agentId,
-    connectorId ?? "",
-  );
 
   const connectorConfigs = configs.filter((c) => c.connector_id === connectorId);
 
@@ -163,7 +157,7 @@ export function ConnectorConfigPage() {
         error={configsError}
         onConfigsChanged={() => void refetchConfigs()}
       />
-      <ConnectorCredentialsSection
+      <ConnectorInstancesSection
         agentId={agentId}
         connectorId={connectorId}
         requiredCredentials={connector.required_credentials}
@@ -177,8 +171,6 @@ export function ConnectorConfigPage() {
             (c) => c.auth_type === "oauth2" && c.oauth_provider,
           )?.oauth_provider
         }
-        oauthConnectionId={credentialBinding?.oauth_connection_id ?? undefined}
-        hasApiKeyCredential={!!credentialBinding?.credential_id}
       />
     </div>
   );

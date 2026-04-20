@@ -3,45 +3,49 @@ import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
 
-export type AgentConnectorCredential =
+export type AgentConnectorCredentialResponse =
   components["schemas"]["AgentConnectorCredentialResponse"];
 
-export function useAgentConnectorCredential(
+export function useAgentConnectorInstanceCredential(
   agentId: number,
   connectorId: string,
+  instanceId: string,
 ) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
 
   const query = useQuery({
-    queryKey: ["agent-connector-credential", agentId, connectorId],
+    queryKey: ["agent-connector-instance-credential", agentId, connectorId, instanceId],
     queryFn: async () => {
       if (!accessToken) throw new Error("Missing access token");
       const { data, error } = await client.GET(
-        "/v1/agents/{agent_id}/connectors/{connector_id}/credential",
+        "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential",
         {
           headers: { Authorization: `Bearer ${accessToken}` },
-          params: { path: { agent_id: agentId, connector_id: connectorId } },
+          params: {
+            path: {
+              agent_id: agentId,
+              connector_id: connectorId,
+              instance_id: instanceId,
+            },
+          },
         },
       );
       if (error) throw new Error("Failed to load credential binding");
       return data;
     },
-    enabled: !!accessToken && agentId > 0 && !!connectorId,
+    enabled: !!accessToken && agentId > 0 && !!connectorId && !!instanceId,
   });
 
   return {
     binding: query.data ?? null,
     isLoading: query.isLoading,
-    /** True while the first credential binding fetch is in flight (avoids UI flash). */
     isCredentialBindingPending: query.isPending,
-    error: query.isError
-      ? "Unable to load credential binding."
-      : null,
+    error: query.isError ? "Unable to load credential binding." : null,
   };
 }
 
-export function useAssignAgentConnectorCredential() {
+export function useAssignAgentConnectorInstanceCredential() {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const queryClient = useQueryClient();
@@ -50,20 +54,28 @@ export function useAssignAgentConnectorCredential() {
     mutationFn: async ({
       agentId,
       connectorId,
+      instanceId,
       credentialId,
       oauthConnectionId,
     }: {
       agentId: number;
       connectorId: string;
+      instanceId: string;
       credentialId?: string;
       oauthConnectionId?: string;
     }) => {
       if (!accessToken) throw new Error("Missing access token");
       const { data, error } = await client.PUT(
-        "/v1/agents/{agent_id}/connectors/{connector_id}/credential",
+        "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential",
         {
           headers: { Authorization: `Bearer ${accessToken}` },
-          params: { path: { agent_id: agentId, connector_id: connectorId } },
+          params: {
+            path: {
+              agent_id: agentId,
+              connector_id: connectorId,
+              instance_id: instanceId,
+            },
+          },
           body: {
             credential_id: credentialId,
             oauth_connection_id: oauthConnectionId,
@@ -81,9 +93,10 @@ export function useAssignAgentConnectorCredential() {
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: [
-          "agent-connector-credential",
+          "agent-connector-instance-credential",
           variables.agentId,
           variables.connectorId,
+          variables.instanceId,
         ],
       });
       queryClient.invalidateQueries({
@@ -109,7 +122,7 @@ export function useAssignAgentConnectorCredential() {
   };
 }
 
-export function useRemoveAgentConnectorCredential() {
+export function useRemoveAgentConnectorInstanceCredential() {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const queryClient = useQueryClient();
@@ -118,16 +131,24 @@ export function useRemoveAgentConnectorCredential() {
     mutationFn: async ({
       agentId,
       connectorId,
+      instanceId,
     }: {
       agentId: number;
       connectorId: string;
+      instanceId: string;
     }) => {
       if (!accessToken) throw new Error("Missing access token");
-      const { data, error } = await client.DELETE(
-        "/v1/agents/{agent_id}/connectors/{connector_id}/credential",
+      const { error } = await client.DELETE(
+        "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential",
         {
           headers: { Authorization: `Bearer ${accessToken}` },
-          params: { path: { agent_id: agentId, connector_id: connectorId } },
+          params: {
+            path: {
+              agent_id: agentId,
+              connector_id: connectorId,
+              instance_id: instanceId,
+            },
+          },
         },
       );
       if (error) {
@@ -136,14 +157,14 @@ export function useRemoveAgentConnectorCredential() {
           "Failed to remove credential";
         throw new Error(msg);
       }
-      return data;
     },
     onSuccess: (_data, variables) => {
       queryClient.invalidateQueries({
         queryKey: [
-          "agent-connector-credential",
+          "agent-connector-instance-credential",
           variables.agentId,
           variables.connectorId,
+          variables.instanceId,
         ],
       });
       queryClient.invalidateQueries({
