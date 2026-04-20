@@ -246,6 +246,9 @@ paths:
   /v1/profile/notification-preferences:
     $ref: './components/paths/profiles.yaml#/notificationPreferences'
 
+  /v1/profile/notification-type-preferences:
+    $ref: './components/paths/profiles.yaml#/notificationTypePreferences'
+
   /v1/push-subscriptions:
     $ref: './components/paths/push_subscriptions.yaml#/pushSubscriptions'
 

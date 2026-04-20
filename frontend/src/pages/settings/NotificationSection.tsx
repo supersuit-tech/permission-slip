@@ -6,8 +6,11 @@ import { useUpdateProfile } from "@/hooks/useUpdateProfile";
 import { trackEvent, PostHogEvents } from "@/lib/posthog";
 import { useNotificationPreferences } from "@/hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "@/hooks/useUpdateNotificationPreferences";
+import { useNotificationTypePreferences } from "@/hooks/useNotificationTypePreferences";
+import { useUpdateNotificationTypePreferences } from "@/hooks/useUpdateNotificationTypePreferences";
 import type { components } from "@/api/schema";
 import { Switch } from "@/components/ui/switch";
+import { NotifyAboutAutoApprovalsRow } from "./NotifyAboutAutoApprovalsRow";
 import {
   Card,
   CardContent,
@@ -36,8 +39,22 @@ export function NotificationSection() {
   const { profile } = useProfile();
   const { updateProfile, isLoading: isUpdatingProfile } = useUpdateProfile();
   const { preferences, isLoading, error } = useNotificationPreferences();
+  const {
+    preferences: typePreferences,
+    isLoading: isLoadingTypePrefs,
+    error: typePrefsError,
+  } = useNotificationTypePreferences();
   const { updatePreferences, isLoading: isUpdating } =
     useUpdateNotificationPreferences();
+  const {
+    updatePreferences: updateTypePreferences,
+    isLoading: isUpdatingTypePrefs,
+  } = useUpdateNotificationTypePreferences();
+
+  const standingExecutionPref = typePreferences.find(
+    (p) => p.notification_type === "standing_execution",
+  );
+  const standingExecutionEnabled = standingExecutionPref?.enabled ?? true;
 
   // Determine which channels are missing required contact info.
   const missingContact: Record<string, string> = {};
@@ -59,6 +76,22 @@ export function NotificationSection() {
       );
     } catch {
       toast.error("Failed to update product updates preference.");
+    }
+  }
+
+  async function handleToggleStandingExecution(enabled: boolean) {
+    try {
+      await updateTypePreferences([
+        {
+          notification_type: "standing_execution",
+          enabled,
+        },
+      ]);
+      toast.success(
+        `Auto-approval execution notifications ${enabled ? "enabled" : "silenced"}.`,
+      );
+    } catch {
+      toast.error("Failed to update notification preference.");
     }
   }
 
@@ -88,7 +121,7 @@ export function NotificationSection() {
         </CardDescription>
       </CardHeader>
       <CardContent>
-        {isLoading ? (
+        {isLoading || isLoadingTypePrefs ? (
           <div
             className="flex items-center justify-center py-8"
             role="status"
@@ -96,8 +129,10 @@ export function NotificationSection() {
           >
             <Loader2 className="text-muted-foreground size-5 animate-spin" />
           </div>
-        ) : error ? (
-          <p className="text-destructive text-sm">{error}</p>
+        ) : error || typePrefsError ? (
+          <p className="text-destructive text-sm">
+            {error ?? typePrefsError}
+          </p>
         ) : (
           <div className="space-y-4">
             {preferences
@@ -148,6 +183,19 @@ export function NotificationSection() {
                 </div>
               );
             })}
+
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                Notify me about
+              </p>
+              <NotifyAboutAutoApprovalsRow
+                enabled={standingExecutionEnabled}
+                disabled={isUpdating || isUpdatingTypePrefs}
+                onCheckedChange={(checked) =>
+                  void handleToggleStandingExecution(checked)
+                }
+              />
+            </div>
 
             <hr className="border-border" />
 

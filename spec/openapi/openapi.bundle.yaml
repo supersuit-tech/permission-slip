@@ -4679,7 +4679,7 @@ paths:
         - All approval history and audit log events
         - All standing approvals and their execution history
         - Subscription and usage data
-        - Notification preferences and push subscriptions
+        - Notification preferences, notification type preferences, and push subscriptions
         - The Supabase authentication user (best-effort)
       tags:
         - Profiles
@@ -4846,6 +4846,75 @@ paths:
                   details:
                     current_plan: free
                     required_plan: pay_as_you_go
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/profile/notification-type-preferences:
+    get:
+      operationId: getNotificationTypePreferences
+      summary: Get notification type preferences
+      description: |
+        Returns per-notification-type preferences (e.g. whether to notify about
+        standing approval / auto-approval executions). Types without an explicit
+        row default to enabled.
+      tags:
+        - Profiles
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Notification type preferences retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTypePreferencesResponse'
+              example:
+                preferences:
+                  - notification_type: standing_execution
+                    enabled: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: updateNotificationTypePreferences
+      summary: Update notification type preferences
+      description: |
+        Updates per-notification-type preferences. Accepts an array of
+        notification_type/enabled pairs. Types not included in the request are left
+        unchanged.
+      tags:
+        - Profiles
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNotificationTypePreferencesRequest'
+            example:
+              preferences:
+                - notification_type: standing_execution
+                  enabled: false
+      responses:
+        '200':
+          description: Notification type preferences updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTypePreferencesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -11785,6 +11854,62 @@ components:
           type: boolean
           description: Whether notifications should be enabled for this channel
           example: true
+    NotificationTypePreference:
+      type: object
+      description: |
+        Per-notification-type preference (e.g. auto-approval execution notifications).
+        Types without an explicit row default to enabled.
+      required:
+        - notification_type
+        - enabled
+      properties:
+        notification_type:
+          type: string
+          description: Logical notification category
+          enum:
+            - standing_execution
+          example: standing_execution
+        enabled:
+          type: boolean
+          description: When false, this notification category is silenced on all channels.
+          example: true
+    NotificationTypePreferencesResponse:
+      type: object
+      description: All per-type notification preferences for the authenticated user.
+      required:
+        - preferences
+      properties:
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTypePreference'
+    NotificationTypePreferenceUpdate:
+      type: object
+      description: A notification type preference update (request-only).
+      required:
+        - notification_type
+        - enabled
+      properties:
+        notification_type:
+          type: string
+          enum:
+            - standing_execution
+          example: standing_execution
+        enabled:
+          type: boolean
+          example: false
+    UpdateNotificationTypePreferencesRequest:
+      type: object
+      description: Request body for updating per-type notification preferences.
+      required:
+        - preferences
+      properties:
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTypePreferenceUpdate'
+          description: Type preferences to update. Types not included are unchanged.
+          minItems: 1
     PlanLimits:
       type: object
       required:

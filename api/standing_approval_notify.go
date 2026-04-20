@@ -51,10 +51,21 @@ func NotifyStandingApprovalExecution(ctx context.Context, deps *Deps, exec *db.S
 		AgentID:     exec.AgentID,
 		AgentName:   agentName,
 		Action:      actionJSON,
-		Context: contextJSON,
+		Context:     contextJSON,
 		ApprovalURL: activityURL,
 		CreatedAt:   time.Now(),
 		Type:        notify.NotificationTypeStandingExecution,
+	}
+
+	enabled, err := db.IsNotificationTypeEnabled(ctx, deps.DB, exec.UserID, db.NotificationTypeStandingExecution)
+	if err != nil {
+		log.Printf("notify: standing execution: failed to load notification type preference for user %s: %v", exec.UserID, err)
+		CaptureError(ctx, err)
+		return
+	}
+	if !enabled {
+		log.Printf("notify: skipping standing execution notification for user %s — notification type disabled", exec.UserID)
+		return
 	}
 
 	recipient := notify.Recipient{
