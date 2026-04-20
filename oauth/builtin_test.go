@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"golang.org/x/oauth2"
+
 	"github.com/supersuit-tech/permission-slip/oauth"
 	_ "github.com/supersuit-tech/permission-slip/oauth/providers"
 )
@@ -186,6 +188,42 @@ func TestBuiltInProviders(t *testing.T) {
 		}
 		if len(a.Scopes) != 6 {
 			t.Errorf("expected 6 scopes, got %d: %v", len(a.Scopes), a.Scopes)
+		}
+	})
+
+	t.Run("slack", func(t *testing.T) {
+		// REGRESSION GUARD: do NOT change these endpoints to oauth.v2.access /
+		// oauth/v2/authorize. Slack's standard oauth.v2.access endpoint nests
+		// the user token under authed_user and leaves top-level access_token
+		// empty when only user scopes are requested, which causes the Go
+		// oauth2 library to reject the response with "server response missing
+		// access_token" at cfg.Exchange — before any normalization can run.
+		// The dedicated user-token-only endpoints below return the user token
+		// at the top level. See Sentry PERMISSION-SLIP-GO-N and PR #958.
+		s, ok := byID["slack"]
+		if !ok {
+			t.Fatal("slack provider not found")
+		}
+		if s.AuthorizeURL != "https://slack.com/oauth/v2_user/authorize" {
+			t.Errorf("AuthorizeURL = %q, want https://slack.com/oauth/v2_user/authorize", s.AuthorizeURL)
+		}
+		if s.TokenURL != "https://slack.com/api/oauth.v2.user.access" {
+			t.Errorf("TokenURL = %q, want https://slack.com/api/oauth.v2.user.access", s.TokenURL)
+		}
+		if _, bad := s.AuthorizeParams["user_scope"]; bad {
+			t.Error("AuthorizeParams must not contain user_scope — v2_user endpoints use scope; user_scope is only valid for the standard v2 flow")
+		}
+		if s.AuthorizeParams["scope"] == "" {
+			t.Error("AuthorizeParams must set scope (comma-separated) for the v2_user authorize endpoint")
+		}
+		if s.AuthStyle != oauth2.AuthStyleInParams {
+			t.Errorf("AuthStyle = %v, want AuthStyleInParams (Slack token endpoint returns HTTP 200 for errors so auto-detect picks Basic and fails silently)", s.AuthStyle)
+		}
+		if s.Source != oauth.SourceBuiltIn {
+			t.Errorf("Source = %q, want %q", s.Source, oauth.SourceBuiltIn)
+		}
+		if len(s.Scopes) == 0 {
+			t.Error("expected default scopes")
 		}
 	})
 

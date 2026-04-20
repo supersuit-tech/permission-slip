@@ -279,6 +279,100 @@ func TestClassifyConnectorError(t *testing.T) {
 	}
 }
 
+func TestCaptureConnectorError_FingerprintSplitsByConnectorActionStatus(t *testing.T) {
+	t.Parallel()
+
+	transport := &sentryTestTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://key@sentry.example.com/1",
+		Transport: transport,
+	})
+	if err != nil {
+		t.Fatalf("failed to create sentry client: %v", err)
+	}
+
+	hub := sentry.NewHub(client, sentry.NewScope())
+	ctx := sentry.SetHubOnContext(context.Background(), hub)
+
+	CaptureConnectorError(ctx, &connectors.ExternalError{StatusCode: 404, Message: "Chat app not found"}, ConnectorContext{
+		ActionType: "google.chat_send_message",
+		AgentID:    1,
+	})
+
+	events := transport.getEvents()
+	if len(events) == 0 {
+		t.Fatal("expected event to be captured")
+	}
+	fp := events[0].Fingerprint
+	wantParts := []string{"connector", "external", "google", "google.chat_send_message", "404"}
+	if len(fp) != len(wantParts) {
+		t.Fatalf("fingerprint = %v, want %v", fp, wantParts)
+	}
+	for i, want := range wantParts {
+		if fp[i] != want {
+			t.Errorf("fingerprint[%d] = %q, want %q", i, fp[i], want)
+		}
+	}
+}
+
+func TestCaptureConnectorError_4xxExternalErrorIsWarning(t *testing.T) {
+	t.Parallel()
+
+	transport := &sentryTestTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://key@sentry.example.com/1",
+		Transport: transport,
+	})
+	if err != nil {
+		t.Fatalf("failed to create sentry client: %v", err)
+	}
+
+	hub := sentry.NewHub(client, sentry.NewScope())
+	ctx := sentry.SetHubOnContext(context.Background(), hub)
+
+	CaptureConnectorError(ctx, &connectors.ExternalError{StatusCode: 400, Message: "bad range"}, ConnectorContext{
+		ConnectorID: "google",
+		ActionType:  "google.sheets_read_range",
+	})
+
+	events := transport.getEvents()
+	if len(events) == 0 {
+		t.Fatal("expected event to be captured")
+	}
+	if got := events[0].Level; got != sentry.LevelWarning {
+		t.Errorf("level = %q, want %q (4xx external errors should not page)", got, sentry.LevelWarning)
+	}
+}
+
+func TestCaptureConnectorError_5xxExternalErrorStaysError(t *testing.T) {
+	t.Parallel()
+
+	transport := &sentryTestTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://key@sentry.example.com/1",
+		Transport: transport,
+	})
+	if err != nil {
+		t.Fatalf("failed to create sentry client: %v", err)
+	}
+
+	hub := sentry.NewHub(client, sentry.NewScope())
+	ctx := sentry.SetHubOnContext(context.Background(), hub)
+
+	CaptureConnectorError(ctx, &connectors.ExternalError{StatusCode: 503, Message: "upstream down"}, ConnectorContext{
+		ConnectorID: "google",
+		ActionType:  "google.sheets_read_range",
+	})
+
+	events := transport.getEvents()
+	if len(events) == 0 {
+		t.Fatal("expected event to be captured")
+	}
+	if got := events[0].Level; got == sentry.LevelWarning {
+		t.Errorf("level = %q, expected default error-level (5xx is a real outage)", got)
+	}
+}
+
 // sentryTestTransport captures events in memory for test assertions.
 // A mutex guards the events slice in case the SDK delivers events from a
 // background goroutine (defensive — our tests are single-goroutine but
@@ -294,9 +388,9 @@ func (t *sentryTestTransport) SendEvent(event *sentry.Event) {
 	defer t.mu.Unlock()
 	t.events = append(t.events, event)
 }
-func (t *sentryTestTransport) Flush(_ time.Duration) bool             { return true }
+func (t *sentryTestTransport) Flush(_ time.Duration) bool              { return true }
 func (t *sentryTestTransport) FlushWithContext(_ context.Context) bool { return true }
-func (t *sentryTestTransport) Close()                                 {}
+func (t *sentryTestTransport) Close()                                  {}
 
 // getEvents returns a snapshot of captured events (safe for concurrent use).
 func (t *sentryTestTransport) getEvents() []*sentry.Event {
