@@ -137,6 +137,66 @@ UpdateNotificationPreferencesRequest:
       description: Channel preferences to update. Channels not included are unchanged.
       minItems: 1
 
+NotificationTypePreference:
+  type: object
+  description: |
+    Per-notification-type preference (e.g. auto-approval execution notifications).
+    Types without an explicit row default to enabled.
+  required:
+    - notification_type
+    - enabled
+  properties:
+    notification_type:
+      type: string
+      description: Logical notification category
+      enum:
+        - standing_execution
+      example: "standing_execution"
+    enabled:
+      type: boolean
+      description: When false, this notification category is silenced on all channels.
+      example: true
+
+NotificationTypePreferencesResponse:
+  type: object
+  description: All per-type notification preferences for the authenticated user.
+  required:
+    - preferences
+  properties:
+    preferences:
+      type: array
+      items:
+        $ref: '#/NotificationTypePreference'
+
+NotificationTypePreferenceUpdate:
+  type: object
+  description: A notification type preference update (request-only).
+  required:
+    - notification_type
+    - enabled
+  properties:
+    notification_type:
+      type: string
+      enum:
+        - standing_execution
+      example: "standing_execution"
+    enabled:
+      type: boolean
+      example: false
+
+UpdateNotificationTypePreferencesRequest:
+  type: object
+  description: Request body for updating per-type notification preferences.
+  required:
+    - preferences
+  properties:
+    preferences:
+      type: array
+      items:
+        $ref: '#/NotificationTypePreferenceUpdate'
+      description: Type preferences to update. Types not included are unchanged.
+      minItems: 1
+
 DeleteAccountRequest:
   type: object
   description: Request body for deleting the authenticated user's account.

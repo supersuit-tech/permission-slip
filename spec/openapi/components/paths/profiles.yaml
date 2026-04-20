@@ -126,7 +126,7 @@ profile:
       - All approval history and audit log events
       - All standing approvals and their execution history
       - Subscription and usage data
-      - Notification preferences and push subscriptions
+      - Notification preferences, notification type preferences, and push subscriptions
       - The Supabase authentication user (best-effort)
 
     tags:
@@ -154,6 +154,93 @@ profile:
             example:
               deleted: true
               message: "Account and all associated data have been permanently deleted."
+
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+notificationTypePreferences:
+  get:
+    operationId: getNotificationTypePreferences
+    summary: Get notification type preferences
+    description: |
+      Returns per-notification-type preferences (e.g. whether to notify about
+      standing approval / auto-approval executions). Types without an explicit
+      row default to enabled.
+
+    tags:
+      - Profiles
+
+    security:
+      - SupabaseSession: []
+
+    responses:
+      '200':
+        description: Notification type preferences retrieved successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/profiles.yaml#/NotificationTypePreferencesResponse'
+            example:
+              preferences:
+                - notification_type: "standing_execution"
+                  enabled: true
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+  put:
+    operationId: updateNotificationTypePreferences
+    summary: Update notification type preferences
+    description: |
+      Updates per-notification-type preferences. Accepts an array of
+      notification_type/enabled pairs. Types not included in the request are left
+      unchanged.
+
+    tags:
+      - Profiles
+
+    security:
+      - SupabaseSession: []
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/profiles.yaml#/UpdateNotificationTypePreferencesRequest'
+          example:
+            preferences:
+              - notification_type: "standing_execution"
+                enabled: false
+
+    responses:
+      '200':
+        description: Notification type preferences updated successfully
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/profiles.yaml#/NotificationTypePreferencesResponse'
 
       '400':
         $ref: '../responses/errors.yaml#/BadRequest'

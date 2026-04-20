@@ -80,6 +80,32 @@ jest.mock("../../../hooks/useUpdateNotificationPreferences", () => ({
   }),
 }));
 
+const mockTypePreferences = [
+  { notification_type: "standing_execution" as const, enabled: true },
+];
+
+let mockTypePrefsReturn = {
+  preferences: mockTypePreferences,
+  isLoading: false,
+  error: null as string | null,
+  refetch: jest.fn(),
+};
+
+jest.mock("../../../hooks/useNotificationTypePreferences", () => ({
+  NOTIFICATION_TYPE_STANDING_EXECUTION: "standing_execution",
+  useNotificationTypePreferences: () => mockTypePrefsReturn,
+}));
+
+const mockUpdateTypePreferences = jest.fn().mockResolvedValue({});
+
+jest.mock("../../../hooks/useUpdateNotificationTypePreferences", () => ({
+  useUpdateNotificationTypePreferences: () => ({
+    updatePreferences: mockUpdateTypePreferences,
+    isUpdating: false,
+    error: null,
+  }),
+}));
+
 const mockDeleteAccount = jest.fn().mockResolvedValue({});
 
 jest.mock("../../../hooks/useDeleteAccount", () => ({
@@ -131,6 +157,12 @@ describe("SettingsScreen", () => {
     jest.clearAllMocks();
     mockPrefsReturn = {
       preferences: mockPreferences,
+      isLoading: false,
+      error: null,
+      refetch: jest.fn(),
+    };
+    mockTypePrefsReturn = {
+      preferences: mockTypePreferences,
       isLoading: false,
       error: null,
       refetch: jest.fn(),
@@ -200,6 +232,10 @@ describe("SettingsScreen", () => {
       isLoading: true,
       preferences: [],
     };
+    mockTypePrefsReturn = {
+      ...mockTypePrefsReturn,
+      isLoading: false,
+    };
     await act(async () => {
       renderer = renderScreen();
     });
@@ -213,11 +249,43 @@ describe("SettingsScreen", () => {
       error: "Failed to load",
       preferences: [],
     };
+    mockTypePrefsReturn = {
+      ...mockTypePrefsReturn,
+      error: null,
+    };
     await act(async () => {
       renderer = renderScreen();
     });
     expect(hasText(renderer, "Failed to load")).toBe(true);
     expect(findByTestId(renderer, "mobile-push-toggle")).toHaveLength(0);
+  });
+
+  it("renders auto-approval execution toggle", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    expect(hasText(renderer, "Notify me about")).toBe(true);
+    expect(hasText(renderer, "Auto-approval executions")).toBe(true);
+    expect(findByTestId(renderer, "standing-execution-toggle").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("calls updateTypePreferences when auto-approval toggle is pressed", async () => {
+    await act(async () => {
+      renderer = renderScreen();
+    });
+    const toggle = renderer.root.findAll(
+      (node) =>
+        node.props.testID === "standing-execution-toggle" &&
+        typeof node.props.onValueChange === "function",
+    )[0];
+
+    await act(async () => {
+      toggle?.props.onValueChange(false);
+    });
+
+    expect(mockUpdateTypePreferences).toHaveBeenCalledWith([
+      { notification_type: "standing_execution", enabled: false },
+    ]);
   });
 
   it("renders the sign out button", async () => {
