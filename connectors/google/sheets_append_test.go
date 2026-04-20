@@ -80,6 +80,47 @@ func TestSheetsAppendRows_Success(t *testing.T) {
 	}
 }
 
+func TestSheetsAppendRows_ColumnOnlyRangeNormalized(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Column-only range "Sheet1!A:C" must be normalized to "Sheet1" before
+		// hitting the API — the append endpoint rejects column-only ranges.
+		if r.URL.Path != "/spreadsheets/spreadsheet-456/values/Sheet1:append" {
+			t.Errorf("expected normalized path .../values/Sheet1:append, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(sheetsAppendValuesResponse{
+			SpreadsheetID: "spreadsheet-456",
+			Updates: struct {
+				UpdatedRange   string `json:"updatedRange"`
+				UpdatedRows    int    `json:"updatedRows"`
+				UpdatedColumns int    `json:"updatedColumns"`
+				UpdatedCells   int    `json:"updatedCells"`
+			}{UpdatedRange: "Sheet1!A2:C2", UpdatedRows: 1, UpdatedColumns: 3, UpdatedCells: 3},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", "", srv.URL)
+	action := &sheetsAppendRowsAction{conn: conn}
+
+	params, _ := json.Marshal(sheetsAppendRowsParams{
+		SpreadsheetID: "spreadsheet-456",
+		Range:         "Sheet1!A:C",
+		Values:        [][]any{{"Demo Row", "Yes", "Yes"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.sheets_append_rows",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSheetsAppendRows_MissingSpreadsheetID(t *testing.T) {
 	t.Parallel()
 

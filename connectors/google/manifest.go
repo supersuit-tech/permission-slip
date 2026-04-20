@@ -9,6 +9,7 @@ import (
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -77,10 +78,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.create_calendar_event",
-				Name:        "Create Calendar Event",
-				Description: "Create a new event on Google Calendar",
-				RiskLevel:   "medium",
+				ActionType:      "google.create_calendar_event",
+				Name:            "Create Calendar Event",
+				Description:     "Create a new event on Google Calendar",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create event {{summary}} on {{start_time:datetime}} with {{attendees:count}} attendees",
 				Preview: &connectors.ActionPreview{
 					Layout: "event",
@@ -136,10 +137,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.list_calendar_events",
-				Name:        "List Calendar Events",
-				Description: "List upcoming events from Google Calendar",
-				RiskLevel:   "low",
+				ActionType:      "google.list_calendar_events",
+				Name:            "List Calendar Events",
+				Description:     "List upcoming events from Google Calendar",
+				RiskLevel:       "low",
 				DisplayTemplate: "List calendar events from {{calendar_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -191,10 +192,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			},
 			// Sheets actions
 			{
-				ActionType:  "google.sheets_read_range",
-				Name:        "Read Spreadsheet Range",
-				Description: "Read cell values from a specified range in a Google Sheets spreadsheet",
-				RiskLevel:   "low",
+				ActionType:      "google.sheets_read_range",
+				Name:            "Read Spreadsheet Range",
+				Description:     "Read cell values from a specified range in a Google Sheets spreadsheet",
+				RiskLevel:       "low",
 				DisplayTemplate: "Read {{range}} from spreadsheet",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -214,10 +215,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.sheets_write_range",
-				Name:        "Write Spreadsheet Range",
-				Description: "Write cell values to a specified range in a Google Sheets spreadsheet",
-				RiskLevel:   "medium",
+				ActionType:      "google.sheets_write_range",
+				Name:            "Write Spreadsheet Range",
+				Description:     "Write cell values to a specified range in a Google Sheets spreadsheet",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Write to {{range}} in spreadsheet",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -246,10 +247,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.sheets_append_rows",
-				Name:        "Append Spreadsheet Rows",
-				Description: "Append rows to a sheet or table in a Google Sheets spreadsheet",
-				RiskLevel:   "medium",
+				ActionType:      "google.sheets_append_rows",
+				Name:            "Append Spreadsheet Rows",
+				Description:     "Append rows to a sheet or table in a Google Sheets spreadsheet",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Append rows to {{range}} in spreadsheet",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -278,10 +279,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.sheets_list_sheets",
-				Name:        "List Worksheets",
-				Description: "List all worksheets (tabs) in a Google Sheets spreadsheet",
-				RiskLevel:   "low",
+				ActionType:      "google.sheets_list_sheets",
+				Name:            "List Worksheets",
+				Description:     "List all worksheets (tabs) in a Google Sheets spreadsheet",
+				RiskLevel:       "low",
 				DisplayTemplate: "List worksheets in spreadsheet {{spreadsheet_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -295,12 +296,36 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:      "google.create_spreadsheet",
+				Name:            "Create Spreadsheet",
+				Description:     "Create a new Google Sheets spreadsheet",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Create spreadsheet {{title}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["title"],
+					"properties": {
+						"title": {
+							"type": "string",
+							"description": "Title of the new spreadsheet",
+							"x-ui": {"label": "Title", "placeholder": "My Spreadsheet"}
+						},
+						"sheet_titles": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Optional list of initial worksheet tab names (defaults to a single 'Sheet1')",
+							"x-ui": {"label": "Sheet names", "help_text": "Names for initial worksheet tabs"}
+						}
+					}
+				}`)),
+			},
 			// Docs actions
 			{
-				ActionType:  "google.create_document",
-				Name:        "Create Document",
-				Description: "Create a new Google Doc with a title and optional body content",
-				RiskLevel:   "medium",
+				ActionType:      "google.create_document",
+				Name:            "Create Document",
+				Description:     "Create a new Google Doc with a title and optional body content",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create document {{title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -320,10 +345,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.get_document",
-				Name:        "Get Document",
-				Description: "Retrieve the content and metadata of a Google Doc by document ID. Returns plain text content, word count, and a direct link to the document.",
-				RiskLevel:   "low",
+				ActionType:      "google.get_document",
+				Name:            "Get Document",
+				Description:     "Retrieve the content and metadata of a Google Doc by document ID. Returns plain text content, word count, and a direct link to the document.",
+				RiskLevel:       "low",
 				DisplayTemplate: "Get document {{document_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -338,24 +363,24 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.update_document",
-				Name:        "Update Document",
-				Description: "Append or insert text into an existing Google Doc. By default text is appended to the end; specify an index to insert at a specific position.",
-				RiskLevel:   "medium",
+				ActionType:      "google.update_document",
+				Name:            "Update Document",
+				Description:     "Append or insert text into an existing Google Doc. By default text is appended to the end; specify an index to insert at a specific position.",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Update document {{document_id}} with new text",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["document_id", "text"],
+					"required": ["document_id", "content"],
 					"properties": {
 						"document_id": {
 							"type": "string",
 							"description": "The ID of the Google Doc to update (e.g. '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms')",
 							"x-ui": {"label": "Document ID", "help_text": "From the Google Docs URL between /d/ and /edit"}
 						},
-						"text": {
+						"content": {
 							"type": "string",
 							"description": "Text to insert into the document",
-							"x-ui": {"label": "Text", "widget": "textarea"}
+							"x-ui": {"label": "Content", "widget": "textarea"}
 						},
 						"index": {
 							"type": "integer",
@@ -367,10 +392,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.list_documents",
-				Name:        "List Documents",
-				Description: "Search and list Google Docs from Drive",
-				RiskLevel:   "low",
+				ActionType:      "google.list_documents",
+				Name:            "List Documents",
+				Description:     "Search and list Google Docs from Drive",
+				RiskLevel:       "low",
 				DisplayTemplate: "List documents matching {{query}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -393,10 +418,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			},
 			// Chat actions
 			{
-				ActionType:  "google.create_presentation",
-				Name:        "Create Presentation",
-				Description: "Create a new Google Slides presentation",
-				RiskLevel:   "medium",
+				ActionType:      "google.create_presentation",
+				Name:            "Create Presentation",
+				Description:     "Create a new Google Slides presentation",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create presentation {{title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -411,10 +436,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.get_presentation",
-				Name:        "Get Presentation",
-				Description: "Retrieve metadata about a Google Slides presentation",
-				RiskLevel:   "low",
+				ActionType:      "google.get_presentation",
+				Name:            "Get Presentation",
+				Description:     "Retrieve metadata about a Google Slides presentation",
+				RiskLevel:       "low",
 				DisplayTemplate: "Get presentation {{presentation_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -429,10 +454,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.add_slide",
-				Name:        "Add Slide",
-				Description: "Add a new slide to an existing Google Slides presentation",
-				RiskLevel:   "medium",
+				ActionType:      "google.add_slide",
+				Name:            "Add Slide",
+				Description:     "Add a new slide to an existing Google Slides presentation",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Add {{layout}} slide to presentation",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -455,15 +480,20 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"minimum": 0,
 							"description": "Position to insert the slide at (defaults to end)",
 							"x-ui": {"label": "Position", "help_text": "0-based slide index — 0 means first slide"}
+						},
+						"title": {
+							"type": "string",
+							"description": "Optional title text to populate in the slide's title placeholder",
+							"x-ui": {"label": "Title", "placeholder": "Slide Title"}
 						}
 					}
 				}`)),
 			},
 			{
-				ActionType:  "google.send_chat_message",
-				Name:        "Send Chat Message",
-				Description: "Send a message to a Google Chat space",
-				RiskLevel:   "medium",
+				ActionType:      "google.send_chat_message",
+				Name:            "Send Chat Message",
+				Description:     "Send a message to a Google Chat space",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Send message to {{space_name}} — {{text}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -483,10 +513,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.list_chat_spaces",
-				Name:        "List Chat Spaces",
-				Description: "List Google Chat spaces accessible to the user",
-				RiskLevel:   "low",
+				ActionType:      "google.list_chat_spaces",
+				Name:            "List Chat Spaces",
+				Description:     "List Google Chat spaces accessible to the user",
+				RiskLevel:       "low",
 				DisplayTemplate: "List Google Chat spaces",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -509,10 +539,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			},
 			// Meet action
 			{
-				ActionType:  "google.create_meeting",
-				Name:        "Create Meeting",
-				Description: "Create a Google Calendar event with an auto-generated Google Meet link",
-				RiskLevel:   "medium",
+				ActionType:      "google.create_meeting",
+				Name:            "Create Meeting",
+				Description:     "Create a Google Calendar event with an auto-generated Google Meet link",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create meeting {{summary}} on {{start_time:datetime}} with {{attendees:count}} attendees",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -565,10 +595,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			},
 			// Drive actions
 			{
-				ActionType:  "google.list_drive_files",
-				Name:        "List Drive Files",
-				Description: "List or search files in Google Drive",
-				RiskLevel:   "low",
+				ActionType:      "google.list_drive_files",
+				Name:            "List Drive Files",
+				Description:     "List or search files in Google Drive",
+				RiskLevel:       "low",
 				DisplayTemplate: "List Drive files matching {{query}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -599,10 +629,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.get_drive_file",
-				Name:        "Get Drive File",
-				Description: "Get file metadata and optionally download content from Google Drive",
-				RiskLevel:   "low",
+				ActionType:      "google.get_drive_file",
+				Name:            "Get Drive File",
+				Description:     "Get file metadata and optionally download content from Google Drive",
+				RiskLevel:       "low",
 				DisplayTemplate: "Get Drive file {{file_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -623,10 +653,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.upload_drive_file",
-				Name:        "Upload Drive File",
-				Description: "Create and upload a text file to Google Drive",
-				RiskLevel:   "medium",
+				ActionType:      "google.upload_drive_file",
+				Name:            "Upload Drive File",
+				Description:     "Create and upload a text file to Google Drive",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Upload {{name}} to Drive",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -657,10 +687,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.delete_drive_file",
-				Name:        "Delete Drive File",
-				Description: "Move a file to trash in Google Drive (soft delete)",
-				RiskLevel:   "high",
+				ActionType:      "google.delete_drive_file",
+				Name:            "Delete Drive File",
+				Description:     "Move a file to trash in Google Drive (soft delete)",
+				RiskLevel:       "high",
 				DisplayTemplate: "Delete Drive file {{file_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -675,10 +705,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.update_calendar_event",
-				Name:        "Update Calendar Event",
-				Description: "Update an existing Google Calendar event (time, title, attendees, or location)",
-				RiskLevel:   "medium",
+				ActionType:      "google.update_calendar_event",
+				Name:            "Update Calendar Event",
+				Description:     "Update an existing Google Calendar event (time, title, attendees, or location)",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Update event {{event_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -745,10 +775,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.delete_calendar_event",
-				Name:        "Delete Calendar Event",
-				Description: "Delete or cancel a Google Calendar event",
-				RiskLevel:   "high",
+				ActionType:      "google.delete_calendar_event",
+				Name:            "Delete Calendar Event",
+				Description:     "Delete or cancel a Google Calendar event",
+				RiskLevel:       "high",
 				DisplayTemplate: "Delete event {{event_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -777,10 +807,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.search_drive",
-				Name:        "Search Drive",
-				Description: "Search Google Drive files by name, type, or content",
-				RiskLevel:   "low",
+				ActionType:      "google.search_drive",
+				Name:            "Search Drive",
+				Description:     "Search Google Drive files by name, type, or content",
+				RiskLevel:       "low",
 				DisplayTemplate: "Search Drive for {{query}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -813,10 +843,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.create_drive_folder",
-				Name:        "Create Drive Folder",
-				Description: "Create a new folder in Google Drive",
-				RiskLevel:   "medium",
+				ActionType:      "google.create_drive_folder",
+				Name:            "Create Drive Folder",
+				Description:     "Create a new folder in Google Drive",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Create folder {{name}} in Drive",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -836,10 +866,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.read_email",
-				Name:        "Read Email",
-				Description: "Read a single email message from Gmail by message ID, returning the full body, headers, and attachment metadata",
-				RiskLevel:   "low",
+				ActionType:      "google.read_email",
+				Name:            "Read Email",
+				Description:     "Read a single email message from Gmail by message ID, returning the full body, headers, and attachment metadata",
+				RiskLevel:       "low",
 				DisplayTemplate: "Read email {{message_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -861,10 +891,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.send_email_reply",
-				Name:        "Reply to Email",
-				Description: "Reply to an existing Gmail thread",
-				RiskLevel:   "medium",
+				ActionType:      "google.send_email_reply",
+				Name:            "Reply to Email",
+				Description:     "Reply to an existing Gmail thread",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Reply to email thread {{thread_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -889,10 +919,10 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "google.archive_email",
-				Name:        "Archive Email",
-				Description: "Archive a Gmail thread (removes all messages from inbox; still accessible via search and All Mail)",
-				RiskLevel:   "medium",
+				ActionType:      "google.archive_email",
+				Name:            "Archive Email",
+				Description:     "Archive a Gmail thread (removes all messages from inbox; still accessible via search and All Mail)",
+				RiskLevel:       "medium",
 				DisplayTemplate: "Archive email thread {{thread_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",

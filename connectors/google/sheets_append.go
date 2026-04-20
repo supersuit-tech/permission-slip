@@ -6,9 +6,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
+
+// columnOnlyRange matches ranges like "Sheet1!A:C" or "Sheet1!A:A" where the
+// column range has no row anchors. The Sheets API values.append endpoint does
+// not accept these; callers should pass just the sheet name instead.
+var columnOnlyRange = regexp.MustCompile(`^([^!]+)![A-Za-z]+:[A-Za-z]+$`)
 
 // sheetsAppendRowsAction implements connectors.Action for google.sheets_append_rows.
 // It appends rows to a sheet via the Google Sheets API
@@ -25,6 +32,16 @@ type sheetsAppendRowsParams struct {
 }
 
 // validate checks that required fields are present and values are well-formed.
+// normalizeRange converts a column-only range like "Sheet1!A:C" to just the
+// sheet name "Sheet1". values.append requires a cell anchor, not a bare column
+// span, so callers who pass "Sheet1!A:C" get the same result as "Sheet1".
+func normalizeAppendRange(r string) string {
+	if m := columnOnlyRange.FindStringSubmatch(r); m != nil {
+		return strings.TrimSpace(m[1])
+	}
+	return r
+}
+
 func (p *sheetsAppendRowsParams) validate() error {
 	if p.SpreadsheetID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: spreadsheet_id"}
@@ -62,12 +79,13 @@ func (a *sheetsAppendRowsAction) Execute(ctx context.Context, req connectors.Act
 		return nil, err
 	}
 
+	appendRange := normalizeAppendRange(params.Range)
 	appendURL := a.conn.sheetsBaseURL + "/spreadsheets/" +
 		url.PathEscape(params.SpreadsheetID) + "/values/" +
-		url.PathEscape(params.Range) + ":append?valueInputOption=USER_ENTERED"
+		url.PathEscape(appendRange) + ":append?valueInputOption=USER_ENTERED"
 
 	body := sheetsUpdateValuesRequest{
-		Range:          params.Range,
+		Range:          appendRange,
 		MajorDimension: "ROWS",
 		Values:         params.Values,
 	}
