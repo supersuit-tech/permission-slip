@@ -72,7 +72,7 @@ func (a *sheetsWriteRangeAction) Execute(ctx context.Context, req connectors.Act
 
 	var resp sheetsUpdateValuesResponse
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPut, writeURL, body, &resp); err != nil {
-		return nil, err
+		return nil, remapInvalidRangeError(ctx, a.conn, req.Credentials, params.SpreadsheetID, params.Range, err)
 	}
 
 	return connectors.JSONResult(map[string]any{

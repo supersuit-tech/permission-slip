@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
@@ -206,5 +207,116 @@ func TestSheetsAppendRows_InvalidJSON(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+// TestSheetsAppendRows_InvalidRange_ListsAvailableTabs verifies that when the
+// Google Sheets API returns "Unable to parse range" (i.e. the named tab does
+// not exist), the connector remaps it into a ValidationError that lists the
+// spreadsheet's actual tab titles. This keeps the error out of Sentry and
+// gives the agent enough context to self-correct.
+func TestSheetsAppendRows_InvalidRange_ListsAvailableTabs(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/spreadsheets/spreadsheet-999/values/Sheet1!A:C:append":
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"code": 400, "message": "Unable to parse range: Sheet1!A:C"},
+			})
+		case r.Method == http.MethodGet && r.URL.Path == "/spreadsheets/spreadsheet-999":
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(sheetsSpreadsheetResponse{
+				Sheets: []struct {
+					Properties sheetsProperties `json:"properties"`
+				}{
+					{Properties: sheetsProperties{Title: "Data"}},
+					{Properties: sheetsProperties{Title: "Summary"}},
+				},
+			})
+		default:
+			t.Errorf("unexpected request: %s %s", r.Method, r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", "", srv.URL)
+	action := &sheetsAppendRowsAction{conn: conn}
+
+	params, _ := json.Marshal(sheetsAppendRowsParams{
+		SpreadsheetID: "spreadsheet-999",
+		Range:         "Sheet1!A:C",
+		Values:        [][]any{{"a", "b", "c"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.sheets_append_rows",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid range")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Fatalf("expected ValidationError, got %T: %v", err, err)
+	}
+	msg := err.Error()
+	for _, want := range []string{`"Sheet1!A:C"`, `"Data"`, `"Summary"`} {
+		if !strings.Contains(msg, want) {
+			t.Errorf("expected error message to contain %s, got: %s", want, msg)
+		}
+	}
+}
+
+// TestSheetsAppendRows_InvalidRange_ListFailureFallsBack verifies that if
+// Google's "Unable to parse range" 400 is followed by a failed tab-list
+// lookup (e.g. permission issue), the original ExternalError is returned
+// unchanged — we never mask a genuine external failure with a misleading
+// validation message.
+func TestSheetsAppendRows_InvalidRange_ListFailureFallsBack(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"code": 400, "message": "Unable to parse range: Sheet1!A:C"},
+			})
+		case r.Method == http.MethodGet:
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(map[string]any{
+				"error": map[string]any{"code": 500, "message": "backend error"},
+			})
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", "", srv.URL)
+	action := &sheetsAppendRowsAction{conn: conn}
+
+	params, _ := json.Marshal(sheetsAppendRowsParams{
+		SpreadsheetID: "spreadsheet-999",
+		Range:         "Sheet1!A:C",
+		Values:        [][]any{{"a", "b", "c"}},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.sheets_append_rows",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if connectors.IsValidationError(err) {
+		t.Fatalf("expected original ExternalError to be preserved, got ValidationError: %v", err)
+	}
+	if !connectors.IsExternalError(err) {
+		t.Fatalf("expected ExternalError, got %T: %v", err, err)
 	}
 }

@@ -1,7 +1,12 @@
 package google
 
 import (
+	"context"
+	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -56,4 +61,58 @@ func validateValues(values [][]any) error {
 		}
 	}
 	return nil
+}
+
+// remapInvalidRangeError converts Google's "Unable to parse range" HTTP 400
+// into a ValidationError that lists the spreadsheet's actual tab titles, so
+// the agent can self-correct on the next call instead of this surfacing as
+// an opaque ExternalError (which gets captured in Sentry). For any other
+// error, or if listing the spreadsheet's tabs fails, the original error is
+// returned unchanged so we never mask a genuine external failure.
+func remapInvalidRangeError(ctx context.Context, conn *GoogleConnector, creds connectors.Credentials, spreadsheetID, rangeStr string, err error) error {
+	if err == nil {
+		return nil
+	}
+	var extErr *connectors.ExternalError
+	if !errors.As(err, &extErr) {
+		return err
+	}
+	if !strings.Contains(extErr.Message, "Unable to parse range") {
+		return err
+	}
+
+	titles, listErr := fetchSheetTitles(ctx, conn, creds, spreadsheetID)
+	if listErr != nil {
+		return err
+	}
+
+	msg := fmt.Sprintf("range %q refers to a tab that does not exist in this spreadsheet. ", rangeStr)
+	if len(titles) == 0 {
+		msg += "The spreadsheet has no worksheets."
+	} else {
+		quoted := make([]string, len(titles))
+		for i, t := range titles {
+			quoted[i] = fmt.Sprintf("%q", t)
+		}
+		msg += "Available tabs: " + strings.Join(quoted, ", ") + ". Use google.sheets_list_sheets to discover tab names."
+	}
+	return &connectors.ValidationError{Message: msg}
+}
+
+// fetchSheetTitles calls the Google Sheets API to list the tab titles in a
+// spreadsheet. It uses the same endpoint as sheetsListSheetsAction.Execute.
+func fetchSheetTitles(ctx context.Context, conn *GoogleConnector, creds connectors.Credentials, spreadsheetID string) ([]string, error) {
+	listURL := conn.sheetsBaseURL + "/spreadsheets/" +
+		url.PathEscape(spreadsheetID) +
+		"?fields=sheets.properties(title)"
+
+	var resp sheetsSpreadsheetResponse
+	if err := conn.doJSON(ctx, creds, http.MethodGet, listURL, nil, &resp); err != nil {
+		return nil, err
+	}
+	titles := make([]string, 0, len(resp.Sheets))
+	for _, s := range resp.Sheets {
+		titles = append(titles, s.Properties.Title)
+	}
+	return titles, nil
 }
