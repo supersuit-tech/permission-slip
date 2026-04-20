@@ -52,6 +52,10 @@ CREATE TRIGGER trg_agent_connectors_before_insert
     FOR EACH ROW
     EXECUTE FUNCTION trg_agent_connectors_before_insert();
 
+-- agent_connector_credentials references this PK; drop FK before PK swap (re-added in next migration).
+ALTER TABLE agent_connector_credentials
+    DROP CONSTRAINT IF EXISTS agent_connector_credentials_agent_id_connector_id_fkey;
+
 ALTER TABLE agent_connectors DROP CONSTRAINT agent_connectors_pkey;
 
 ALTER TABLE agent_connectors

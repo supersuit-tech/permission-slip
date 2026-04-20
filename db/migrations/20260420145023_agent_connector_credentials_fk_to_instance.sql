@@ -14,8 +14,7 @@ WHERE acc.agent_id = ac.agent_id
 ALTER TABLE agent_connector_credentials
     ALTER COLUMN connector_instance_id SET NOT NULL;
 
-ALTER TABLE agent_connector_credentials
-    DROP CONSTRAINT agent_connector_credentials_agent_id_connector_id_fkey;
+-- Legacy FK already dropped in add_connector_instance_id_to_agent_connectors (required before PK swap).
 
 DROP INDEX IF EXISTS idx_agent_connector_credentials_unique;
 
