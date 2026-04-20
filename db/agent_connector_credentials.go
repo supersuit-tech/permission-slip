@@ -149,3 +149,30 @@ func DeleteAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, agen
 	}
 	return tag.RowsAffected() > 0, nil
 }
+
+// ListAgentConnectorCredentialsForAgentConnector returns all credential bindings for every
+// instance of this connector on the agent (used when disabling with delete_credentials).
+func ListAgentConnectorCredentialsForAgentConnector(ctx context.Context, db DBTX, agentID int64, approverID, connectorID string) ([]AgentConnectorCredential, error) {
+	rows, err := db.Query(ctx, `
+		SELECT id, agent_id, connector_id, connector_instance_id, approver_id,
+		       credential_id, oauth_connection_id, created_at
+		FROM agent_connector_credentials
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3`,
+		agentID, approverID, connectorID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []AgentConnectorCredential
+	for rows.Next() {
+		var acc AgentConnectorCredential
+		if err := rows.Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ConnectorInstanceID, &acc.ApproverID,
+			&acc.CredentialID, &acc.OAuthConnectionID, &acc.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, acc)
+	}
+	return out, rows.Err()
+}

@@ -5,11 +5,18 @@ import (
 	"errors"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
+
+// ErrAgentConnectorInstanceLabelRequired is returned when label is empty after trim.
+var ErrAgentConnectorInstanceLabelRequired = errors.New("label is required")
+
+// ErrAgentConnectorInstanceLabelTooLong is returned when label exceeds MaxAgentConnectorInstanceLabelLen runes.
+var ErrAgentConnectorInstanceLabelTooLong = errors.New("label exceeds maximum length")
 
 // AgentConnectorInstance is a row in agent_connectors (one instance of a connector type for an agent).
 type AgentConnectorInstance struct {
@@ -38,6 +45,9 @@ const (
 	AgentConnectorInstanceErrCannotDeleteDefault AgentConnectorInstanceErrCode = "cannot_delete_default_instance"
 )
 
+// MaxAgentConnectorInstanceLabelLen is the maximum rune length for instance labels (API + DB).
+const MaxAgentConnectorInstanceLabelLen = 256
+
 // CreateAgentConnectorInstanceParams holds parameters for creating a new instance (non-default row).
 type CreateAgentConnectorInstanceParams struct {
 	AgentID     int64
@@ -52,7 +62,10 @@ type CreateAgentConnectorInstanceParams struct {
 func CreateAgentConnectorInstance(ctx context.Context, db DBTX, p CreateAgentConnectorInstanceParams) (*AgentConnectorInstance, error) {
 	label := strings.TrimSpace(p.Label)
 	if label == "" {
-		return nil, errors.New("label is required")
+		return nil, ErrAgentConnectorInstanceLabelRequired
+	}
+	if utf8.RuneCountInString(label) > MaxAgentConnectorInstanceLabelLen {
+		return nil, ErrAgentConnectorInstanceLabelTooLong
 	}
 
 	var agentOK bool
@@ -75,6 +88,20 @@ func CreateAgentConnectorInstance(ctx context.Context, db DBTX, p CreateAgentCon
 	}
 	if !connOK {
 		return nil, &AgentConnectorError{Code: AgentConnectorErrConnectorNotFound}
+	}
+
+	var enabled bool
+	if err := db.QueryRow(ctx,
+		`SELECT EXISTS (
+			SELECT 1 FROM agent_connectors
+			WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
+		)`,
+		p.AgentID, p.ApproverID, p.ConnectorID,
+	).Scan(&enabled); err != nil {
+		return nil, err
+	}
+	if !enabled {
+		return nil, &AgentConnectorError{Code: AgentConnectorErrConnectorNotEnabled}
 	}
 
 	row := db.QueryRow(ctx, `
@@ -193,7 +220,10 @@ func GetDefaultAgentConnectorInstanceByAgent(ctx context.Context, db DBTX, agent
 func RenameAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID, newLabel string) (*AgentConnectorInstance, error) {
 	label := strings.TrimSpace(newLabel)
 	if label == "" {
-		return nil, errors.New("label is required")
+		return nil, ErrAgentConnectorInstanceLabelRequired
+	}
+	if utf8.RuneCountInString(label) > MaxAgentConnectorInstanceLabelLen {
+		return nil, ErrAgentConnectorInstanceLabelTooLong
 	}
 
 	row := db.QueryRow(ctx, `
@@ -219,8 +249,16 @@ func RenameAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 
 // DeleteAgentConnectorInstance removes a non-default instance and revokes instance-scoped standing approvals.
 func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID string) error {
+	tx, owned, err := BeginOrContinue(ctx, db)
+	if err != nil {
+		return err
+	}
+	if owned {
+		defer RollbackTx(ctx, tx) //nolint:errcheck // commit path clears
+	}
+
 	var isDefault bool
-	err := db.QueryRow(ctx, `
+	err = tx.QueryRow(ctx, `
 		SELECT is_default FROM agent_connectors
 		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
 		agentID, approverID, connectorID, connectorInstanceID,
@@ -235,7 +273,7 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 		return &AgentConnectorInstanceError{Code: AgentConnectorInstanceErrCannotDeleteDefault}
 	}
 
-	_, err = db.Exec(ctx, `
+	_, err = tx.Exec(ctx, `
 		UPDATE standing_approvals
 		SET status = 'revoked', revoked_at = now()
 		WHERE agent_id = $1
@@ -248,7 +286,7 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 		return err
 	}
 
-	tag, err := db.Exec(ctx, `
+	tag, err := tx.Exec(ctx, `
 		DELETE FROM agent_connectors
 		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
 		agentID, approverID, connectorID, connectorInstanceID,
@@ -258,6 +296,10 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 	}
 	if tag.RowsAffected() == 0 {
 		return &AgentConnectorInstanceError{Code: AgentConnectorInstanceErrNotFound}
+	}
+
+	if owned {
+		return CommitTx(ctx, tx)
 	}
 	return nil
 }

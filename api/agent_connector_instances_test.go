@@ -127,3 +127,66 @@ func TestPatchAgentConnectorInstance_DuplicateLabel409(t *testing.T) {
 		t.Fatalf("expected 409, got %d: %s", w2.Code, w2.Body.String())
 	}
 }
+
+func TestGetAgentConnectorInstance_InvalidUUID400(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet,
+		fmt.Sprintf("/agents/%d/connectors/%s/instances/not-a-uuid", agentID, connID), uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestDeleteAgentConnectorInstance_SecondInstance204(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{"label":"Extra"}`))
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, r1)
+	if w1.Code != http.StatusCreated {
+		t.Fatalf("create second: %d %s", w1.Code, w1.Body.String())
+	}
+	var created agentConnectorInstanceResponse
+	if err := json.Unmarshal(w1.Body.Bytes(), &created); err != nil {
+		t.Fatal(err)
+	}
+
+	rDel := authenticatedRequest(t, http.MethodDelete,
+		fmt.Sprintf("/agents/%d/connectors/%s/instances/%s", agentID, connID, created.ConnectorInstanceID), uid)
+	wDel := httptest.NewRecorder()
+	router.ServeHTTP(wDel, rDel)
+	if wDel.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", wDel.Code, wDel.Body.String())
+	}
+
+	rList := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid)
+	wList := httptest.NewRecorder()
+	router.ServeHTTP(wList, rList)
+	list := decodeInstanceList(t, wList.Body.Bytes())
+	if len(list.Data) != 1 {
+		t.Fatalf("after delete expected 1 instance, got %d", len(list.Data))
+	}
+}

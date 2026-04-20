@@ -68,6 +68,29 @@ func TestCreateAgentConnectorInstance_SecondInstance(t *testing.T) {
 	}
 }
 
+func TestCreateAgentConnectorInstance_RequiresConnectorEnabled(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	// Connector exists in catalog but is not enabled for the agent.
+
+	_, err := db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
+		AgentID:     agentID,
+		ApproverID:  uid,
+		ConnectorID: connID,
+		Label:       "First",
+	})
+	var acErr *db.AgentConnectorError
+	if !errors.As(err, &acErr) || acErr.Code != db.AgentConnectorErrConnectorNotEnabled {
+		t.Fatalf("expected connector_not_enabled, got %v", err)
+	}
+}
+
 func TestCreateAgentConnectorInstance_DuplicateLabel(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

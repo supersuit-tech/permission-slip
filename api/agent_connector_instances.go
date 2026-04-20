@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/supersuit-tech/permission-slip/connectors"
 	"github.com/supersuit-tech/permission-slip/db"
 )
@@ -127,6 +128,10 @@ func handleCreateAgentConnectorInstance(deps *Deps) http.HandlerFunc {
 			Label:       req.Label,
 		})
 		if err != nil {
+			if errors.Is(err, db.ErrAgentConnectorInstanceLabelRequired) || errors.Is(err, db.ErrAgentConnectorInstanceLabelTooLong) {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "label must be 1–256 characters"))
+				return
+			}
 			var acErr *db.AgentConnectorError
 			if errors.As(err, &acErr) {
 				switch acErr.Code {
@@ -135,6 +140,9 @@ func handleCreateAgentConnectorInstance(deps *Deps) http.HandlerFunc {
 					return
 				case db.AgentConnectorErrConnectorNotFound:
 					RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorNotFound, "Connector not found"))
+					return
+				case db.AgentConnectorErrConnectorNotEnabled:
+					RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Enable this connector for the agent before adding another instance"))
 					return
 				}
 			}
@@ -159,7 +167,27 @@ func parsePathInstanceID(w http.ResponseWriter, r *http.Request) (string, bool) 
 		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "instance_id is required"))
 		return "", false
 	}
+	if _, err := uuid.Parse(id); err != nil {
+		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "instance_id must be a valid UUID"))
+		return "", false
+	}
 	return id, true
+}
+
+// requireAgentConnectorInstance loads the instance or writes 404/500 and returns nil, false on failure.
+func requireAgentConnectorInstance(w http.ResponseWriter, r *http.Request, deps *Deps, agentID int64, userID, connectorID, instanceID string) (*db.AgentConnectorInstance, bool) {
+	inst, err := db.GetAgentConnectorInstance(r.Context(), deps.DB, agentID, userID, connectorID, instanceID)
+	if err != nil {
+		log.Printf("[%s] GetAgentConnectorInstance: %v", TraceID(r.Context()), err)
+		CaptureError(r.Context(), err)
+		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify connector instance"))
+		return nil, false
+	}
+	if inst == nil {
+		RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorInstanceNotFound, "Connector instance not found"))
+		return nil, false
+	}
+	return inst, true
 }
 
 func handleGetAgentConnectorInstance(deps *Deps) http.HandlerFunc {
@@ -182,15 +210,8 @@ func handleGetAgentConnectorInstance(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		inst, err := db.GetAgentConnectorInstance(r.Context(), deps.DB, agentID, userID, connectorID, instanceID)
-		if err != nil {
-			log.Printf("[%s] GetAgentConnectorInstance: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to get connector instance"))
-			return
-		}
-		if inst == nil {
-			RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorInstanceNotFound, "Connector instance not found"))
+		inst, instOK := requireAgentConnectorInstance(w, r, deps, agentID, userID, connectorID, instanceID)
+		if !instOK {
 			return
 		}
 		RespondJSON(w, http.StatusOK, toAgentConnectorInstanceResponse(*inst))
@@ -224,6 +245,10 @@ func handlePatchAgentConnectorInstance(deps *Deps) http.HandlerFunc {
 
 		inst, err := db.RenameAgentConnectorInstance(r.Context(), deps.DB, agentID, userID, connectorID, instanceID, req.Label)
 		if err != nil {
+			if errors.Is(err, db.ErrAgentConnectorInstanceLabelRequired) || errors.Is(err, db.ErrAgentConnectorInstanceLabelTooLong) {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "label must be 1–256 characters"))
+				return
+			}
 			var instErr *db.AgentConnectorInstanceError
 			if errors.As(err, &instErr) && instErr.Code == db.AgentConnectorInstanceErrDuplicateLabel {
 				RespondError(w, r, http.StatusConflict, Conflict(ErrConstraintViolation, "An instance with this label already exists"))
@@ -304,15 +329,7 @@ func handleAssignAgentConnectorInstanceCredential(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		inst, err := db.GetAgentConnectorInstance(r.Context(), deps.DB, agentID, userID, connectorID, instanceID)
-		if err != nil {
-			log.Printf("[%s] AssignInstanceCredential: get instance: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify connector instance"))
-			return
-		}
-		if inst == nil {
-			RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorInstanceNotFound, "Connector instance not found"))
+		if _, ok := requireAgentConnectorInstance(w, r, deps, agentID, userID, connectorID, instanceID); !ok {
 			return
 		}
 
@@ -377,15 +394,7 @@ func handleRemoveAgentConnectorInstanceCredential(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		inst, err := db.GetAgentConnectorInstance(r.Context(), deps.DB, agentID, userID, connectorID, instanceID)
-		if err != nil {
-			log.Printf("[%s] RemoveInstanceCredential: get instance: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify connector instance"))
-			return
-		}
-		if inst == nil {
-			RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorInstanceNotFound, "Connector instance not found"))
+		if _, ok := requireAgentConnectorInstance(w, r, deps, agentID, userID, connectorID, instanceID); !ok {
 			return
 		}
 
@@ -424,15 +433,7 @@ func handleGetAgentConnectorInstanceCredential(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		inst, err := db.GetAgentConnectorInstance(r.Context(), deps.DB, agentID, userID, connectorID, instanceID)
-		if err != nil {
-			log.Printf("[%s] GetInstanceCredential: get instance: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to verify connector instance"))
-			return
-		}
-		if inst == nil {
-			RespondError(w, r, http.StatusNotFound, NotFound(ErrConnectorInstanceNotFound, "Connector instance not found"))
+		if _, ok := requireAgentConnectorInstance(w, r, deps, agentID, userID, connectorID, instanceID); !ok {
 			return
 		}
 
@@ -478,6 +479,10 @@ func handleListAgentConnectorInstanceChannels(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if !requireAgentOwnership(w, r, deps, agentID, userID) {
+			return
+		}
+
+		if _, ok := requireAgentConnectorInstance(w, r, deps, agentID, userID, connectorID, instanceID); !ok {
 			return
 		}
 
@@ -569,6 +574,10 @@ func handleListAgentConnectorInstanceCalendars(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		if _, ok := requireAgentConnectorInstance(w, r, deps, agentID, userID, connectorID, instanceID); !ok {
+			return
+		}
+
 		if deps.Connectors == nil {
 			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Connectors are not available"))
 			return
@@ -654,6 +663,10 @@ func handleListAgentConnectorInstanceUsers(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if !requireAgentOwnership(w, r, deps, agentID, userID) {
+			return
+		}
+
+		if _, ok := requireAgentConnectorInstance(w, r, deps, agentID, userID, connectorID, instanceID); !ok {
 			return
 		}
 
