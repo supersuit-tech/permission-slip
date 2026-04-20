@@ -6,11 +6,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
-
-const titlePlaceholderObjectID = "ps_title_placeholder"
 
 // addSlideAction implements connectors.Action for google.add_slide.
 // It adds a new slide to an existing presentation via batchUpdate.
@@ -136,15 +135,22 @@ func (a *addSlideAction) Execute(ctx context.Context, req connectors.ActionReque
 	requests := []slidesBatchRequest{{CreateSlide: createReq}}
 
 	if params.Title != "" {
+		// Generate a unique ID per call — the Slides API requires object IDs to
+		// be unique within a presentation, so a fixed constant would fail on any
+		// second titled slide. The Google Slides API applies batchUpdate requests
+		// sequentially, so InsertText safely references the placeholder created
+		// in the preceding CreateSlide request:
+		// https://developers.google.com/slides/api/reference/rest/v1/presentations/batchUpdate
+		titleID := fmt.Sprintf("ps_title_%x", time.Now().UnixNano())
 		createReq.PlaceholderIdMappings = []slidePlaceholderIDMapping{
 			{
 				LayoutPlaceholder: slidePlaceholderRef{Type: "TITLE", Index: 0},
-				ObjectId:          titlePlaceholderObjectID,
+				ObjectId:          titleID,
 			},
 		}
 		requests = append(requests, slidesBatchRequest{
 			InsertText: &slidesInsertTextReq{
-				ObjectId: titlePlaceholderObjectID,
+				ObjectId: titleID,
 				Text:     params.Title,
 			},
 		})

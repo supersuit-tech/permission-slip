@@ -233,7 +233,7 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.update_document",
 			Name:        "Edit any document",
 			Description: "Agent can insert or append text to any Google Doc.",
-			Parameters:  json.RawMessage(`{"document_id":"*","text":"*","index":"*"}`),
+			Parameters:  json.RawMessage(`{"document_id":"*","content":"*","index":"*"}`),
 		},
 		// --- Sheets ---
 		{

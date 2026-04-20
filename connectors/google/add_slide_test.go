@@ -103,8 +103,14 @@ func TestAddSlide_WithTitle(t *testing.T) {
 		if it.Text != "Hello World" {
 			t.Errorf("expected title text 'Hello World', got %q", it.Text)
 		}
-		if it.ObjectId != titlePlaceholderObjectID {
-			t.Errorf("expected objectId %q, got %q", titlePlaceholderObjectID, it.ObjectId)
+		// The placeholder objectId must be unique per call (not a fixed constant)
+		// and must match between the mapping and the insertText request.
+		mappingID := cs.PlaceholderIdMappings[0].ObjectId
+		if it.ObjectId != mappingID {
+			t.Errorf("insertText objectId %q must match placeholderIdMapping objectId %q", it.ObjectId, mappingID)
+		}
+		if mappingID == "" {
+			t.Error("expected non-empty placeholder objectId")
 		}
 
 		w.Header().Set("Content-Type", "application/json")

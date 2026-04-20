@@ -92,7 +92,7 @@ func (a *sheetsAppendRowsAction) Execute(ctx context.Context, req connectors.Act
 
 	var resp sheetsAppendValuesResponse
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, appendURL, body, &resp); err != nil {
-		return nil, remapInvalidRangeError(ctx, a.conn, req.Credentials, params.SpreadsheetID, params.Range, err)
+		return nil, remapInvalidRangeError(ctx, a.conn, req.Credentials, params.SpreadsheetID, appendRange, err)
 	}
 
 	return connectors.JSONResult(map[string]any{
