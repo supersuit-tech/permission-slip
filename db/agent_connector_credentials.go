@@ -55,15 +55,15 @@ type UpsertAgentConnectorCredentialParams struct {
 }
 
 // UpsertAgentConnectorCredential creates or replaces the credential binding
-// for an agent+connector pair. The unique index on (agent_id, connector_id)
-// ensures at most one binding per pair.
+// for an agent+connector pair. The unique index on (agent_id, connector_id, connector_instance_id)
+// ensures at most one binding per instance; omitted instance resolves to the default via trigger.
 func UpsertAgentConnectorCredential(ctx context.Context, db DBTX, p UpsertAgentConnectorCredentialParams) (*AgentConnectorCredential, error) {
 	var acc AgentConnectorCredential
 	err := db.QueryRow(ctx, `
 		INSERT INTO agent_connector_credentials
 		    (id, agent_id, connector_id, approver_id, credential_id, oauth_connection_id)
 		VALUES ($1, $2, $3, $4, $5, $6)
-		ON CONFLICT (agent_id, connector_id) DO UPDATE
+		ON CONFLICT (agent_id, connector_id, connector_instance_id) DO UPDATE
 		    SET credential_id = EXCLUDED.credential_id,
 		        oauth_connection_id = EXCLUDED.oauth_connection_id,
 		        approver_id = EXCLUDED.approver_id
