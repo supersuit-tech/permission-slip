@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/getsentry/sentry-go"
 	"github.com/supersuit-tech/permission-slip/connectors"
@@ -107,7 +108,43 @@ func CaptureConnectorError(ctx context.Context, err error, cc ConnectorContext) 
 		if cc.AgentID != 0 {
 			scope.SetTag("agent_id", fmt.Sprintf("%d", cc.AgentID))
 		}
-		scope.SetTag("error_type", classifyConnectorError(err))
+		errorType := classifyConnectorError(err)
+		scope.SetTag("error_type", errorType)
+
+		// Fingerprint by connector + action + error class (+ status for external
+		// errors) so distinct upstream failures land in their own Sentry issues
+		// instead of collapsing into one bucket keyed only by exception type +
+		// stack trace. Without this, every ExternalError — regardless of which
+		// connector, action, or status code — merges into a single issue,
+		// making triage impossible.
+		fp := []string{"connector", errorType}
+		connID := cc.ConnectorID
+		if connID == "" && cc.ActionType != "" {
+			if derived := connectorIDFromActionType(cc.ActionType); derived != nil {
+				connID = *derived
+			}
+		}
+		if connID != "" {
+			fp = append(fp, connID)
+		}
+		if cc.ActionType != "" {
+			fp = append(fp, cc.ActionType)
+		}
+		var extErr *connectors.ExternalError
+		if errors.As(err, &extErr) {
+			fp = append(fp, strconv.Itoa(extErr.StatusCode))
+			// 4xx from an external service means the request we sent was
+			// rejected (bad params, missing resource, user-level config
+			// problem). These are worth keeping in Sentry for visibility and
+			// product-side follow-up, but they aren't backend outages and
+			// shouldn't page via error-level alert rules. 5xx stays at the
+			// default error level so genuine upstream outages still alert.
+			if extErr.StatusCode >= 400 && extErr.StatusCode < 500 {
+				scope.SetLevel(sentry.LevelWarning)
+			}
+		}
+		scope.SetFingerprint(fp)
+
 		hub.CaptureException(err)
 	})
 }
