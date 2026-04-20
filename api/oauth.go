@@ -9,8 +9,10 @@
 //     and creates an oauth_connections row
 //  6. Server redirects to /settings?oauth_status=success (or error)
 //
-// Slack uses user-token-only OAuth: the callback requires authed_user.access_token
-// and rejects exchanges that only return a bot token (misconfigured Slack app).
+// Slack uses user-token-only OAuth via the oauth.v2.user.access endpoint, which
+// returns the user token (xoxp-) at the top level. NormalizeSlackUserOAuthToken
+// remains as a defensive fallback in case a response ever comes back with the
+// token nested under authed_user (e.g., misconfigured app using oauth.v2.access).
 //
 // Security:
 //   - CSRF protection via signed JWT state tokens (HS256, 10-min TTL)
