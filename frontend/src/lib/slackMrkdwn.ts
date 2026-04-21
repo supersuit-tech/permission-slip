@@ -12,37 +12,44 @@ const SANITIZE_CONFIG = {
  * <#C123|name> → #name. Handles: *bold*, _italic_, ~strike~, `code`,
  * ```code blocks```, >blockquotes, <url|label> links, and \n → <br>.
  *
- * Code spans are extracted first and protected from mrkdwn processing via
- * null-byte placeholders, then restored before sanitization.
+ * Processing order: code extraction → link substitution → inline
+ * formatting → restore code → newlines → DOMPurify. Code spans are
+ * extracted first via null-byte placeholders so that Slack link syntax
+ * or mrkdwn markers inside code are never processed.
  *
- * Output must be rendered via dangerouslySetInnerHTML — DOMPurify is applied
- * as the final step.
+ * Output must be rendered via dangerouslySetInnerHTML — DOMPurify is
+ * applied as the final step.
  */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
 export function slackMrkdwnToHtml(text: string): string {
   const protected_: string[] = [];
 
   let html = text;
 
-  // Slack link format: <url> and <url|label>
+  // Extract code blocks (triple backtick) first — protect from all further transforms.
+  // HTML-escape the content so angle brackets inside code render as text, not tags.
+  html = html.replace(/```([\s\S]*?)```/g, (_, code: string) => {
+    const idx = protected_.length;
+    protected_.push(`<pre><code>${escapeHtml(code)}</code></pre>`);
+    return `\x00P${idx}\x00`;
+  });
+
+  // Extract inline code — same escaping treatment
+  html = html.replace(/`([^`\n]+)`/g, (_, code: string) => {
+    const idx = protected_.length;
+    protected_.push(`<code>${escapeHtml(code)}</code>`);
+    return `\x00P${idx}\x00`;
+  });
+
+  // Slack link format: <url> and <url|label> (after code extraction)
   html = html.replace(
     /<(https?:\/\/[^|>\s]+)(?:\|([^>]*))?>/g,
     (_, url: string, label?: string) =>
       `<a href="${url}" target="_blank" rel="noopener noreferrer">${label ?? url}</a>`,
   );
-
-  // Extract code blocks (triple backtick) — protect from further formatting
-  html = html.replace(/```([\s\S]*?)```/g, (_, code: string) => {
-    const idx = protected_.length;
-    protected_.push(`<pre><code>${code}</code></pre>`);
-    return `\x00P${idx}\x00`;
-  });
-
-  // Extract inline code — protect from further formatting
-  html = html.replace(/`([^`\n]+)`/g, (_, code: string) => {
-    const idx = protected_.length;
-    protected_.push(`<code>${code}</code>`);
-    return `\x00P${idx}\x00`;
-  });
 
   // Bold *text*
   html = html.replace(

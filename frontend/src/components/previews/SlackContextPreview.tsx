@@ -66,9 +66,9 @@ function FileList({ files }: { files: SlackContextFileMeta[] }) {
   if (files.length === 0) return null;
   return (
     <div className="mt-1.5 flex flex-wrap gap-1.5">
-      {files.map((f, i) => (
+      {files.map((f) => (
         <span
-          key={i}
+          key={`${f.filename}-${f.size_bytes}`}
           className="inline-flex items-center gap-1 rounded border bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground"
         >
           <Paperclip className="size-3 shrink-0" aria-hidden="true" />

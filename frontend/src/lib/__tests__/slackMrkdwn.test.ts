@@ -73,6 +73,17 @@ describe("slackMrkdwnToHtml", () => {
     expect(result).not.toContain("<strong>");
   });
 
+  it("does not convert Slack link syntax inside fenced code blocks", () => {
+    const result = slackMrkdwnToHtml("```<https://example.com|link>```");
+    expect(result).not.toContain("<a ");
+    expect(result).toContain("https://example.com");
+  });
+
+  it("does not convert Slack link syntax inside inline code", () => {
+    const result = slackMrkdwnToHtml("`<https://example.com>`");
+    expect(result).not.toContain("<a ");
+  });
+
   it("handles already-resolved mentions as plain text", () => {
     const result = slackMrkdwnToHtml("@alice and #general");
     expect(result).toContain("@alice");

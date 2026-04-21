@@ -36,6 +36,11 @@ import { CountdownBadge } from "./CountdownBadge";
 import { ApprovalActions } from "./ApprovalActions";
 import { KeyValueList, type KeyValueEntry } from "./KeyValueList";
 import { TimelineView, type TimelineEntry } from "./TimelineView";
+import { EmailThreadCard } from "./EmailThreadCard";
+import {
+  isEmailReplyAction,
+  parseEmailThreadDetails,
+} from "./emailThreadUtils";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -70,10 +75,18 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     () => Object.entries(parameters).map(([label, value]) => ({ label, value })),
     [parameters],
   );
+  const isEmailReply = isEmailReplyAction(approval.action.type);
+  const emailThread = useMemo(
+    () => parseEmailThreadDetails(approval.context.details),
+    [approval.context.details],
+  );
+
   const contextDetailEntries: KeyValueEntry[] = useMemo(() => {
     const details = safeParams(approval.context.details);
-    return Object.entries(details).map(([label, value]) => ({ label, value }));
-  }, [approval.context.details]);
+    return Object.entries(details)
+      .filter(([label]) => !(isEmailReply && label === "email_thread"))
+      .map(([label, value]) => ({ label, value }));
+  }, [approval.context.details, isEmailReply]);
 
   const isPending = approval.status === "pending" && !isApproved && !isDenied;
   const expired = checkExpired(approval.status, approval.expires_at);
@@ -279,6 +292,12 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             <View style={styles.cardElevated}>
               <KeyValueList entries={paramEntries} />
             </View>
+          </View>
+        )}
+
+        {isEmailReply && (
+          <View style={styles.sectionMajor}>
+            <EmailThreadCard thread={emailThread} testID="email-thread-card" />
           </View>
         )}
 
