@@ -8,15 +8,6 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
-type mockCreds struct{}
-
-func (mockCreds) Get(key string) (string, bool) {
-	if key == "access_token" {
-		return "xoxp-test", true
-	}
-	return "", false
-}
-
 type mockAPI struct {
 	mu sync.Mutex
 
@@ -80,4 +71,8 @@ func copyInto(dest any, src any) error {
 		return err
 	}
 	return json.Unmarshal(b, dest)
+}
+
+func testSlackCredentials() connectors.Credentials {
+	return connectors.NewCredentials(map[string]string{"access_token": "xoxp-test"})
 }

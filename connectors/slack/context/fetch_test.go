@@ -46,7 +46,7 @@ func TestFetchRecentMessages_WindowAndAnchor(t *testing.T) {
 		}, nil
 	}
 
-	msgs, err := FetchRecentMessages(context.Background(), api, "C1", mockCreds{}, nil, RecentMessagesOpts{AnchorTS: tsMid}, nil)
+	msgs, err := FetchRecentMessages(context.Background(), api, "C1", testSlackCredentials(), nil, RecentMessagesOpts{AnchorTS: tsMid}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func TestFetchThread_Truncation(t *testing.T) {
 			}{ID: params["user"], Name: "alice"},
 		}, nil
 	}
-	parent, replies, truncated, err := FetchThread(context.Background(), api, "C1", "10.0", mockCreds{}, nil, nil)
+	parent, replies, truncated, err := FetchThread(context.Background(), api, "C1", "10.0", testSlackCredentials(), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -106,7 +106,7 @@ func TestFetchDMHistory_SelfAndFirstContact(t *testing.T) {
 	api := newMockAPI()
 	api.authTest.UserID = "U_PEER"
 
-	sent, msgs, ch, err := FetchDMHistory(context.Background(), api, "U_PEER", mockCreds{}, nil, nil)
+	sent, msgs, ch, err := FetchDMHistory(context.Background(), api, "U_PEER", testSlackCredentials(), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -123,7 +123,7 @@ func TestFetchDMHistory_SelfAndFirstContact(t *testing.T) {
 	api.postHandlers["conversations.history"] = func(body json.RawMessage) (any, error) {
 		return messagesResponse{slackResponse: slackResponse{OK: true}, Messages: nil}, nil
 	}
-	sent, msgs, ch, err = FetchDMHistory(context.Background(), api, "U_PEER", mockCreds{}, nil, nil)
+	sent, msgs, ch, err = FetchDMHistory(context.Background(), api, "U_PEER", testSlackCredentials(), nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -138,7 +138,7 @@ func TestHandleRateLimit_FromFetch(t *testing.T) {
 	api.postHandlers["conversations.history"] = func(body json.RawMessage) (any, error) {
 		return nil, &connectors.RateLimitError{Message: "nope"}
 	}
-	_, err := FetchRecentMessages(context.Background(), api, "C1", mockCreds{}, nil, RecentMessagesOpts{}, nil)
+	_, err := FetchRecentMessages(context.Background(), api, "C1", testSlackCredentials(), nil, RecentMessagesOpts{}, nil)
 	sc, ok := HandleRateLimit(err)
 	if !ok || sc.ContextScope != ScopeMetadataOnly {
 		t.Fatalf("HandleRateLimit after fetch: %v %v", sc, ok)

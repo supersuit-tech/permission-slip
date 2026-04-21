@@ -58,7 +58,7 @@ func TestResolveMentions(t *testing.T) {
 	}
 
 	in := "Hi <@U1> in <#C9|ignored> <!here>"
-	out, err := ResolveMentions(context.Background(), in, api, mockCreds{}, &MentionCache{})
+	out, err := ResolveMentions(context.Background(), in, api, testSlackCredentials(), &MentionCache{})
 	if err != nil {
 		t.Fatal(err)
 	}
