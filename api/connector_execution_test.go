@@ -887,7 +887,7 @@ func TestExecuteConnectorAction_UsesConnectorInstanceIDWhenProvided(t *testing.T
 	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 	inst, err := db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
-		AgentID: agentID, ApproverID: uid, ConnectorID: connID, Label: "Other",
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
 	})
 	if err != nil {
 		t.Fatalf("create instance: %v", err)

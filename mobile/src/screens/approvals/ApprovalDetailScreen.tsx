@@ -82,7 +82,10 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const summary = buildActionSummary(approval.action.type, parameters, undefined, approval.resource_details as Record<string, unknown> | undefined);
   const actionName = humanizeActionType(approval.action.type);
   const instanceLabel = connectorInstanceLabelFromAction(
-    approval.action as { _connector_instance_label?: unknown },
+    approval.action as {
+      _connector_instance_display?: unknown;
+      _connector_instance_label?: unknown;
+    },
   );
   const connectorDisplayName = instanceLabel
     ? `${humanizeConnectorPrefix(approval.action.type)} (${instanceLabel})`

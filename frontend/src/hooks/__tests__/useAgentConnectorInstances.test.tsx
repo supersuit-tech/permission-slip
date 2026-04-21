@@ -12,7 +12,6 @@ import {
 import {
   useAgentConnectorInstances,
   useCreateAgentConnectorInstance,
-  useRenameAgentConnectorInstance,
   useSetDefaultAgentConnectorInstance,
   useDeleteAgentConnectorInstance,
 } from "../useAgentConnectorInstances";
@@ -38,7 +37,7 @@ describe("useAgentConnectorInstances", () => {
             connector_instance_id: "11111111-1111-1111-1111-111111111111",
             agent_id: 1,
             connector_id: "slack",
-            label: "Main",
+            display: "Main",
             is_default: true,
             enabled_at: "2026-01-01T00:00:00Z",
           },
@@ -54,7 +53,7 @@ describe("useAgentConnectorInstances", () => {
     await waitFor(() => {
       expect(result.current.instances).toHaveLength(1);
     });
-    expect(result.current.instances[0]?.label).toBe("Main");
+    expect(result.current.instances[0]?.display).toBe("Main");
     expect(mockGet).toHaveBeenCalledWith(
       "/v1/agents/{agent_id}/connectors/{connector_id}/instances",
       expect.objectContaining({
@@ -63,7 +62,7 @@ describe("useAgentConnectorInstances", () => {
     );
   });
 
-  it("create posts label", async () => {
+  it("create posts empty body", async () => {
     mockPost.mockResolvedValue({ data: {} });
     const { result } = renderHook(() => useCreateAgentConnectorInstance(), {
       wrapper,
@@ -73,14 +72,13 @@ describe("useAgentConnectorInstances", () => {
       await result.current.create({
         agentId: 1,
         connectorId: "slack",
-        label: "Sales",
       });
     });
 
     expect(mockPost).toHaveBeenCalledWith(
       "/v1/agents/{agent_id}/connectors/{connector_id}/instances",
       expect.objectContaining({
-        body: { label: "Sales" },
+        body: {},
         params: { path: { agent_id: 1, connector_id: "slack" } },
       }),
     );
@@ -112,29 +110,6 @@ describe("useAgentConnectorInstances", () => {
             instance_id: "22222222-2222-2222-2222-222222222222",
           },
         },
-      }),
-    );
-  });
-
-  it("rename patches label", async () => {
-    mockPatch.mockResolvedValue({ data: {} });
-    const { result } = renderHook(() => useRenameAgentConnectorInstance(), {
-      wrapper,
-    });
-
-    await act(async () => {
-      await result.current.rename({
-        agentId: 1,
-        connectorId: "slack",
-        instanceId: "11111111-1111-1111-1111-111111111111",
-        label: "Renamed",
-      });
-    });
-
-    expect(mockPatch).toHaveBeenCalledWith(
-      "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}",
-      expect.objectContaining({
-        body: { label: "Renamed" },
       }),
     );
   });

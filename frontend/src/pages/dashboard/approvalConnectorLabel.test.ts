@@ -2,12 +2,12 @@ import { describe, expect, it } from "vitest";
 import { formatConnectorDisplayName } from "./approvalConnectorLabel";
 
 describe("formatConnectorDisplayName", () => {
-  it("appends instance label in parentheses when present", () => {
+  it("appends instance display in parentheses when present", () => {
     expect(
       formatConnectorDisplayName({
         connectorName: "Slack",
         actionType: "slack.send_message",
-        instanceLabel: "Engineering",
+        instanceDisplay: "Engineering",
       }),
     ).toBe("Slack (Engineering)");
   });
@@ -17,9 +17,19 @@ describe("formatConnectorDisplayName", () => {
       formatConnectorDisplayName({
         connectorName: null,
         actionType: "slack.send_message",
-        instanceLabel: "Engineering",
+        instanceDisplay: "Engineering",
       }),
     ).toBe("Slack (Engineering)");
+  });
+
+  it("falls back to legacy instanceLabel when display is absent", () => {
+    expect(
+      formatConnectorDisplayName({
+        connectorName: "Slack",
+        actionType: "slack.send_message",
+        instanceLabel: "Legacy",
+      }),
+    ).toBe("Slack (Legacy)");
   });
 
   it("uses connector name only when no instance label", () => {

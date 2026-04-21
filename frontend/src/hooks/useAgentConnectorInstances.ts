@@ -43,11 +43,9 @@ export function useCreateAgentConnectorInstance() {
     mutationFn: async ({
       agentId,
       connectorId,
-      label,
     }: {
       agentId: number;
       connectorId: string;
-      label: string;
     }) => {
       if (!accessToken) throw new Error("Missing access token");
       const { data, error } = await client.POST(
@@ -55,7 +53,7 @@ export function useCreateAgentConnectorInstance() {
         {
           headers: { Authorization: `Bearer ${accessToken}` },
           params: { path: { agent_id: agentId, connector_id: connectorId } },
-          body: { label },
+          body: {},
         },
       );
       if (error) {
@@ -82,74 +80,6 @@ export function useCreateAgentConnectorInstance() {
 
   return {
     create: mutation.mutateAsync,
-    isPending: mutation.isPending,
-  };
-}
-
-export function useRenameAgentConnectorInstance() {
-  const { session } = useAuth();
-  const accessToken = session?.access_token;
-  const queryClient = useQueryClient();
-
-  const mutation = useMutation({
-    mutationFn: async ({
-      agentId,
-      connectorId,
-      instanceId,
-      label,
-    }: {
-      agentId: number;
-      connectorId: string;
-      instanceId: string;
-      label: string;
-    }) => {
-      if (!accessToken) throw new Error("Missing access token");
-      const { data, error } = await client.PATCH(
-        "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}",
-        {
-          headers: { Authorization: `Bearer ${accessToken}` },
-          params: {
-            path: {
-              agent_id: agentId,
-              connector_id: connectorId,
-              instance_id: instanceId,
-            },
-          },
-          body: { label },
-        },
-      );
-      if (error) {
-        const msg =
-          (error as { error?: { message?: string } }).error?.message ??
-          "Failed to rename instance";
-        throw new Error(msg);
-      }
-      return data;
-    },
-    onSuccess: (_data, variables) => {
-      queryClient.invalidateQueries({
-        queryKey: ["agent-connector-instances", variables.agentId, variables.connectorId],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [
-          "agent-connector-instance-credential",
-          variables.agentId,
-          variables.connectorId,
-          variables.instanceId,
-        ],
-      });
-      queryClient.invalidateQueries({
-        queryKey: [
-          "connector-instance-bindings-summary",
-          variables.agentId,
-          variables.connectorId,
-        ],
-      });
-    },
-  });
-
-  return {
-    rename: mutation.mutateAsync,
     isPending: mutation.isPending,
   };
 }

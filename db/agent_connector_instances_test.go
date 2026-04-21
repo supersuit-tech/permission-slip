@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -30,9 +31,6 @@ func TestListAgentConnectorInstances_DefaultOnly(t *testing.T) {
 	if !instances[0].IsDefault {
 		t.Error("expected first instance to be default")
 	}
-	if instances[0].Label == "" {
-		t.Error("expected non-empty label")
-	}
 }
 
 func TestCreateAgentConnectorInstance_SecondInstance(t *testing.T) {
@@ -50,7 +48,6 @@ func TestCreateAgentConnectorInstance_SecondInstance(t *testing.T) {
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "Second",
 	})
 	if err != nil {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)
@@ -83,7 +80,6 @@ func TestCreateAgentConnectorInstance_RequiresConnectorEnabled(t *testing.T) {
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "First",
 	})
 	var acErr *db.AgentConnectorError
 	if !errors.As(err, &acErr) || acErr.Code != db.AgentConnectorErrConnectorNotEnabled {
@@ -107,7 +103,6 @@ func TestSetDefaultAgentConnectorInstance_SwitchesDefault(t *testing.T) {
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "Sales",
 	})
 	if err != nil {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)
@@ -137,13 +132,14 @@ func TestSetDefaultAgentConnectorInstance_SwitchesDefault(t *testing.T) {
 		t.Fatalf("default after: err=%v inst=%v", err, def2)
 	}
 	if def2.ConnectorInstanceID != inst2.ConnectorInstanceID {
-		t.Fatalf("expected Sales instance default, got %s", def2.ConnectorInstanceID)
+		t.Fatalf("expected second instance to become default, got %s", def2.ConnectorInstanceID)
 	}
 }
 
-func TestCreateAgentConnectorInstance_DuplicateLabel(t *testing.T) {
+func TestResolveAgentConnectorInstance_AmbiguousDisplay(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
 
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -152,20 +148,53 @@ func TestCreateAgentConnectorInstance_DuplicateLabel(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	defaultInst, err := db.GetDefaultAgentConnectorInstance(t.Context(), tx, agentID, uid, connID)
-	if err != nil || defaultInst == nil {
-		t.Fatalf("default instance: err=%v inst=%v", err, defaultInst)
+	inst2, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
+	})
+	if err != nil {
+		t.Fatalf("CreateAgentConnectorInstance: %v", err)
 	}
 
-	_, err = db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
-		AgentID:     agentID,
-		ApproverID:  uid,
-		ConnectorID: connID,
-		Label:       defaultInst.Label,
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default: %v", defInst)
+	}
+
+	// Two OAuth connections with the same extra_data->>'name' (credentials cannot duplicate label per user+service).
+	oauth1 := testhelper.GenerateID(t, "oauth_")
+	oauth2 := testhelper.GenerateID(t, "oauth_")
+	sharedName, _ := json.Marshal(map[string]string{"name": "SharedOAuthName"})
+	testhelper.InsertOAuthConnectionFull(t, tx, oauth1, uid, "test_oauth", testhelper.OAuthConnectionOpts{
+		Scopes:    []string{},
+		ExtraData: sharedName,
 	})
+	testhelper.InsertOAuthConnectionFull(t, tx, oauth2, uid, "test_oauth", testhelper.OAuthConnectionOpts{
+		Scopes:    []string{},
+		ExtraData: sharedName,
+	})
+
+	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "acc_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, OAuthConnectionID: &oauth1,
+	})
+	if err != nil {
+		t.Fatalf("bind default: %v", err)
+	}
+	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "acc_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: inst2.ConnectorInstanceID, ApproverID: uid, OAuthConnectionID: &oauth2,
+	})
+	if err != nil {
+		t.Fatalf("bind second: %v", err)
+	}
+
+	_, err = db.ResolveAgentConnectorInstance(ctx, tx, agentID, uid, connID, "SharedOAuthName")
 	var instErr *db.AgentConnectorInstanceError
-	if !errors.As(err, &instErr) || instErr.Code != db.AgentConnectorInstanceErrDuplicateLabel {
-		t.Fatalf("expected duplicate label error, got %v", err)
+	if !errors.As(err, &instErr) || instErr.Code != db.AgentConnectorInstanceErrAmbiguousDisplay {
+		t.Fatalf("expected ambiguous display error, got %v", err)
+	}
+	if len(instErr.AmbiguousInstanceIDs) != 2 {
+		t.Fatalf("expected 2 ids, got %v", instErr.AmbiguousInstanceIDs)
 	}
 }
 
@@ -187,7 +216,6 @@ func TestFindActiveStandingApprovalsForAgent_FiltersByInstance(t *testing.T) {
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "Sales",
 	})
 	if err != nil {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)
@@ -249,7 +277,6 @@ func TestDeleteAgentConnectorInstance_RevokesInstanceScopedStandingApproval(t *t
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "ToDelete",
 	})
 	if err != nil {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)

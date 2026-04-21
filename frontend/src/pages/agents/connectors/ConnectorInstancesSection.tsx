@@ -1,14 +1,5 @@
 import { useMemo, useState } from "react";
-import {
-  Check,
-  Loader2,
-  Pencil,
-  Plus,
-  Settings,
-  Star,
-  Trash2,
-  Unplug,
-} from "lucide-react";
+import { Loader2, Plus, Settings, Star, Trash2, Unplug } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,7 +10,6 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Dialog,
@@ -38,7 +28,6 @@ import { serviceLabel } from "@/lib/labels";
 import {
   useAgentConnectorInstances,
   useCreateAgentConnectorInstance,
-  useRenameAgentConnectorInstance,
   useDeleteAgentConnectorInstance,
   useSetDefaultAgentConnectorInstance,
   type AgentConnectorInstance,
@@ -73,7 +62,6 @@ export function ConnectorInstancesSection({
   );
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
-  const [newLabel, setNewLabel] = useState("");
 
   useAutoAssignOAuthCredential(agentId, connectorId);
 
@@ -120,15 +108,9 @@ export function ConnectorInstancesSection({
   const showManageButton = hasRequiredCredentials || !!matchingProvider;
 
   async function handleAddInstance() {
-    const label = newLabel.trim();
-    if (!label) {
-      toast.error("Enter a label for the new instance.");
-      return;
-    }
     try {
-      await create({ agentId, connectorId, label });
-      toast.success("Connector instance added.");
-      setNewLabel("");
+      await create({ agentId, connectorId });
+      toast.success("Connector instance added. Assign a credential to name it.");
       setAddOpen(false);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed to add instance.");
@@ -202,22 +184,11 @@ export function ConnectorInstancesSection({
           <DialogHeader>
             <DialogTitle>Add connector instance</DialogTitle>
             <DialogDescription>
-              Choose a unique label (for example a Slack workspace name). You
-              can connect a credential after the instance is created.
+              Creates another slot for this connector. After you add it, assign a
+              credential on that instance&apos;s card in the list (below this dialog)
+              so it has a name in approvals and capabilities.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-            <Label htmlFor="new-instance-label">Label</Label>
-            <Input
-              id="new-instance-label"
-              value={newLabel}
-              onChange={(e) => setNewLabel(e.target.value)}
-              placeholder="e.g. Engineering Slack"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") void handleAddInstance();
-              }}
-            />
-          </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setAddOpen(false)}>
               Cancel
@@ -269,40 +240,17 @@ function InstanceCard({
   connections: OAuthConnection[];
   anyLoading: boolean;
 }) {
-  const [editing, setEditing] = useState(false);
-  const [labelDraft, setLabelDraft] = useState(instance.label);
   const [deleteOpen, setDeleteOpen] = useState(false);
 
-  const { rename, isPending: renaming } = useRenameAgentConnectorInstance();
   const { setDefault, isPending: settingDefault } =
     useSetDefaultAgentConnectorInstance();
   const { deleteInstance, isPending: deleting } =
     useDeleteAgentConnectorInstance();
 
-  const isBusy = renaming || settingDefault || deleting;
-
-  async function commitRename() {
-    const next = labelDraft.trim();
-    if (!next || next === instance.label) {
-      setLabelDraft(instance.label);
-      setEditing(false);
-      return;
-    }
-    try {
-      await rename({
-        agentId,
-        connectorId,
-        instanceId: instance.connector_instance_id,
-        label: next,
-      });
-      toast.success("Instance renamed.");
-      setEditing(false);
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to rename.");
-      setLabelDraft(instance.label);
-      setEditing(false);
-    }
-  }
+  const isBusy = settingDefault || deleting;
+  const displayName =
+    instance.display?.trim() ||
+    "Unnamed instance — assign a credential";
 
   async function handleMakeDefault() {
     try {
@@ -338,55 +286,12 @@ function InstanceCard({
       <div className="rounded-lg border p-4">
         <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
           <div className="min-w-0 flex-1">
-            {editing ? (
-              <div className="flex flex-wrap items-center gap-2">
-                <Input
-                  value={labelDraft}
-                  onChange={(e) => setLabelDraft(e.target.value)}
-                  className="max-w-md"
-                  disabled={renaming}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void commitRename();
-                    if (e.key === "Escape") {
-                      setLabelDraft(instance.label);
-                      setEditing(false);
-                    }
-                  }}
-                  autoFocus
-                />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => void commitRename()}
-                  disabled={renaming}
-                >
-                  <Check className="size-4" />
-                  Save
-                </Button>
-              </div>
-            ) : (
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="font-medium">{instance.label}</p>
-                {instance.is_default && (
-                  <Badge variant="secondary">Default</Badge>
-                )}
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="size-8"
-                  onClick={() => {
-                    setLabelDraft(instance.label);
-                    setEditing(true);
-                  }}
-                  disabled={isBusy}
-                  aria-label="Rename instance"
-                >
-                  <Pencil className="size-3.5" />
-                </Button>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="font-medium">{displayName}</p>
+              {instance.is_default && (
+                <Badge variant="secondary">Default</Badge>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1 text-xs">
               Added {new Date(instance.enabled_at).toLocaleString()}
             </p>
@@ -435,7 +340,7 @@ function InstanceCard({
           <DialogHeader>
             <DialogTitle>Remove this instance?</DialogTitle>
             <DialogDescription>
-              This removes the <strong>{instance.label}</strong> instance and its
+              This removes the <strong>{displayName}</strong> instance and its
               credential binding. Standing approvals scoped to this instance are
               revoked. The default instance cannot be removed here — disable the
               connector type instead.
