@@ -1,5 +1,5 @@
 /**
- * permission-slip request --action <action_id> [--params '{}'] [--server <url>]
+ * permission-slip request --action <action_id> [--instance <name_or_uuid>] [--params '{}'] [--server <url>]
  *
  * Requests approval for an action. If a matching standing approval exists,
  * the action is auto-approved and executed immediately — the result is
@@ -13,12 +13,21 @@ import { resolveAgentId } from "./status.js";
 import { resolveServerUrl, isBuiltInDefaultServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
+import {
+  mergeParamsWithConnectorInstance,
+  parseAvailableInstances,
+} from "../util/connectorInstance.js";
+import { promptConnectorInstanceChoice } from "../util/promptConnectorInstance.js";
 
 export function requestCommand(program: Command): void {
   program
     .command("request")
     .description("Request approval for an action (auto-approves if a standing approval matches)")
     .requiredOption("--action <action_id>", "Action type (e.g. email.send)")
+    .option(
+      "--instance <name_or_uuid>",
+      "Connector instance (UUID or display name); merged into parameters as connector_instance",
+    )
     .option("--params <json>", "Action parameters as JSON string", "{}")
     .option("--description <text>", "Human-readable description of the action")
     .option("--risk-level <level>", "Risk level: low, medium, high")
@@ -33,6 +42,7 @@ export function requestCommand(program: Command): void {
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       action: string;
+      instance?: string;
       params: string;
       description?: string;
       riskLevel?: string;
@@ -53,6 +63,14 @@ export function requestCommand(program: Command): void {
           throw new Error(`--params must be valid JSON. Got: ${opts.params}`);
         }
 
+        // Snapshot before --instance merge so interactive retry can merge a picked UUID into the same base object.
+        const paramsBeforeInstance: unknown = JSON.parse(opts.params);
+
+        const instanceFlag = opts.instance?.trim();
+        if (instanceFlag) {
+          params = mergeParamsWithConnectorInstance(params, instanceFlag);
+        }
+
         const agentId = resolveAgentId(server, opts.agentId);
         const client = new ApiClient({ serverUrl: server, agentId });
 
@@ -64,20 +82,54 @@ export function requestCommand(program: Command): void {
               }
             : undefined;
 
-        const result = await client.requestApproval(
-          opts.action,
-          params,
-          context,
-          { paymentMethodId: opts.paymentMethodId, amountCents: opts.amountCents },
-          opts.requestId,
-        );
+        const send = async (p: unknown) =>
+          client.requestApproval(
+            opts.action,
+            p,
+            context,
+            { paymentMethodId: opts.paymentMethodId, amountCents: opts.amountCents },
+            opts.requestId,
+          );
+
+        const tryRecoverConnectorInstance = async (
+          err: PermissionSlipApiError,
+        ): Promise<Awaited<ReturnType<ApiClient["requestApproval"]>> | null> => {
+          if (err.statusCode !== 400 || err.apiError.code !== "connector_instance_required") {
+            return null;
+          }
+          if (!process.stdin.isTTY || instanceFlag) {
+            return null;
+          }
+          const list = parseAvailableInstances(err.apiError.details);
+          if (list.length === 0) {
+            return null;
+          }
+          const chosen = await promptConnectorInstanceChoice(list);
+          if (!chosen) {
+            return null;
+          }
+          return send(mergeParamsWithConnectorInstance(paramsBeforeInstance, chosen));
+        };
+
+        let result: Awaited<ReturnType<ApiClient["requestApproval"]>>;
+        try {
+          result = await send(params);
+        } catch (firstErr) {
+          if (firstErr instanceof PermissionSlipApiError) {
+            const recovered = await tryRecoverConnectorInstance(firstErr);
+            if (recovered !== null) {
+              result = recovered;
+            } else {
+              throw firstErr;
+            }
+          } else {
+            throw firstErr;
+          }
+        }
 
         if (result.status === "approved") {
-          // Auto-approved via standing approval — action already executed, result is inline.
-          // Include executed flag so external tools know no further action is needed.
           output({ ...result, executed: true }, outputOpts);
         } else {
-          // Pending — tell the user how to check the result.
           output(
             {
               ...result,
