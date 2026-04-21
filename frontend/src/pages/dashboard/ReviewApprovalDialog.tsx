@@ -26,6 +26,8 @@ import {
   EMAIL_REPLY_ACTION_TYPES,
   parseEmailThreadFromDetails,
 } from "@/components/previews/EmailThreadPreview";
+import { SlackContextPreview } from "@/components/previews/SlackContextPreview";
+import type { components } from "@/api/schema";
 import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
 import {
   useCountdown,
@@ -169,6 +171,13 @@ export function ReviewApprovalDialog({
     [approval.context.details],
   );
   const showEmailThreadPreview = EMAIL_REPLY_ACTION_TYPES.has(approval.action.type);
+
+  const slackContext = useMemo(
+    () =>
+      (approval.context.details as Record<string, unknown> | undefined)
+        ?.slack_context as components["schemas"]["SlackContext"] | undefined,
+    [approval.context.details],
+  );
 
   // Auto-close dialog after successful approval (never while the nested standing-approval
   // wizard is open — a render with isApproved true before autoCloseBlocked flips true
@@ -377,6 +386,7 @@ export function ReviewApprovalDialog({
                     displayTemplate={displayTemplate}
                     resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
                   />
+                  {slackContext && <SlackContextPreview slackContext={slackContext} />}
                 </>
               )}
             </div>
