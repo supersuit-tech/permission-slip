@@ -5,7 +5,7 @@
  * without API calls so Storybook stays offline.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { Star } from "lucide-react";
+import { Settings, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -69,7 +69,8 @@ function ConnectorInstancesSectionLayoutMirror() {
         </div>
 
         <div className="mt-4 flex justify-end">
-          <Button variant="outline" size="sm" type="button">
+          <Button type="button" variant="outline" size="sm">
+            <Settings className="size-3" />
             Manage credentials
           </Button>
         </div>

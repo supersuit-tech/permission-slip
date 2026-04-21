@@ -464,6 +464,7 @@ export function ConnectorInstancesSection({
         {showManageButton && (
           <div className="mt-4 flex justify-end">
             <Button
+              type="button"
               variant="outline"
               size="sm"
               onClick={() => setManageDialogOpen(true)}
