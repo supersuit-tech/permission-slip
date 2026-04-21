@@ -347,17 +347,33 @@ describe("SlackContextPreview", () => {
     expect(hasTestId(renderer, "recent-messages-list")).toBe(true);
   });
 
-  it("shows label with message count and hours", async () => {
+  it("shows channel label with message count and hours", async () => {
     await act(async () => {
       renderer = render(
         makeContext({
+          context_scope: "recent_channel",
           recent_messages: [MESSAGE, BOT_MESSAGE],
           context_window: { message_count: 2, hours: 24 },
         }),
       );
     });
+    expect(textContent(renderer)).toContain("Channel activity");
     expect(textContent(renderer)).toContain("last 24h");
     expect(textContent(renderer)).toContain("2 messages");
+  });
+
+  it("shows DM label for recent_dm scope", async () => {
+    await act(async () => {
+      renderer = render(
+        makeContext({
+          context_scope: "recent_dm",
+          recent_messages: [MESSAGE],
+          context_window: { message_count: 1, hours: 24 },
+        }),
+      );
+    });
+    expect(textContent(renderer)).toContain("DM activity");
+    expect(textContent(renderer)).not.toContain("Channel activity");
   });
 
   // --- missing fields ---

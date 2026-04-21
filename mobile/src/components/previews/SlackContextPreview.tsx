@@ -74,6 +74,7 @@ export function SlackContextPreview({ slackContext }: Props) {
       {recent_messages && recent_messages.length > 0 && (
         <RecentMessagesSection
           messages={recent_messages}
+          contextScope={context_scope}
           contextWindow={context_window}
         />
       )}
@@ -260,14 +261,16 @@ function ThreadSection({ thread }: { thread: SlackContextThread }) {
 
 function RecentMessagesSection({
   messages,
+  contextScope,
   contextWindow,
 }: {
   messages: SlackContextMessage[];
+  contextScope: SlackContext["context_scope"];
   contextWindow?: SlackContextWindow;
 }) {
   const [expanded, setExpanded] = useState(false);
 
-  const label = buildRecentLabel(messages.length, contextWindow);
+  const label = buildRecentLabel(messages.length, contextScope, contextWindow);
 
   return (
     <View style={styles.section} testID="recent-messages-section">
@@ -383,10 +386,12 @@ function getAvatarColors(name: string): { bg: string; text: string } {
 
 function buildRecentLabel(
   count: number,
+  contextScope: SlackContext["context_scope"],
   contextWindow?: SlackContextWindow,
 ): string {
   const hours = contextWindow?.hours ?? 24;
-  return `Channel activity in the last ${hours}h (${count} message${count !== 1 ? "s" : ""})`;
+  const prefix = contextScope === "recent_dm" ? "DM activity" : "Channel activity";
+  return `${prefix} in the last ${hours}h (${count} message${count !== 1 ? "s" : ""})`;
 }
 
 // ---------------------------------------------------------------------------
