@@ -36,6 +36,8 @@ import { CountdownBadge } from "./CountdownBadge";
 import { ApprovalActions } from "./ApprovalActions";
 import { KeyValueList, type KeyValueEntry } from "./KeyValueList";
 import { TimelineView, type TimelineEntry } from "./TimelineView";
+import { SlackContextPreview } from "../../components/previews/SlackContextPreview";
+import type { components } from "../../api/schema";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -70,9 +72,16 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     () => Object.entries(parameters).map(([label, value]) => ({ label, value })),
     [parameters],
   );
+  const slackContext = useMemo(() => {
+    const details = approval.context.details as { slack_context?: components["schemas"]["SlackContext"] } | undefined;
+    return details?.slack_context ?? null;
+  }, [approval.context.details]);
+
   const contextDetailEntries: KeyValueEntry[] = useMemo(() => {
     const details = safeParams(approval.context.details);
-    return Object.entries(details).map(([label, value]) => ({ label, value }));
+    // Exclude slack_context — rendered by SlackContextPreview below
+    const { slack_context: _sc, ...rest } = details;
+    return Object.entries(rest).map(([label, value]) => ({ label, value }));
   }, [approval.context.details]);
 
   const isPending = approval.status === "pending" && !isApproved && !isDenied;
@@ -279,6 +288,14 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             <View style={styles.cardElevated}>
               <KeyValueList entries={paramEntries} />
             </View>
+          </View>
+        )}
+
+        {/* Slack context — rich preview for Slack connector actions */}
+        {slackContext && (
+          <View style={styles.sectionMajor}>
+            <Text style={styles.sectionLabel}>Slack Context</Text>
+            <SlackContextPreview slackContext={slackContext} />
           </View>
         )}
 
