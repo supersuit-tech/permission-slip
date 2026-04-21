@@ -245,7 +245,7 @@ func TestExecuteConnectorAction_OAuthPath_Success(t *testing.T) {
 		t.Fatalf("update tokens: %v", err)
 	}
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestExecuteConnectorAction_OAuthPath_NoConnection_NoBinding(t *testing.T) {
 		// No Connection — no binding will be created either.
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error when no credential binding exists")
 	}
@@ -295,7 +295,7 @@ func TestExecuteConnectorAction_OAuth_NoBinding_ReturnsError(t *testing.T) {
 	})
 
 	// Without a binding, execution should fail even though the connector exists.
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error when no credential binding exists")
 	}
@@ -319,7 +319,7 @@ func TestExecuteConnectorAction_OAuth_NeedsReauth(t *testing.T) {
 		Connection:  &testhelper.OAuthConnectionOpts{Status: "needs_reauth"},
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testnotion.search", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error for needs_reauth status")
 	}
@@ -335,7 +335,7 @@ func TestExecuteConnectorAction_OAuthPath_NeedsReauth(t *testing.T) {
 		Connection: &testhelper.OAuthConnectionOpts{Status: "needs_reauth"},
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error for needs_reauth connection")
 	}
@@ -352,7 +352,7 @@ func TestExecuteConnectorAction_OAuthPath_RevokedConnection(t *testing.T) {
 		Connection: &testhelper.OAuthConnectionOpts{Status: "revoked"},
 	})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.list_emails", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.list_emails", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error for revoked connection")
 	}
@@ -366,7 +366,7 @@ func TestExecuteConnectorAction_OAuthPath_NoVault(t *testing.T) {
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{NoVault: true})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error when vault is nil")
 	}
@@ -377,7 +377,7 @@ func TestExecuteConnectorAction_OAuthPath_NoOAuthRegistry(t *testing.T) {
 
 	f := setupOAuthExecutionTest(t, oauthExecOpts{NoOAuthRegistry: true})
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error when OAuth registry is nil")
 	}
@@ -396,7 +396,7 @@ func TestExecuteConnectorAction_OAuthPath_ExpiredTokenNoRefreshToken(t *testing.
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, &pastExpiry)
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error for expired token without refresh token")
 	}
@@ -429,7 +429,7 @@ func TestExecuteConnectorAction_OAuthPath_NonExpiredTokenSkipsRefresh(t *testing
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, &farFuture)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -460,7 +460,7 @@ func TestExecuteConnectorAction_OAuthPath_NilTokenExpirySkipsRefresh(t *testing.
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, nil)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -492,7 +492,7 @@ func TestExecuteConnectorAction_OAuthPath_NilExpiryNilOAuthRegistrySucceeds(t *t
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, nil, nil)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error with nil OAuthProviders and nil expiry: %v", err)
 	}
@@ -550,7 +550,7 @@ func TestExecuteConnectorAction_OAuthPath_RefreshesExpiredToken(t *testing.T) {
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, &refreshVaultID, &pastExpiry)
 
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -620,7 +620,7 @@ func TestExecuteConnectorAction_OAuthPath_RefreshFailsTokenRevoked(t *testing.T)
 	conn, _ := db.GetOAuthConnectionByProvider(t.Context(), f.TX, f.UserID, "google")
 	_ = db.UpdateOAuthConnectionTokens(t.Context(), f.TX, conn.ID, f.UserID, accessVaultID, &refreshVaultID, &pastExpiry)
 
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, "testgoogle.send_email", json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error when refresh token is revoked")
 	}
@@ -658,7 +658,7 @@ func TestResolveCredentialsWithFallback_NoAgentID_ReturnsError(t *testing.T) {
 		t.Fatalf("get creds: %v", err)
 	}
 
-	_, err = resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".do_thing", connID, reqCreds)
+	_, err = resolveCredentialsWithFallback(t.Context(), deps, 0, uid, connID+".do_thing", connID, "", reqCreds)
 	if err == nil {
 		t.Fatal("expected error when agentID is 0")
 	}
@@ -690,7 +690,7 @@ func TestResolveCredentialsWithFallback_NoBinding_ReturnsError(t *testing.T) {
 		t.Fatalf("get creds: %v", err)
 	}
 
-	_, err = resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, reqCreds)
+	_, err = resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, "", reqCreds)
 	if err == nil {
 		t.Fatal("expected error when no credential binding exists")
 	}
@@ -738,7 +738,7 @@ func TestResolveCredentialsWithFallback_WithStaticBinding_Works(t *testing.T) {
 		t.Fatalf("get creds: %v", err)
 	}
 
-	creds, err := resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, reqCreds)
+	creds, err := resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, "", reqCreds)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -801,7 +801,7 @@ func TestResolveCredentialsWithFallback_WithOAuthBinding_Works(t *testing.T) {
 		t.Fatalf("get creds: %v", err)
 	}
 
-	creds, err := resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, reqCreds)
+	creds, err := resolveCredentialsWithFallback(t.Context(), deps, agentID, uid, connID+".do_thing", connID, "", reqCreds)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -856,7 +856,7 @@ func TestExecuteConnectorAction_StaticPath_WithBinding(t *testing.T) {
 
 	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
 
-	result, err := executeConnectorAction(t.Context(), deps, agentID, uid, "testslack.send_message", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), deps, agentID, uid, "testslack.send_message", json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -873,13 +873,77 @@ func TestExecuteConnectorAction_StaticPath_WithBinding(t *testing.T) {
 	}
 }
 
+func TestExecuteConnectorAction_UsesConnectorInstanceIDWhenProvided(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "testslack2"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, "testslack2.send_message", "Send Message")
+	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "slack", "api_key")
+
+	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	inst, err := db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID, Label: "Other",
+	})
+	if err != nil {
+		t.Fatalf("create instance: %v", err)
+	}
+
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "xoxb-instance-token"})
+	vaultID, err := v.CreateSecret(t.Context(), tx, "cred", credJSON)
+	if err != nil {
+		t.Fatalf("vault create: %v", err)
+	}
+	credID := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID, uid, "slack", vaultID)
+
+	_, err = db.UpsertAgentConnectorCredentialByInstance(t.Context(), tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: inst.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID,
+	})
+	if err != nil {
+		t.Fatalf("upsert binding: %v", err)
+	}
+
+	var capturedCreds connectors.Credentials
+	reg := connectors.NewRegistry()
+	reg.Register(&credCapturingConnector{
+		id:      connID,
+		actions: []string{"testslack2.send_message"},
+		onExec:  func(creds connectors.Credentials) { capturedCreds = creds },
+	})
+
+	deps := &Deps{DB: tx, Vault: v, Connectors: reg}
+
+	result, err := executeConnectorAction(t.Context(), deps, agentID, uid, "testslack2.send_message", json.RawMessage(`{}`), nil, inst.ConnectorInstanceID)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected non-nil result")
+	}
+
+	tok, ok := capturedCreds.Get("api_key")
+	if !ok {
+		t.Fatal("expected api_key in credentials")
+	}
+	if tok != "xoxb-instance-token" {
+		t.Errorf("expected api_key %q, got %q", "xoxb-instance-token", tok)
+	}
+}
+
 // ── executeConnectorAction: edge cases ──────────────────────────────────────
 
 func TestExecuteConnectorAction_NilConnectorRegistry(t *testing.T) {
 	t.Parallel()
 
 	deps := &Deps{Connectors: nil}
-	result, err := executeConnectorAction(context.Background(), deps, 0, "any-user", "any.action", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(context.Background(), deps, 0, "any-user", "any.action", json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("expected nil error, got %v", err)
 	}
@@ -895,7 +959,7 @@ func TestExecuteConnectorAction_UnknownAction(t *testing.T) {
 	reg.Register(newTestStubConnector("github", "github.create_issue"))
 
 	deps := &Deps{Connectors: reg}
-	result, err := executeConnectorAction(context.Background(), deps, 0, "any-user", "unknown.action", json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(context.Background(), deps, 0, "any-user", "unknown.action", json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("expected nil error for unknown action, got %v", err)
 	}
@@ -1317,7 +1381,7 @@ func TestExecuteConnectorAction_PaymentMethod_Success(t *testing.T) {
 	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
-	})
+	}, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1355,7 +1419,7 @@ func TestExecuteConnectorAction_PaymentMethod_MissingRequired(t *testing.T) {
 	f := setupPaymentExecTest(t, paymentExecOpts{})
 
 	// No payment params provided.
-	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), nil)
+	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), nil, "")
 	if err == nil {
 		t.Fatal("expected error when payment_method_id is missing")
 	}
@@ -1381,7 +1445,7 @@ func TestExecuteConnectorAction_PaymentMethod_PerTxLimitExceeded(t *testing.T) {
 	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
-	})
+	}, "")
 	if err == nil {
 		t.Fatal("expected error when per-transaction limit is exceeded")
 	}
@@ -1429,7 +1493,7 @@ func TestExecuteConnectorAction_PaymentMethod_MonthlyLimitExceeded(t *testing.T)
 	_, err = executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: pmID,
 		AmountCents:     &amount,
-	})
+	}, "")
 	if err == nil {
 		t.Fatal("expected error when monthly limit is exceeded")
 	}
@@ -1465,7 +1529,7 @@ func TestExecuteConnectorAction_PaymentMethod_NotFound(t *testing.T) {
 	_, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), &paymentParams{
 		PaymentMethodID: "00000000-0000-0000-0000-000000000099",
 		AmountCents:     &amount,
-	})
+	}, "")
 	if err == nil {
 		t.Fatal("expected error for nonexistent payment method")
 	}
@@ -1484,7 +1548,7 @@ func TestExecuteConnectorAction_NoPaymentMethod_WhenNotRequired(t *testing.T) {
 	f := setupPaymentExecTest(t, paymentExecOpts{RequiresPayment: &noPayment})
 
 	// No payment params — should succeed because action doesn't require payment.
-	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), nil)
+	result, err := executeConnectorAction(t.Context(), f.Deps, f.AgentID, f.UserID, f.ActionType, json.RawMessage(`{}`), nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

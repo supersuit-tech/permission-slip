@@ -7320,7 +7320,20 @@ components:
           description: Agent that requested the approval
           example: 42
         action:
-          $ref: '#/components/schemas/Action'
+          description: |
+            Same as `Action`, plus optional frozen connector instance fields when the
+            request targeted a specific instance (`_connector_instance_id`, `_connector_instance_label`).
+          allOf:
+            - $ref: '#/components/schemas/Action'
+            - type: object
+              properties:
+                _connector_instance_id:
+                  type: string
+                  format: uuid
+                  description: Frozen UUID of the connector instance for this approval (if any).
+                _connector_instance_label:
+                  type: string
+                  description: Human-readable instance label at request time (if any).
         context:
           $ref: '#/components/schemas/ActionContext'
         status:
@@ -9513,6 +9526,13 @@ components:
             `credentials_ready` is `false`. The agent can present this URL to the
             user to prompt credential setup.
           example: https://app.permissionslip.dev/connect/stripe
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConnectorInstanceCapability'
+          description: |
+            Enabled connector instances for this agent (one row per workspace/account binding).
+            Use `label` or `id` as `action.parameters.connector_instance` when multiple instances exist.
         actions:
           type: array
           items:
@@ -9712,6 +9732,13 @@ components:
             the standing approval is inactive and the agent must use one-off
             approval or the user must create a new standing approval.
           example: '2026-05-15T00:00:00Z'
+        connector_instance_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            When set, this standing approval applies only to that connector instance.
+            Omitted or null means type-wide (legacy) and matches any instance.
       example:
         standing_approval_id: sa_def456
         constraints:
@@ -11631,6 +11658,14 @@ components:
 
             **Security**: Permission Slip verifies that request parameters match the stored
             params_hash before executing actions.
+
+            **Multi-instance connectors**: When an agent has more than one instance of the
+            same connector (e.g. two Slack workspaces), include `connector_instance` in this
+            object with the instance label or UUID from `GET /agents/{id}/capabilities`
+            (`connectors[].instances[]`). Omit it when only one instance exists — the server
+            auto-selects. The field is stripped before schema validation and does not appear on
+            stored approvals; resolved routing is frozen as `_connector_instance_id` and
+            `_connector_instance_label` on the action object in responses.
           example:
             from: alice@example.com
             to:
@@ -11917,6 +11952,23 @@ components:
             next page. Only present when `has_more` is true. Do not construct
             or parse cursor values — they may change format without notice.
           example: 2026-02-11T13:15:00.123456Z,42
+    ConnectorInstanceCapability:
+      type: object
+      required:
+        - id
+        - label
+        - credentials_ready
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Instance identifier (also accepted as `connector_instance`).
+        label:
+          type: string
+          description: Human-readable label for this instance (shown in UIs and accepted as `connector_instance`).
+        credentials_ready:
+          type: boolean
+          description: Whether this specific instance has required credentials bound.
     AgentConnectorCredentialResponse:
       type: object
       required:

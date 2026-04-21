@@ -247,7 +247,20 @@ ApprovalSummary:
       description: Agent that requested the approval
       example: 42
     action:
-      $ref: './shared.yaml#/Action'
+      description: |
+        Same as `Action`, plus optional frozen connector instance fields when the
+        request targeted a specific instance (`_connector_instance_id`, `_connector_instance_label`).
+      allOf:
+        - $ref: './shared.yaml#/Action'
+        - type: object
+          properties:
+            _connector_instance_id:
+              type: string
+              format: uuid
+              description: Frozen UUID of the connector instance for this approval (if any).
+            _connector_instance_label:
+              type: string
+              description: Human-readable instance label at request time (if any).
     context:
       $ref: './shared.yaml#/ActionContext'
     status:

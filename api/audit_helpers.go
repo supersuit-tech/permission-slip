@@ -240,3 +240,38 @@ func redactActionToType(raw []byte) []byte {
 	redacted, _ := json.Marshal(map[string]string{"type": obj.Type})
 	return redacted
 }
+
+// redactActionToTypeWithConnectorInstance is like redactActionToType but preserves
+// frozen multi-instance routing fields for audit visibility (no parameters).
+func redactActionToTypeWithConnectorInstance(raw []byte) []byte {
+	if len(raw) == 0 {
+		return nil
+	}
+	var obj map[string]json.RawMessage
+	if json.Unmarshal(raw, &obj) != nil {
+		return redactActionToType(raw)
+	}
+	typeRaw, ok := obj["type"]
+	if !ok {
+		return redactActionToType(raw)
+	}
+	var actionType string
+	if json.Unmarshal(typeRaw, &actionType) != nil || actionType == "" {
+		return redactActionToType(raw)
+	}
+	out := map[string]any{"type": actionType}
+	if v, ok := obj["_connector_instance_id"]; ok {
+		var s string
+		if json.Unmarshal(v, &s) == nil && s != "" {
+			out["_connector_instance_id"] = s
+		}
+	}
+	if v, ok := obj["_connector_instance_label"]; ok {
+		var s string
+		if json.Unmarshal(v, &s) == nil && s != "" {
+			out["_connector_instance_label"] = s
+		}
+	}
+	redacted, _ := json.Marshal(out)
+	return redacted
+}

@@ -66,6 +66,23 @@ export function humanizeActionType(actionType: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** First segment of an action type, title-cased (e.g. slack.send_message → Slack). */
+export function humanizeConnectorPrefix(actionType: string): string {
+  const dot = actionType.indexOf(".");
+  const prefix = dot > 0 ? actionType.slice(0, dot) : actionType;
+  if (!prefix) return actionType;
+  return prefix.charAt(0).toUpperCase() + prefix.slice(1);
+}
+
+/** Reads frozen multi-instance label from stored action JSON, if present. */
+export function connectorInstanceLabelFromAction(action: {
+  _connector_instance_label?: unknown;
+}): string | undefined {
+  const v = action._connector_instance_label;
+  if (typeof v === "string" && v.trim() !== "") return v;
+  return undefined;
+}
+
 /** Builds a plain-text summary for an action, similar to the web frontend. */
 export function buildActionSummary(
   actionType: string,

@@ -11,6 +11,8 @@ import { getAvatarColors, formatTimestamp } from "./approvalUtils";
 interface HeroHeaderProps {
   actionName: string;
   actionType: string;
+  /** e.g. "Slack (Engineering)" when a connector instance is targeted */
+  connectorDisplayName?: string | null;
   actionVersion?: string;
   summary: string;
   riskLevel?: "low" | "medium" | "high" | null;
@@ -28,6 +30,7 @@ interface HeroHeaderProps {
 export function HeroHeader({
   actionName,
   actionType,
+  connectorDisplayName,
   actionVersion,
   summary,
   riskLevel,
@@ -55,6 +58,9 @@ export function HeroHeader({
             {actionType}
             {actionVersion ? `  v${actionVersion}` : ""}
           </Text>
+          {connectorDisplayName ? (
+            <Text style={styles.connectorLine}>{connectorDisplayName}</Text>
+          ) : null}
         </View>
         {showStatus && <StatusPill status={displayStatus} />}
       </View>
@@ -133,6 +139,12 @@ const styles = StyleSheet.create({
     color: colors.gray400,
     fontFamily: "monospace",
     marginTop: 4,
+  },
+  connectorLine: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.gray700,
+    marginTop: 6,
   },
   summary: {
     fontSize: 15,

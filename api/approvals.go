@@ -251,7 +251,17 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 		_ = json.Unmarshal(appr.Action, &actionObj)
 	}
 
-	result, execErr := executeConnectorAction(ctx, deps, appr.AgentID, userID, actionType, actionObj.Parameters, nil)
+	var connectorInstanceID string
+	if len(appr.Action) > 0 {
+		var raw map[string]json.RawMessage
+		if json.Unmarshal(appr.Action, &raw) == nil {
+			if v, ok := raw["_connector_instance_id"]; ok {
+				_ = json.Unmarshal(v, &connectorInstanceID)
+			}
+		}
+	}
+
+	result, execErr := executeConnectorAction(ctx, deps, appr.AgentID, userID, actionType, actionObj.Parameters, nil, connectorInstanceID)
 
 	var execStatus string
 	var resultJSON json.RawMessage

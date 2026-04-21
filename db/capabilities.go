@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"time"
 )
@@ -11,10 +12,11 @@ import (
 // ActionCapability, StandingApprovalCapability, and CapabilityActionConfig
 // structs from these rows.
 type AgentCapabilities struct {
-	Connectors        []CapabilityConnector
-	Actions           []CapabilityAction
-	StandingApprovals []CapabilityStandingApproval
-	ActionConfigs     []CapabilityActionConfig
+	Connectors         []CapabilityConnector
+	ConnectorInstances []CapabilityConnectorInstance
+	Actions            []CapabilityAction
+	StandingApprovals  []CapabilityStandingApproval
+	ActionConfigs      []CapabilityActionConfig
 }
 
 // CapabilityConnector represents an enabled connector with credential readiness.
@@ -23,6 +25,14 @@ type CapabilityConnector struct {
 	Name             string
 	Description      *string
 	CredentialsReady bool
+}
+
+// CapabilityConnectorInstance is one agent connector instance with per-instance credential readiness.
+type CapabilityConnectorInstance struct {
+	ConnectorID         string
+	ConnectorInstanceID string
+	Label               string
+	CredentialsReady    bool
 }
 
 // CapabilityAction represents an action available through an enabled connector.
@@ -49,10 +59,11 @@ type CapabilityActionConfig struct {
 
 // CapabilityStandingApproval represents an active, non-expired standing approval.
 type CapabilityStandingApproval struct {
-	StandingApprovalID string
-	ActionType         string
-	Constraints        json.RawMessage // raw JSONB
-	ExpiresAt          *time.Time
+	StandingApprovalID  string
+	ActionType          string
+	Constraints         json.RawMessage // raw JSONB
+	ExpiresAt           *time.Time
+	ConnectorInstanceID *string
 }
 
 // GetAgentCapabilities retrieves all data needed for the capabilities endpoint:
@@ -76,35 +87,38 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// Connectors with no connector_required_credentials rows are always ready.
 	connRows, err := db.Query(ctx, `
 		SELECT c.id, c.name, c.description,
-		       NOT EXISTS (
-		           SELECT 1 FROM connector_required_credentials crc
-		           WHERE crc.connector_id = c.id
-		             AND NOT (
-		                 (crc.auth_type <> 'oauth2' AND EXISTS (
-		                     SELECT 1 FROM agent_connector_credentials acc
-		                     INNER JOIN credentials cr ON cr.id = acc.credential_id
-		                     WHERE acc.agent_id = ac.agent_id
-		                       AND acc.connector_id = c.id
-		                       AND acc.approver_id = ac.approver_id
-		                       AND cr.user_id = ac.approver_id
-		                       AND (cr.service = crc.service OR cr.service = c.id)
-		                 ))
-		                 OR (crc.auth_type = 'oauth2' AND EXISTS (
-		                     SELECT 1 FROM agent_connector_credentials acc
-		                     INNER JOIN oauth_connections oc ON oc.id = acc.oauth_connection_id
-		                     WHERE acc.agent_id = ac.agent_id
-		                       AND acc.connector_id = c.id
-		                       AND acc.approver_id = ac.approver_id
-		                       AND oc.user_id = ac.approver_id
-		                       AND oc.provider = crc.oauth_provider
-		                       AND oc.status = 'active'
-		                       AND crc.oauth_scopes <@ oc.scopes
-		                 ))
-		             )
+		       BOOL_OR(
+		           NOT EXISTS (
+		               SELECT 1 FROM connector_required_credentials crc
+		               WHERE crc.connector_id = c.id
+		                 AND NOT (
+		                     (crc.auth_type <> 'oauth2' AND EXISTS (
+		                         SELECT 1 FROM agent_connector_credentials acc
+		                         INNER JOIN credentials cr ON cr.id = acc.credential_id
+		                         WHERE acc.agent_id = ac.agent_id
+		                           AND acc.connector_id = c.id
+		                           AND acc.approver_id = ac.approver_id
+		                           AND cr.user_id = ac.approver_id
+		                           AND (cr.service = crc.service OR cr.service = c.id)
+		                     ))
+		                     OR (crc.auth_type = 'oauth2' AND EXISTS (
+		                         SELECT 1 FROM agent_connector_credentials acc
+		                         INNER JOIN oauth_connections oc ON oc.id = acc.oauth_connection_id
+		                         WHERE acc.agent_id = ac.agent_id
+		                           AND acc.connector_id = c.id
+		                           AND acc.approver_id = ac.approver_id
+		                           AND oc.user_id = ac.approver_id
+		                           AND oc.provider = crc.oauth_provider
+		                           AND oc.status = 'active'
+		                           AND crc.oauth_scopes <@ oc.scopes
+		                     ))
+		                 )
+		           )
 		       ) AS credentials_ready
 		FROM agent_connectors ac
 		JOIN connectors c ON c.id = ac.connector_id
 		WHERE ac.agent_id = $1 AND ac.approver_id = $2
+		GROUP BY c.id, c.name, c.description
 		ORDER BY c.id`,
 		agentID, approverID,
 	)
@@ -129,6 +143,58 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// Short-circuit: no connectors means no actions or standing approvals.
 	if len(connectorIDs) == 0 {
 		return caps, nil
+	}
+
+	// 1b. Per-instance credential readiness (one row per agent_connectors instance).
+	instRows, err := db.Query(ctx, `
+		SELECT ac.connector_id, ac.connector_instance_id::text, ac.label,
+		       NOT EXISTS (
+		           SELECT 1 FROM connector_required_credentials crc
+		           WHERE crc.connector_id = ac.connector_id
+		             AND NOT (
+		                 (crc.auth_type <> 'oauth2' AND EXISTS (
+		                     SELECT 1 FROM agent_connector_credentials acc
+		                     INNER JOIN credentials cr ON cr.id = acc.credential_id
+		                     WHERE acc.agent_id = ac.agent_id
+		                       AND acc.connector_id = ac.connector_id
+		                       AND acc.connector_instance_id = ac.connector_instance_id
+		                       AND acc.approver_id = ac.approver_id
+		                       AND cr.user_id = ac.approver_id
+		                       AND (cr.service = crc.service OR cr.service = ac.connector_id)
+		                 ))
+		                 OR (crc.auth_type = 'oauth2' AND EXISTS (
+		                     SELECT 1 FROM agent_connector_credentials acc
+		                     INNER JOIN oauth_connections oc ON oc.id = acc.oauth_connection_id
+		                     WHERE acc.agent_id = ac.agent_id
+		                       AND acc.connector_id = ac.connector_id
+		                       AND acc.connector_instance_id = ac.connector_instance_id
+		                       AND acc.approver_id = ac.approver_id
+		                       AND oc.user_id = ac.approver_id
+		                       AND oc.provider = crc.oauth_provider
+		                       AND oc.status = 'active'
+		                       AND crc.oauth_scopes <@ oc.scopes
+		                 ))
+		             )
+		       ) AS credentials_ready
+		FROM agent_connectors ac
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2
+		ORDER BY ac.connector_id, ac.enabled_at ASC, ac.connector_instance_id ASC`,
+		agentID, approverID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer instRows.Close()
+
+	for instRows.Next() {
+		var ci CapabilityConnectorInstance
+		if err := instRows.Scan(&ci.ConnectorID, &ci.ConnectorInstanceID, &ci.Label, &ci.CredentialsReady); err != nil {
+			return nil, err
+		}
+		caps.ConnectorInstances = append(caps.ConnectorInstances, ci)
+	}
+	if err := instRows.Err(); err != nil {
+		return nil, err
 	}
 
 	// 2. Actions for enabled connectors.
@@ -159,7 +225,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// 3. Active, non-expired standing approvals for this agent.
 	saRows, err := db.Query(ctx, `
 		SELECT sa.standing_approval_id, sa.action_type, sa.constraints,
-		       sa.expires_at
+		       sa.expires_at, sa.connector_instance_id::text
 		FROM standing_approvals sa
 		WHERE sa.agent_id = $1
 		  AND sa.user_id = $2
@@ -176,8 +242,13 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 
 	for saRows.Next() {
 		var sa CapabilityStandingApproval
-		if err := saRows.Scan(&sa.StandingApprovalID, &sa.ActionType, &sa.Constraints, &sa.ExpiresAt); err != nil {
+		var instID sql.NullString
+		if err := saRows.Scan(&sa.StandingApprovalID, &sa.ActionType, &sa.Constraints, &sa.ExpiresAt, &instID); err != nil {
 			return nil, err
+		}
+		if instID.Valid {
+			s := instID.String
+			sa.ConnectorInstanceID = &s
 		}
 		caps.StandingApprovals = append(caps.StandingApprovals, sa)
 	}

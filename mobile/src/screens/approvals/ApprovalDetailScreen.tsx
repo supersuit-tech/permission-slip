@@ -23,6 +23,8 @@ import { useDenyApproval } from "../../hooks/useDenyApproval";
 import { colors } from "../../theme/colors";
 import {
   humanizeActionType,
+  humanizeConnectorPrefix,
+  connectorInstanceLabelFromAction,
   buildActionSummary,
   safeParams,
   isExpired as checkExpired,
@@ -79,6 +81,12 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
   const summary = buildActionSummary(approval.action.type, parameters, undefined, approval.resource_details as Record<string, unknown> | undefined);
   const actionName = humanizeActionType(approval.action.type);
+  const instanceLabel = connectorInstanceLabelFromAction(
+    approval.action as { _connector_instance_label?: unknown },
+  );
+  const connectorDisplayName = instanceLabel
+    ? `${humanizeConnectorPrefix(approval.action.type)} (${instanceLabel})`
+    : null;
 
   // Derive display status for the hero header
   const displayStatus = useMemo(() => {
@@ -215,6 +223,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
         <HeroHeader
           actionName={actionName}
           actionType={approval.action.type}
+          connectorDisplayName={connectorDisplayName}
           actionVersion={approval.action.version}
           summary={summary}
           riskLevel={approval.context.risk_level}
