@@ -3,7 +3,9 @@ package context
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -22,9 +24,12 @@ func TestBuildReactionContext_SurroundingMessages(t *testing.T) {
 			},
 		}, nil
 	}
-	tsTarget := "100.000001"
-	tsOlder := "99.000001"
-	tsNewer := "101.000001"
+	// Slack TS unix seconds must fall within fetchChannelHistory24h's 24h window.
+	now := time.Now().UTC()
+	sec := now.Unix()
+	tsTarget := fmt.Sprintf("%d.%06d", sec, 0)
+	tsOlder := fmt.Sprintf("%d.%06d", sec-30, 0)
+	tsNewer := fmt.Sprintf("%d.%06d", sec+30, 0)
 	api.postHandlers["conversations.history"] = func(body json.RawMessage) (any, error) {
 		var req readChannelHistoryRequest
 		if err := json.Unmarshal(body, &req); err != nil {
