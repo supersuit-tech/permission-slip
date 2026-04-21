@@ -6,8 +6,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func testResolveServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *MicrosoftConnector) {
