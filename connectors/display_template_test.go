@@ -29,6 +29,9 @@ var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 //     • resolveFile          → file_name, title
 //     • resolveEmail         → subject, from
 //     • resolveSheet         → title, range
+//   - GitHub: connectors/github/resolve_resource_details.go
+//     • resolveWorkflow → workflow_name
+//     • resolveWebhook  → webhook_url, webhook_events
 var resourceDetailFields = map[string]bool{
 	// Slack (see connectors/slack/resolve_resource_details.go)
 	"channel_name": true,
@@ -40,6 +43,10 @@ var resourceDetailFields = map[string]bool{
 	"subject":    true,
 	"from":       true,
 	"range":      true,
+	// GitHub (see connectors/github/resolve_resource_details.go)
+	"workflow_name":  true,
+	"webhook_url":    true,
+	"webhook_events": true,
 }
 
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a
