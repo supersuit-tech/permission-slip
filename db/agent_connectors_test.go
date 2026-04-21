@@ -1,7 +1,6 @@
 package db_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -24,40 +23,6 @@ func TestAgentConnectorsIndex(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 
 	testhelper.RequireIndex(t, tx, "agent_connectors", "idx_agent_connectors_connector")
-}
-
-func TestEnableAgentConnector_Idempotent(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-
-	uid := testhelper.GenerateUID(t)
-	connID := testhelper.GenerateID(t, "conn_")
-
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "user_"+uid[:8])
-	testhelper.InsertConnector(t, tx, connID)
-
-	row1, err := db.EnableAgentConnector(t.Context(), tx, agentID, uid, connID)
-	if err != nil {
-		t.Fatalf("EnableAgentConnector first: %v", err)
-	}
-	row2, err := db.EnableAgentConnector(t.Context(), tx, agentID, uid, connID)
-	if err != nil {
-		t.Fatalf("EnableAgentConnector second: %v", err)
-	}
-	if row1.EnabledAt != row2.EnabledAt {
-		t.Fatalf("expected same row on idempotent enable, got %v vs %v", row1.EnabledAt, row2.EnabledAt)
-	}
-
-	var n int
-	if err := tx.QueryRow(t.Context(),
-		`SELECT count(*) FROM agent_connectors WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3`,
-		agentID, uid, connID,
-	).Scan(&n); err != nil {
-		t.Fatalf("count: %v", err)
-	}
-	if n != 1 {
-		t.Fatalf("expected 1 agent_connectors row, got %d", n)
-	}
 }
 
 func TestAgentConnectorsCascadeOnAgentDelete(t *testing.T) {

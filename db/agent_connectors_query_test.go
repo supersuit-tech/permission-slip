@@ -149,6 +149,17 @@ func TestEnableAgentConnector_Idempotent(t *testing.T) {
 	if !row1.EnabledAt.Equal(row2.EnabledAt) {
 		t.Errorf("expected same enabled_at on idempotent enable, got %v and %v", row1.EnabledAt, row2.EnabledAt)
 	}
+
+	var n int
+	if err := tx.QueryRow(t.Context(),
+		`SELECT count(*) FROM agent_connectors WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3`,
+		agentID, uid, connID,
+	).Scan(&n); err != nil {
+		t.Fatalf("count: %v", err)
+	}
+	if n != 1 {
+		t.Fatalf("expected 1 agent_connectors row, got %d", n)
+	}
 }
 
 // ── DisableAgentConnector ───────────────────────────────────────────────────
