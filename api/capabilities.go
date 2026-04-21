@@ -20,7 +20,7 @@ type capabilitiesResponse struct {
 
 type connectorInstanceCapability struct {
 	ID               string `json:"id"`
-	Label            string `json:"label"`
+	Display          string `json:"display,omitempty"`
 	CredentialsReady bool   `json:"credentials_ready"`
 }
 
@@ -171,7 +171,7 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 		for _, inst := range instancesByConnector[c.ID] {
 			cc.Instances = append(cc.Instances, connectorInstanceCapability{
 				ID:               inst.ConnectorInstanceID,
-				Label:            inst.Label,
+				Display:          inst.DisplayName,
 				CredentialsReady: inst.CredentialsReady,
 			})
 		}

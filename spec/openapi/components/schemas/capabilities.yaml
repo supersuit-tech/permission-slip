@@ -116,16 +116,18 @@ ConnectorInstanceCapability:
   type: object
   required:
     - id
-    - label
     - credentials_ready
   properties:
     id:
       type: string
       format: uuid
       description: Instance identifier (also accepted as `connector_instance`).
-    label:
+    display:
       type: string
-      description: Human-readable label for this instance (shown in UIs and accepted as `connector_instance`).
+      description: >-
+        Credential nickname / workspace name for this instance (from the bound credential). Omitted
+        when unset. Use `id` or this value as `action.parameters.connector_instance` when multiple
+        instances exist.
     credentials_ready:
       type: boolean
       description: Whether this specific instance has required credentials bound.
@@ -193,7 +195,7 @@ ConnectorCapability:
         $ref: '#/ConnectorInstanceCapability'
       description: |
         Enabled connector instances for this agent (one row per workspace/account binding).
-        Use `label` or `id` as `action.parameters.connector_instance` when multiple instances exist.
+        Use `display` (credential nickname) or `id` as `action.parameters.connector_instance` when multiple instances exist.
 
     actions:
       type: array

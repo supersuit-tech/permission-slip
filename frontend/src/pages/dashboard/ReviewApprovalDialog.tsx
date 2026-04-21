@@ -125,13 +125,18 @@ export function ReviewApprovalDialog({
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const { schema, actionName, displayTemplate, preview, connectorName, connectorLogoSvg, isLoading: schemaLoading } =
     useActionSchema(approval.action.type);
-  const connectorInstanceLabel =
+  const connectorInstanceDisplay =
     typeof approval.action === "object" &&
     approval.action !== null &&
-    "_connector_instance_label" in approval.action &&
-    typeof (approval.action as { _connector_instance_label?: unknown })._connector_instance_label === "string"
-      ? (approval.action as { _connector_instance_label: string })._connector_instance_label
-      : undefined;
+    "_connector_instance_display" in approval.action &&
+    typeof (approval.action as { _connector_instance_display?: unknown })._connector_instance_display === "string"
+      ? (approval.action as { _connector_instance_display: string })._connector_instance_display
+      : typeof approval.action === "object" &&
+          approval.action !== null &&
+          "_connector_instance_label" in approval.action &&
+          typeof (approval.action as { _connector_instance_label?: unknown })._connector_instance_label === "string"
+        ? (approval.action as { _connector_instance_label: string })._connector_instance_label
+        : undefined;
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
   const isBusy = pendingAction !== null || isDenying;
@@ -252,7 +257,7 @@ export function ReviewApprovalDialog({
                     {formatConnectorDisplayName({
                       connectorName,
                       actionType: approval.action.type,
-                      instanceLabel: connectorInstanceLabel,
+                      instanceDisplay: connectorInstanceDisplay,
                     })}
                   </p>
                 </div>

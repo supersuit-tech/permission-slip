@@ -287,12 +287,29 @@ describe("humanizeConnectorPrefix", () => {
 });
 
 describe("connectorInstanceLabelFromAction", () => {
-  it("returns the label when present", () => {
+  it("returns display when present", () => {
     expect(
       connectorInstanceLabelFromAction({
-        _connector_instance_label: "Engineering",
+        _connector_instance_display: "Engineering",
       }),
     ).toBe("Engineering");
+  });
+
+  it("returns legacy label when display is absent", () => {
+    expect(
+      connectorInstanceLabelFromAction({
+        _connector_instance_label: "Legacy",
+      }),
+    ).toBe("Legacy");
+  });
+
+  it("prefers display over legacy label", () => {
+    expect(
+      connectorInstanceLabelFromAction({
+        _connector_instance_display: "New",
+        _connector_instance_label: "Old",
+      }),
+    ).toBe("New");
   });
 
   it("returns undefined when absent", () => {
