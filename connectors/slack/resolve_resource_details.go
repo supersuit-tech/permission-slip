@@ -20,8 +20,13 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	case "slack.send_message", "slack.read_channel_messages", "slack.read_thread",
 		"slack.schedule_message", "slack.set_topic", "slack.invite_to_channel",
 		"slack.upload_file", "slack.add_reaction", "slack.update_message",
-		"slack.delete_message":
+		"slack.delete_message",
+		"slack.remove_from_channel", "slack.remove_reaction", "slack.pin_message",
+		"slack.unpin_message", "slack.archive_channel", "slack.rename_channel":
 		return c.resolveChannel(ctx, creds, params)
+
+	case "slack.search_messages":
+		return c.resolveSearchMessagesChannel(ctx, creds, params)
 
 	// User-based actions
 	case "slack.send_dm":
@@ -30,6 +35,25 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	default:
 		return nil, nil
 	}
+}
+
+// resolveSearchMessagesChannel resolves an optional channel ID for
+// slack.search_messages. When channel is omitted, returns nil details (no error).
+func (c *SlackConnector) resolveSearchMessagesChannel(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
+	var p struct {
+		Channel string `json:"channel"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, nil
+	}
+	if p.Channel == "" {
+		return map[string]any{"channel_name": "Slack"}, nil
+	}
+	channelOnly, err := json.Marshal(map[string]string{"channel": p.Channel})
+	if err != nil {
+		return nil, err
+	}
+	return c.resolveChannel(ctx, creds, channelOnly)
 }
 
 // resolveChannel calls conversations.info to fetch the channel name for a
