@@ -18,6 +18,9 @@ type sessionCache struct {
 	info *sessionInfo
 }
 
+// SessionCache caches auth.test for a single ResolveResourceDetails / context build.
+type SessionCache = sessionCache
+
 func (c *sessionCache) get() *sessionInfo {
 	if c == nil {
 		return nil
