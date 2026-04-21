@@ -19,7 +19,7 @@ const defaultInstance = {
   connector_instance_id: "11111111-1111-1111-1111-111111111111",
   agent_id: 42,
   connector_id: "slack",
-  label: "Engineering",
+  display: "Engineering",
   is_default: true,
   enabled_at: "2026-02-18T10:00:00Z",
 };
@@ -28,7 +28,7 @@ const secondInstance = {
   connector_instance_id: "22222222-2222-2222-2222-222222222222",
   agent_id: 42,
   connector_id: "slack",
-  label: "Sales",
+  display: "Sales",
   is_default: false,
   enabled_at: "2026-02-19T10:00:00Z",
 };
@@ -146,7 +146,6 @@ describe("ConnectorInstancesSection", () => {
       expect(screen.getByText("Engineering")).toBeInTheDocument();
     });
     await user.click(screen.getByRole("button", { name: /Add another/i }));
-    await user.type(screen.getByLabelText(/Label/i), "Sales");
     await user.click(screen.getByRole("button", { name: /^Add$/i }));
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalled();
@@ -154,7 +153,7 @@ describe("ConnectorInstancesSection", () => {
     const call = mockPost.mock.calls.find(
       (c) => c[0] === "/v1/agents/{agent_id}/connectors/{connector_id}/instances",
     );
-    expect(call?.[1]?.body).toEqual({ label: "Sales" });
+    expect(call?.[1]?.body).toEqual({});
   });
 
   it("sets default instance via PATCH", async () => {

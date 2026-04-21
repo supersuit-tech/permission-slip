@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -31,8 +32,9 @@ func TestApprovalFlow_MultiInstance_UsesCorrectCredentialOnApprove(t *testing.T)
 	testhelper.InsertConnectorRequiredCredential(t, tx, connID, connID, "api_key")
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
-	instSales, err := db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
-		AgentID: agentID, ApproverID: uid, ConnectorID: connID, Label: "Sales",
+	ctx := context.Background()
+	instSales, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
 	})
 	if err != nil {
 		t.Fatalf("create instance: %v", err)
@@ -55,7 +57,19 @@ func TestApprovalFlow_MultiInstance_UsesCorrectCredentialOnApprove(t *testing.T)
 	credID2 := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID2, uid, connID, "sales", v2)
 
-	_, err = db.UpsertAgentConnectorCredentialByInstance(t.Context(), tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default instance: %v", defInst)
+	}
+	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID1,
+	})
+	if err != nil {
+		t.Fatalf("bind default: %v", err)
+	}
+
+	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
 		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
 		ConnectorInstanceID: instSales.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID2,
 	})
@@ -74,7 +88,7 @@ func TestApprovalFlow_MultiInstance_UsesCorrectCredentialOnApprove(t *testing.T)
 	deps := &Deps{DB: tx, Vault: v, Connectors: reg, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	reqBody := `{"request_id":"req_flow_mi","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"Sales"}},"context":{"description":"x"}}`
+	reqBody := `{"request_id":"req_flow_mi","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"sales"}},"context":{"description":"x"}}`
 	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
