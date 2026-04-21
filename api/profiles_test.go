@@ -36,9 +36,10 @@ func TestGetProfile_Unauthenticated(t *testing.T) {
 
 func TestGetProfile_TraceIDPresent(t *testing.T) {
 	t.Parallel()
-	// Verify trace ID middleware runs before session auth
+	// Verify trace ID middleware runs before session auth. NewRouter omits
+	// TraceIDMiddleware (main.go wraps the full mux); mirror production here.
 	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
-	router := NewRouter(deps)
+	router := TraceIDMiddleware(NewRouter(deps))
 
 	r := httptest.NewRequest(http.MethodGet, "/profile", nil)
 	w := httptest.NewRecorder()
