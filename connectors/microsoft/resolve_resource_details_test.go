@@ -17,10 +17,6 @@ func testResolveServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server
 	return srv, conn
 }
 
-func validCreds() connectors.Credentials {
-	return connectors.CredentialsFromMap(map[string]string{"access_token": "test-token"})
-}
-
 func TestResolveResourceDetails_DriveItem(t *testing.T) {
 	srv, conn := testResolveServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/me/drive/items/item123" {
