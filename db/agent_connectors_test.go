@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
