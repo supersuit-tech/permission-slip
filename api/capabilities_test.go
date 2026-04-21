@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
@@ -661,5 +663,125 @@ func TestGetCapabilities_InvalidAgentID(t *testing.T) {
 
 	if w.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestGetCapabilities_MultiInstance_InjectsConnectorInstanceEnum(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
+
+	conn := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, conn)
+	schema := json.RawMessage(`{"type":"object","properties":{"channel":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, conn, conn+".post", "Post", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn)
+	ctx := context.Background()
+	inst2, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: conn,
+	})
+	if err != nil {
+		t.Fatalf("second instance: %v", err)
+	}
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, conn)
+	if err != nil || defInst == nil {
+		t.Fatalf("default: %v", defInst)
+	}
+
+	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	r := capabilitiesRequest(t, agentID, privKey)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp capabilitiesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Connectors) != 1 {
+		t.Fatalf("expected 1 connector, got %d", len(resp.Connectors))
+	}
+	a := resp.Connectors[0].Actions[0]
+	var sch map[string]any
+	if err := json.Unmarshal(a.ParametersSchema, &sch); err != nil {
+		t.Fatalf("schema: %v", err)
+	}
+	props, _ := sch["properties"].(map[string]any)
+	if props == nil {
+		t.Fatal("expected properties in parameters_schema")
+	}
+	ci, ok := props["connector_instance"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected connector_instance in properties, got %#v", props)
+	}
+	enum, _ := ci["enum"].([]any)
+	if len(enum) != 2 {
+		t.Fatalf("expected enum len 2, got %#v", enum)
+	}
+	gotEnum := make(map[string]struct{})
+	for _, x := range enum {
+		s, _ := x.(string)
+		gotEnum[s] = struct{}{}
+	}
+	if _, ok := gotEnum[defInst.ConnectorInstanceID]; !ok {
+		t.Errorf("enum missing default id %q: %#v", defInst.ConnectorInstanceID, enum)
+	}
+	if _, ok := gotEnum[inst2.ConnectorInstanceID]; !ok {
+		t.Errorf("enum missing second id %q: %#v", inst2.ConnectorInstanceID, enum)
+	}
+	desc, _ := ci["description"].(string)
+	if !strings.Contains(desc, defInst.ConnectorInstanceID) || !strings.Contains(desc, inst2.ConnectorInstanceID) {
+		t.Errorf("description should list both UUIDs: %q", desc)
+	}
+}
+
+func TestGetCapabilities_SingleInstance_OmitsConnectorInstanceInjection(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
+
+	conn := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, conn)
+	schema := json.RawMessage(`{"type":"object","properties":{"channel":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, conn, conn+".post", "Post", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn)
+
+	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	r := capabilitiesRequest(t, agentID, privKey)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp capabilitiesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	a := resp.Connectors[0].Actions[0]
+	var sch map[string]any
+	if err := json.Unmarshal(a.ParametersSchema, &sch); err != nil {
+		t.Fatalf("schema: %v", err)
+	}
+	props, _ := sch["properties"].(map[string]any)
+	if props == nil {
+		t.Fatal("expected properties")
+	}
+	if _, ok := props["connector_instance"]; ok {
+		t.Error("single-instance connector should not inject connector_instance")
 	}
 }

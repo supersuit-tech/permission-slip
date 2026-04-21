@@ -1027,7 +1027,7 @@ func TestAgentRequestApproval_RequestValidatorAllowsValidChannel(t *testing.T) {
 	}
 }
 
-func TestAgentRequestApproval_MultiInstance_RequiresConnectorInstance(t *testing.T) {
+func TestAgentRequestApproval_MultiInstance_UsesDefaultWhenUnset(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -1109,6 +1109,118 @@ func TestAgentRequestApproval_MultiInstance_RequiresConnectorInstance(t *testing
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 (default instance), got %d: %s", w.Code, w.Body.String())
+	}
+	var createResp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	appr, err := db.GetApprovalByIDAndAgent(t.Context(), tx, createResp.ApprovalID, agentID)
+	if err != nil || appr == nil {
+		t.Fatalf("get approval: %v", err)
+	}
+	var actionObj map[string]json.RawMessage
+	if err := json.Unmarshal(appr.Action, &actionObj); err != nil {
+		t.Fatalf("unmarshal action: %v", err)
+	}
+	var gotID string
+	_ = json.Unmarshal(actionObj["_connector_instance_id"], &gotID)
+	if gotID != defInst.ConnectorInstanceID {
+		t.Errorf("expected frozen instance %q, got %q", defInst.ConnectorInstanceID, gotID)
+	}
+}
+
+func TestAgentRequestApproval_MultiInstance_NoDefault_RequiresConnectorInstance(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	connID := "mi_test_conn_nd"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".ping", "Ping")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	ctx := context.Background()
+	inst2, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
+	})
+	if err != nil {
+		t.Fatalf("second instance: %v", err)
+	}
+
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "k1"})
+	v1, err := v.CreateSecret(ctx, tx, "c1", credJSON)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID1 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID1, uid, connID, "Alpha", v1)
+
+	credJSON2, _ := json.Marshal(map[string]string{"api_key": "k2"})
+	v2, err := v.CreateSecret(ctx, tx, "c2", credJSON2)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID2 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID2, uid, connID, "Beta", v2)
+
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default instance: %v", defInst)
+	}
+	instances, err := db.ListAgentConnectorInstances(ctx, tx, agentID, uid, connID)
+	if err != nil || len(instances) != 2 {
+		t.Fatalf("instances: %v len=%d", err, len(instances))
+	}
+	var secondID string
+	for _, inst := range instances {
+		if inst.ConnectorInstanceID != defInst.ConnectorInstanceID {
+			secondID = inst.ConnectorInstanceID
+			break
+		}
+	}
+	if secondID == "" {
+		t.Fatal("expected two distinct instances")
+	}
+
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID1,
+	}); err != nil {
+		t.Fatalf("bind default: %v", err)
+	}
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: secondID, ApproverID: uid, CredentialID: &credID2,
+	}); err != nil {
+		t.Fatalf("bind second: %v", err)
+	}
+
+	// Clear default flags — simulates legacy or inconsistent data where no instance is marked default.
+	testhelper.MustExec(t, tx, `UPDATE agent_connectors SET is_default = false WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3`,
+		agentID, uid, connID)
+	if def2, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID); err != nil || def2 != nil {
+		t.Fatalf("expected no default after update, got %v err=%v", def2, err)
+	}
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, connID+".ping"))
+	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"req_mi_need_inst_nd","action":{"type":"` + connID + `.ping","parameters":{}},"context":{"description":"x"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
@@ -1119,19 +1231,117 @@ func TestAgentRequestApproval_MultiInstance_RequiresConnectorInstance(t *testing
 	if errResp.Error.Code != ErrConnectorInstanceRequired {
 		t.Errorf("expected %q, got %q", ErrConnectorInstanceRequired, errResp.Error.Code)
 	}
-	labels, _ := errResp.Error.Details["available_instances"].([]any)
-	if len(labels) != 2 {
+	rawList, _ := errResp.Error.Details["available_instances"].([]any)
+	if len(rawList) != 2 {
 		t.Fatalf("expected 2 available_instances, got %#v", errResp.Error.Details)
 	}
-	got := make(map[string]struct{})
-	for _, x := range labels {
-		s, _ := x.(string)
-		got[s] = struct{}{}
-	}
-	for _, want := range []string{"Alpha", "Beta"} {
-		if _, ok := got[want]; !ok {
-			t.Fatalf("expected available_instances to include %q, got %#v", want, labels)
+	gotIDs := make(map[string]struct{})
+	for _, x := range rawList {
+		m, ok := x.(map[string]any)
+		if !ok {
+			t.Fatalf("expected object entries in available_instances, got %#v", x)
 		}
+		id, _ := m["id"].(string)
+		gotIDs[id] = struct{}{}
+	}
+	if _, ok := gotIDs[defInst.ConnectorInstanceID]; !ok {
+		t.Errorf("missing default id %q in %#v", defInst.ConnectorInstanceID, rawList)
+	}
+	if _, ok := gotIDs[inst2.ConnectorInstanceID]; !ok {
+		t.Errorf("missing second id %q in %#v", inst2.ConnectorInstanceID, rawList)
+	}
+}
+
+func TestAgentRequestApproval_MultiInstance_ExplicitSelector_OverridesDefault(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	connID := "mi_test_conn_ov"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".ping", "Ping")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	ctx := context.Background()
+	inst2, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
+	})
+	if err != nil {
+		t.Fatalf("second instance: %v", err)
+	}
+
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "k1"})
+	v1, err := v.CreateSecret(ctx, tx, "c1", credJSON)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID1 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID1, uid, connID, "Alpha", v1)
+
+	credJSON2, _ := json.Marshal(map[string]string{"api_key": "k2"})
+	v2, err := v.CreateSecret(ctx, tx, "c2", credJSON2)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID2 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID2, uid, connID, "Beta", v2)
+
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default instance: %v", defInst)
+	}
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID1,
+	}); err != nil {
+		t.Fatalf("bind default: %v", err)
+	}
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: inst2.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID2,
+	}); err != nil {
+		t.Fatalf("bind second: %v", err)
+	}
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, connID+".ping"))
+	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"req_mi_override","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"` + inst2.ConnectorInstanceID + `"}},"context":{"description":"x"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var createResp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	appr, err := db.GetApprovalByIDAndAgent(t.Context(), tx, createResp.ApprovalID, agentID)
+	if err != nil || appr == nil {
+		t.Fatalf("get approval: %v", err)
+	}
+	var actionObj map[string]json.RawMessage
+	if err := json.Unmarshal(appr.Action, &actionObj); err != nil {
+		t.Fatalf("unmarshal action: %v", err)
+	}
+	var gotID string
+	_ = json.Unmarshal(actionObj["_connector_instance_id"], &gotID)
+	if gotID != inst2.ConnectorInstanceID {
+		t.Errorf("expected explicit instance %q, got %q", inst2.ConnectorInstanceID, gotID)
+	}
+	if gotID == defInst.ConnectorInstanceID {
+		t.Error("explicit selector should not route to default")
 	}
 }
 

@@ -10,6 +10,24 @@ import (
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
+// availableInstanceDetail is one selectable connector instance in error details (JSON).
+type availableInstanceDetail struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"display_name,omitempty"`
+}
+
+func availableInstancesDetails(instances []db.AgentConnectorInstance) []availableInstanceDetail {
+	out := make([]availableInstanceDetail, 0, len(instances))
+	for _, i := range instances {
+		d := availableInstanceDetail{ID: i.ConnectorInstanceID}
+		if i.DisplayName != "" {
+			d.DisplayName = i.DisplayName
+		}
+		out = append(out, d)
+	}
+	return out
+}
+
 // connectorInstanceResolutionError carries an HTTP error for applyConnectorInstanceToAction.
 type connectorInstanceResolutionError struct {
 	status int
@@ -87,28 +105,35 @@ func applyConnectorInstanceToAction(ctx context.Context, d db.DBTX, agent *db.Ag
 		}
 	} else {
 		if selector == "" {
-			nicknames := make([]string, 0, len(instances))
-			for _, i := range instances {
-				nicknames = append(nicknames, i.DisplayName)
+			def, err := db.GetDefaultAgentConnectorInstance(ctx, d, agent.AgentID, agent.ApproverID, connectorID)
+			if err != nil {
+				return "", err
 			}
-			resp := BadRequest(ErrConnectorInstanceRequired, "connector_instance is required when multiple instances exist")
-			resp.Error.Details = map[string]any{"available_instances": nicknames}
-			return "", &connectorInstanceResolutionError{status: http.StatusBadRequest, resp: resp}
-		}
-		resolved, err := db.ResolveAgentConnectorInstance(ctx, d, agent.AgentID, agent.ApproverID, connectorID, selector)
-		if err != nil {
-			if amb := ambiguousConnectorInstanceErr(err); amb != nil {
-				return "", amb
+			if def != nil {
+				inst = def
+			} else {
+				resp := BadRequest(ErrConnectorInstanceRequired, "connector_instance is required when multiple instances exist and no default is set")
+				resp.Error.Details = map[string]any{
+					"available_instances": availableInstancesDetails(instances),
+				}
+				return "", &connectorInstanceResolutionError{status: http.StatusBadRequest, resp: resp}
 			}
-			return "", err
-		}
-		if resolved == nil {
-			return "", &connectorInstanceResolutionError{
-				status: http.StatusBadRequest,
-				resp:   BadRequest(ErrConnectorInstanceNotFound, "no connector instance matches the given connector_instance"),
+		} else {
+			resolved, err := db.ResolveAgentConnectorInstance(ctx, d, agent.AgentID, agent.ApproverID, connectorID, selector)
+			if err != nil {
+				if amb := ambiguousConnectorInstanceErr(err); amb != nil {
+					return "", amb
+				}
+				return "", err
 			}
+			if resolved == nil {
+				return "", &connectorInstanceResolutionError{
+					status: http.StatusBadRequest,
+					resp:   BadRequest(ErrConnectorInstanceNotFound, "no connector instance matches the given connector_instance"),
+				}
+			}
+			inst = resolved
 		}
-		inst = resolved
 	}
 
 	idRaw, _ := json.Marshal(inst.ConnectorInstanceID)

@@ -185,7 +185,7 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 				Name:             a.Name,
 				Description:      a.Description,
 				RiskLevel:        a.RiskLevel,
-				ParametersSchema: a.ParametersSchema,
+				ParametersSchema: injectConnectorInstanceIntoParametersSchema(a.ParametersSchema, cc.Instances),
 			}
 
 			// Attach standing approvals for this action type.

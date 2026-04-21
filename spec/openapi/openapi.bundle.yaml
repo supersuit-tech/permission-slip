@@ -9604,6 +9604,13 @@ components:
             should validate parameters against this schema before submitting approval
             requests or executing actions.
 
+            When the user has **multiple connector instances** for this connector
+            (multiple workspaces/accounts), the server injects an optional
+            `connector_instance` property: a `string` with `format: uuid`, `enum` listing
+            allowed instance IDs, and a `description` that maps each UUID to its display
+            name. Omit it to use the **default** instance when one is configured; otherwise
+            pass a UUID or nickname from `GET /agents/{id}/capabilities`.
+
             The schema follows standard JSON Schema (draft-07) conventions and includes
             `type`, `required`, `properties`, and validation keywords like `maxLength`,
             `minimum`, `format`, etc.
