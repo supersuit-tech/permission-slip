@@ -111,6 +111,32 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:      "microsoft.send_email_reply",
+				Name:            "Reply to Email",
+				Description:     "Reply to an existing message in a Microsoft 365 mailbox",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Reply to {{subject}} from {{from}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["message_id", "body"],
+					"properties": {
+						"message_id": {
+							"type": "string",
+							"description": "Microsoft Graph message ID of the message to reply to"
+						},
+						"body": {
+							"type": "string",
+							"description": "Reply body. When html is true (default), use valid HTML. When html is false, body is sent as plain text."
+						},
+						"html": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), body is HTML. When false, plain text only."
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:      "microsoft.list_emails",
 				Name:            "List Emails",
 				Description:     "List recent emails from the user's mailbox",
@@ -715,6 +741,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 func (c *MicrosoftConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
 		"microsoft.send_email":            &sendEmailAction{conn: c},
+		"microsoft.send_email_reply":      &sendEmailReplyAction{conn: c},
 		"microsoft.list_emails":           &listEmailsAction{conn: c},
 		"microsoft.create_calendar_event": &createCalendarEventAction{conn: c},
 		"microsoft.list_calendar_events":  &listCalendarEventsAction{conn: c},

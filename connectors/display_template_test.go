@@ -29,10 +29,14 @@ var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 //   - resolveFile          → file_name, title
 //   - resolveEmail         → subject, from
 //   - resolveSheet         → title, range
+//   - GitHub: connectors/github/resolve_resource_details.go
+//   - resolveWorkflow → workflow_name
+//   - resolveWebhook  → webhook_url, webhook_events
 //   - Microsoft: connectors/microsoft/resolve_resource_details.go
 //   - drive item → file_name (shared key with Google)
 //   - document / presentation / workbook → document_title, presentation_title, workbook_title
 //   - calendar / team / channel → calendar_name, team_name, channel_name (channel_name shared with Slack)
+//   - send_email_reply → subject, from, email_thread (via EmailThreadDetailsMap)
 var resourceDetailFields = map[string]bool{
 	// Slack (see connectors/slack/resolve_resource_details.go)
 	"channel_name": true,
@@ -44,12 +48,17 @@ var resourceDetailFields = map[string]bool{
 	"subject":    true,
 	"from":       true,
 	"range":      true,
+	// GitHub (see connectors/github/resolve_resource_details.go)
+	"workflow_name":  true,
+	"webhook_url":    true,
+	"webhook_events": true,
 	// Microsoft (see connectors/microsoft/resolve_resource_details.go)
 	"document_title":     true,
 	"presentation_title": true,
 	"workbook_title":     true,
 	"calendar_name":      true,
 	"team_name":          true,
+	"email_thread":       true,
 }
 
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a
