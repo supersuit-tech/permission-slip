@@ -22,13 +22,17 @@ var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 // When adding a new connector that implements ResourceDetailResolver, add its
 // returned keys here. Source files for each connector's resolver:
 //   - Slack: connectors/slack/resolve_resource_details.go
-//     • resolveChannel → channel_name
-//     • resolveUser    → user_name
+//   - resolveChannel → channel_name
+//   - resolveUser    → user_name
 //   - Google: connectors/google/resolve_resource_details.go
-//     • resolveCalendarEvent → title, start_time
-//     • resolveFile          → file_name, title
-//     • resolveEmail         → subject, from
-//     • resolveSheet         → title, range
+//   - resolveCalendarEvent → title, start_time
+//   - resolveFile          → file_name, title
+//   - resolveEmail         → subject, from
+//   - resolveSheet         → title, range
+//   - Microsoft: connectors/microsoft/resolve_resource_details.go
+//   - drive item → file_name (shared key with Google)
+//   - document / presentation / workbook → document_title, presentation_title, workbook_title
+//   - calendar / team / channel → calendar_name, team_name, channel_name (channel_name shared with Slack)
 var resourceDetailFields = map[string]bool{
 	// Slack (see connectors/slack/resolve_resource_details.go)
 	"channel_name": true,
@@ -40,6 +44,12 @@ var resourceDetailFields = map[string]bool{
 	"subject":    true,
 	"from":       true,
 	"range":      true,
+	// Microsoft (see connectors/microsoft/resolve_resource_details.go)
+	"document_title":     true,
+	"presentation_title": true,
+	"workbook_title":     true,
+	"calendar_name":      true,
+	"team_name":          true,
 }
 
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a
