@@ -312,6 +312,39 @@ describe("SlackContextPreview", () => {
     expect(hasTestId(renderer, "thread-section")).toBe(false);
   });
 
+  it("hides target-message block when it duplicates thread.parent (same ts)", async () => {
+    await act(async () => {
+      renderer = render(
+        makeContext({
+          context_scope: "thread",
+          target_message: MESSAGE,
+          thread: { parent: MESSAGE, replies: [BOT_MESSAGE] },
+        }),
+      );
+    });
+    // thread-section shows the parent — standalone target-message block should be absent
+    expect(hasTestId(renderer, "thread-section")).toBe(true);
+    const targetSections = renderer.root.findAll(
+      (n) => n.props.testID === "target-message-section",
+    );
+    expect(targetSections.length).toBe(0);
+  });
+
+  it("shows target-message block when it differs from thread.parent ts", async () => {
+    const differentTarget: typeof MESSAGE = { ...MESSAGE, ts: "1711234000.000000" };
+    await act(async () => {
+      renderer = render(
+        makeContext({
+          context_scope: "thread",
+          target_message: differentTarget,
+          thread: { parent: MESSAGE, replies: [] },
+        }),
+      );
+    });
+    expect(hasTestId(renderer, "target-message-section")).toBe(true);
+    expect(hasTestId(renderer, "thread-section")).toBe(true);
+  });
+
   // --- recent messages accordion ---
 
   it("renders recent-messages section when messages present", async () => {

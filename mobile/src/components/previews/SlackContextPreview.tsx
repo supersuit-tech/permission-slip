@@ -60,7 +60,8 @@ export function SlackContextPreview({ slackContext }: Props) {
         <RecipientCard recipient={recipient} />
       )}
 
-      {target_message && (
+      {target_message &&
+        !(context_scope === "thread" && thread?.parent?.ts === target_message.ts) && (
         <View style={styles.section} testID="target-message-section">
           <Text style={styles.sectionLabel}>Target message</Text>
           <MessageCard message={target_message} />
