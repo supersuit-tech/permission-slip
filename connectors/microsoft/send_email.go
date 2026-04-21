@@ -21,6 +21,7 @@ type sendEmailParams struct {
 	Subject string   `json:"subject"`
 	Body    string   `json:"body"`
 	CC      []string `json:"cc,omitempty"`
+	HTML    *bool    `json:"html,omitempty"`
 }
 
 func (p *sendEmailParams) validate() error {
@@ -85,7 +86,7 @@ func (a *sendEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	var graphReq graphSendMailRequest
 	graphReq.Message.Subject = params.Subject
 	graphReq.Message.Body = graphEmailBody{
-		ContentType: detectContentType(params.Body),
+		ContentType: sendMailGraphContentType(params.HTML),
 		Content:     params.Body,
 	}
 	graphReq.Message.ToRecipients = toGraphRecipients(params.To)

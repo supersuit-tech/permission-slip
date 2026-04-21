@@ -53,6 +53,15 @@ func detectContentType(body string) string {
 	return "Text"
 }
 
+// sendMailGraphContentType maps the explicit html flag to Microsoft Graph
+// sendMail body contentType. Nil defaults to HTML (issue #971).
+func sendMailGraphContentType(html *bool) string {
+	if html != nil && !*html {
+		return "Text"
+	}
+	return "HTML"
+}
+
 // validateFolderPath checks a OneDrive folder path for traversal sequences and
 // URL-significant characters that could manipulate the Graph API request.
 // Slashes are allowed since folder paths are naturally slash-separated.
