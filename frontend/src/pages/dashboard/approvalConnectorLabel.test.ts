@@ -32,6 +32,17 @@ describe("formatConnectorDisplayName", () => {
     ).toBe("Slack (Legacy)");
   });
 
+  it("prefers instanceDisplay over instanceLabel when both are present", () => {
+    expect(
+      formatConnectorDisplayName({
+        connectorName: "Slack",
+        actionType: "slack.send_message",
+        instanceDisplay: "New",
+        instanceLabel: "Old",
+      }),
+    ).toBe("Slack (New)");
+  });
+
   it("uses connector name only when no instance label", () => {
     expect(
       formatConnectorDisplayName({
