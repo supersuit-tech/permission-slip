@@ -472,7 +472,11 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 		// Attempt connector execution. If no connector is registered for this
 		// action type, the existing behavior (record execution, emit audit event)
 		// still works — execution just returns no external result (graceful degradation).
-		result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, profile.ID, exec.ActionType, req.Parameters, nil)
+		var connectorInstanceID string
+		if exec.ConnectorInstanceID != nil {
+			connectorInstanceID = *exec.ConnectorInstanceID
+		}
+		result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, profile.ID, exec.ActionType, req.Parameters, nil, connectorInstanceID)
 
 		// Always emit the audit event with the actual execution result (best-effort).
 		emitStandingApprovalAuditEvent(r.Context(), deps.DB, profile.ID, exec.AgentID, saID, exec.ActionType, exec.AgentMeta, execErr)

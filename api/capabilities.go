@@ -13,28 +13,35 @@ import (
 // ── Response types ──────────────────────────────────────────────────────────
 
 type capabilitiesResponse struct {
-	AgentID    int64                    `json:"agent_id"`
-	Approver   *approverInfo            `json:"approver,omitempty"`
-	Connectors []connectorCapability    `json:"connectors"`
+	AgentID    int64                 `json:"agent_id"`
+	Approver   *approverInfo         `json:"approver,omitempty"`
+	Connectors []connectorCapability `json:"connectors"`
+}
+
+type connectorInstanceCapability struct {
+	ID               string `json:"id"`
+	Label            string `json:"label"`
+	CredentialsReady bool   `json:"credentials_ready"`
 }
 
 type connectorCapability struct {
-	ID                  string              `json:"id"`
-	Name                string              `json:"name"`
-	Description         *string             `json:"description,omitempty"`
-	CredentialsReady    bool                `json:"credentials_ready"`
-	CredentialsSetupURL *string             `json:"credentials_setup_url,omitempty"`
-	Actions             []actionCapability  `json:"actions"`
+	ID                  string                        `json:"id"`
+	Name                string                        `json:"name"`
+	Description         *string                       `json:"description,omitempty"`
+	CredentialsReady    bool                          `json:"credentials_ready"`
+	CredentialsSetupURL *string                       `json:"credentials_setup_url,omitempty"`
+	Instances           []connectorInstanceCapability `json:"instances,omitempty"`
+	Actions             []actionCapability            `json:"actions"`
 }
 
 type actionCapability struct {
-	ActionType           string                        `json:"action_type"`
-	Name                 string                        `json:"name"`
-	Description          *string                       `json:"description,omitempty"`
-	RiskLevel            *string                       `json:"risk_level,omitempty"`
-	ParametersSchema     json.RawMessage               `json:"parameters_schema,omitempty"`
-	StandingApprovals    []standingApprovalCapability   `json:"standing_approvals"`
-	ActionConfigurations []actionConfigCapability       `json:"action_configurations"`
+	ActionType           string                       `json:"action_type"`
+	Name                 string                       `json:"name"`
+	Description          *string                      `json:"description,omitempty"`
+	RiskLevel            *string                      `json:"risk_level,omitempty"`
+	ParametersSchema     json.RawMessage              `json:"parameters_schema,omitempty"`
+	StandingApprovals    []standingApprovalCapability `json:"standing_approvals"`
+	ActionConfigurations []actionConfigCapability     `json:"action_configurations"`
 }
 
 type actionConfigCapability struct {
@@ -46,9 +53,10 @@ type actionConfigCapability struct {
 }
 
 type standingApprovalCapability struct {
-	StandingApprovalID string          `json:"standing_approval_id"`
-	Constraints        json.RawMessage `json:"constraints"`
-	ExpiresAt          *time.Time      `json:"expires_at"`
+	StandingApprovalID  string          `json:"standing_approval_id"`
+	Constraints         json.RawMessage `json:"constraints"`
+	ExpiresAt           *time.Time      `json:"expires_at"`
+	ConnectorInstanceID *string         `json:"connector_instance_id,omitempty"`
 }
 
 // ── Route registration ──────────────────────────────────────────────────────
@@ -130,6 +138,11 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 		saByAction[sa.ActionType] = append(saByAction[sa.ActionType], sa)
 	}
 
+	instancesByConnector := make(map[string][]db.CapabilityConnectorInstance)
+	for _, inst := range caps.ConnectorInstances {
+		instancesByConnector[inst.ConnectorID] = append(instancesByConnector[inst.ConnectorID], inst)
+	}
+
 	// Index action configurations by connector+action_type composite key.
 	// Unlike standing approvals (which lack ConnectorID), action configs
 	// are connector-scoped and must not bleed across connectors that share
@@ -155,6 +168,14 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 			cc.CredentialsSetupURL = &url
 		}
 
+		for _, inst := range instancesByConnector[c.ID] {
+			cc.Instances = append(cc.Instances, connectorInstanceCapability{
+				ID:               inst.ConnectorInstanceID,
+				Label:            inst.Label,
+				CredentialsReady: inst.CredentialsReady,
+			})
+		}
+
 		// Build actions for this connector.
 		dbActions := actionsByConnector[c.ID]
 		actions := make([]actionCapability, 0, len(dbActions))
@@ -172,9 +193,10 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 			sas := make([]standingApprovalCapability, 0, len(dbSAs))
 			for _, sa := range dbSAs {
 				sas = append(sas, standingApprovalCapability{
-					StandingApprovalID: sa.StandingApprovalID,
-					Constraints:        sa.Constraints,
-					ExpiresAt:          sa.ExpiresAt,
+					StandingApprovalID:  sa.StandingApprovalID,
+					Constraints:         sa.Constraints,
+					ExpiresAt:           sa.ExpiresAt,
+					ConnectorInstanceID: sa.ConnectorInstanceID,
 				})
 			}
 			acap.StandingApprovals = sas

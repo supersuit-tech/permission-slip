@@ -31,7 +31,7 @@ type paymentParams struct {
 // validates the payment method and enforces spending limits before execution,
 // then records the transaction only after the connector succeeds. This ensures
 // failed executions don't count against the user's spending limits.
-func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, userID, actionType string, parameters json.RawMessage, pp *paymentParams) (*connectors.ActionResult, error) {
+func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, userID, actionType string, parameters json.RawMessage, pp *paymentParams, connectorInstanceID string) (*connectors.ActionResult, error) {
 	if deps.Connectors == nil {
 		return nil, nil
 	}
@@ -52,7 +52,7 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 	connectorID := strings.SplitN(actionType, ".", 2)[0]
 
 	var creds connectors.Credentials
-	creds, err = resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, reqCreds)
+	creds, err = resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
 	if err != nil {
 		return nil, err
 	}
@@ -241,7 +241,9 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 // It requires an explicit credential binding on the agent — no auto-resolve.
 // If no binding exists, it returns a validation error prompting the user to
 // assign a credential in the agent's connector settings.
-func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
+// connectorInstanceID selects which agent connector instance to use. Empty string
+// selects the default instance (backward compatible with single-instance agents).
+func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
 	if len(reqCreds) == 0 {
 		return connectors.NewCredentials(nil), nil
 	}
@@ -254,7 +256,13 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 		}
 	}
 
-	binding, err := db.GetAgentConnectorCredential(ctx, deps.DB, agentID, connectorID)
+	var binding *db.AgentConnectorCredential
+	var err error
+	if connectorInstanceID != "" {
+		binding, err = db.GetAgentConnectorCredentialByInstance(ctx, deps.DB, agentID, connectorID, connectorInstanceID)
+	} else {
+		binding, err = db.GetAgentConnectorCredential(ctx, deps.DB, agentID, connectorID)
+	}
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("look up agent connector credential: %w", err)
 	}
@@ -263,19 +271,7 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 
 // resolveCredentialsForConnectorInstance resolves credentials for a specific connector instance (same rules as resolveCredentialsWithFallback).
 func resolveCredentialsForConnectorInstance(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
-	if len(reqCreds) == 0 {
-		return connectors.NewCredentials(nil), nil
-	}
-	if agentID == 0 {
-		return connectors.Credentials{}, &connectors.ValidationError{
-			Message: "no credential assigned — assign a credential to this connector before running actions",
-		}
-	}
-	binding, err := db.GetAgentConnectorCredentialByInstance(ctx, deps.DB, agentID, connectorID, connectorInstanceID)
-	if err != nil {
-		return connectors.Credentials{}, fmt.Errorf("look up agent connector credential: %w", err)
-	}
-	return resolveCredentialsFromAgentConnectorBinding(ctx, deps, userID, binding)
+	return resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
 }
 
 func resolveCredentialsFromAgentConnectorBinding(ctx context.Context, deps *Deps, userID string, binding *db.AgentConnectorCredential) (connectors.Credentials, error) {

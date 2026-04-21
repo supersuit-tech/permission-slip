@@ -1025,3 +1025,119 @@ func TestAgentRequestApproval_RequestValidatorAllowsValidChannel(t *testing.T) {
 		t.Fatalf("expected 200 for valid channel ID, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+func TestAgentRequestApproval_MultiInstance_RequiresConnectorInstance(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	connID := "mi_test_conn"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".ping", "Ping")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	if _, err := db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID, Label: "Beta",
+	}); err != nil {
+		t.Fatalf("second instance: %v", err)
+	}
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, connID+".ping"))
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"req_mi_need_inst","action":{"type":"` + connID + `.ping","parameters":{}},"context":{"description":"x"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if errResp.Error.Code != ErrConnectorInstanceRequired {
+		t.Errorf("expected %q, got %q", ErrConnectorInstanceRequired, errResp.Error.Code)
+	}
+	labels, _ := errResp.Error.Details["available_instances"].([]any)
+	if len(labels) != 2 {
+		t.Fatalf("expected 2 available_instances, got %#v", errResp.Error.Details)
+	}
+}
+
+func TestAgentRequestApproval_MultiInstance_WithLabel_FreezesInstanceOnAction(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	connID := "mi_test_conn2"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".ping", "Ping")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	inst2, err := db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID, Label: "Sales",
+	})
+	if err != nil {
+		t.Fatalf("second instance: %v", err)
+	}
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, connID+".ping"))
+	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"req_mi_label","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"Sales"}},"context":{"description":"x"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var createResp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	appr, err := db.GetApprovalByIDAndAgent(t.Context(), tx, createResp.ApprovalID, agentID)
+	if err != nil || appr == nil {
+		t.Fatalf("get approval: %v", err)
+	}
+	var actionObj map[string]json.RawMessage
+	if err := json.Unmarshal(appr.Action, &actionObj); err != nil {
+		t.Fatalf("unmarshal action: %v", err)
+	}
+	var gotID, gotLabel string
+	_ = json.Unmarshal(actionObj["_connector_instance_id"], &gotID)
+	_ = json.Unmarshal(actionObj["_connector_instance_label"], &gotLabel)
+	if gotID != inst2.ConnectorInstanceID {
+		t.Errorf("connector_instance_id: want %q got %q", inst2.ConnectorInstanceID, gotID)
+	}
+	if gotLabel != "Sales" {
+		t.Errorf("connector_instance_label: want Sales got %q", gotLabel)
+	}
+	if raw, ok := actionObj["parameters"]; ok {
+		var params map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &params); err != nil {
+			t.Fatalf("parameters: %v", err)
+		}
+		if _, ok := params["connector_instance"]; ok {
+			t.Error("connector_instance should be stripped from parameters")
+		}
+	}
+}

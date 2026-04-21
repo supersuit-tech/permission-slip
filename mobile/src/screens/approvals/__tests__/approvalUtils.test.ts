@@ -2,6 +2,8 @@ import {
   secondsUntil,
   formatCountdown,
   humanizeActionType,
+  humanizeConnectorPrefix,
+  connectorInstanceLabelFromAction,
   buildActionSummary,
   formatRelativeTime,
   formatLastUpdated,
@@ -275,5 +277,25 @@ describe("formatTimestamp", () => {
 
   it("returns input string for invalid date", () => {
     expect(formatTimestamp("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("humanizeConnectorPrefix", () => {
+  it("title-cases the first segment", () => {
+    expect(humanizeConnectorPrefix("slack.send_message")).toBe("Slack");
+  });
+});
+
+describe("connectorInstanceLabelFromAction", () => {
+  it("returns the label when present", () => {
+    expect(
+      connectorInstanceLabelFromAction({
+        _connector_instance_label: "Engineering",
+      }),
+    ).toBe("Engineering");
+  });
+
+  it("returns undefined when absent", () => {
+    expect(connectorInstanceLabelFromAction({})).toBeUndefined();
   });
 });

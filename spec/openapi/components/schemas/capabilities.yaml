@@ -112,6 +112,24 @@ AgentCapabilitiesResponse:
             standing_approvals: []
             action_configurations: []
 
+ConnectorInstanceCapability:
+  type: object
+  required:
+    - id
+    - label
+    - credentials_ready
+  properties:
+    id:
+      type: string
+      format: uuid
+      description: Instance identifier (also accepted as `connector_instance`).
+    label:
+      type: string
+      description: Human-readable label for this instance (shown in UIs and accepted as `connector_instance`).
+    credentials_ready:
+      type: boolean
+      description: Whether this specific instance has required credentials bound.
+
 ConnectorCapability:
   type: object
   required:
@@ -168,6 +186,14 @@ ConnectorCapability:
         `credentials_ready` is `false`. The agent can present this URL to the
         user to prompt credential setup.
       example: "https://app.permissionslip.dev/connect/stripe"
+
+    instances:
+      type: array
+      items:
+        $ref: '#/ConnectorInstanceCapability'
+      description: |
+        Enabled connector instances for this agent (one row per workspace/account binding).
+        Use `label` or `id` as `action.parameters.connector_instance` when multiple instances exist.
 
     actions:
       type: array
@@ -380,6 +406,14 @@ StandingApprovalCapability:
         the standing approval is inactive and the agent must use one-off
         approval or the user must create a new standing approval.
       example: "2026-05-15T00:00:00Z"
+
+    connector_instance_id:
+      type: string
+      format: uuid
+      nullable: true
+      description: |
+        When set, this standing approval applies only to that connector instance.
+        Omitted or null means type-wide (legacy) and matches any instance.
 
   example:
     standing_approval_id: "sa_def456"

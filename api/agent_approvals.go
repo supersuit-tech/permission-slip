@@ -18,13 +18,13 @@ import (
 // ── Request/response types ─────────────────────────────────────────────────
 
 type agentRequestApprovalRequest struct {
-	RequestID       string                 `json:"request_id" validate:"required"`
-	Action          json.RawMessage        `json:"action" validate:"required"`
-	Context         json.RawMessage        `json:"context" validate:"required"`
-	ExpiresIn       *int                   `json:"expires_in,omitempty" validate:"omitempty,gte=60,lte=86400"`
+	RequestID       string                  `json:"request_id" validate:"required"`
+	Action          json.RawMessage         `json:"action" validate:"required"`
+	Context         json.RawMessage         `json:"context" validate:"required"`
+	ExpiresIn       *int                    `json:"expires_in,omitempty" validate:"omitempty,gte=60,lte=86400"`
 	Configuration   *agentApprovalConfigRef `json:"configuration,omitempty"`
-	PaymentMethodID string                 `json:"payment_method_id,omitempty"`
-	AmountCents     *int                   `json:"amount_cents,omitempty"`
+	PaymentMethodID string                  `json:"payment_method_id,omitempty"`
+	AmountCents     *int                    `json:"amount_cents,omitempty"`
 }
 
 type agentApprovalConfigRef struct {
@@ -204,6 +204,23 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		// Multi-instance routing: resolve optional parameters.connector_instance, freeze UUID+label on action, strip from parameters.
+		connectorInstanceID, err := applyConnectorInstanceToAction(r.Context(), deps.DB, agent, actionType, actionObj)
+		if err != nil {
+			var ciErr *connectorInstanceResolutionError
+			if errors.As(err, &ciErr) {
+				RespondError(w, r, ciErr.status, ciErr.resp)
+				return
+			}
+			log.Printf("[%s] applyConnectorInstanceToAction: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to process action"))
+			return
+		}
+		if updated, mErr := json.Marshal(actionObj); mErr == nil {
+			req.Action = updated
+		}
+
 		// Validate action parameters against the connector's parameters_schema.
 		// Runs after alias normalization so canonical keys are checked.
 		// Fail-open: skipped if the action has no schema.
@@ -233,7 +250,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		// approval matches this agent + action type + parameters. If so,
 		// execute immediately and return the result — no human review needed.
 		pp := &paymentParams{PaymentMethodID: req.PaymentMethodID, AmountCents: req.AmountCents}
-		if handled := tryStandingApprovalAutoApprove(w, r, deps, agent, actionType, actionParams, req.RequestID, pp); handled {
+		if handled := tryStandingApprovalAutoApprove(w, r, deps, agent, actionType, actionParams, req.RequestID, pp, connectorInstanceID); handled {
 			return
 		}
 
@@ -272,7 +289,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 				if conn, ok := deps.Connectors.Get(cid[0]); ok {
 					if resolver, ok := conn.(connectors.ResourceDetailResolver); ok {
 						resolveCtx, resolveCancel := context.WithTimeout(r.Context(), 5*time.Second)
-						details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCredentialsForResolver(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0]))
+						details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCredentialsForResolver(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID))
 						resolveCancel()
 						if resolveErr != nil {
 							log.Printf("[%s] ResolveResourceDetails: %v", TraceID(r.Context()), resolveErr)
@@ -432,12 +449,12 @@ var handleAgentApprovalError = handleApprovalError
 // ResourceDetailResolver call. It mirrors the credential resolution logic from
 // connector execution but returns empty credentials on any failure (since
 // resource detail resolution is non-fatal).
-func resolveCredentialsForResolver(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID string) connectors.Credentials {
+func resolveCredentialsForResolver(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string) connectors.Credentials {
 	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil || len(reqCreds) == 0 {
 		return connectors.NewCredentials(nil)
 	}
-	creds, err := resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, reqCreds)
+	creds, err := resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
 	if err != nil {
 		return connectors.NewCredentials(nil)
 	}
@@ -456,7 +473,7 @@ func emitApprovalRequestAuditEvent(ctx context.Context, d db.DBTX, userID string
 		SourceID:    appr.ApprovalID,
 		SourceType:  "approval",
 		AgentMeta:   agentMeta,
-		Action:      redactActionToType(appr.Action),
+		Action:      redactActionToTypeWithConnectorInstance(appr.Action),
 		ConnectorID: connectorIDFromActionType(actionTypeFromJSON(appr.Action)),
 	}, true)
 }

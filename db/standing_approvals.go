@@ -452,14 +452,15 @@ func RevokeStandingApproval(ctx context.Context, db DBTX, saID, userID string) (
 // AgentID, UserID, ActionType, and AgentMeta are derived from related rows
 // (not stored on the executions table) and populated via JOIN in queries.
 type StandingApprovalExecution struct {
-	ExecutionID        int64
-	StandingApprovalID string
-	AgentID            int64
-	UserID             string
-	ActionType         string
-	AgentMeta          []byte // raw JSONB from agents.metadata, may be nil
-	Parameters         []byte // raw JSONB, may be nil
-	ExecutedAt         time.Time
+	ExecutionID         int64
+	StandingApprovalID  string
+	AgentID             int64
+	UserID              string
+	ActionType          string
+	ConnectorInstanceID *string // from standing_approvals.connector_instance_id; nil = type-wide
+	AgentMeta           []byte  // raw JSONB from agents.metadata, may be nil
+	Parameters          []byte  // raw JSONB, may be nil
+	ExecutedAt          time.Time
 }
 
 // RecordStandingApprovalExecution inserts an execution record after locking the
@@ -471,7 +472,7 @@ func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingAppro
 
 	err := db.QueryRow(ctx,
 		`WITH locked AS (
-			SELECT standing_approval_id, agent_id, user_id, action_type
+			SELECT standing_approval_id, agent_id, user_id, action_type, connector_instance_id
 			FROM standing_approvals
 			WHERE standing_approval_id = $1 AND user_id = $2 AND status = 'active'
 			  AND (expires_at IS NULL OR expires_at > now())
@@ -484,12 +485,12 @@ func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingAppro
 			RETURNING id, standing_approval_id, parameters, executed_at
 		)
 		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id::text,
-		       locked.action_type, a.metadata, ins.parameters, ins.executed_at
+		       locked.action_type, locked.connector_instance_id, a.metadata, ins.parameters, ins.executed_at
 		FROM ins
 		JOIN locked ON locked.standing_approval_id = ins.standing_approval_id
 		LEFT JOIN agents a ON a.agent_id = locked.agent_id`,
 		standingApprovalID, userID, parameters,
-	).Scan(&e.ExecutionID, &e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType, &e.AgentMeta, &e.Parameters, &e.ExecutedAt)
+	).Scan(&e.ExecutionID, &e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType, &e.ConnectorInstanceID, &e.AgentMeta, &e.Parameters, &e.ExecutedAt)
 	if err == nil {
 		return &e, nil
 	}
@@ -618,7 +619,7 @@ func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standi
 
 	err := db.QueryRow(ctx,
 		`WITH locked AS (
-			SELECT standing_approval_id, agent_id, user_id, action_type
+			SELECT standing_approval_id, agent_id, user_id, action_type, connector_instance_id
 			FROM standing_approvals
 			WHERE standing_approval_id = $1
 			  AND agent_id = $2
@@ -634,13 +635,13 @@ func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standi
 			RETURNING id, standing_approval_id, parameters, executed_at
 		)
 		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id::text,
-		       locked.action_type, a.metadata, ins.parameters, ins.executed_at
+		       locked.action_type, locked.connector_instance_id, a.metadata, ins.parameters, ins.executed_at
 		FROM ins
 		JOIN locked ON locked.standing_approval_id = ins.standing_approval_id
 		LEFT JOIN agents a ON a.agent_id = locked.agent_id`,
 		standingApprovalID, agentID, parameters, requestID,
 	).Scan(&e.ExecutionID, &e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType,
-		&e.AgentMeta, &e.Parameters, &e.ExecutedAt)
+		&e.ConnectorInstanceID, &e.AgentMeta, &e.Parameters, &e.ExecutedAt)
 	if err == nil {
 		return &e, nil
 	}

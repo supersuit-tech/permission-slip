@@ -28,6 +28,7 @@ import {
   urgencyColor,
   RiskBadge,
 } from "./approval-components";
+import { formatConnectorDisplayName } from "./approvalConnectorLabel";
 
 /** Auto-close delay (ms) after a successful approval. */
 const SUCCESS_AUTO_CLOSE_MS = 3_000;
@@ -124,6 +125,13 @@ export function ReviewApprovalDialog({
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const { schema, actionName, displayTemplate, preview, connectorName, connectorLogoSvg, isLoading: schemaLoading } =
     useActionSchema(approval.action.type);
+  const connectorInstanceLabel =
+    typeof approval.action === "object" &&
+    approval.action !== null &&
+    "_connector_instance_label" in approval.action &&
+    typeof (approval.action as { _connector_instance_label?: unknown })._connector_instance_label === "string"
+      ? (approval.action as { _connector_instance_label: string })._connector_instance_label
+      : undefined;
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
   const isBusy = pendingAction !== null || isDenying;
@@ -240,11 +248,13 @@ export function ReviewApprovalDialog({
                   <DialogTitle className="truncate text-base">
                     {actionName ?? approval.action.type}
                   </DialogTitle>
-                  {connectorName && (
-                    <p className="text-muted-foreground text-sm">
-                      {connectorName}
-                    </p>
-                  )}
+                  <p className="text-muted-foreground text-sm">
+                    {formatConnectorDisplayName({
+                      connectorName,
+                      actionType: approval.action.type,
+                      instanceLabel: connectorInstanceLabel,
+                    })}
+                  </p>
                 </div>
               </>
             )}

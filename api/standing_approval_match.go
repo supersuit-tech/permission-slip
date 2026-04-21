@@ -14,8 +14,8 @@ import (
 // is executed immediately and the result is written to w. Returns true if the
 // response was written (either success or error), false if no standing approval
 // matched and the caller should fall through to the pending approval flow.
-func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps *Deps, agent *db.Agent, actionType string, params json.RawMessage, requestID string, pp *paymentParams) bool {
-	approvals, err := db.FindActiveStandingApprovalsForAgent(r.Context(), deps.DB, agent.AgentID, actionType, "")
+func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps *Deps, agent *db.Agent, actionType string, params json.RawMessage, requestID string, pp *paymentParams, connectorInstanceID string) bool {
+	approvals, err := db.FindActiveStandingApprovalsForAgent(r.Context(), deps.DB, agent.AgentID, actionType, connectorInstanceID)
 	if err != nil {
 		log.Printf("[%s] AutoApprove: find standing approvals: %v", TraceID(r.Context()), err)
 		CaptureError(r.Context(), err)
@@ -92,7 +92,7 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 	// the record remains even though no action succeeded. This is intentional: reversing
 	// the atomic CTE would require a compensating transaction and could mask abuse (an agent
 	// retrying indefinitely to bypass rate limits).
-	result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, exec.UserID, actionType, params, pp)
+	result, execErr := executeConnectorAction(r.Context(), deps, exec.AgentID, exec.UserID, actionType, params, pp, connectorInstanceID)
 
 	// Emit audit event (best-effort).
 	emitStandingApprovalAuditEvent(r.Context(), deps.DB, exec.UserID, exec.AgentID, sa.StandingApprovalID, exec.ActionType, exec.AgentMeta, execErr)
