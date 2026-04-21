@@ -20,20 +20,20 @@ func (c *MicrosoftConnector) ResolveResourceDetails(ctx context.Context, actionT
 
 	// OneDrive item (file name)
 	case "microsoft.get_drive_file", "microsoft.delete_drive_file":
-		return c.resolveDriveItemName(ctx, creds, params)
+		return c.resolveDriveItemAs(ctx, creds, params, "file_name")
 
 	// Word document title (drive item name)
 	case "microsoft.get_document", "microsoft.update_document":
-		return c.resolveDocumentTitle(ctx, creds, params)
+		return c.resolveDriveItemAs(ctx, creds, params, "document_title")
 
 	// PowerPoint presentation title
 	case "microsoft.get_presentation":
-		return c.resolvePresentationTitle(ctx, creds, params)
+		return c.resolveDriveItemAs(ctx, creds, params, "presentation_title")
 
 	// Excel workbook title
 	case "microsoft.excel_list_worksheets", "microsoft.excel_read_range",
 		"microsoft.excel_write_range", "microsoft.excel_append_rows":
-		return c.resolveWorkbookTitle(ctx, creds, params)
+		return c.resolveDriveItemAs(ctx, creds, params, "workbook_title")
 
 	// Calendar display name
 	case "microsoft.list_calendar_events":
@@ -83,7 +83,7 @@ func (c *MicrosoftConnector) resolveSendEmailReply(ctx context.Context, creds co
 	return details, nil
 }
 
-func (c *MicrosoftConnector) resolveDriveItemName(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
+func (c *MicrosoftConnector) resolveDriveItemAs(ctx context.Context, creds connectors.Credentials, params json.RawMessage, resultKey string) (map[string]any, error) {
 	var p struct {
 		ItemID string `json:"item_id"`
 	}
@@ -97,58 +97,7 @@ func (c *MicrosoftConnector) resolveDriveItemName(ctx context.Context, creds con
 	if name == "" {
 		return nil, nil
 	}
-	return map[string]any{"file_name": name}, nil
-}
-
-func (c *MicrosoftConnector) resolveDocumentTitle(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
-	var p struct {
-		ItemID string `json:"item_id"`
-	}
-	if err := json.Unmarshal(params, &p); err != nil || p.ItemID == "" {
-		return nil, fmt.Errorf("missing item_id")
-	}
-	name, err := c.fetchDriveItemName(ctx, creds, p.ItemID)
-	if err != nil {
-		return nil, err
-	}
-	if name == "" {
-		return nil, nil
-	}
-	return map[string]any{"document_title": name}, nil
-}
-
-func (c *MicrosoftConnector) resolvePresentationTitle(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
-	var p struct {
-		ItemID string `json:"item_id"`
-	}
-	if err := json.Unmarshal(params, &p); err != nil || p.ItemID == "" {
-		return nil, fmt.Errorf("missing item_id")
-	}
-	name, err := c.fetchDriveItemName(ctx, creds, p.ItemID)
-	if err != nil {
-		return nil, err
-	}
-	if name == "" {
-		return nil, nil
-	}
-	return map[string]any{"presentation_title": name}, nil
-}
-
-func (c *MicrosoftConnector) resolveWorkbookTitle(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
-	var p struct {
-		ItemID string `json:"item_id"`
-	}
-	if err := json.Unmarshal(params, &p); err != nil || p.ItemID == "" {
-		return nil, fmt.Errorf("missing item_id")
-	}
-	name, err := c.fetchDriveItemName(ctx, creds, p.ItemID)
-	if err != nil {
-		return nil, err
-	}
-	if name == "" {
-		return nil, nil
-	}
-	return map[string]any{"workbook_title": name}, nil
+	return map[string]any{resultKey: name}, nil
 }
 
 func (c *MicrosoftConnector) fetchDriveItemName(ctx context.Context, creds connectors.Credentials, itemID string) (string, error) {
@@ -167,7 +116,7 @@ func (c *MicrosoftConnector) resolveCalendarName(ctx context.Context, creds conn
 		CalendarID string `json:"calendar_id"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, fmt.Errorf("invalid parameters")
+		return nil, fmt.Errorf("unmarshal calendar params: %w", err)
 	}
 	var path string
 	if p.CalendarID == "" {
