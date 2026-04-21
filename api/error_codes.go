@@ -36,6 +36,7 @@ const (
 	ErrApprovalExpired              ErrorCode = "approval_expired"
 	ErrRateLimited                  ErrorCode = "rate_limited"
 	ErrInternalError                ErrorCode = "internal_error"
+	ErrInternalPanic                ErrorCode = "internal_panic"
 	ErrUpstreamError                ErrorCode = "upstream_error"
 	ErrActionConfigNotFound         ErrorCode = "action_config_not_found"
 	ErrActionConfigTemplateNotFound ErrorCode = "action_config_template_not_found"

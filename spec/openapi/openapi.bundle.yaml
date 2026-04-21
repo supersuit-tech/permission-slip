@@ -11850,6 +11850,7 @@ components:
             - rate_limited
             - monthly_quota_exceeded
             - internal_error
+            - internal_panic
             - upstream_error
             - service_unavailable
             - billing_not_enabled

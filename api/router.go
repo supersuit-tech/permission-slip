@@ -47,8 +47,9 @@ type Deps struct {
 }
 
 // NewRouter returns an http.Handler that serves all /api/v1/ routes.
-// The returned handler includes the TraceIDMiddleware, RequestLoggerMiddleware,
-// and RateLimitMiddleware.
+// The returned handler includes RequestLoggerMiddleware, RateLimitMiddleware,
+// sentryhttp, PanicRecoverMiddleware, and SentryTraceIDMiddleware. Trace IDs
+// are set by TraceIDMiddleware in main.go (wrapping the entire server).
 //
 // Rate limiting is scoped to /api/v1/ intentionally. Endpoints outside this
 // router (/api/health for load-balancer probes, /invite/ for user-facing
@@ -76,17 +77,17 @@ func NewRouter(deps *Deps) http.Handler {
 		handler = RequestLoggerMiddleware(deps.Logger, deps.TrustedProxyHeader)(handler)
 	}
 	// Middleware execution order (outermost → innermost):
-	//   TraceIDMiddleware → sentryhttp.Handler → SentryTraceIDMiddleware → ...
+	//   sentryhttp.Handler → PanicRecoverMiddleware → SentryTraceIDMiddleware → mux
 	//
-	// TraceID generates the trace ID first, sentryhttp puts a Sentry hub in
-	// context, then SentryTraceIDMiddleware tags the hub with the trace ID.
-	// sentryhttp also captures panics with full stack traces. Repanic: true
-	// re-panics so net/http or an upstream supervisor can also observe them.
+	// sentryhttp puts a Sentry hub in context. PanicRecoverMiddleware runs
+	// inside sentryhttp's defer order so it recovers before sentry-go's
+	// recover, writes JSON 500 + CaptureError, and does not re-panic.
+	// Repanic is false so the panic does not propagate after our recovery.
 	sentryHandler := sentryhttp.New(sentryhttp.Options{
-		Repanic: true,
+		Repanic: false,
 	})
 	handler = SentryTraceIDMiddleware(handler)
+	handler = PanicRecoverMiddleware(handler)
 	handler = sentryHandler.Handle(handler)
-	handler = TraceIDMiddleware(handler)
 	return handler
 }
