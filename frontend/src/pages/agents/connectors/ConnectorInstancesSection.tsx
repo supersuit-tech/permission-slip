@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Loader2, Settings, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,6 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { useQueryClient } from "@tanstack/react-query";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
@@ -63,7 +62,6 @@ export function ConnectorInstancesSection({
     [connectorId, requiredCredentials],
   );
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
-  const queryClient = useQueryClient();
 
   useAutoAssignOAuthCredential(agentId, connectorId);
 
@@ -80,12 +78,6 @@ export function ConnectorInstancesSection({
     useAssignAgentConnectorInstanceCredential();
   const { remove, isPending: removing } =
     useRemoveAgentConnectorInstanceCredential();
-
-  const invalidateConnectorInstanceBindings = useCallback(() => {
-    void queryClient.invalidateQueries({
-      queryKey: ["connector-instance-credential-bindings", agentId, connectorId],
-    });
-  }, [queryClient, agentId, connectorId]);
 
   const hasRequiredCredentials = requiredCredentials.length > 0;
   const hasExplicitOAuth = requiredCredentials.some(
@@ -128,8 +120,11 @@ export function ConnectorInstancesSection({
     [instances],
   );
 
-  const { data: bindingByInstance, isLoading: bindingsLoading } =
-    useConnectorInstanceCredentialBindings(agentId, connectorId, instanceIds);
+  const {
+    data: bindingByInstance,
+    isLoading: bindingsLoading,
+    isError: bindingsError,
+  } = useConnectorInstanceCredentialBindings(agentId, connectorId, instanceIds);
 
   const rows: CredentialRow[] = useMemo(() => {
     const activeConnections = connections.filter(
@@ -243,22 +238,23 @@ export function ConnectorInstancesSection({
         credentialId: row.credential.id,
       });
     }
-    invalidateConnectorInstanceBindings();
   }
 
-  async function disableRow(inst: AgentConnectorInstance) {
+  /** Returns true if the instance was fully removed; false if user messaging already ran. */
+  async function disableRow(inst: AgentConnectorInstance): Promise<boolean> {
     const otherWithCredential = instances.filter((i) => {
       if (i.connector_instance_id === inst.connector_instance_id) return false;
       const b = bindingByInstance?.get(i.connector_instance_id);
       return bindingRowKey(b ?? undefined) !== null;
     });
 
+    let transferredDefaultAway = false;
     if (inst.is_default) {
       if (otherWithCredential.length === 0) {
         toast.error(
           "Enable another credential before disabling the default, or pick a different default first.",
         );
-        return;
+        return false;
       }
       const nextDefault = [...otherWithCredential].sort((a, b) =>
         a.connector_instance_id.localeCompare(b.connector_instance_id),
@@ -269,12 +265,37 @@ export function ConnectorInstancesSection({
           connectorId,
           instanceId: nextDefault.connector_instance_id,
         });
+        transferredDefaultAway = true;
       }
     }
 
-    await remove({ agentId, connectorId, instanceId: inst.connector_instance_id });
-    await deleteInstance({ agentId, connectorId, instanceId: inst.connector_instance_id });
-    invalidateConnectorInstanceBindings();
+    try {
+      await remove({ agentId, connectorId, instanceId: inst.connector_instance_id });
+      await deleteInstance({ agentId, connectorId, instanceId: inst.connector_instance_id });
+      return true;
+    } catch (err) {
+      if (transferredDefaultAway) {
+        try {
+          await setDefault({
+            agentId,
+            connectorId,
+            instanceId: inst.connector_instance_id,
+          });
+        } catch {
+          /* best-effort rollback */
+        }
+        toast.error(
+          err instanceof Error
+            ? `${err.message} The default was reverted to this credential — try again or change default manually.`
+            : "Failed to disable credential. The default was reverted — try again or change default manually.",
+        );
+      } else {
+        toast.error(
+          err instanceof Error ? err.message : "Failed to disable credential.",
+        );
+      }
+      return false;
+    }
   }
 
   async function toggleRow(row: CredentialRow, checked: boolean) {
@@ -291,13 +312,9 @@ export function ConnectorInstancesSection({
       return;
     }
     if (!checked && inst) {
-      try {
-        await disableRow(inst);
+      const disabledOk = await disableRow(inst);
+      if (disabledOk) {
         toast.success("Credential disabled for this agent.");
-      } catch (err) {
-        toast.error(
-          err instanceof Error ? err.message : "Failed to disable credential.",
-        );
       }
     }
   }
@@ -344,8 +361,13 @@ export function ConnectorInstancesSection({
         )}
         {!isLoading && !error && (
           <div className="space-y-4">
-            {(bindingsLoading || (instanceIds.length > 0 && !bindingByInstance)) && (
+            {bindingsLoading && (
               <p className="text-muted-foreground text-sm">Loading credential links…</p>
+            )}
+            {bindingsError && (
+              <p className="text-destructive text-sm">
+                Failed to load credential links. Refresh the page to retry.
+              </p>
             )}
             {rows.length === 0 && (
               <p className="text-muted-foreground text-sm">
@@ -425,7 +447,7 @@ export function ConnectorInstancesSection({
                         type="button"
                         variant="outline"
                         size="sm"
-                        disabled={busyRow || deleting}
+                        disabled={busyRow}
                         onClick={() => void handleRemoveOrphan(id)}
                       >
                         <Trash2 className="size-3.5" />

@@ -7,7 +7,8 @@ export type InstanceCredentialBinding =
   components["schemas"]["AgentConnectorCredentialResponse"];
 
 /**
- * Loads credential bindings for each connector instance row (batch GET per instance).
+ * Loads credential bindings for each connector instance row (one GET per instance).
+ * Follow-up: consider a batch endpoint to avoid N+1 when many instances exist.
  */
 export function useConnectorInstanceCredentialBindings(
   agentId: number,
