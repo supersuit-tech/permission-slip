@@ -7,20 +7,42 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
+	slackctx "github.com/supersuit-tech/permission-slip/connectors/slack/context"
 )
 
 // ResolveResourceDetails fetches human-readable metadata for resources
 // referenced by opaque IDs in Slack action parameters. For channel-based
 // actions it resolves channel IDs to names; for user-based actions it
-// resolves user IDs to display names. Errors are non-fatal — the caller
+// resolves user IDs to display names. Message-lifecycle actions also
+// populate slack_context (issue #981). Errors are non-fatal — the caller
 // stores the approval without details on failure.
 func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType string, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
+	var cache slackctx.SessionCache
 	switch actionType {
+	case "slack.send_message":
+		sc, _ := buildSendMessageContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+
+	case "slack.schedule_message":
+		sc, _ := buildScheduleMessageContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+
+	case "slack.send_dm":
+		sc, _ := buildSendDMContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+
+	case "slack.update_message":
+		sc, _ := buildUpdateMessageContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+
+	case "slack.delete_message":
+		sc, _ := buildDeleteMessageContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+
 	// Channel-based actions
-	case "slack.send_message", "slack.read_channel_messages", "slack.read_thread",
-		"slack.schedule_message", "slack.set_topic", "slack.invite_to_channel",
-		"slack.upload_file", "slack.add_reaction", "slack.update_message",
-		"slack.delete_message",
+	case "slack.read_channel_messages", "slack.read_thread",
+		"slack.set_topic", "slack.invite_to_channel",
+		"slack.upload_file", "slack.add_reaction",
 		"slack.remove_from_channel", "slack.remove_reaction", "slack.pin_message",
 		"slack.unpin_message", "slack.archive_channel", "slack.rename_channel":
 		return c.resolveChannel(ctx, creds, params)
@@ -28,13 +50,44 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	case "slack.search_messages":
 		return c.resolveSearchMessagesChannel(ctx, creds, params)
 
-	// User-based actions
-	case "slack.send_dm":
-		return c.resolveUser(ctx, creds, params)
-
 	default:
 		return nil, nil
 	}
+}
+
+func mergeLifecycleResourceDetails(ctx context.Context, c *SlackConnector, creds connectors.Credentials, actionType string, params json.RawMessage, sc *slackctx.SlackContext) map[string]any {
+	out := map[string]any{}
+	switch actionType {
+	case "slack.send_message", "slack.schedule_message", "slack.update_message", "slack.delete_message":
+		if legacy, err := c.resolveChannel(ctx, creds, params); err == nil && legacy != nil {
+			for k, v := range legacy {
+				out[k] = v
+			}
+		}
+	case "slack.send_dm":
+		if legacy, err := c.resolveUser(ctx, creds, params); err == nil && legacy != nil {
+			for k, v := range legacy {
+				out[k] = v
+			}
+		}
+	}
+	if actionType == "slack.schedule_message" {
+		var sp scheduleMessageParams
+		if err := json.Unmarshal(params, &sp); err == nil {
+			if u, err := sp.postAtUnix(); err == nil {
+				out["post_at"] = u
+			}
+		}
+	}
+	if sc != nil {
+		if b, err := json.Marshal(sc); err == nil {
+			var asMap map[string]any
+			if err := json.Unmarshal(b, &asMap); err == nil {
+				out["slack_context"] = asMap
+			}
+		}
+	}
+	return out
 }
 
 // resolveSearchMessagesChannel resolves an optional channel ID for
