@@ -117,6 +117,8 @@ func (c *SlackConnector) Actions() map[string]connectors.Action {
 		"slack.get_user_profile":      &getUserProfileAction{conn: c},
 		"slack.pin_message":           &pinMessageAction{conn: c},
 		"slack.unpin_message":         &unpinMessageAction{conn: c},
+		"slack.list_unread":           &listUnreadAction{conn: c},
+		"slack.mark_read":             &markReadAction{conn: c},
 	}
 }
 

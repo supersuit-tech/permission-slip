@@ -134,7 +134,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "slack.read_channel_messages",
 				Name:            "Read Channel Messages",
-				Description:     "Read recent messages from a Slack channel, DM (D…), or group DM (G…).",
+				Description:     "Read recent messages from a Slack channel, DM (D…), or group DM (G…). To fetch only unread messages, call slack.list_unread first and pass oldest = last_read_ts from that result (do not rely on blind recent history).",
 				RiskLevel:       "low",
 				DisplayTemplate: "Read messages from {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
@@ -785,6 +785,46 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:      "slack.list_unread",
+				Name:            "List Unread",
+				Description:     "List Slack conversations where the authorizing user has unread messages (users.conversations + conversations.info per channel). Use slack.read_channel_messages with oldest = last_read_ts from an entry to load only unread messages; optionally clear read state with slack.mark_read using the ts of the last message you surfaced (required parameter).",
+				RiskLevel:       "low",
+				DisplayTemplate: "List unread Slack conversations",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {}
+				}`)),
+			},
+			{
+				ActionType:      "slack.mark_read",
+				Name:            "Mark Read",
+				Description:     "Set the read cursor for a conversation (conversations.mark). Requires channel_id and ts — pass the Slack message timestamp of the last message you showed the user (no default).",
+				RiskLevel:       "low",
+				DisplayTemplate: "Mark Slack conversation read",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["channel_id", "ts"],
+					"properties": {
+						"channel_id": {
+							"type": "string",
+							"description": "Channel ID (C…, D…, or G…)",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)"
+							}
+						},
+						"ts": {
+							"type": "string",
+							"description": "Slack message timestamp to mark as read (e.g. 1234567890.123456) — required; use the ts of the last message you surfaced",
+							"x-ui": {"hidden": true}
+						}
+					}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
@@ -1001,6 +1041,22 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:             "Unpin messages",
 				Description:      "Agent can unpin messages in channels.",
 				Parameters:       json.RawMessage(`{"channel":"*","ts":"*"}`),
+				StandingApproval: neverExpire,
+			},
+			{
+				ID:               "tpl_slack_list_unread",
+				ActionType:       "slack.list_unread",
+				Name:             "List unread conversations",
+				Description:      "Agent can list conversations with unread messages for the authorizing user.",
+				Parameters:       json.RawMessage(`{}`),
+				StandingApproval: neverExpire,
+			},
+			{
+				ID:               "tpl_slack_mark_read",
+				ActionType:       "slack.mark_read",
+				Name:             "Mark conversations read",
+				Description:      "Agent can mark a conversation read at an explicit message timestamp.",
+				Parameters:       json.RawMessage(`{"channel_id":"*","ts":"*"}`),
 				StandingApproval: neverExpire,
 			},
 		},

@@ -172,6 +172,30 @@ Reads recent messages from a Slack channel. For private channels, DMs, and group
 
 **Required bot token scopes:** `channels:history` (public), `groups:history` (private)
 
+#### Unread messages (user token)
+
+To answer “do I have unread Slack messages?” or load only unread content, use this flow (no extra OAuth scopes beyond the connector’s user token):
+
+1. Call **`slack.list_unread`** — returns conversations where `unread_count` &gt; 0, with `last_read_ts` and a short `latest_message_preview` when Slack provides `latest`.
+2. For a given conversation, call **`slack.read_channel_messages`** with **`oldest` = `last_read_ts`** from that row (Slack accepts the same timestamp format as in `list_unread`). That limits history to messages after the user’s read cursor instead of guessing from “recent” history alone.
+3. Optionally **`slack.mark_read`** with **`channel_id`** and an explicit **`ts`** — the Slack message timestamp of the last message you surfaced to the user. **`ts` is required** (there is no default) so the agent cannot clear unreads it never showed.
+
+---
+
+### `slack.list_unread`
+
+Lists conversations where the authorizing user has unread messages. Uses `users.conversations` to enumerate conversations, then `conversations.info` per channel for `last_read`, `unread_count_display`, and `latest`. Requires a Permission Slip profile email that matches the Slack account (same identity model as other private/DM flows).
+
+**Slack API:** `POST /users.conversations`, `GET /conversations.info`
+
+---
+
+### `slack.mark_read`
+
+Sets the read cursor for a conversation (`conversations.mark`). **`channel_id`** and **`ts`** are both required.
+
+**Slack API:** `POST /conversations.mark`
+
 ---
 
 ### `slack.read_thread`
@@ -664,6 +688,9 @@ connectors/slack/
 ├── create_channel.go               # slack.create_channel action
 ├── list_channels.go                # slack.list_channels action
 ├── read_channel_messages.go        # slack.read_channel_messages action
+├── conversation_info.go            # conversations.info helper (unread + shared)
+├── list_unread.go                  # slack.list_unread action
+├── mark_read.go                    # slack.mark_read action
 ├── read_thread.go                  # slack.read_thread action
 ├── schedule_message.go             # slack.schedule_message action
 ├── set_topic.go                    # slack.set_topic action

@@ -63,6 +63,17 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	case "slack.search_messages":
 		return c.resolveSearchMessagesChannel(ctx, creds, params)
 
+	case "slack.mark_read":
+		var p markReadParams
+		if err := json.Unmarshal(params, &p); err != nil || p.ChannelID == "" {
+			return nil, nil
+		}
+		channelOnly, err := json.Marshal(map[string]string{"channel": p.ChannelID})
+		if err != nil {
+			return nil, err
+		}
+		return c.resolveChannel(ctx, creds, channelOnly)
+
 	default:
 		return nil, nil
 	}
