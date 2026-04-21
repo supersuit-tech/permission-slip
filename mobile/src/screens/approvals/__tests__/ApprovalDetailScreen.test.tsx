@@ -166,6 +166,46 @@ describe("ApprovalDetailScreen", () => {
     expect(json).toContain("Welcome");
   });
 
+  it("shows email thread card for google.send_email_reply with thread in context", async () => {
+    const approval = makeApproval({
+      action: {
+        type: "google.send_email_reply",
+        version: "1",
+        parameters: { thread_id: "t1", body: "Reply text" },
+      },
+      context: {
+        description: "Reply to thread",
+        risk_level: "low",
+        details: {
+          email_thread: {
+            subject: "Re: Topic",
+            messages: [
+              {
+                from: "x@y.com",
+                to: ["z@y.com"],
+                cc: [],
+                date: "2026-04-20T12:00:00Z",
+                body_html: "",
+                body_text: "Thread body",
+                snippet: "",
+                message_id: "mid",
+                truncated: false,
+              },
+            ],
+          },
+        },
+      },
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    const json = JSON.stringify(renderer.toJSON());
+    expect(json).toContain("Email thread");
+    expect(json).toContain("Re: Topic");
+    expect(json).toContain("Thread body");
+    expect(json).not.toContain('"label":"email_thread"');
+  });
+
   it("shows Approved banner for approved status", async () => {
     const approval = makeApproval({
       status: "approved",

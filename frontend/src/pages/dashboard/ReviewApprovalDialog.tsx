@@ -21,6 +21,11 @@ import { useAgents } from "@/hooks/useAgents";
 import { useStandingApprovals } from "@/hooks/useStandingApprovals";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { ActionPreviewCard } from "@/components/previews/ActionPreviewCard";
+import {
+  EmailThreadPreview,
+  EMAIL_REPLY_ACTION_TYPES,
+  parseEmailThreadFromDetails,
+} from "@/components/previews/EmailThreadPreview";
 import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
 import {
   useCountdown,
@@ -125,18 +130,20 @@ export function ReviewApprovalDialog({
   const { denyApproval, isPending: isDenying } = useDenyApproval();
   const { schema, actionName, displayTemplate, preview, connectorName, connectorLogoSvg, isLoading: schemaLoading } =
     useActionSchema(approval.action.type);
-  const connectorInstanceDisplay =
+  const connectorInstanceDisplayStr =
     typeof approval.action === "object" &&
     approval.action !== null &&
     "_connector_instance_display" in approval.action &&
     typeof (approval.action as { _connector_instance_display?: unknown })._connector_instance_display === "string"
       ? (approval.action as { _connector_instance_display: string })._connector_instance_display
-      : typeof approval.action === "object" &&
-          approval.action !== null &&
-          "_connector_instance_label" in approval.action &&
-          typeof (approval.action as { _connector_instance_label?: unknown })._connector_instance_label === "string"
-        ? (approval.action as { _connector_instance_label: string })._connector_instance_label
-        : undefined;
+      : undefined;
+  const connectorInstanceLabelStr =
+    typeof approval.action === "object" &&
+    approval.action !== null &&
+    "_connector_instance_label" in approval.action &&
+    typeof (approval.action as { _connector_instance_label?: unknown })._connector_instance_label === "string"
+      ? (approval.action as { _connector_instance_label: string })._connector_instance_label
+      : undefined;
   const remaining = useCountdown(approval.expires_at);
   const isExpired = remaining <= 0;
   const isBusy = pendingAction !== null || isDenying;
@@ -156,6 +163,12 @@ export function ReviewApprovalDialog({
     [standingApprovals, approval.agent_id, approval.action.type],
   );
   const showAlwaysAllow = hasParams && !standingApprovalsLoading && !hasExistingStandingApproval;
+
+  const emailThread = useMemo(
+    () => parseEmailThreadFromDetails(approval.context.details),
+    [approval.context.details],
+  );
+  const showEmailThreadPreview = EMAIL_REPLY_ACTION_TYPES.has(approval.action.type);
 
   // Auto-close dialog after successful approval (never while the nested standing-approval
   // wizard is open — a render with isApproved true before autoCloseBlocked flips true
@@ -257,7 +270,8 @@ export function ReviewApprovalDialog({
                     {formatConnectorDisplayName({
                       connectorName,
                       actionType: approval.action.type,
-                      instanceDisplay: connectorInstanceDisplay,
+                      instanceDisplay: connectorInstanceDisplayStr,
+                      instanceLabel: connectorInstanceLabelStr,
                     })}
                   </p>
                 </div>
@@ -348,15 +362,22 @@ export function ReviewApprovalDialog({
                   <Skeleton className="h-3 w-full" />
                 </div>
               ) : (
-                <ActionPreviewCard
-                  preview={preview}
-                  parameters={params}
-                  actionType={approval.action.type}
-                  schema={schema}
-                  actionName={actionName}
-                  displayTemplate={displayTemplate}
-                  resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
-                />
+                <>
+                  {showEmailThreadPreview && (
+                    <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
+                      <EmailThreadPreview thread={emailThread} />
+                    </div>
+                  )}
+                  <ActionPreviewCard
+                    preview={preview}
+                    parameters={params}
+                    actionType={approval.action.type}
+                    schema={schema}
+                    actionName={actionName}
+                    displayTemplate={displayTemplate}
+                    resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
+                  />
+                </>
               )}
             </div>
 
