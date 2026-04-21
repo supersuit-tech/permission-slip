@@ -3,6 +3,7 @@ package google
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -19,6 +20,12 @@ func (c *GoogleConnector) ResolveResourceDetails(ctx context.Context, actionType
 	// Calendar
 	case "google.delete_calendar_event", "google.update_calendar_event":
 		return c.resolveCalendarEvent(ctx, creds, params)
+	case "google.list_calendar_events":
+		return c.resolveCalendar(ctx, creds, params)
+
+	// Chat
+	case "google.send_chat_message":
+		return c.resolveChatSpace(ctx, creds, params)
 
 	// Drive
 	case "google.delete_drive_file", "google.get_drive_file":
@@ -188,7 +195,66 @@ func (c *GoogleConnector) resolvePresentation(ctx context.Context, creds connect
 		return nil, err
 	}
 
-	return map[string]any{"title": resp.Title}, nil
+	// Include presentation_title so templates can disambiguate from other "title"
+	// params (e.g. optional slide title on google.add_slide).
+	return map[string]any{
+		"title":              resp.Title,
+		"presentation_title": resp.Title,
+	}, nil
+}
+
+// resolveChatSpace fetches the Chat space display name for approval summaries.
+// API: GET https://chat.googleapis.com/v1/{name}?fields=displayName
+func (c *GoogleConnector) resolveChatSpace(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
+	var p struct {
+		SpaceName string `json:"space_name"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil || p.SpaceName == "" {
+		return nil, fmt.Errorf("missing space_name")
+	}
+	if _, err := validateChatSpaceName(p.SpaceName); err != nil {
+		switch {
+		case errors.Is(err, errChatSpaceNotPrefixed):
+			return nil, fmt.Errorf("space_name must start with 'spaces/'")
+		case errors.Is(err, errChatSpaceEmptyID), errors.Is(err, errChatSpaceInvalidChars):
+			return nil, fmt.Errorf("invalid space_name")
+		default:
+			return nil, err
+		}
+	}
+
+	var resp struct {
+		DisplayName string `json:"displayName"`
+	}
+	getURL := c.chatBaseURL + "/v1/" + p.SpaceName + "?fields=displayName"
+	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
+		return nil, err
+	}
+	return map[string]any{"space_display_name": resp.DisplayName}, nil
+}
+
+// resolveCalendar fetches the calendar summary (human-readable name) for a calendar ID.
+// API: GET {calendarBaseURL}/calendars/{calendarId}?fields=summary (Calendar API v3).
+// When calendar_id is empty, defaults to "primary", matching listCalendarEventsParams.normalize().
+func (c *GoogleConnector) resolveCalendar(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
+	var p struct {
+		CalendarID string `json:"calendar_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, fmt.Errorf("invalid calendar params: %w", err)
+	}
+	if p.CalendarID == "" {
+		p.CalendarID = "primary"
+	}
+
+	var resp struct {
+		Summary string `json:"summary"`
+	}
+	getURL := c.calendarBaseURL + "/calendars/" + url.PathEscape(p.CalendarID) + "?fields=summary"
+	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
+		return nil, err
+	}
+	return map[string]any{"calendar_name": resp.Summary}, nil
 }
 
 // ── Gmail ───────────────────────────────────────────────────────────────────

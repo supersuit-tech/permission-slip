@@ -3,9 +3,9 @@ package google
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
-	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -28,19 +28,17 @@ func (p *sendChatMessageParams) validate() error {
 	if p.SpaceName == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: space_name"}
 	}
-	// Validate the space_name format to prevent path traversal and URL injection.
-	// Google Chat space names follow the pattern "spaces/{spaceId}" where
-	// spaceId is an alphanumeric identifier (e.g. "spaces/AAAAMpdlehY").
-	if !strings.HasPrefix(p.SpaceName, "spaces/") {
-		return &connectors.ValidationError{Message: "space_name must start with 'spaces/' (e.g. 'spaces/AAAA1234')"}
-	}
-	spaceID := strings.TrimPrefix(p.SpaceName, "spaces/")
-	if spaceID == "" {
-		return &connectors.ValidationError{Message: "space_name must include a space ID after 'spaces/'"}
-	}
-	// Reject characters that could alter URL path or query (/  ?  #  ..)
-	if strings.ContainsAny(spaceID, "/?#") || strings.Contains(spaceID, "..") {
-		return &connectors.ValidationError{Message: "space_name contains invalid characters"}
+	if _, err := validateChatSpaceName(p.SpaceName); err != nil {
+		switch {
+		case errors.Is(err, errChatSpaceNotPrefixed):
+			return &connectors.ValidationError{Message: "space_name must start with 'spaces/' (e.g. 'spaces/AAAA1234')"}
+		case errors.Is(err, errChatSpaceEmptyID):
+			return &connectors.ValidationError{Message: "space_name must include a space ID after 'spaces/'"}
+		case errors.Is(err, errChatSpaceInvalidChars):
+			return &connectors.ValidationError{Message: "space_name contains invalid characters"}
+		default:
+			return &connectors.ValidationError{Message: err.Error()}
+		}
 	}
 	if p.Text == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: text"}
