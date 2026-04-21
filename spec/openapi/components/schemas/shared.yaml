@@ -148,6 +148,12 @@ ActionContext:
         - `recipient_count`: Number of email recipients
         - `estimated_cost`: Estimated cost of a payment action
         - `affected_resources`: List of resources that will be modified
+        
+        Slack connector actions may include `slack_context` (see `SlackContext`) with
+        channel/thread/DM surroundings for the reviewer.
+      properties:
+        slack_context:
+          $ref: './slack_context.yaml#/SlackContext'
       example:
         recipient_count: 1
         estimated_time: "5 minutes"

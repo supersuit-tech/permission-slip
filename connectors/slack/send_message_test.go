@@ -76,6 +76,49 @@ func TestSendMessage_Success(t *testing.T) {
 	}
 }
 
+func TestSendMessage_WithThreadTS(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body struct {
+			Channel  string `json:"channel"`
+			Text     string `json:"text"`
+			ThreadTS string `json:"thread_ts"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode body: %v", err)
+		}
+		if body.ThreadTS != "111222333.444555" {
+			t.Errorf("expected thread_ts in body, got %q", body.ThreadTS)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok":      true,
+			"ts":      "999888777.666555",
+			"channel": "C01234567",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &sendMessageAction{conn: conn}
+
+	params, _ := json.Marshal(sendMessageParams{
+		Channel:  "#general",
+		Message:  "thread reply",
+		ThreadTS: "111222333.444555",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.send_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestSendMessage_MissingChannel(t *testing.T) {
 	t.Parallel()
 

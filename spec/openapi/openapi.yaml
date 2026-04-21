@@ -668,6 +668,20 @@ components:
       $ref: './components/schemas/shared.yaml#/Action'
     ActionContext:
       $ref: './components/schemas/shared.yaml#/ActionContext'
+    SlackContext:
+      $ref: './components/schemas/slack_context.yaml#/SlackContext'
+    SlackContextChannel:
+      $ref: './components/schemas/slack_context.yaml#/SlackContextChannel'
+    SlackContextWindow:
+      $ref: './components/schemas/slack_context.yaml#/SlackContextWindow'
+    SlackContextFileMeta:
+      $ref: './components/schemas/slack_context.yaml#/SlackContextFileMeta'
+    SlackContextMessage:
+      $ref: './components/schemas/slack_context.yaml#/SlackContextMessage'
+    SlackContextThread:
+      $ref: './components/schemas/slack_context.yaml#/SlackContextThread'
+    SlackContextUserRef:
+      $ref: './components/schemas/slack_context.yaml#/SlackContextUserRef'
     AlternativeUrls:
       $ref: './components/schemas/shared.yaml#/AlternativeUrls'
     ExecutionStatus:
