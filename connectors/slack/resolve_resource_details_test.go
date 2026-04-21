@@ -38,6 +38,8 @@ func TestResolveResourceDetails_Channel(t *testing.T) {
 		"slack.schedule_message", "slack.set_topic", "slack.invite_to_channel",
 		"slack.upload_file", "slack.add_reaction", "slack.update_message",
 		"slack.delete_message",
+		"slack.remove_from_channel", "slack.remove_reaction", "slack.pin_message",
+		"slack.unpin_message", "slack.archive_channel", "slack.rename_channel",
 	}
 
 	params, _ := json.Marshal(map[string]string{"channel": "C0AMRGKRTA4"})
@@ -138,6 +140,51 @@ func TestResolveResourceDetails_UserFallbackToRealName(t *testing.T) {
 	}
 	if details["user_name"] != "John Smith" {
 		t.Errorf("expected user_name 'John Smith', got %v", details["user_name"])
+	}
+}
+
+func TestResolveResourceDetails_SearchMessages_DefaultChannelName(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	params, _ := json.Marshal(map[string]string{"query": "hello"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "slack.search_messages", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["channel_name"] != "Slack" {
+		t.Errorf("expected channel_name 'Slack', got %v", details["channel_name"])
+	}
+}
+
+func TestResolveResourceDetails_SearchMessages_WithChannelID(t *testing.T) {
+	t.Parallel()
+
+	srv, conn := testSlackResolveServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/conversations.info" {
+			t.Errorf("expected /conversations.info, got %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"channel": map[string]any{
+				"name":       "engineering",
+				"is_private": false,
+			},
+		})
+	}))
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{
+		"query":   "deploy",
+		"channel": "C0AMRGKRTA4",
+	})
+	details, err := conn.ResolveResourceDetails(context.Background(), "slack.search_messages", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["channel_name"] != "#engineering" {
+		t.Errorf("expected channel_name '#engineering', got %v", details["channel_name"])
 	}
 }
 

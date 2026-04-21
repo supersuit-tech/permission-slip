@@ -52,11 +52,17 @@ export function humanizeKey(key: string): string {
  * Consolidated from ActionPreviewSummary's formatHighlightValue to
  * avoid duplicate formatting logic.
  */
+/** Masks Slack opaque resource IDs embedded in free-text params (e.g. search query). */
+function redactSlackOpaqueIdsInString(s: string): string {
+  return s.replace(/\b[CGD][A-Z0-9]{8,}\b/g, "\u2014");
+}
+
 export function formatHighlightValue(
   value: unknown,
   maxLen = 60,
 ): string | null {
-  if (typeof value === "string") return truncate(value, maxLen);
+  if (typeof value === "string")
+    return truncate(redactSlackOpaqueIdsInString(value), maxLen);
   if (typeof value === "number" || typeof value === "boolean")
     return String(value);
   if (Array.isArray(value)) {

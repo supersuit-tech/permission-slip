@@ -515,7 +515,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Search Messages",
 				Description:     "Search messages across Slack channels (requires search:read)",
 				RiskLevel:       "low",
-				DisplayTemplate: "Search Slack for {{query}}",
+				DisplayTemplate: "Search {{channel_name}} for {{query}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["query"],
@@ -524,6 +524,18 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"description": "Search query (supports Slack search modifiers like in:#channel, from:@user)",
 							"x-ui": {"placeholder": "search terms or in:#channel from:@user", "help_text": "Search query — supports Slack modifiers like in:#channel, from:@user"}
+						},
+						"channel": {
+							"type": "string",
+							"description": "Optional channel ID to scope the search (C…, G…, or D…)",
+							"x-ui": {
+								"widget": "remote-select",
+								"remote_select_options_path": "/v1/agents/{agent_id}/connectors/{connector_id}/channels",
+								"remote_select_id_key": "id",
+								"remote_select_label_key": "display_label",
+								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
+								"help_text": "Optional — limit search to this channel; shown by name in the approval summary when set"
+							}
 						},
 						"count": {
 							"type": "integer",
@@ -888,7 +900,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:       "slack.search_messages",
 				Name:             "Search messages",
 				Description:      "Agent can search messages across channels.",
-				Parameters:       json.RawMessage(`{"query":"*","count":"*","page":"*","sort":"*"}`),
+				Parameters:       json.RawMessage(`{"query":"*","channel":"*","count":"*","page":"*","sort":"*"}`),
 				StandingApproval: neverExpire,
 			},
 			{
