@@ -31,7 +31,7 @@ func buildSendMessageContext(ctx context.Context, c *SlackConnector, creds conne
 	if p.ThreadTS != "" {
 		parent, replies, truncated, err := slackctx.FetchThread(ctx, c, p.Channel, p.ThreadTS, creds, cache, mcache)
 		if err != nil {
-			if sc, ok := slackctx.HandleRateLimit(err); ok {
+			if _, ok := slackctx.HandleRateLimit(err); ok {
 				out.ContextScope = slackctx.ScopeMetadataOnly
 				return out, nil
 			}
@@ -39,7 +39,7 @@ func buildSendMessageContext(ctx context.Context, c *SlackConnector, creds conne
 		}
 		out.ContextScope = slackctx.ScopeThread
 		out.Thread = &slackctx.ThreadBlock{Parent: &parent, Replies: replies, Truncated: truncated}
-		slackctx.WithLastActivity(out.Channel, append(threadTSToList(parent.TS, replies)...)...)
+		slackctx.WithLastActivity(out.Channel, threadTSToList(parent.TS, replies)...)
 		return out, nil
 	}
 	opts := slackctx.RecentMessagesOpts{}
@@ -48,7 +48,7 @@ func buildSendMessageContext(ctx context.Context, c *SlackConnector, creds conne
 	}
 	recent, err := slackctx.FetchRecentMessages(ctx, c, p.Channel, creds, cache, opts, mcache)
 	if err != nil {
-		if sc, ok := slackctx.HandleRateLimit(err); ok {
+		if _, ok := slackctx.HandleRateLimit(err); ok {
 			out.ContextScope = slackctx.ScopeMetadataOnly
 			return out, nil
 		}
@@ -84,7 +84,7 @@ func buildScheduleMessageContext(ctx context.Context, c *SlackConnector, creds c
 	if p.ThreadTS != "" {
 		parent, replies, truncated, err := slackctx.FetchThread(ctx, c, p.Channel, p.ThreadTS, creds, cache, mcache)
 		if err != nil {
-			if sc, ok := slackctx.HandleRateLimit(err); ok {
+			if _, ok := slackctx.HandleRateLimit(err); ok {
 				out.ContextScope = slackctx.ScopeMetadataOnly
 				return out, nil
 			}
@@ -92,7 +92,7 @@ func buildScheduleMessageContext(ctx context.Context, c *SlackConnector, creds c
 		}
 		out.ContextScope = slackctx.ScopeThread
 		out.Thread = &slackctx.ThreadBlock{Parent: &parent, Replies: replies, Truncated: truncated}
-		slackctx.WithLastActivity(out.Channel, append(threadTSToList(parent.TS, replies)...)...)
+		slackctx.WithLastActivity(out.Channel, threadTSToList(parent.TS, replies)...)
 		return out, nil
 	}
 	opts := slackctx.RecentMessagesOpts{}
@@ -101,7 +101,7 @@ func buildScheduleMessageContext(ctx context.Context, c *SlackConnector, creds c
 	}
 	recent, err := slackctx.FetchRecentMessages(ctx, c, p.Channel, creds, cache, opts, mcache)
 	if err != nil {
-		if sc, ok := slackctx.HandleRateLimit(err); ok {
+		if _, ok := slackctx.HandleRateLimit(err); ok {
 			out.ContextScope = slackctx.ScopeMetadataOnly
 			return out, nil
 		}
@@ -125,15 +125,15 @@ func buildSendDMContext(ctx context.Context, c *SlackConnector, creds connectors
 	mcache := &slackctx.MentionCache{}
 	recipient, err := slackctx.FetchUserRef(ctx, c, creds, p.UserID)
 	if err != nil {
-		if sc, ok := slackctx.HandleRateLimit(err); ok {
-			return sc, nil
+		if rl, ok := slackctx.HandleRateLimit(err); ok {
+			return rl, nil
 		}
 		return nil, err
 	}
 	out := &slackctx.SlackContext{Recipient: recipient}
 	sentinel, msgs, imCh, err := slackctx.FetchDMHistory(ctx, c, p.UserID, creds, cache, mcache)
 	if err != nil {
-		if sc, ok := slackctx.HandleRateLimit(err); ok {
+		if _, ok := slackctx.HandleRateLimit(err); ok {
 			out.ContextScope = slackctx.ScopeMetadataOnly
 			return out, nil
 		}
@@ -221,7 +221,7 @@ func buildMessageTargetContext(ctx context.Context, c *SlackConnector, creds con
 	out := &slackctx.SlackContext{Channel: chMeta}
 	win, err := slackctx.FetchMessageWindowAroundTS(ctx, c, channelID, ts, creds, cache, mcache)
 	if err != nil {
-		if sc, ok := slackctx.HandleRateLimit(err); ok {
+		if _, ok := slackctx.HandleRateLimit(err); ok {
 			out.ContextScope = slackctx.ScopeMetadataOnly
 			return out, nil
 		}
@@ -234,7 +234,7 @@ func buildMessageTargetContext(ctx context.Context, c *SlackConnector, creds con
 	if win.TargetThreadRootTS != "" {
 		parent, replies, truncated, err := slackctx.FetchThread(ctx, c, channelID, win.TargetThreadRootTS, creds, cache, mcache)
 		if err != nil {
-			if sc, ok := slackctx.HandleRateLimit(err); ok {
+			if _, ok := slackctx.HandleRateLimit(err); ok {
 				out.ContextScope = slackctx.ScopeMetadataOnly
 				return out, nil
 			}
@@ -246,7 +246,7 @@ func buildMessageTargetContext(ctx context.Context, c *SlackConnector, creds con
 		if out.TargetMessage == nil {
 			out.TargetMessage = &win.Target
 		}
-		slackctx.WithLastActivity(out.Channel, append(threadTSToList(parent.TS, replies)...)...)
+		slackctx.WithLastActivity(out.Channel, threadTSToList(parent.TS, replies)...)
 		return out, nil
 	}
 	out.ContextScope = slackctx.ScopeRecentChannel
