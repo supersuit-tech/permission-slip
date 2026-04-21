@@ -21,6 +21,8 @@ import { useAgents } from "@/hooks/useAgents";
 import { useStandingApprovals } from "@/hooks/useStandingApprovals";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { ActionPreviewCard } from "@/components/previews/ActionPreviewCard";
+import { SlackContextPreview } from "@/components/previews/SlackContextPreview";
+import type { components } from "@/api/schema";
 import { CreateStandingApprovalDialog } from "./CreateStandingApprovalDialog";
 import {
   useCountdown,
@@ -348,15 +350,24 @@ export function ReviewApprovalDialog({
                   <Skeleton className="h-3 w-full" />
                 </div>
               ) : (
-                <ActionPreviewCard
-                  preview={preview}
-                  parameters={params}
-                  actionType={approval.action.type}
-                  schema={schema}
-                  actionName={actionName}
-                  displayTemplate={displayTemplate}
-                  resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
-                />
+                <>
+                  <ActionPreviewCard
+                    preview={preview}
+                    parameters={params}
+                    actionType={approval.action.type}
+                    schema={schema}
+                    actionName={actionName}
+                    displayTemplate={displayTemplate}
+                    resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
+                  />
+                  {(() => {
+                    const slackCtx = (approval.context.details as Record<string, unknown> | undefined)
+                      ?.slack_context as components["schemas"]["SlackContext"] | undefined;
+                    return slackCtx ? (
+                      <SlackContextPreview slackContext={slackCtx} />
+                    ) : null;
+                  })()}
+                </>
               )}
             </div>
 
