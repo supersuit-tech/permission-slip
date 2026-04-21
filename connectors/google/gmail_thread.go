@@ -143,12 +143,6 @@ func extractHTMLAndPlain(part *gmailMessagePart, depth int) (plain, html string)
 		return plainOut, htmlOut
 	}
 
-	if part.Body.Data != "" && part.MimeType == "text/plain" {
-		return decodeBase64URL(part.Body.Data), ""
-	}
-	if part.Body.Data != "" && part.MimeType == "text/html" {
-		return "", decodeBase64URL(part.Body.Data)
-	}
 	return "", ""
 }
 

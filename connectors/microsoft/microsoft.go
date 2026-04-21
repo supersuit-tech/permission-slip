@@ -110,11 +110,10 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:      "microsoft.send_email_reply",
-				Name:            "Reply to Email",
-				Description:     "Reply to an existing message in a Microsoft 365 mailbox",
-				RiskLevel:       "medium",
-				DisplayTemplate: "Reply to email {{message_id}}",
+				ActionType:  "microsoft.send_email_reply",
+				Name:        "Reply to Email",
+				Description: "Reply to an existing message in a Microsoft 365 mailbox",
+				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["message_id", "body"],
