@@ -4,21 +4,13 @@ import (
 	"context"
 	"errors"
 	"strings"
-	"time"
-	"unicode/utf8"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
-// ErrAgentConnectorInstanceLabelRequired is returned when label is empty after trim.
-var ErrAgentConnectorInstanceLabelRequired = errors.New("label is required")
-
-// ErrAgentConnectorInstanceLabelTooLong is returned when label exceeds MaxAgentConnectorInstanceLabelLen runes.
-var ErrAgentConnectorInstanceLabelTooLong = errors.New("label exceeds maximum length")
-
 // AgentConnectorInstance is a row in agent_connectors (one instance of a connector type for an agent).
+// Label is a display string derived from the bound credential (API key label or OAuth workspace name).
 type AgentConnectorInstance struct {
 	ConnectorInstanceID string
 	AgentID             int64
@@ -41,33 +33,35 @@ type AgentConnectorInstanceErrCode string
 
 const (
 	AgentConnectorInstanceErrNotFound            AgentConnectorInstanceErrCode = "connector_instance_not_found"
-	AgentConnectorInstanceErrDuplicateLabel      AgentConnectorInstanceErrCode = "duplicate_instance_label"
 	AgentConnectorInstanceErrCannotDeleteDefault AgentConnectorInstanceErrCode = "cannot_delete_default_instance"
 )
 
-// MaxAgentConnectorInstanceLabelLen is the maximum rune length for instance labels (API + DB).
-const MaxAgentConnectorInstanceLabelLen = 256
+// agentConnectorInstanceSelect is the standard SELECT for an agent_connectors row with display label
+// from the assigned credential (static API key label or OAuth extra_data name).
+const agentConnectorInstanceSelect = `
+	SELECT ac.connector_instance_id, ac.agent_id, ac.connector_id, ac.approver_id,
+	       COALESCE(cr.label, oc.extra_data->>'name', '') AS label,
+	       ac.is_default, ac.enabled_at
+	FROM agent_connectors ac
+	LEFT JOIN agent_connector_credentials acc
+	       ON acc.agent_id = ac.agent_id
+	      AND acc.connector_id = ac.connector_id
+	      AND acc.approver_id = ac.approver_id
+	      AND acc.connector_instance_id = ac.connector_instance_id
+	LEFT JOIN credentials cr ON cr.id = acc.credential_id
+	LEFT JOIN oauth_connections oc ON oc.id = acc.oauth_connection_id`
 
 // CreateAgentConnectorInstanceParams holds parameters for creating a new instance (non-default row).
 type CreateAgentConnectorInstanceParams struct {
 	AgentID     int64
 	ApproverID  string
 	ConnectorID string
-	Label       string
 }
 
-// CreateAgentConnectorInstance inserts a new agent connector instance with the given label.
+// CreateAgentConnectorInstance inserts a new agent connector instance.
 // The first instance for an (agent, connector) pair is the default (enforced by DB trigger);
 // additional instances are non-default.
 func CreateAgentConnectorInstance(ctx context.Context, db DBTX, p CreateAgentConnectorInstanceParams) (*AgentConnectorInstance, error) {
-	label := strings.TrimSpace(p.Label)
-	if label == "" {
-		return nil, ErrAgentConnectorInstanceLabelRequired
-	}
-	if utf8.RuneCountInString(label) > MaxAgentConnectorInstanceLabelLen {
-		return nil, ErrAgentConnectorInstanceLabelTooLong
-	}
-
 	var agentOK bool
 	if err := db.QueryRow(ctx,
 		`SELECT EXISTS (SELECT 1 FROM agents WHERE agent_id = $1 AND approver_id = $2)`,
@@ -104,21 +98,17 @@ func CreateAgentConnectorInstance(ctx context.Context, db DBTX, p CreateAgentCon
 		return nil, &AgentConnectorError{Code: AgentConnectorErrConnectorNotEnabled}
 	}
 
-	row := db.QueryRow(ctx, `
-		INSERT INTO agent_connectors (agent_id, approver_id, connector_id, label, is_default)
-		VALUES ($1, $2, $3, $4, false)
-		RETURNING connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at`,
-		p.AgentID, p.ApproverID, p.ConnectorID, label,
-	)
-	inst, err := scanAgentConnectorInstance(row)
+	var newID string
+	err := db.QueryRow(ctx, `
+		INSERT INTO agent_connectors (agent_id, approver_id, connector_id, is_default)
+		VALUES ($1, $2, $3, false)
+		RETURNING connector_instance_id::text`,
+		p.AgentID, p.ApproverID, p.ConnectorID,
+	).Scan(&newID)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
-			return nil, &AgentConnectorInstanceError{Code: AgentConnectorInstanceErrDuplicateLabel}
-		}
 		return nil, err
 	}
-	return inst, nil
+	return GetAgentConnectorInstance(ctx, db, p.AgentID, p.ApproverID, p.ConnectorID, newID)
 }
 
 func scanAgentConnectorInstance(row pgx.Row) (*AgentConnectorInstance, error) {
@@ -135,11 +125,9 @@ func scanAgentConnectorInstance(row pgx.Row) (*AgentConnectorInstance, error) {
 
 // ListAgentConnectorInstances returns all instances for an agent+connector scoped to the approver.
 func ListAgentConnectorInstances(ctx context.Context, db DBTX, agentID int64, approverID, connectorID string) ([]AgentConnectorInstance, error) {
-	rows, err := db.Query(ctx, `
-		SELECT connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at
-		FROM agent_connectors
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
-		ORDER BY enabled_at ASC, connector_instance_id ASC`,
+	rows, err := db.Query(ctx, agentConnectorInstanceSelect+`
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3
+		ORDER BY ac.enabled_at ASC, ac.connector_instance_id ASC`,
 		agentID, approverID, connectorID,
 	)
 	if err != nil {
@@ -149,24 +137,19 @@ func ListAgentConnectorInstances(ctx context.Context, db DBTX, agentID int64, ap
 
 	var out []AgentConnectorInstance
 	for rows.Next() {
-		var inst AgentConnectorInstance
-		if err := rows.Scan(
-			&inst.ConnectorInstanceID, &inst.AgentID, &inst.ConnectorID, &inst.ApproverID,
-			&inst.Label, &inst.IsDefault, &inst.EnabledAt,
-		); err != nil {
+		inst, err := scanAgentConnectorInstance(rows)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, inst)
+		out = append(out, *inst)
 	}
 	return out, rows.Err()
 }
 
 // GetAgentConnectorInstance returns a single instance by ID, scoped to agent and approver.
 func GetAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID string) (*AgentConnectorInstance, error) {
-	row := db.QueryRow(ctx, `
-		SELECT connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at
-		FROM agent_connectors
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+	row := db.QueryRow(ctx, agentConnectorInstanceSelect+`
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3 AND ac.connector_instance_id = $4::uuid`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	inst, err := scanAgentConnectorInstance(row)
@@ -181,10 +164,8 @@ func GetAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, appr
 
 // GetDefaultAgentConnectorInstance returns the default instance for an (agent, connector) pair.
 func GetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID string) (*AgentConnectorInstance, error) {
-	row := db.QueryRow(ctx, `
-		SELECT connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at
-		FROM agent_connectors
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND is_default`,
+	row := db.QueryRow(ctx, agentConnectorInstanceSelect+`
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3 AND ac.is_default`,
 		agentID, approverID, connectorID,
 	)
 	inst, err := scanAgentConnectorInstance(row)
@@ -200,10 +181,8 @@ func GetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int6
 // GetDefaultAgentConnectorInstanceByAgent returns the default instance using only agent_id and connector_id.
 // Each agent has a single approver; this is used when approver_id is not available on the call path.
 func GetDefaultAgentConnectorInstanceByAgent(ctx context.Context, db DBTX, agentID int64, connectorID string) (*AgentConnectorInstance, error) {
-	row := db.QueryRow(ctx, `
-		SELECT connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at
-		FROM agent_connectors
-		WHERE agent_id = $1 AND connector_id = $2 AND is_default`,
+	row := db.QueryRow(ctx, agentConnectorInstanceSelect+`
+		WHERE ac.agent_id = $1 AND ac.connector_id = $2 AND ac.is_default`,
 		agentID, connectorID,
 	)
 	inst, err := scanAgentConnectorInstance(row)
@@ -239,19 +218,20 @@ func SetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int6
 		return nil, err
 	}
 
-	row := tx.QueryRow(ctx, `
+	tag, err := tx.Exec(ctx, `
 		UPDATE agent_connectors
 		SET is_default = true
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid
-		RETURNING connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at`,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
-	inst, err := scanAgentConnectorInstance(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
+	}
+	if tag.RowsAffected() == 0 {
+		if owned {
+			_ = RollbackTx(ctx, tx)
+		}
+		return nil, nil
 	}
 
 	if owned {
@@ -259,38 +239,7 @@ func SetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int6
 			return nil, err
 		}
 	}
-	return inst, nil
-}
-
-// RenameAgentConnectorInstance updates the label for an instance.
-func RenameAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID, newLabel string) (*AgentConnectorInstance, error) {
-	label := strings.TrimSpace(newLabel)
-	if label == "" {
-		return nil, ErrAgentConnectorInstanceLabelRequired
-	}
-	if utf8.RuneCountInString(label) > MaxAgentConnectorInstanceLabelLen {
-		return nil, ErrAgentConnectorInstanceLabelTooLong
-	}
-
-	row := db.QueryRow(ctx, `
-		UPDATE agent_connectors
-		SET label = $5
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid
-		RETURNING connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at`,
-		agentID, approverID, connectorID, connectorInstanceID, label,
-	)
-	inst, err := scanAgentConnectorInstance(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
-			return nil, &AgentConnectorInstanceError{Code: AgentConnectorInstanceErrDuplicateLabel}
-		}
-		return nil, err
-	}
-	return inst, nil
+	return GetAgentConnectorInstance(ctx, db, agentID, approverID, connectorID, connectorInstanceID)
 }
 
 // DeleteAgentConnectorInstance removes a non-default instance and revokes instance-scoped standing approvals.
@@ -350,7 +299,7 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 	return nil
 }
 
-// ResolveAgentConnectorInstance finds an instance by UUID or by exact label (trimmed).
+// ResolveAgentConnectorInstance finds an instance by UUID or by credential display name (trimmed).
 func ResolveAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, selector string) (*AgentConnectorInstance, error) {
 	sel := strings.TrimSpace(selector)
 	if sel == "" {
@@ -361,10 +310,9 @@ func ResolveAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, 
 		return GetAgentConnectorInstance(ctx, db, agentID, approverID, connectorID, sel)
 	}
 
-	row := db.QueryRow(ctx, `
-		SELECT connector_instance_id, agent_id, connector_id, approver_id, label, is_default, enabled_at
-		FROM agent_connectors
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND label = $4`,
+	row := db.QueryRow(ctx, agentConnectorInstanceSelect+`
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3
+		  AND COALESCE(cr.label, oc.extra_data->>'name', '') = $4`,
 		agentID, approverID, connectorID, sel,
 	)
 	inst, err := scanAgentConnectorInstance(row)

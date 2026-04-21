@@ -12,6 +12,7 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors/slack"
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 // testDepsForDB creates a Deps suitable for tests that only need a DB and JWT secret.
@@ -1042,15 +1043,65 @@ func TestAgentRequestApproval_MultiInstance_RequiresConnectorInstance(t *testing
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertConnectorAction(t, tx, connID, connID+".ping", "Ping")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
-	if _, err := db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
-		AgentID: agentID, ApproverID: uid, ConnectorID: connID, Label: "Beta",
+	ctx := context.Background()
+	if _, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
 	}); err != nil {
 		t.Fatalf("second instance: %v", err)
 	}
 
+	v := vault.NewMockVaultStore()
+	credJSON, _ := json.Marshal(map[string]string{"api_key": "k1"})
+	v1, err := v.CreateSecret(ctx, tx, "c1", credJSON)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID1 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID1, uid, connID, "Alpha", v1)
+
+	credJSON2, _ := json.Marshal(map[string]string{"api_key": "k2"})
+	v2, err := v.CreateSecret(ctx, tx, "c2", credJSON2)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID2 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID2, uid, connID, "Beta", v2)
+
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default instance: %v", defInst)
+	}
+	instances, err := db.ListAgentConnectorInstances(ctx, tx, agentID, uid, connID)
+	if err != nil || len(instances) != 2 {
+		t.Fatalf("instances: %v len=%d", err, len(instances))
+	}
+	var secondID string
+	for _, inst := range instances {
+		if inst.ConnectorInstanceID != defInst.ConnectorInstanceID {
+			secondID = inst.ConnectorInstanceID
+			break
+		}
+	}
+	if secondID == "" {
+		t.Fatal("expected two distinct instances")
+	}
+
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID1,
+	}); err != nil {
+		t.Fatalf("bind default: %v", err)
+	}
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: secondID, ApproverID: uid, CredentialID: &credID2,
+	}); err != nil {
+		t.Fatalf("bind second: %v", err)
+	}
+
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector(connID, connID+".ping"))
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_mi_need_inst","action":{"type":"` + connID + `.ping","parameters":{}},"context":{"description":"x"}}`
@@ -1072,6 +1123,16 @@ func TestAgentRequestApproval_MultiInstance_RequiresConnectorInstance(t *testing
 	if len(labels) != 2 {
 		t.Fatalf("expected 2 available_instances, got %#v", errResp.Error.Details)
 	}
+	got := make(map[string]struct{})
+	for _, x := range labels {
+		s, _ := x.(string)
+		got[s] = struct{}{}
+	}
+	for _, want := range []string{"Alpha", "Beta"} {
+		if _, ok := got[want]; !ok {
+			t.Fatalf("expected available_instances to include %q, got %#v", want, labels)
+		}
+	}
 }
 
 func TestAgentRequestApproval_MultiInstance_WithLabel_FreezesInstanceOnAction(t *testing.T) {
@@ -1090,16 +1151,51 @@ func TestAgentRequestApproval_MultiInstance_WithLabel_FreezesInstanceOnAction(t 
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertConnectorAction(t, tx, connID, connID+".ping", "Ping")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
-	inst2, err := db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
-		AgentID: agentID, ApproverID: uid, ConnectorID: connID, Label: "Sales",
+	ctx := context.Background()
+	inst2, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
 	})
 	if err != nil {
 		t.Fatalf("second instance: %v", err)
 	}
 
+	v := vault.NewMockVaultStore()
+	credJSON1, _ := json.Marshal(map[string]string{"api_key": "k1"})
+	v1, err := v.CreateSecret(ctx, tx, "c1", credJSON1)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID1 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID1, uid, connID, "Alpha", v1)
+
+	credJSON2, _ := json.Marshal(map[string]string{"api_key": "k2"})
+	v2, err := v.CreateSecret(ctx, tx, "c2", credJSON2)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID2 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID2, uid, connID, "Sales", v2)
+
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default instance: %v", defInst)
+	}
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID1,
+	}); err != nil {
+		t.Fatalf("bind default: %v", err)
+	}
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: inst2.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID2,
+	}); err != nil {
+		t.Fatalf("bind sales: %v", err)
+	}
+
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector(connID, connID+".ping"))
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_mi_label","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"Sales"}},"context":{"description":"x"}}`

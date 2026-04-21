@@ -61,7 +61,7 @@ func TestCreateAgentConnectorInstance_Second(t *testing.T) {
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{"label":"Sales"}`))
+	r := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -94,7 +94,7 @@ func TestPatchAgentConnectorInstance_SetDefault(t *testing.T) {
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{"label":"Sales"}`))
+	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, r1)
 	if w1.Code != http.StatusCreated {
@@ -125,7 +125,7 @@ func TestPatchAgentConnectorInstance_SetDefault(t *testing.T) {
 	}
 }
 
-func TestPatchAgentConnectorInstance_DuplicateLabel409(t *testing.T) {
+func TestPatchAgentConnectorInstance_RequiresIsDefault(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -145,30 +145,17 @@ func TestPatchAgentConnectorInstance_DuplicateLabel409(t *testing.T) {
 	if len(list.Data) != 1 {
 		t.Fatalf("expected 1 default instance")
 	}
-	defaultLabel := list.Data[0].Label
 
-	// Create second instance
-	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{"label":"Sales"}`))
-	w1 := httptest.NewRecorder()
-	router.ServeHTTP(w1, r1)
-	if w1.Code != http.StatusCreated {
-		t.Fatalf("create second: %d %s", w1.Code, w1.Body.String())
-	}
-	var created agentConnectorInstanceResponse
-	if err := json.Unmarshal(w1.Body.Bytes(), &created); err != nil {
-		t.Fatalf("unmarshal created: %v", err)
-	}
-
-	patchPayload, err := json.Marshal(map[string]string{"label": defaultLabel})
+	patchPayload, err := json.Marshal(map[string]string{})
 	if err != nil {
 		t.Fatal(err)
 	}
 	r2 := authenticatedRequestWithBody(t, http.MethodPatch,
-		fmt.Sprintf("/agents/%d/connectors/%s/instances/%s", agentID, connID, created.ConnectorInstanceID), uid, patchPayload)
+		fmt.Sprintf("/agents/%d/connectors/%s/instances/%s", agentID, connID, list.Data[0].ConnectorInstanceID), uid, patchPayload)
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
-	if w2.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", w2.Code, w2.Body.String())
+	if w2.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w2.Code, w2.Body.String())
 	}
 }
 
@@ -207,7 +194,7 @@ func TestDeleteAgentConnectorInstance_SecondInstance204(t *testing.T) {
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{"label":"Extra"}`))
+	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, r1)
 	if w1.Code != http.StatusCreated {

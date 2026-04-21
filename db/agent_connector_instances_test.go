@@ -30,9 +30,6 @@ func TestListAgentConnectorInstances_DefaultOnly(t *testing.T) {
 	if !instances[0].IsDefault {
 		t.Error("expected first instance to be default")
 	}
-	if instances[0].Label == "" {
-		t.Error("expected non-empty label")
-	}
 }
 
 func TestCreateAgentConnectorInstance_SecondInstance(t *testing.T) {
@@ -50,7 +47,6 @@ func TestCreateAgentConnectorInstance_SecondInstance(t *testing.T) {
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "Second",
 	})
 	if err != nil {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)
@@ -83,7 +79,6 @@ func TestCreateAgentConnectorInstance_RequiresConnectorEnabled(t *testing.T) {
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "First",
 	})
 	var acErr *db.AgentConnectorError
 	if !errors.As(err, &acErr) || acErr.Code != db.AgentConnectorErrConnectorNotEnabled {
@@ -107,7 +102,6 @@ func TestSetDefaultAgentConnectorInstance_SwitchesDefault(t *testing.T) {
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "Sales",
 	})
 	if err != nil {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)
@@ -137,35 +131,7 @@ func TestSetDefaultAgentConnectorInstance_SwitchesDefault(t *testing.T) {
 		t.Fatalf("default after: err=%v inst=%v", err, def2)
 	}
 	if def2.ConnectorInstanceID != inst2.ConnectorInstanceID {
-		t.Fatalf("expected Sales instance default, got %s", def2.ConnectorInstanceID)
-	}
-}
-
-func TestCreateAgentConnectorInstance_DuplicateLabel(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-
-	uid := testhelper.GenerateUID(t)
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-
-	connID := testhelper.GenerateID(t, "conn_")
-	testhelper.InsertConnector(t, tx, connID)
-	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
-
-	defaultInst, err := db.GetDefaultAgentConnectorInstance(t.Context(), tx, agentID, uid, connID)
-	if err != nil || defaultInst == nil {
-		t.Fatalf("default instance: err=%v inst=%v", err, defaultInst)
-	}
-
-	_, err = db.CreateAgentConnectorInstance(t.Context(), tx, db.CreateAgentConnectorInstanceParams{
-		AgentID:     agentID,
-		ApproverID:  uid,
-		ConnectorID: connID,
-		Label:       defaultInst.Label,
-	})
-	var instErr *db.AgentConnectorInstanceError
-	if !errors.As(err, &instErr) || instErr.Code != db.AgentConnectorInstanceErrDuplicateLabel {
-		t.Fatalf("expected duplicate label error, got %v", err)
+		t.Fatalf("expected second instance to become default, got %s", def2.ConnectorInstanceID)
 	}
 }
 
@@ -187,7 +153,6 @@ func TestFindActiveStandingApprovalsForAgent_FiltersByInstance(t *testing.T) {
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "Sales",
 	})
 	if err != nil {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)
@@ -249,7 +214,6 @@ func TestDeleteAgentConnectorInstance_RevokesInstanceScopedStandingApproval(t *t
 		AgentID:     agentID,
 		ApproverID:  uid,
 		ConnectorID: connID,
-		Label:       "ToDelete",
 	})
 	if err != nil {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)

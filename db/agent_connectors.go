@@ -100,14 +100,17 @@ func EnableAgentConnector(ctx context.Context, db DBTX, agentID int64, approverI
 			INSERT INTO agent_connectors (agent_id, approver_id, connector_id)
 			SELECT $1, $2, $3
 			WHERE EXISTS (SELECT 1 FROM agent_check)
-			ON CONFLICT (agent_id, connector_id, label) DO NOTHING
+			  AND NOT EXISTS (
+			      SELECT 1 FROM agent_connectors ac0
+			      WHERE ac0.agent_id = $1 AND ac0.approver_id = $2 AND ac0.connector_id = $3
+			  )
 			RETURNING agent_id, connector_id, enabled_at
 		)
 		SELECT agent_id, connector_id, enabled_at FROM inserted
 		UNION ALL
 		SELECT ac.agent_id, ac.connector_id, ac.enabled_at
 		FROM agent_connectors ac
-		WHERE ac.agent_id = $1 AND ac.connector_id = $3
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3
 		  AND NOT EXISTS (SELECT 1 FROM inserted)
 		  AND EXISTS (SELECT 1 FROM agent_check)`,
 		agentID, approverID, connectorID,

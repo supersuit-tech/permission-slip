@@ -147,7 +147,8 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 
 	// 1b. Per-instance credential readiness (one row per agent_connectors instance).
 	instRows, err := db.Query(ctx, `
-		SELECT ac.connector_id, ac.connector_instance_id::text, ac.label,
+		SELECT ac.connector_id, ac.connector_instance_id::text,
+		       COALESCE(cr.label, oc.extra_data->>'name', ''),
 		       NOT EXISTS (
 		           SELECT 1 FROM connector_required_credentials crc
 		           WHERE crc.connector_id = ac.connector_id
@@ -177,6 +178,13 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		             )
 		       ) AS credentials_ready
 		FROM agent_connectors ac
+		LEFT JOIN agent_connector_credentials acc
+		       ON acc.agent_id = ac.agent_id
+		      AND acc.connector_id = ac.connector_id
+		      AND acc.approver_id = ac.approver_id
+		      AND acc.connector_instance_id = ac.connector_instance_id
+		LEFT JOIN credentials cr ON cr.id = acc.credential_id
+		LEFT JOIN oauth_connections oc ON oc.id = acc.oauth_connection_id
 		WHERE ac.agent_id = $1 AND ac.approver_id = $2
 		ORDER BY ac.connector_id, ac.enabled_at ASC, ac.connector_instance_id ASC`,
 		agentID, approverID,
