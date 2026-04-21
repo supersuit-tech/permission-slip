@@ -216,9 +216,14 @@ ActionContext:
         - `estimated_cost`: Estimated cost of a payment action
         - `affected_resources`: List of resources that will be modified
         - `email_thread`: Full conversation for email reply actions (see EmailThread)
+        
+        Slack connector actions may include `slack_context` (see `SlackContext`) with
+        channel/thread/DM surroundings for the reviewer.
       properties:
         email_thread:
           $ref: '#/EmailThread'
+        slack_context:
+          $ref: './slack_context.yaml#/SlackContext'
       example:
         recipient_count: 1
         estimated_time: "5 minutes"

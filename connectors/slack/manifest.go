@@ -57,6 +57,16 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"description": "Message text (supports Slack mrkdwn formatting)",
 							"x-ui": {"widget": "textarea", "placeholder": "Enter the message text"}
+						},
+						"thread_ts": {
+							"type": "string",
+							"description": "Optional. Post as a thread reply — Slack message timestamp of the parent message (e.g. 1234567890.123456). Used for approval context (thread view) when set.",
+							"x-ui": {"hidden": true}
+						},
+						"in_response_to_ts": {
+							"type": "string",
+							"description": "Optional. Slack message timestamp to anchor recent-channel context around for approvers. Does not change the Slack API request.",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),
@@ -242,6 +252,16 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 							"format": "date-time",
 							"description": "When the message should be sent in RFC 3339 format (e.g. 2026-03-20T09:00:00Z)",
 							"x-ui": {"label": "Send at", "help_text": "The date and time to deliver the message"}
+						},
+						"thread_ts": {
+							"type": "string",
+							"description": "Optional. Schedule as a thread reply — Slack message timestamp of the parent message. Used for approval context when set.",
+							"x-ui": {"hidden": true}
+						},
+						"in_response_to_ts": {
+							"type": "string",
+							"description": "Optional. Slack message timestamp to anchor recent-channel context around for approvers. Does not change the Slack API request.",
+							"x-ui": {"hidden": true}
 						}
 					}
 				}`)),

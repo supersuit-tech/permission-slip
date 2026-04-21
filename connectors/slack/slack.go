@@ -314,6 +314,17 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 	return nil
 }
 
+// Post and Get expose the Slack Web API request lifecycle for helpers in
+// subpackages (e.g. connectors/slack/context). They delegate to doPost/doGet.
+func (c *SlackConnector) Post(ctx context.Context, method string, creds connectors.Credentials, body any, dest any) error {
+	return c.doPost(ctx, method, creds, body, dest)
+}
+
+// Get sends a GET request to a Slack API method with query parameters.
+func (c *SlackConnector) Get(ctx context.Context, method string, creds connectors.Credentials, params map[string]string, dest any) error {
+	return c.doGet(ctx, method, creds, params, dest)
+}
+
 // doGet sends a GET request to a Slack API method with query parameters.
 // Used for endpoints like conversations.info and users.info that only accept
 // application/x-www-form-urlencoded (not JSON body). The params map is
