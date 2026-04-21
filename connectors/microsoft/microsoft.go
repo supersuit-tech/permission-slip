@@ -75,10 +75,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
-				ActionType:  "microsoft.send_email",
-				Name:        "Send Email",
-				Description: "Send an email using Microsoft 365",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.send_email",
+				Name:            "Send Email",
+				Description:     "Send an email using Microsoft 365",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Send email to {{to}} — {{subject}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["to", "subject", "body"],
@@ -110,10 +111,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.send_email_reply",
-				Name:        "Reply to Email",
-				Description: "Reply to an existing message in a Microsoft 365 mailbox",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.send_email_reply",
+				Name:            "Reply to Email",
+				Description:     "Reply to an existing message in a Microsoft 365 mailbox",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Reply to {{subject}} from {{from}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["message_id", "body"],
@@ -135,10 +137,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_emails",
-				Name:        "List Emails",
-				Description: "List recent emails from the user's mailbox",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.list_emails",
+				Name:            "List Emails",
+				Description:     "List recent emails from the user's mailbox",
+				RiskLevel:       "low",
+				DisplayTemplate: "List emails in {{folder}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -158,10 +161,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.create_calendar_event",
-				Name:        "Create Calendar Event",
-				Description: "Create a new event on the user's calendar",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.create_calendar_event",
+				Name:            "Create Calendar Event",
+				Description:     "Create a new event on the user's calendar",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Create event {{subject}} on {{start:datetime}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["subject", "start", "end"],
@@ -218,10 +222,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_calendar_events",
-				Name:        "List Calendar Events",
-				Description: "List upcoming events from the user's calendar",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.list_calendar_events",
+				Name:            "List Calendar Events",
+				Description:     "List upcoming events from the user's calendar",
+				RiskLevel:       "low",
+				DisplayTemplate: "List calendar events in {{calendar_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -249,10 +254,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_drive_files",
-				Name:        "List Drive Files",
-				Description: "List files and folders in OneDrive",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.list_drive_files",
+				Name:            "List Drive Files",
+				Description:     "List files and folders in OneDrive",
+				RiskLevel:       "low",
+				DisplayTemplate: "List OneDrive files in {{folder_path}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -271,10 +277,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.get_drive_file",
-				Name:        "Get Drive File",
-				Description: "Get file metadata and optionally download text content from OneDrive",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.get_drive_file",
+				Name:            "Get Drive File",
+				Description:     "Get file metadata and optionally download text content from OneDrive",
+				RiskLevel:       "low",
+				DisplayTemplate: "Get OneDrive file {{file_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id"],
@@ -292,10 +299,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.upload_drive_file",
-				Name:        "Upload Drive File",
-				Description: "Upload or create a file in OneDrive",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.upload_drive_file",
+				Name:            "Upload Drive File",
+				Description:     "Upload or create a file in OneDrive",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Upload {{file_path}} to OneDrive",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["file_path"],
@@ -318,10 +326,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.delete_drive_file",
-				Name:        "Delete Drive File",
-				Description: "Move a file to the OneDrive recycle bin (recoverable)",
-				RiskLevel:   "high",
+				ActionType:      "microsoft.delete_drive_file",
+				Name:            "Delete Drive File",
+				Description:     "Move a file to the OneDrive recycle bin (recoverable)",
+				RiskLevel:       "high",
+				DisplayTemplate: "Delete OneDrive file {{file_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id"],
@@ -334,10 +343,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.create_document",
-				Name:        "Create Document",
-				Description: "Create a new Word document in OneDrive",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.create_document",
+				Name:            "Create Document",
+				Description:     "Create a new Word document in OneDrive",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Create Word doc {{filename}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["filename"],
@@ -360,10 +370,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.get_document",
-				Name:        "Get Document",
-				Description: "Get metadata of a Word document from OneDrive",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.get_document",
+				Name:            "Get Document",
+				Description:     "Get metadata of a Word document from OneDrive",
+				RiskLevel:       "low",
+				DisplayTemplate: "Get document {{document_title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id"],
@@ -376,10 +387,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.update_document",
-				Name:        "Update Document",
-				Description: "Update the content of a Word document in OneDrive",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.update_document",
+				Name:            "Update Document",
+				Description:     "Update the content of a Word document in OneDrive",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Update document {{document_title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id", "content"],
@@ -396,10 +408,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_documents",
-				Name:        "List Documents",
-				Description: "List Word documents from OneDrive",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.list_documents",
+				Name:            "List Documents",
+				Description:     "List Word documents from OneDrive",
+				RiskLevel:       "low",
+				DisplayTemplate: "List documents in {{folder_path}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -419,10 +432,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_teams",
-				Name:        "List Teams",
-				Description: "List Microsoft Teams the user is a member of",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.list_teams",
+				Name:            "List Teams",
+				Description:     "List Microsoft Teams the user is a member of",
+				RiskLevel:       "low",
+				DisplayTemplate: "List Microsoft Teams",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -437,10 +451,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_channels",
-				Name:        "List Channels",
-				Description: "List channels in a Microsoft Teams team",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.list_channels",
+				Name:            "List Channels",
+				Description:     "List channels in a Microsoft Teams team",
+				RiskLevel:       "low",
+				DisplayTemplate: "List channels in {{team_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["team_id"],
@@ -453,10 +468,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.send_channel_message",
-				Name:        "Send Channel Message",
-				Description: "Send a message to a Microsoft Teams channel",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.send_channel_message",
+				Name:            "Send Channel Message",
+				Description:     "Send a message to a Microsoft Teams channel",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Send message to {{team_name}} / {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["team_id", "channel_id", "message"],
@@ -486,10 +502,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_channel_messages",
-				Name:        "List Channel Messages",
-				Description: "List recent messages from a Microsoft Teams channel",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.list_channel_messages",
+				Name:            "List Channel Messages",
+				Description:     "List recent messages from a Microsoft Teams channel",
+				RiskLevel:       "low",
+				DisplayTemplate: "Read messages in {{team_name}} / {{channel_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["team_id", "channel_id"],
@@ -513,10 +530,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.create_presentation",
-				Name:        "Create Presentation",
-				Description: "Create a new PowerPoint presentation in OneDrive",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.create_presentation",
+				Name:            "Create Presentation",
+				Description:     "Create a new PowerPoint presentation in OneDrive",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Create presentation {{filename}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["filename"],
@@ -533,10 +551,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.list_presentations",
-				Name:        "List Presentations",
-				Description: "Search for PowerPoint presentations in OneDrive",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.list_presentations",
+				Name:            "List Presentations",
+				Description:     "Search for PowerPoint presentations in OneDrive",
+				RiskLevel:       "low",
+				DisplayTemplate: "List presentations in {{folder_path}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -555,10 +574,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.get_presentation",
-				Name:        "Get Presentation",
-				Description: "Get metadata about a specific PowerPoint presentation",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.get_presentation",
+				Name:            "Get Presentation",
+				Description:     "Get metadata about a specific PowerPoint presentation",
+				RiskLevel:       "low",
+				DisplayTemplate: "Get presentation {{presentation_title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id"],
@@ -571,10 +591,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.create_spreadsheet",
-				Name:        "Create Spreadsheet",
-				Description: "Create a new Excel spreadsheet in OneDrive",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.create_spreadsheet",
+				Name:            "Create Spreadsheet",
+				Description:     "Create a new Excel spreadsheet in OneDrive",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Create Excel workbook {{filename}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["filename"],
@@ -591,10 +612,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.excel_list_worksheets",
-				Name:        "List Excel Worksheets",
-				Description: "List all worksheets in an Excel workbook stored in OneDrive",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.excel_list_worksheets",
+				Name:            "List Excel Worksheets",
+				Description:     "List all worksheets in an Excel workbook stored in OneDrive",
+				RiskLevel:       "low",
+				DisplayTemplate: "List worksheets in {{workbook_title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id"],
@@ -607,10 +629,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.excel_read_range",
-				Name:        "Read Excel Range",
-				Description: "Read cell values from a worksheet range in an Excel workbook",
-				RiskLevel:   "low",
+				ActionType:      "microsoft.excel_read_range",
+				Name:            "Read Excel Range",
+				Description:     "Read cell values from a worksheet range in an Excel workbook",
+				RiskLevel:       "low",
+				DisplayTemplate: "Read {{range}} from {{workbook_title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id", "sheet_name", "range"],
@@ -631,10 +654,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.excel_write_range",
-				Name:        "Write Excel Range",
-				Description: "Write cell values to a worksheet range in an Excel workbook",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.excel_write_range",
+				Name:            "Write Excel Range",
+				Description:     "Write cell values to a worksheet range in an Excel workbook",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Write to {{range}} in {{workbook_title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id", "sheet_name", "range", "values"],
@@ -663,10 +687,11 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "microsoft.excel_append_rows",
-				Name:        "Append Excel Rows",
-				Description: "Append rows to a named table in an Excel workbook",
-				RiskLevel:   "medium",
+				ActionType:      "microsoft.excel_append_rows",
+				Name:            "Append Excel Rows",
+				Description:     "Append rows to a named table in an Excel workbook",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Append rows to {{workbook_title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["item_id", "table_name", "values"],
