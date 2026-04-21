@@ -213,7 +213,11 @@ The OpenAPI spec (`spec/openapi/`) is the single source of truth for all API typ
 - When creating issues, default to using checklists (`- [ ]`) instead of bullet points for work items that can be completed independently. This makes it easy to track progress directly in the issue.
 - When you encounter an issue with a checklist that is out of date (items completed but not checked off, missing items, irrelevant items), update the checklist to reflect the current state.
 - **Never assume issue scope.** If you can't access an issue (e.g., a link doesn't work or returns an error), try fetching it with the `gh` CLI (`GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh issue view <number>`). If you still can't access it, ask the user for the issue details — do not guess or infer what the issue is about.
-- **Organize multi-task issues into phases, one PR per phase.** When an issue has multiple tasks, group them into sequential phases where each phase depends on the previous one completing. Each phase should be scoped to ship as its own PR — sized so it can be reviewed and merged independently before the next phase begins. Within each phase, mark which tasks can run in parallel vs. which must be sequential. Use checklists within each phase for trackability, and reference the phase's PR in the issue as it opens/merges.
+- **Organize multi-task issues into phases.** When an issue has multiple tasks, group them into phases and make dependencies explicit:
+  - **Mark whether each phase can run in parallel with others or must wait** for an earlier phase to merge. Default to sequential only when there's a real dependency (e.g., Phase 2 imports a type Phase 1 introduces). Independent phases should be labeled "parallelizable" so multiple agents/devs can work them simultaneously.
+  - **Within each phase, mark which tasks can run in parallel vs. which must be sequential.**
+  - **Prefer fewer PRs.** Each PR costs a review cycle, so combine work into a single PR when it's cohesive and reviewable in one sitting. Split into separate PRs only when there's a real reason — e.g., the change is too large to review well, phases are genuinely independent and shippable on their own, a risky change should be isolated for easy revert, or separate phases unblock parallel work. When in doubt, one PR is usually better than two.
+  - Use checklists within each phase for trackability, and reference the phase's PR in the issue as it opens/merges.
 
 ## Go Toolchain Setup
 
