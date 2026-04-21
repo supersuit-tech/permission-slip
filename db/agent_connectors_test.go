@@ -1,7 +1,6 @@
 package db_test
 
 import (
-	"context"
 	"fmt"
 	"testing"
 
@@ -14,7 +13,7 @@ func TestAgentConnectorsSchema(t *testing.T) {
 
 	testhelper.RequireColumns(t, tx, "agent_connectors", []string{
 		"agent_id", "approver_id", "connector_id", "connector_instance_id",
-		"label", "is_default", "enabled_at",
+		"is_default", "enabled_at",
 	})
 }
 
@@ -23,30 +22,6 @@ func TestAgentConnectorsIndex(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 
 	testhelper.RequireIndex(t, tx, "agent_connectors", "idx_agent_connectors_connector")
-}
-
-func TestAgentConnectorsDuplicateInsert(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-
-	uid := testhelper.GenerateUID(t)
-	connID := testhelper.GenerateID(t, "conn_")
-
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "user_"+uid[:8])
-	testhelper.InsertConnector(t, tx, connID)
-
-	testhelper.RequireUniqueViolation(t, tx, "(agent_id, connector_id, label)",
-		func() error {
-			testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
-			return nil
-		},
-		func() error {
-			_, err := tx.Exec(context.Background(),
-				`INSERT INTO agent_connectors (agent_id, approver_id, connector_id) VALUES ($1, $2, $3)`,
-				agentID, uid, connID)
-			return err
-		},
-	)
 }
 
 func TestAgentConnectorsCascadeOnAgentDelete(t *testing.T) {

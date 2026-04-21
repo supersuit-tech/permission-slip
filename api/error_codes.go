@@ -79,6 +79,7 @@ const (
 	// 429 Too Many Requests (quota)
 	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 
-	ErrConnectorInstanceRequired ErrorCode = "connector_instance_required"
-	ErrConnectorInstanceNotFound ErrorCode = "connector_instance_not_found"
+	ErrConnectorInstanceRequired  ErrorCode = "connector_instance_required"
+	ErrConnectorInstanceNotFound  ErrorCode = "connector_instance_not_found"
+	ErrConnectorInstanceAmbiguous ErrorCode = "connector_instance_ambiguous"
 )
