@@ -304,12 +304,14 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		contextForStore := mergeEmailThreadFromResourceDetailsIntoContext(req.Context, resourceDetails)
+
 		approval, err := db.InsertApproval(r.Context(), deps.DB, db.InsertApprovalParams{
 			ApprovalID:      approvalID,
 			AgentID:         agent.AgentID,
 			ApproverID:      agent.ApproverID,
 			Action:          req.Action,
-			Context:         req.Context,
+			Context:         contextForStore,
 			ResourceDetails: resourceDetails,
 			ExpiresAt:       expiresAt,
 		}, req.RequestID)
