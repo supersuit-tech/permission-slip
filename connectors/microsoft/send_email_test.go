@@ -30,6 +30,9 @@ func TestSendEmail_Success(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("failed to decode request body: %v", err)
 		}
+		if body.Message.Body.ContentType != "HTML" {
+			t.Errorf("expected default HTML content type, got %q", body.Message.Body.ContentType)
+		}
 		if body.Message.Subject != "Test Subject" {
 			t.Errorf("expected subject 'Test Subject', got %q", body.Message.Subject)
 		}
@@ -308,11 +311,49 @@ func TestSendEmail_PlainTextBody(t *testing.T) {
 
 	conn := newForTest(srv.Client(), srv.URL)
 	action := &sendEmailAction{conn: conn}
+	htmlFalse := false
 
 	params, _ := json.Marshal(sendEmailParams{
 		To:      []string{"user@example.com"},
 		Subject: "Test",
 		Body:    "Just plain text, no HTML here.",
+		HTML:    &htmlFalse,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSendEmail_HTMLExplicitTrue(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body graphSendMailRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Message.Body.ContentType != "HTML" {
+			t.Errorf("expected content type 'HTML', got %q", body.Message.Body.ContentType)
+		}
+		w.WriteHeader(http.StatusAccepted)
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &sendEmailAction{conn: conn}
+	htmlTrue := true
+
+	params, _ := json.Marshal(sendEmailParams{
+		To:      []string{"user@example.com"},
+		Subject: "Test",
+		Body:    "minimal",
+		HTML:    &htmlTrue,
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -346,7 +387,7 @@ func TestSendEmail_HTMLBody(t *testing.T) {
 	params, _ := json.Marshal(sendEmailParams{
 		To:      []string{"user@example.com"},
 		Subject: "Test",
-		Body:    "<p>Hello <strong>world</strong></p>",
+		Body:    "No angle brackets — still HTML mode by default.",
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{

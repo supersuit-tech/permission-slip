@@ -21,6 +21,7 @@ type sendEmailParams struct {
 	To      string `json:"to"`
 	Subject string `json:"subject"`
 	Body    string `json:"body"`
+	HTML    *bool  `json:"html,omitempty"`
 }
 
 func (p *sendEmailParams) validate() error {
@@ -70,7 +71,7 @@ func (a *sendEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		return nil, err
 	}
 
-	raw := buildGmailRaw(params.To, params.Subject, params.Body, nil)
+	raw := buildGmailRaw(params.To, params.Subject, params.Body, emailHTMLDefault(params.HTML), nil)
 
 	body := gmailSendRequest{Raw: raw}
 	var resp gmailSendResponse

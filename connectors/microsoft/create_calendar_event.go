@@ -34,6 +34,7 @@ type createCalendarEventParams struct {
 	End        string   `json:"end"`
 	TimeZone   string   `json:"time_zone"`
 	Body       string   `json:"body,omitempty"`
+	HTML       *bool    `json:"html,omitempty"`
 	Attendees  []string `json:"attendees,omitempty"`
 	Location   string   `json:"location,omitempty"`
 }
@@ -107,7 +108,7 @@ func (a *createCalendarEventAction) Execute(ctx context.Context, req connectors.
 
 	if params.Body != "" {
 		graphReq.Body = &graphEmailBody{
-			ContentType: "HTML",
+			ContentType: graphBodyContentType(params.HTML),
 			Content:     params.Body,
 		}
 	}

@@ -49,8 +49,11 @@ func TestSendEmail_Success(t *testing.T) {
 		if !strings.Contains(msg, "Subject: Test Subject") {
 			t.Error("decoded message missing Subject header")
 		}
-		if !strings.Contains(msg, "Hello, world!") {
-			t.Error("decoded message missing body text")
+		if !strings.Contains(msg, "<p>Hello, world!</p>") {
+			t.Error("decoded message missing HTML body")
+		}
+		if !strings.Contains(msg, "multipart/alternative") {
+			t.Error("expected multipart/alternative for default html mode")
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -67,7 +70,7 @@ func TestSendEmail_Success(t *testing.T) {
 	params, _ := json.Marshal(sendEmailParams{
 		To:      "user@example.com",
 		Subject: "Test Subject",
-		Body:    "Hello, world!",
+		Body:    "<p>Hello, world!</p>",
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -278,6 +281,52 @@ func TestSendEmail_HeaderInjectionSubject(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestSendEmail_HTMLFalsePlaintext(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body gmailSendRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		decoded, err := base64.RawURLEncoding.DecodeString(body.Raw)
+		if err != nil {
+			t.Fatalf("decode raw: %v", err)
+		}
+		msg := string(decoded)
+		if strings.Contains(msg, "multipart/alternative") {
+			t.Error("expected single part for html=false")
+		}
+		if !strings.Contains(msg, "Content-Type: text/plain; charset=\"UTF-8\"") {
+			t.Error("expected text/plain only")
+		}
+		if !strings.Contains(msg, "<p>tags as text</p>") {
+			t.Error("expected literal tags in plaintext body")
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(gmailSendResponse{ID: "m1", ThreadID: "t1"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL, "", "")
+	action := &sendEmailAction{conn: conn}
+	htmlFalse := false
+	params, _ := json.Marshal(sendEmailParams{
+		To:      "user@example.com",
+		Subject: "S",
+		Body:    "<p>tags as text</p>",
+		HTML:    &htmlFalse,
+	})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.send_email",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 

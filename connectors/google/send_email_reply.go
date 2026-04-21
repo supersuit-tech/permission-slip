@@ -23,6 +23,7 @@ type sendEmailReplyParams struct {
 	ThreadID  string `json:"thread_id"`
 	MessageID string `json:"message_id"`
 	Body      string `json:"body"`
+	HTML      *bool  `json:"html,omitempty"`
 }
 
 func (p *sendEmailReplyParams) validate() error {
@@ -105,7 +106,7 @@ func (a *sendEmailReplyAction) Execute(ctx context.Context, req connectors.Actio
 	}
 
 	// Build and encode the RFC 2822 reply using the shared helper.
-	raw := buildGmailRaw(origFrom, replySubject, params.Body, [][2]string{
+	raw := buildGmailRaw(origFrom, replySubject, params.Body, emailHTMLDefault(params.HTML), [][2]string{
 		{"In-Reply-To", origMessageID},
 		{"References", origMessageID},
 	})

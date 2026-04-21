@@ -4,9 +4,9 @@
 package microsoft
 
 import (
-	_ "embed"
 	"bytes"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -62,6 +62,7 @@ func (c *MicrosoftConnector) ID() string { return "microsoft" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -93,12 +94,17 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Email body (HTML or plain text — auto-detected)"
+							"description": "Email body. When html is true (default), use valid HTML (e.g. <p>, <br>, <strong>). When html is false, body is sent as plain text and tags are not interpreted."
 						},
 						"cc": {
 							"type": "array",
 							"items": {"type": "string"},
 							"description": "CC recipient email addresses"
+						},
+						"html": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), body must be valid HTML. When false, body is sent as plain text only."
 						}
 					}
 				}`)),
@@ -154,7 +160,12 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Event body/description (HTML supported)"
+							"description": "Event body/description. When html is true (default), use valid HTML. When false, plain text only."
+						},
+						"html": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), body is HTML. When false, body is plain text only."
 						},
 						"attendees": {
 							"type": "array",
@@ -213,7 +224,7 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-			ActionType:  "microsoft.list_drive_files",
+				ActionType:  "microsoft.list_drive_files",
 				Name:        "List Drive Files",
 				Description: "List files and folders in OneDrive",
 				RiskLevel:   "low",
@@ -435,7 +446,12 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"message": {
 							"type": "string",
-							"description": "Message content (HTML or plain text — auto-detected)"
+							"description": "Message content. When html is true (default), use valid HTML. When false, plain text only."
+						},
+						"html": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), message is HTML. When false, plain text only."
 						},
 						"reply_to_message_id": {
 							"type": "string",

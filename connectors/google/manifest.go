@@ -47,8 +47,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Email body (plain text)",
+							"description": "Email body. When html is true (default), use valid HTML (e.g. <p>, <br>, <strong>). When html is false, body is sent as plain text and tags are not interpreted.",
 							"x-ui": {"label": "Body", "widget": "textarea"}
+						},
+						"html": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), body must be valid HTML. When false, body is sent as plain text only."
 						}
 					}
 				}`)),
@@ -912,8 +917,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Reply body (plain text)",
+							"description": "Reply body. When html is true (default), use valid HTML (e.g. <p>, <br>, <strong>). When html is false, body is sent as plain text and tags are not interpreted.",
 							"x-ui": {"label": "Reply", "widget": "textarea"}
+						},
+						"html": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), body must be valid HTML. When false, body is sent as plain text only."
 						}
 					}
 				}`)),

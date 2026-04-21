@@ -124,8 +124,12 @@ func TestSendEmailReply_SubjectPrefixed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decode raw: %v", err)
 	}
-	if !strings.Contains(string(raw), "Subject: Re: Existing Thread\r\n") {
-		t.Errorf("expected exact Subject header in raw message, got:\n%s", string(raw))
+	rawStr := string(raw)
+	if !strings.Contains(rawStr, "Subject: Re: Existing Thread\r\n") {
+		t.Errorf("expected exact Subject header in raw message, got:\n%s", rawStr)
+	}
+	if !strings.Contains(rawStr, "multipart/alternative") {
+		t.Error("expected multipart for default html reply")
 	}
 }
 
@@ -223,6 +227,42 @@ func TestSendEmailReply_MissingThreadID(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got %T: %v", err, err)
+	}
+}
+
+func TestSendEmailReply_HTMLFalsePlaintext(t *testing.T) {
+	var sent gmailSendReplyRequest
+	srv := httptest.NewServer(replyTestHandler(t,
+		"threadPlain", "sender@example.com", "Sub", "<mid@x.com>", &sent,
+	))
+	defer srv.Close()
+
+	conn := newGmailForTest(srv.Client(), srv.URL)
+	action := &sendEmailReplyAction{conn: conn}
+	htmlFalse := false
+	params, _ := json.Marshal(map[string]any{
+		"thread_id":  "threadPlain",
+		"message_id": "msgPlain",
+		"body":       "<b>not html</b>",
+		"html":       htmlFalse,
+	})
+	_, err := action.Execute(context.Background(), connectors.ActionRequest{
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(sent.Raw)
+	if err != nil {
+		t.Fatalf("decode raw: %v", err)
+	}
+	rawStr := string(raw)
+	if strings.Contains(rawStr, "multipart/alternative") {
+		t.Error("expected single part for html=false reply")
+	}
+	if !strings.Contains(rawStr, "<b>not html</b>") {
+		t.Error("expected literal angle brackets in plaintext reply body")
 	}
 }
 

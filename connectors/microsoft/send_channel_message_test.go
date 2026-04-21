@@ -33,8 +33,8 @@ func TestSendChannelMessage_Success(t *testing.T) {
 		if body.Body.Content != "Hello Teams!" {
 			t.Errorf("expected message 'Hello Teams!', got %q", body.Body.Content)
 		}
-		if body.Body.ContentType != "Text" {
-			t.Errorf("expected content type 'Text', got %q", body.Body.ContentType)
+		if body.Body.ContentType != "HTML" {
+			t.Errorf("expected default content type 'HTML', got %q", body.Body.ContentType)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -76,7 +76,7 @@ func TestSendChannelMessage_Success(t *testing.T) {
 	}
 }
 
-func TestSendChannelMessage_HTMLContent(t *testing.T) {
+func TestSendChannelMessage_HTMLExplicitTrue(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -85,7 +85,7 @@ func TestSendChannelMessage_HTMLContent(t *testing.T) {
 			t.Fatalf("failed to decode request body: %v", err)
 		}
 		if body.Body.ContentType != "HTML" {
-			t.Errorf("expected content type 'HTML' for HTML body, got %q", body.Body.ContentType)
+			t.Errorf("expected content type 'HTML', got %q", body.Body.ContentType)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -99,11 +99,58 @@ func TestSendChannelMessage_HTMLContent(t *testing.T) {
 
 	conn := newForTest(srv.Client(), srv.URL)
 	action := &sendChannelMessageAction{conn: conn}
+	htmlTrue := true
 
 	params, _ := json.Marshal(sendChannelMessageParams{
 		TeamID:    "team-1",
 		ChannelID: "channel-1",
-		Message:   "<p>Hello <strong>Teams</strong></p>",
+		Message:   "plain prose, no brackets",
+		HTML:      &htmlTrue,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.send_channel_message",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSendChannelMessage_HTMLFalsePlainText(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body graphChannelMessageRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Body.ContentType != "Text" {
+			t.Errorf("expected content type 'Text', got %q", body.Body.ContentType)
+		}
+		if body.Body.Content != "<p>literal</p>" {
+			t.Errorf("expected literal message, got %q", body.Body.Content)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusCreated)
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":              "msg-plain",
+			"createdDateTime": "2024-01-15T10:00:00Z",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &sendChannelMessageAction{conn: conn}
+	htmlFalse := false
+
+	params, _ := json.Marshal(sendChannelMessageParams{
+		TeamID:    "team-1",
+		ChannelID: "channel-1",
+		Message:   "<p>literal</p>",
+		HTML:      &htmlFalse,
 	})
 
 	_, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -316,9 +363,9 @@ func TestSendChannelMessage_PathTraversalInReplyID(t *testing.T) {
 	action := &sendChannelMessageAction{conn: conn}
 
 	params, _ := json.Marshal(map[string]string{
-		"team_id":              "team-1",
-		"channel_id":           "channel-1",
-		"message":              "Hello",
+		"team_id":             "team-1",
+		"channel_id":          "channel-1",
+		"message":             "Hello",
 		"reply_to_message_id": "../../me/sendMail",
 	})
 

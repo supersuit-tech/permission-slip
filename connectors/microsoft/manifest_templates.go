@@ -49,7 +49,7 @@ func microsoftTemplates() []connectors.ManifestTemplate {
 			ActionType:  "microsoft.create_calendar_event",
 			Name:        "Create calendar events",
 			Description: "Agent can create events on the calendar with any details.",
-			Parameters:  json.RawMessage(`{"subject":"*","start":"*","end":"*","time_zone":"*","body":"*","attendees":"*","location":"*","calendar_id":""}`),
+			Parameters:  json.RawMessage(`{"subject":"*","start":"*","end":"*","time_zone":"*","body":"*","attendees":"*","location":"*","calendar_id":"","html":"*"}`),
 		},
 		// --- OneDrive read ---
 		{
@@ -209,7 +209,7 @@ func microsoftTemplates() []connectors.ManifestTemplate {
 			ActionType:  "microsoft.send_channel_message",
 			Name:        "Send channel messages",
 			Description: "Agent can send messages to any Teams channel.",
-			Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","message":"*","reply_to_message_id":"*"}`),
+			Parameters:  json.RawMessage(`{"team_id":"*","channel_id":"*","message":"*","reply_to_message_id":"*","html":"*"}`),
 		},
 	}
 }
