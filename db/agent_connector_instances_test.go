@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -159,27 +160,29 @@ func TestResolveAgentConnectorInstance_AmbiguousDisplay(t *testing.T) {
 		t.Fatalf("default: %v", defInst)
 	}
 
-	cred1 := testhelper.GenerateID(t, "cred_")
-	cred2 := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, cred1, uid, connID, "Same", "00000000-0000-0000-0000-0000000000a1")
-	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, cred2, uid, connID, "Same", "00000000-0000-0000-0000-0000000000a2")
+	// Two OAuth connections with the same extra_data->>'name' (credentials cannot duplicate label per user+service).
+	oauth1 := testhelper.GenerateID(t, "oauth_")
+	oauth2 := testhelper.GenerateID(t, "oauth_")
+	sharedName, _ := json.Marshal(map[string]string{"name": "SharedOAuthName"})
+	testhelper.InsertOAuthConnectionFull(t, tx, oauth1, uid, "test_oauth", testhelper.OAuthConnectionOpts{ExtraData: sharedName})
+	testhelper.InsertOAuthConnectionFull(t, tx, oauth2, uid, "test_oauth", testhelper.OAuthConnectionOpts{ExtraData: sharedName})
 
 	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
 		ID: testhelper.GenerateID(t, "acc_"), AgentID: agentID, ConnectorID: connID,
-		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, CredentialID: &cred1,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, OAuthConnectionID: &oauth1,
 	})
 	if err != nil {
 		t.Fatalf("bind default: %v", err)
 	}
 	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
 		ID: testhelper.GenerateID(t, "acc_"), AgentID: agentID, ConnectorID: connID,
-		ConnectorInstanceID: inst2.ConnectorInstanceID, ApproverID: uid, CredentialID: &cred2,
+		ConnectorInstanceID: inst2.ConnectorInstanceID, ApproverID: uid, OAuthConnectionID: &oauth2,
 	})
 	if err != nil {
 		t.Fatalf("bind second: %v", err)
 	}
 
-	_, err = db.ResolveAgentConnectorInstance(ctx, tx, agentID, uid, connID, "Same")
+	_, err = db.ResolveAgentConnectorInstance(ctx, tx, agentID, uid, connID, "SharedOAuthName")
 	var instErr *db.AgentConnectorInstanceError
 	if !errors.As(err, &instErr) || instErr.Code != db.AgentConnectorInstanceErrAmbiguousDisplay {
 		t.Fatalf("expected ambiguous display error, got %v", err)
