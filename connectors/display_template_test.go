@@ -22,30 +22,37 @@ var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 // When adding a new connector that implements ResourceDetailResolver, add its
 // returned keys here. Source files for each connector's resolver:
 //   - Slack: connectors/slack/resolve_resource_details.go
-//     • resolveChannel → channel_name
-//     • resolveUser    → user_name
+//   - resolveChannel → channel_name
+//   - resolveUser    → user_name
 //   - Google: connectors/google/resolve_resource_details.go
-//     • resolveCalendarEvent → title, start_time
-//     • resolveFile          → file_name, title
-//     • resolveEmail         → subject, from
-//     • resolveSheet         → title, range
-//     • resolveChatSpace     → space_display_name
-//     • resolveCalendar      → calendar_name
-//     • resolvePresentation  → presentation_title (also title)
+//   - resolveCalendarEvent → title, start_time
+//   - resolveFile          → file_name, title
+//   - resolveEmail         → subject, from
+//   - resolveSheet         → title, range
+//   - resolveChatSpace     → space_display_name
+//   - resolveCalendar      → calendar_name
+//   - resolvePresentation  → presentation_title (also title)
+//   - GitHub: connectors/github/resolve_resource_details.go
+//   - resolveWorkflow → workflow_name
+//   - resolveWebhook  → webhook_url, webhook_events
 var resourceDetailFields = map[string]bool{
 	// Slack (see connectors/slack/resolve_resource_details.go)
 	"channel_name": true,
 	"user_name":    true,
 	// Google (see connectors/google/resolve_resource_details.go)
-	"title":               true,
-	"presentation_title":  true,
-	"space_display_name":  true,
-	"calendar_name":       true,
-	"file_name":           true,
-	"start_time":          true,
-	"subject":             true,
-	"from":                true,
-	"range":               true,
+	"title":              true,
+	"presentation_title": true,
+	"space_display_name": true,
+	"calendar_name":      true,
+	"file_name":          true,
+	"start_time":         true,
+	"subject":            true,
+	"from":               true,
+	"range":              true,
+	// GitHub (see connectors/github/resolve_resource_details.go)
+	"workflow_name":  true,
+	"webhook_url":    true,
+	"webhook_events": true,
 }
 
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a

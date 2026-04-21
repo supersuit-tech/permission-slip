@@ -35,6 +35,13 @@ func microsoftTemplates() []connectors.ManifestTemplate {
 			Description: "Agent can only send emails to recipients matching a specific domain pattern. Set the domain before applying.",
 			Parameters:  json.RawMessage(`{"to":{"$pattern":"*@example.com"},"subject":"*","body":"*"}`),
 		},
+		{
+			ID:          "tpl_microsoft_reply_to_email",
+			ActionType:  "microsoft.send_email_reply",
+			Name:        "Reply to emails",
+			Description: "Agent can reply to existing Outlook messages by message ID.",
+			Parameters:  json.RawMessage(`{"message_id":"*","body":"*"}`),
+		},
 		// --- Calendar read ---
 		{
 			ID:          "tpl_microsoft_list_events",
