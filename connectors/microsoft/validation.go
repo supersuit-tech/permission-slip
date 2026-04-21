@@ -45,17 +45,10 @@ func validateItemID(id string) error {
 	return validateGraphID("item_id", id)
 }
 
-// detectContentType returns "HTML" if the body contains HTML tags, otherwise "Text".
-func detectContentType(body string) string {
-	if strings.Contains(body, "<") && strings.Contains(body, ">") {
-		return "HTML"
-	}
-	return "Text"
-}
-
-// sendMailGraphContentType maps the explicit html flag to Microsoft Graph
-// sendMail body contentType. Nil defaults to HTML (issue #971).
-func sendMailGraphContentType(html *bool) string {
+// graphBodyContentType maps the explicit html flag to Microsoft Graph
+// body contentType (sendMail, Teams messages, event body, etc.). Nil defaults
+// to HTML so Markdown-ish content without angle brackets still renders as HTML.
+func graphBodyContentType(html *bool) string {
 	if html != nil && !*html {
 		return "Text"
 	}

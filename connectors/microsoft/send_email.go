@@ -86,7 +86,7 @@ func (a *sendEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	var graphReq graphSendMailRequest
 	graphReq.Message.Subject = params.Subject
 	graphReq.Message.Body = graphEmailBody{
-		ContentType: sendMailGraphContentType(params.HTML),
+		ContentType: graphBodyContentType(params.HTML),
 		Content:     params.Body,
 	}
 	graphReq.Message.ToRecipients = toGraphRecipients(params.To)

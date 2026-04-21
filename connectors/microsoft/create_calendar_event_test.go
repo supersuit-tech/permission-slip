@@ -112,6 +112,101 @@ func TestCreateCalendarEvent_WithCalendarID(t *testing.T) {
 	}
 }
 
+func TestCreateCalendarEvent_BodyDefaultHTML(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body graphEventRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Body == nil {
+			t.Fatal("expected event body")
+		}
+		if body.Body.ContentType != "HTML" {
+			t.Errorf("expected default body ContentType HTML, got %q", body.Body.ContentType)
+		}
+		if body.Body.Content != "Agenda line one" {
+			t.Errorf("unexpected body content: %q", body.Body.Content)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":      "event-body",
+			"subject": "S",
+			"start":   map[string]string{"dateTime": "2024-01-15T09:00:00", "timeZone": "UTC"},
+			"end":     map[string]string{"dateTime": "2024-01-15T10:00:00", "timeZone": "UTC"},
+			"webLink": "https://example.com",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(createCalendarEventParams{
+		Subject: "S",
+		Start:   "2024-01-15T09:00:00",
+		End:     "2024-01-15T10:00:00",
+		Body:    "Agenda line one",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCreateCalendarEvent_BodyPlainText(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body graphEventRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Body == nil {
+			t.Fatal("expected event body")
+		}
+		if body.Body.ContentType != "Text" {
+			t.Errorf("expected body ContentType Text, got %q", body.Body.ContentType)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"id":      "event-txt",
+			"subject": "S",
+			"start":   map[string]string{"dateTime": "2024-01-15T09:00:00", "timeZone": "UTC"},
+			"end":     map[string]string{"dateTime": "2024-01-15T10:00:00", "timeZone": "UTC"},
+			"webLink": "https://example.com",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &createCalendarEventAction{conn: conn}
+	htmlFalse := false
+
+	params, _ := json.Marshal(createCalendarEventParams{
+		Subject: "S",
+		Start:   "2024-01-15T09:00:00",
+		End:     "2024-01-15T10:00:00",
+		Body:    "<p>not html</p>",
+		HTML:    &htmlFalse,
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "microsoft.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestCreateCalendarEvent_WithAttendees(t *testing.T) {
 	t.Parallel()
 

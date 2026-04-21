@@ -32,7 +32,8 @@ Sends an email via Microsoft 365.
 |------|------|----------|---------|-------------|
 | `to` | string[] | Yes | — | Recipient email addresses |
 | `subject` | string | Yes | — | Email subject line |
-| `body` | string | Yes | — | Email body (HTML or plain text — auto-detected) |
+| `body` | string | Yes | — | Email body; format follows `html` |
+| `html` | boolean | No | `true` | When true, body is HTML; when false, plain text |
 | `cc` | string[] | No | — | CC recipient email addresses |
 
 **Response:**
@@ -141,7 +142,7 @@ Lists channels in a Microsoft Teams team.
 
 ### `microsoft.send_channel_message`
 
-Sends a message to a Microsoft Teams channel. Supports plain text and HTML (auto-detected). Optionally replies to an existing message thread.
+Sends a message to a Microsoft Teams channel. Body format is controlled by `html` (default HTML). Optionally replies to an existing message thread.
 
 **Risk level:** medium
 
@@ -151,7 +152,8 @@ Sends a message to a Microsoft Teams channel. Supports plain text and HTML (auto
 |------|------|----------|---------|-------------|
 | `team_id` | string | Yes | — | The ID of the team |
 | `channel_id` | string | Yes | — | The ID of the channel to post to |
-| `message` | string | Yes | — | Message content (HTML or plain text — auto-detected) |
+| `message` | string | Yes | — | Message content; format follows `html` |
+| `html` | boolean | No | `true` | When true, message is HTML; when false, plain text |
 | `reply_to_message_id` | string | No | — | Message ID to reply to (creates a threaded reply) |
 
 **Response:**
@@ -214,7 +216,8 @@ Creates a new event on the user's calendar.
 | `start` | string | Yes | — | Start date/time in ISO 8601 format (e.g., `2024-01-15T09:00:00`) |
 | `end` | string | Yes | — | End date/time in ISO 8601 format (e.g., `2024-01-15T10:00:00`) |
 | `time_zone` | string | No | `"UTC"` | Time zone (e.g., `America/New_York`) |
-| `body` | string | No | — | Event body/description (HTML supported) |
+| `body` | string | No | — | Event body/description; format follows `html` |
+| `html` | boolean | No | `true` | When true, body is HTML; when false, plain text |
 | `attendees` | string[] | No | — | Attendee email addresses |
 | `location` | string | No | — | Event location |
 

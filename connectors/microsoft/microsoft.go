@@ -160,7 +160,12 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"body": {
 							"type": "string",
-							"description": "Event body/description (HTML supported)"
+							"description": "Event body/description. When html is true (default), use valid HTML. When false, plain text only."
+						},
+						"html": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), body is HTML. When false, body is plain text only."
 						},
 						"attendees": {
 							"type": "array",
@@ -441,7 +446,12 @@ func (c *MicrosoftConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"message": {
 							"type": "string",
-							"description": "Message content (HTML or plain text — auto-detected)"
+							"description": "Message content. When html is true (default), use valid HTML. When false, plain text only."
+						},
+						"html": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), message is HTML. When false, plain text only."
 						},
 						"reply_to_message_id": {
 							"type": "string",

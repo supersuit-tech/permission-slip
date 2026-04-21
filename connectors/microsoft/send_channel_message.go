@@ -21,6 +21,7 @@ type sendChannelMessageParams struct {
 	ChannelID        string `json:"channel_id"`
 	Message          string `json:"message"`
 	ReplyToMessageID string `json:"reply_to_message_id,omitempty"`
+	HTML             *bool  `json:"html,omitempty"`
 }
 
 func (p *sendChannelMessageParams) validate() error {
@@ -69,7 +70,7 @@ func (a *sendChannelMessageAction) Execute(ctx context.Context, req connectors.A
 
 	graphReq := graphChannelMessageRequest{
 		Body: graphChannelMessageBody{
-			ContentType: detectContentType(params.Message),
+			ContentType: graphBodyContentType(params.HTML),
 			Content:     params.Message,
 		},
 	}
