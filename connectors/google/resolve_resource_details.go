@@ -3,10 +3,10 @@ package google
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -212,12 +212,15 @@ func (c *GoogleConnector) resolveChatSpace(ctx context.Context, creds connectors
 	if err := json.Unmarshal(params, &p); err != nil || p.SpaceName == "" {
 		return nil, fmt.Errorf("missing space_name")
 	}
-	if !strings.HasPrefix(p.SpaceName, "spaces/") {
-		return nil, fmt.Errorf("space_name must start with 'spaces/'")
-	}
-	spaceID := strings.TrimPrefix(p.SpaceName, "spaces/")
-	if spaceID == "" || strings.ContainsAny(spaceID, "/?#") || strings.Contains(spaceID, "..") {
-		return nil, fmt.Errorf("invalid space_name")
+	if _, err := validateChatSpaceName(p.SpaceName); err != nil {
+		switch {
+		case errors.Is(err, errChatSpaceNotPrefixed):
+			return nil, fmt.Errorf("space_name must start with 'spaces/'")
+		case errors.Is(err, errChatSpaceEmptyID), errors.Is(err, errChatSpaceInvalidChars):
+			return nil, fmt.Errorf("invalid space_name")
+		default:
+			return nil, err
+		}
 	}
 
 	var resp struct {
@@ -231,12 +234,14 @@ func (c *GoogleConnector) resolveChatSpace(ctx context.Context, creds connectors
 }
 
 // resolveCalendar fetches the calendar summary (human-readable name) for a calendar ID.
+// API: GET {calendarBaseURL}/calendars/{calendarId}?fields=summary (Calendar API v3).
+// When calendar_id is empty, defaults to "primary", matching listCalendarEventsParams.normalize().
 func (c *GoogleConnector) resolveCalendar(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
 	var p struct {
 		CalendarID string `json:"calendar_id"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("invalid calendar params: %w", err)
 	}
 	if p.CalendarID == "" {
 		p.CalendarID = "primary"

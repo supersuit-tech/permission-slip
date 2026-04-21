@@ -166,6 +166,16 @@ func TestResolveResourceDetails_Presentation(t *testing.T) {
 	}
 }
 
+func TestResolveResourceDetails_ChatSpace_Invalid(t *testing.T) {
+	conn := New()
+	for _, spaceName := range []string{"AAA", "spaces/", "spaces/foo/bar", "spaces/..", "spaces/foo?bar"} {
+		params, _ := json.Marshal(map[string]string{"space_name": spaceName})
+		if _, err := conn.ResolveResourceDetails(context.Background(), "google.send_chat_message", params, validCreds()); err == nil {
+			t.Errorf("expected error for space_name=%q", spaceName)
+		}
+	}
+}
+
 func TestResolveResourceDetails_ChatSpace(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
 		"/v1/spaces/": `{"displayName":"Dev Team"}`,
@@ -184,7 +194,7 @@ func TestResolveResourceDetails_ChatSpace(t *testing.T) {
 
 func TestResolveResourceDetails_CalendarSummary(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
-		"/calendars/work%40example.com": `{"summary":"Work Calendar"}`,
+		"/calendars/work@example.com": `{"summary":"Work Calendar"}`,
 	})
 	defer srv.Close()
 
@@ -248,7 +258,7 @@ func TestResolveResourceDetails_Email(t *testing.T) {
 func TestResolveResourceDetails_EmailReply(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
 		"/gmail/v1/users/me/messages/": `{"payload":{"headers":[{"name":"Subject","value":"Re: Budget Discussion"}]}}`,
-		"/gmail/v1/users/me/threads/": `{"id":"th1","messages":[{"id":"msg456","internalDate":"1","payload":{"mimeType":"text/plain","headers":[{"name":"Subject","value":"Re: Budget Discussion"}],"body":{"data":"SGk="}}}]}`,
+		"/gmail/v1/users/me/threads/":  `{"id":"th1","messages":[{"id":"msg456","internalDate":"1","payload":{"mimeType":"text/plain","headers":[{"name":"Subject","value":"Re: Budget Discussion"}],"body":{"data":"SGk="}}}]}`,
 	})
 	defer srv.Close()
 
