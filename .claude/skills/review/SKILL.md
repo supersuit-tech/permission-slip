@@ -1,6 +1,6 @@
 ---
 name: review
-description: Perform a comprehensive, multi-round code review on a GitHub PR. Leaves inline review comments prioritized by severity (Critical/High/Medium/Low) across up to 6 rounds, with 5-minute waits between rounds to check for fixes.
+description: Perform a comprehensive, multi-round code review on a GitHub PR. Leaves inline review comments prioritized by severity (Critical/High/Medium/Low) across up to 6 rounds, with 5-minute waits between rounds to check for fixes. When the review completes, automatically opens a follow-up GitHub issue for any unresolved recommendations.
 argument-hint: "<PR_URL> [--max-turns <N>]"
 ---
 
@@ -8,7 +8,7 @@ argument-hint: "<PR_URL> [--max-turns <N>]"
 
 Performs up to 6 rounds of thorough code review on a GitHub Pull Request. Each round submits a PR review with inline comments covering security, architecture, maintainability, code quality, documentation, and performance. Between rounds, waits 5 minutes and re-fetches the diff to check for fixes before reviewing again.
 
-This skill is **strictly read-only** — it never modifies code, creates branches, or makes commits.
+This skill never modifies code, creates branches, or makes commits. The only writes it performs on GitHub are review comments, one final summary comment, and — at the end — a follow-up tracking issue for any unresolved non-blocking recommendations (see Step 4).
 
 ## Reviewer Mindset
 
@@ -323,6 +323,9 @@ Summary format:
 ### Outstanding Issues
 {any unresolved concerns from the final round, or "None — this PR looks good to merge."}
 
+### Follow-up Issue
+{link to the follow-up issue created in Step 4, or "None — no follow-up recommendations."}
+
 ### Review History
 | Round | Inline Comments | Notes |
 |-------|----------------|-------|
@@ -337,9 +340,77 @@ Summary format:
 *Review performed by Claude Code `/review` skill*
 ```
 
+**Important:** Post the final summary *after* Step 4 completes so the "Follow-up Issue" section can include the real issue URL (or "None"). If Step 4 is skipped because there are no follow-ups, render that section as "None — no follow-up recommendations."
+
+## Step 4: Create Follow-up Issue for Unresolved Recommendations
+
+After the review loop ends, collect every finding that is still unresolved and is suitable as a follow-up (i.e., not already fixed by the author and not blocking merge). These typically include:
+
+- **Low** severity findings that the author chose not to address.
+- **Medium** severity findings that remain unresolved and are reasonable to defer (refactors, DRY cleanups, additional test coverage, non-critical docs).
+- Any "future improvement" / "nice to have" suggestions raised during the review.
+
+**Exclude:**
+- Critical and High severity findings — these should block merge, not be deferred. If any remain unresolved, mention them in the final summary's Outstanding Issues section but do NOT move them into the follow-up issue.
+- Findings that were addressed by a later commit in the PR.
+- Purely stylistic nitpicks that don't warrant tracking.
+
+If there are **zero** qualifying follow-up recommendations, skip this step entirely and render the "Follow-up Issue" section of the final summary as "None — no follow-up recommendations."
+
+If there is at least one qualifying recommendation, create a single GitHub issue:
+
+```bash
+ISSUE_BODY=$(cat <<'EOF'
+Follow-up recommendations from the automated code review of #{PR_NUMBER}.
+
+These items were flagged during review but were considered non-blocking and deferred for a future change. Each item is independently actionable — feel free to tackle them in separate PRs or combine related ones.
+
+## Recommendations
+
+### Medium
+- [ ] {short title} — {file.ext}:{line} · {1-sentence description and rationale}
+- [ ] ...
+
+### Low
+- [ ] {short title} — {file.ext}:{line} · {1-sentence description and rationale}
+- [ ] ...
+
+## Context
+- Source PR: #{PR_NUMBER} — {PR_TITLE}
+- Author: @{PR_AUTHOR}
+- Review rounds: {ROUND}/{MAX_TURNS}
+
+---
+*Auto-created by Claude Code `/review` skill*
+EOF
+)
+
+ISSUE_URL=$($GH_CMD issue create \
+  --title "Follow-ups from #${PR_NUMBER} review" \
+  --body "$ISSUE_BODY")
+```
+
+Notes:
+- **Only include severity sections that have items.** If there are no Medium items, omit the `### Medium` heading entirely.
+- **Use checklist items** (`- [ ]`) per the repo's GitHub Issues convention so progress can be tracked in the issue.
+- **Reference files with `path:line`** so each item is easy to locate in the codebase.
+- **Keep the title concise** — `Follow-ups from #{PR_NUMBER} review` is the default; adjust only if the PR has an unusually specific theme.
+- **Do not add `Closes #...`** — this is a tracking issue, not a fix.
+- Capture `ISSUE_URL` and use it in the final summary's "Follow-up Issue" section. Also include it in a short reply on the PR so the author notices:
+
+```bash
+$GH_CMD api \
+  repos/${GH_REPO_PATH}/issues/${PR_NUMBER}/comments \
+  --input - <<EOF
+{"body": "Opened a follow-up issue for non-blocking recommendations from this review: ${ISSUE_URL}"}
+EOF
+```
+
+If the `gh issue create` call fails, log the error, skip posting the PR comment, and render the "Follow-up Issue" section of the final summary as "Failed to create follow-up issue — see recommendations inline in this review." Do not abort the entire skill on an issue-creation failure; the review comments have already been posted and are the primary deliverable.
+
 ## Important Rules
 
-- **Strictly read-only** — NEVER modify files, create branches, make commits, or push code. This skill only reads and comments.
+- **No code changes** — NEVER modify files, create branches, make commits, or push code. The only writes performed are PR review comments, the final summary comment, and a follow-up tracking issue (Step 4).
 - **Use `COMMENT` event** — never `APPROVE` or `REQUEST_CHANGES`. The skill provides findings; humans make approval decisions.
 - **Don't invent problems** — only flag real, substantive issues. If a round has no findings, make a note internally and move on. Padding reviews with nitpicks erodes trust.
 - **Be specific** — every comment must explain what's wrong, WHY it matters (the consequence), and how to fix it. Suggest code when possible.
