@@ -38,6 +38,11 @@ import { KeyValueList, type KeyValueEntry } from "./KeyValueList";
 import { TimelineView, type TimelineEntry } from "./TimelineView";
 import { SlackContextPreview } from "../../components/previews/SlackContextPreview";
 import type { components } from "../../api/schema";
+import { EmailThreadCard } from "./EmailThreadCard";
+import {
+  isEmailReplyAction,
+  parseEmailThreadDetails,
+} from "./emailThreadUtils";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -77,12 +82,20 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     return details?.slack_context ?? null;
   }, [approval.context.details]);
 
+  const isEmailReply = isEmailReplyAction(approval.action.type);
+  const emailThread = useMemo(
+    () => parseEmailThreadDetails(approval.context.details),
+    [approval.context.details],
+  );
+
   const contextDetailEntries: KeyValueEntry[] = useMemo(() => {
     const details = safeParams(approval.context.details);
-    // Exclude slack_context — rendered by SlackContextPreview below
+    // Exclude connector-specific keys rendered by dedicated preview components
     const { slack_context: _sc, ...rest } = details;
-    return Object.entries(rest).map(([label, value]) => ({ label, value }));
-  }, [approval.context.details]);
+    return Object.entries(rest)
+      .filter(([label]) => !(isEmailReply && label === "email_thread"))
+      .map(([label, value]) => ({ label, value }));
+  }, [approval.context.details, isEmailReply]);
 
   const isPending = approval.status === "pending" && !isApproved && !isDenied;
   const expired = checkExpired(approval.status, approval.expires_at);
@@ -296,6 +309,12 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           <View style={styles.sectionMajor}>
             <Text style={styles.sectionLabel}>Slack Context</Text>
             <SlackContextPreview slackContext={slackContext} />
+          </View>
+        )}
+
+        {isEmailReply && (
+          <View style={styles.sectionMajor}>
+            <EmailThreadCard thread={emailThread} testID="email-thread-card" />
           </View>
         )}
 
