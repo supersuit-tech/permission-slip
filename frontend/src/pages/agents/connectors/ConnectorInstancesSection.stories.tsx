@@ -5,7 +5,7 @@
  * credential row) without API calls so Storybook stays offline.
  */
 import type { Meta, StoryObj } from "@storybook/react";
-import { Check, Pencil, Plus, Settings, Star, Trash2, Unplug } from "lucide-react";
+import { Plus, Settings, Star, Trash2, Unplug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -15,7 +15,6 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
 const selectClassName =
@@ -39,15 +38,6 @@ function ConnectorInstancesSectionLayoutMirror() {
                 <div className="flex flex-wrap items-center gap-2">
                   <p className="font-medium">Engineering</p>
                   <Badge variant="secondary">Default</Badge>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="size-8"
-                    aria-label="Rename instance"
-                  >
-                    <Pencil className="size-3.5" />
-                  </Button>
                 </div>
                 <p className="text-muted-foreground mt-1 text-xs">
                   Added 3/1/2026, 12:00:00 PM
@@ -85,11 +75,7 @@ function ConnectorInstancesSectionLayoutMirror() {
             <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Input defaultValue="Sales" className="max-w-md" />
-                  <Button type="button" size="sm" variant="secondary">
-                    <Check className="size-4" />
-                    Save
-                  </Button>
+                  <p className="font-medium">Sales</p>
                 </div>
                 <p className="text-muted-foreground mt-1 text-xs">
                   Added 3/2/2026, 12:00:00 PM

@@ -249,7 +249,7 @@ ApprovalSummary:
     action:
       description: |
         Same as `Action`, plus optional frozen connector instance fields when the
-        request targeted a specific instance (`_connector_instance_id`, `_connector_instance_label`).
+        request targeted a specific instance (`_connector_instance_id`, `_connector_instance_display`).
       allOf:
         - $ref: './shared.yaml#/Action'
         - type: object
@@ -258,9 +258,11 @@ ApprovalSummary:
               type: string
               format: uuid
               description: Frozen UUID of the connector instance for this approval (if any).
-            _connector_instance_label:
+            _connector_instance_display:
               type: string
-              description: Human-readable instance label at request time (if any).
+              description: >-
+                Snapshot of the credential display name at request time (if any). Legacy actions may
+                still expose `_connector_instance_label` instead.
     context:
       $ref: './shared.yaml#/ActionContext'
     status:

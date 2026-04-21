@@ -7,16 +7,19 @@ function humanizeConnectorPrefix(actionType: string): string {
 }
 
 /**
- * Connector line for approval UI: "Slack (Engineering)" when a multi-instance label is frozen on the action.
+ * Connector line for approval UI: "Slack (Engineering)" when a multi-instance display name is frozen on the action.
+ * Prefer `instanceDisplay` (new `_connector_instance_display`); fall back to `instanceLabel` for legacy actions.
  */
 export function formatConnectorDisplayName(args: {
   connectorName: string | null | undefined;
   actionType: string;
+  instanceDisplay?: string | null;
   instanceLabel?: string | null;
 }): string {
   const base =
     args.connectorName?.trim() || humanizeConnectorPrefix(args.actionType);
-  const inst = args.instanceLabel?.trim();
+  const inst =
+    args.instanceDisplay?.trim() || args.instanceLabel?.trim();
   if (inst) {
     return `${base} (${inst})`;
   }

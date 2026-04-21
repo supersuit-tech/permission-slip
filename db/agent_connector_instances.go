@@ -10,13 +10,13 @@ import (
 )
 
 // AgentConnectorInstance is a row in agent_connectors (one instance of a connector type for an agent).
-// Label is a display string derived from the bound credential (API key label or OAuth workspace name).
+// DisplayName is derived from the bound credential (API key label or OAuth workspace name in extra_data).
 type AgentConnectorInstance struct {
 	ConnectorInstanceID string
 	AgentID             int64
 	ConnectorID         string
 	ApproverID          string
-	Label               string
+	DisplayName         string
 	IsDefault           bool
 	EnabledAt           time.Time
 }
@@ -36,11 +36,11 @@ const (
 	AgentConnectorInstanceErrCannotDeleteDefault AgentConnectorInstanceErrCode = "cannot_delete_default_instance"
 )
 
-// agentConnectorInstanceSelect is the standard SELECT for an agent_connectors row with display label
+// agentConnectorInstanceSelect is the standard SELECT for an agent_connectors row with display name
 // from the assigned credential (static API key label or OAuth extra_data name).
 const agentConnectorInstanceSelect = `
 	SELECT ac.connector_instance_id, ac.agent_id, ac.connector_id, ac.approver_id,
-	       COALESCE(cr.label, oc.extra_data->>'name', '') AS label,
+	       COALESCE(cr.label, oc.extra_data->>'name', '') AS display_name,
 	       ac.is_default, ac.enabled_at
 	FROM agent_connectors ac
 	LEFT JOIN agent_connector_credentials acc
@@ -115,7 +115,7 @@ func scanAgentConnectorInstance(row pgx.Row) (*AgentConnectorInstance, error) {
 	var inst AgentConnectorInstance
 	err := row.Scan(
 		&inst.ConnectorInstanceID, &inst.AgentID, &inst.ConnectorID, &inst.ApproverID,
-		&inst.Label, &inst.IsDefault, &inst.EnabledAt,
+		&inst.DisplayName, &inst.IsDefault, &inst.EnabledAt,
 	)
 	if err != nil {
 		return nil, err

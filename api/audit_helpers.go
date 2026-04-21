@@ -266,6 +266,12 @@ func redactActionToTypeWithConnectorInstance(raw []byte) []byte {
 			out["_connector_instance_id"] = s
 		}
 	}
+	if v, ok := obj["_connector_instance_display"]; ok {
+		var s string
+		if json.Unmarshal(v, &s) == nil && s != "" {
+			out["_connector_instance_display"] = s
+		}
+	}
 	if v, ok := obj["_connector_instance_label"]; ok {
 		var s string
 		if json.Unmarshal(v, &s) == nil && s != "" {

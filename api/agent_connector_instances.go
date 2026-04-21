@@ -15,7 +15,7 @@ type agentConnectorInstanceResponse struct {
 	ConnectorInstanceID string    `json:"connector_instance_id"`
 	AgentID             int64     `json:"agent_id"`
 	ConnectorID         string    `json:"connector_id"`
-	Label               string    `json:"label,omitempty"`
+	Display             string    `json:"display,omitempty"`
 	IsDefault           bool      `json:"is_default"`
 	EnabledAt           time.Time `json:"enabled_at"`
 }
@@ -60,7 +60,7 @@ func toAgentConnectorInstanceResponse(inst db.AgentConnectorInstance) agentConne
 		ConnectorInstanceID: inst.ConnectorInstanceID,
 		AgentID:             inst.AgentID,
 		ConnectorID:         inst.ConnectorID,
-		Label:               inst.Label,
+		Display:             inst.DisplayName,
 		IsDefault:           inst.IsDefault,
 		EnabledAt:           inst.EnabledAt,
 	}

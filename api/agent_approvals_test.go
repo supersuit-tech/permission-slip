@@ -1218,14 +1218,14 @@ func TestAgentRequestApproval_MultiInstance_WithLabel_FreezesInstanceOnAction(t 
 	if err := json.Unmarshal(appr.Action, &actionObj); err != nil {
 		t.Fatalf("unmarshal action: %v", err)
 	}
-	var gotID, gotLabel string
+	var gotID, gotDisplay string
 	_ = json.Unmarshal(actionObj["_connector_instance_id"], &gotID)
-	_ = json.Unmarshal(actionObj["_connector_instance_label"], &gotLabel)
+	_ = json.Unmarshal(actionObj["_connector_instance_display"], &gotDisplay)
 	if gotID != inst2.ConnectorInstanceID {
 		t.Errorf("connector_instance_id: want %q got %q", inst2.ConnectorInstanceID, gotID)
 	}
-	if gotLabel != "Sales" {
-		t.Errorf("connector_instance_label: want Sales got %q", gotLabel)
+	if gotDisplay != "Sales" {
+		t.Errorf("connector_instance_display: want Sales got %q", gotDisplay)
 	}
 	if raw, ok := actionObj["parameters"]; ok {
 		var params map[string]json.RawMessage

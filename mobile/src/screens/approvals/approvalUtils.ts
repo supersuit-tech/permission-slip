@@ -74,10 +74,13 @@ export function humanizeConnectorPrefix(actionType: string): string {
   return prefix.charAt(0).toUpperCase() + prefix.slice(1);
 }
 
-/** Reads frozen multi-instance label from stored action JSON, if present. */
+/** Reads frozen multi-instance display from stored action JSON, if present (legacy: `_connector_instance_label`). */
 export function connectorInstanceLabelFromAction(action: {
+  _connector_instance_display?: unknown;
   _connector_instance_label?: unknown;
 }): string | undefined {
+  const d = action._connector_instance_display;
+  if (typeof d === "string" && d.trim() !== "") return d;
   const v = action._connector_instance_label;
   if (typeof v === "string" && v.trim() !== "") return v;
   return undefined;

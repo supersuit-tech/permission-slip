@@ -31,7 +31,7 @@ type CapabilityConnector struct {
 type CapabilityConnectorInstance struct {
 	ConnectorID         string
 	ConnectorInstanceID string
-	Label               string
+	DisplayName         string
 	CredentialsReady    bool
 }
 
@@ -196,7 +196,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 
 	for instRows.Next() {
 		var ci CapabilityConnectorInstance
-		if err := instRows.Scan(&ci.ConnectorID, &ci.ConnectorInstanceID, &ci.Label, &ci.CredentialsReady); err != nil {
+		if err := instRows.Scan(&ci.ConnectorID, &ci.ConnectorInstanceID, &ci.DisplayName, &ci.CredentialsReady); err != nil {
 			return nil, err
 		}
 		caps.ConnectorInstances = append(caps.ConnectorInstances, ci)

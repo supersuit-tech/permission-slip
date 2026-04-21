@@ -1804,8 +1804,9 @@ paths:
       operationId: createAgentConnectorInstance
       summary: Create an additional connector instance
       description: |
-        Creates a new labeled instance for this connector type. The first instance for a connector
-        is created when the connector is enabled; this endpoint adds further instances.
+        Creates an additional instance row for this connector type. The first instance is created
+        when the connector is enabled; this endpoint adds further instances. Assign a credential to
+        the instance to set its display name.
 
         Requires session authentication (Supabase JWT).
       tags:
@@ -1838,8 +1839,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-        '409':
-          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
   /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}:
@@ -1869,7 +1868,7 @@ paths:
           $ref: '#/components/responses/InternalServerError'
     patch:
       operationId: patchAgentConnectorInstance
-      summary: Rename a connector instance
+      summary: Set default connector instance
       tags:
         - Agents
       security:
@@ -1897,8 +1896,6 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
-        '409':
-          $ref: '#/components/responses/Conflict'
         '500':
           $ref: '#/components/responses/InternalServerError'
     delete:
@@ -7322,7 +7319,7 @@ components:
         action:
           description: |
             Same as `Action`, plus optional frozen connector instance fields when the
-            request targeted a specific instance (`_connector_instance_id`, `_connector_instance_label`).
+            request targeted a specific instance (`_connector_instance_id`, `_connector_instance_display`).
           allOf:
             - $ref: '#/components/schemas/Action'
             - type: object
@@ -7331,9 +7328,9 @@ components:
                   type: string
                   format: uuid
                   description: Frozen UUID of the connector instance for this approval (if any).
-                _connector_instance_label:
+                _connector_instance_display:
                   type: string
-                  description: Human-readable instance label at request time (if any).
+                  description: Snapshot of the credential display name at request time (if any). Legacy actions may still expose `_connector_instance_label` instead.
         context:
           $ref: '#/components/schemas/ActionContext'
         status:
@@ -9532,7 +9529,7 @@ components:
             $ref: '#/components/schemas/ConnectorInstanceCapability'
           description: |
             Enabled connector instances for this agent (one row per workspace/account binding).
-            Use `label` or `id` as `action.parameters.connector_instance` when multiple instances exist.
+            Use `display` (credential nickname) or `id` as `action.parameters.connector_instance` when multiple instances exist.
         actions:
           type: array
           items:
@@ -9926,7 +9923,6 @@ components:
         - connector_instance_id
         - agent_id
         - connector_id
-        - label
         - is_default
         - enabled_at
       properties:
@@ -9940,9 +9936,9 @@ components:
         connector_id:
           type: string
           maxLength: 128
-        label:
+        display:
           type: string
-          description: Human-readable label unique per agent and connector type.
+          description: Human-readable name from the credential bound to this instance (API key nickname or OAuth workspace/team name). Omitted when no credential is assigned yet.
         is_default:
           type: boolean
           description: True for the default instance used when no instance is specified (legacy routes).
@@ -9960,26 +9956,16 @@ components:
             $ref: '#/components/schemas/AgentConnectorInstance'
     CreateAgentConnectorInstanceRequest:
       type: object
-      required:
-        - label
-      properties:
-        label:
-          type: string
-          minLength: 1
-          maxLength: 256
-          description: Display label for the new instance (unique per agent and connector).
+      description: Creates an additional instance row for this connector type. Display names come from the credential assigned per instance, not from this request.
     PatchAgentConnectorInstanceRequest:
       type: object
-      description: At least one of `label` or `is_default` must be provided. When `is_default` is true, this instance becomes the default for the agent and connector type.
+      description: '`is_default` must be provided and set to `true` to mark this instance as the default for the agent and connector type.'
+      required:
+        - is_default
       properties:
-        label:
-          type: string
-          minLength: 1
-          maxLength: 256
-          description: New display label for the instance.
         is_default:
           type: boolean
-          description: When true, marks this instance as the default (only value accepted; omit to leave default unchanged).
+          description: Must be `true` — marks this instance as the default.
     CreateRegistrationInviteRequest:
       type: object
       description: Request to create a registration invite.
@@ -11661,11 +11647,11 @@ components:
 
             **Multi-instance connectors**: When an agent has more than one instance of the
             same connector (e.g. two Slack workspaces), include `connector_instance` in this
-            object with the instance label or UUID from `GET /agents/{id}/capabilities`
+            object with the instance UUID or credential nickname from `GET /agents/{id}/capabilities`
             (`connectors[].instances[]`). Omit it when only one instance exists — the server
             auto-selects. The field is stripped before schema validation and does not appear on
             stored approvals; resolved routing is frozen as `_connector_instance_id` and
-            `_connector_instance_label` on the action object in responses.
+            `_connector_instance_display` on the action object in responses.
           example:
             from: alice@example.com
             to:
@@ -11957,16 +11943,15 @@ components:
       type: object
       required:
         - id
-        - label
         - credentials_ready
       properties:
         id:
           type: string
           format: uuid
           description: Instance identifier (also accepted as `connector_instance`).
-        label:
+        display:
           type: string
-          description: Human-readable label for this instance (shown in UIs and accepted as `connector_instance`).
+          description: Credential nickname / workspace name for this instance (from the bound credential). Omitted when unset. Use `id` or this value as `action.parameters.connector_instance` when multiple instances exist.
         credentials_ready:
           type: boolean
           description: Whether this specific instance has required credentials bound.

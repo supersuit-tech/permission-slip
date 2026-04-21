@@ -4,7 +4,6 @@ AgentConnectorInstance:
     - connector_instance_id
     - agent_id
     - connector_id
-    - label
     - is_default
     - enabled_at
   properties:
@@ -18,9 +17,11 @@ AgentConnectorInstance:
     connector_id:
       type: string
       maxLength: 128
-    label:
+    display:
       type: string
-      description: Human-readable label unique per agent and connector type.
+      description: >-
+        Human-readable name from the credential bound to this instance (API key nickname or OAuth
+        workspace/team name). Omitted when no credential is assigned yet.
     is_default:
       type: boolean
       description: True for the default instance used when no instance is specified (legacy routes).
@@ -40,26 +41,18 @@ AgentConnectorInstanceListResponse:
 
 CreateAgentConnectorInstanceRequest:
   type: object
-  required:
-    - label
-  properties:
-    label:
-      type: string
-      minLength: 1
-      maxLength: 256
-      description: Display label for the new instance (unique per agent and connector).
+  description: >-
+    Creates an additional instance row for this connector type. Display names come from the
+    credential assigned per instance, not from this request.
 
 PatchAgentConnectorInstanceRequest:
   type: object
   description: >-
-    At least one of `label` or `is_default` must be provided.
-    When `is_default` is true, this instance becomes the default for the agent and connector type.
+    `is_default` must be provided and set to `true` to mark this instance as the default for the
+    agent and connector type.
+  required:
+    - is_default
   properties:
-    label:
-      type: string
-      minLength: 1
-      maxLength: 256
-      description: New display label for the instance.
     is_default:
       type: boolean
-      description: When true, marks this instance as the default (only value accepted; omit to leave default unchanged).
+      description: Must be `true` — marks this instance as the default.

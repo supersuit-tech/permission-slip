@@ -35,8 +35,9 @@ agentConnectorInstances:
     operationId: createAgentConnectorInstance
     summary: Create an additional connector instance
     description: |
-      Creates a new labeled instance for this connector type. The first instance for a connector
-      is created when the connector is enabled; this endpoint adds further instances.
+      Creates an additional instance row for this connector type. The first instance is created
+      when the connector is enabled; this endpoint adds further instances. Assign a credential to
+      the instance to set its display name.
 
       Requires session authentication (Supabase JWT).
     tags:
@@ -69,8 +70,6 @@ agentConnectorInstances:
           application/json:
             schema:
               $ref: '../schemas/errors.yaml#/ErrorResponse'
-      '409':
-        $ref: '../responses/errors.yaml#/Conflict'
       '500':
         $ref: '../responses/errors.yaml#/InternalServerError'
 
@@ -102,7 +101,7 @@ agentConnectorInstanceById:
 
   patch:
     operationId: patchAgentConnectorInstance
-    summary: Rename a connector instance
+    summary: Set default connector instance
     tags:
       - Agents
     security:
@@ -130,8 +129,6 @@ agentConnectorInstanceById:
         $ref: '../responses/errors.yaml#/Unauthorized'
       '404':
         $ref: '../responses/errors.yaml#/NotFound'
-      '409':
-        $ref: '../responses/errors.yaml#/Conflict'
       '500':
         $ref: '../responses/errors.yaml#/InternalServerError'
 
