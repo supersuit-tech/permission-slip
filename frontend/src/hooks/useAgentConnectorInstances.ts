@@ -75,6 +75,13 @@ export function useCreateAgentConnectorInstance() {
           variables.connectorId,
         ],
       });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "connector-instance-credential-bindings",
+          variables.agentId,
+          variables.connectorId,
+        ],
+      });
     },
   });
 
@@ -129,6 +136,13 @@ export function useSetDefaultAgentConnectorInstance() {
       queryClient.invalidateQueries({
         queryKey: [
           "connector-instance-bindings-summary",
+          variables.agentId,
+          variables.connectorId,
+        ],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "connector-instance-credential-bindings",
           variables.agentId,
           variables.connectorId,
         ],
@@ -193,6 +207,13 @@ export function useDeleteAgentConnectorInstance() {
       queryClient.invalidateQueries({
         queryKey: [
           "connector-instance-bindings-summary",
+          variables.agentId,
+          variables.connectorId,
+        ],
+      });
+      queryClient.invalidateQueries({
+        queryKey: [
+          "connector-instance-credential-bindings",
           variables.agentId,
           variables.connectorId,
         ],
