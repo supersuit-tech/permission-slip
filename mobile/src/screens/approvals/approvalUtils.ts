@@ -119,6 +119,11 @@ type ActionFormatter = (params: Record<string, unknown>, resourceDetails?: Recor
 /** Pattern matching {{param}} and {{param:directive}} placeholders. */
 const TEMPLATE_RE = /\{\{(\w+)(?::(\w+))?\}\}/g;
 
+/** Masks Slack opaque resource IDs embedded in free-text params (e.g. search query). */
+function redactSlackOpaqueIdsInString(s: string): string {
+  return s.replace(/\b[CGD][A-Z0-9]{8,}\b/g, "\u2014");
+}
+
 /**
  * Plain-text display template renderer for mobile.
  * Mirrors the web displayTemplate.ts logic but outputs a plain string
@@ -150,7 +155,11 @@ function renderDisplayTemplate(
     }
 
     if (display === null && rawValue != null) {
-      display = formatParamValue(rawValue);
+      if (typeof rawValue === "string") {
+        display = redactSlackOpaqueIdsInString(rawValue);
+      } else {
+        display = formatParamValue(rawValue);
+      }
     }
 
     if (display !== null) {

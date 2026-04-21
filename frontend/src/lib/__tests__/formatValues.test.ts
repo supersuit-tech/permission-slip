@@ -59,6 +59,12 @@ describe("formatHighlightValue", () => {
     expect(formatHighlightValue("hello")).toBe("hello");
   });
 
+  it("redacts Slack opaque IDs embedded in free-text strings", () => {
+    expect(
+      formatHighlightValue("deploy in:C0AMRGKRTA4 more text"),
+    ).toBe("deploy in:\u2014 more text");
+  });
+
   it("formats numbers and booleans", () => {
     expect(formatHighlightValue(42)).toBe("42");
     expect(formatHighlightValue(true)).toBe("true");

@@ -113,6 +113,18 @@ describe("buildActionSummary", () => {
     expect(result).not.toContain("U12345678");
   });
 
+  it("redacts Slack channel IDs in slack.search_messages query when using display template", () => {
+    const result = buildActionSummary(
+      "slack.search_messages",
+      { query: "deploy in:C0AMRGKRTA4" },
+      "Search {{channel_name}} for {{query}}",
+      { channel_name: "Slack" },
+    );
+    expect(result).toContain("Slack");
+    expect(result).toContain("\u2014");
+    expect(result).not.toContain("C0AMRGKRTA4");
+  });
+
   it("falls back to raw ID when resourceDetails missing", () => {
     const result = buildActionSummary(
       "slack.send_dm",

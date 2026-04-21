@@ -17,10 +17,11 @@ type searchMessagesAction struct {
 
 // searchMessagesParams is the user-facing parameter schema.
 type searchMessagesParams struct {
-	Query string `json:"query"`
-	Count int    `json:"count,omitempty"`
-	Page  int    `json:"page,omitempty"`
-	Sort  string `json:"sort,omitempty"`
+	Query   string `json:"query"`
+	Channel string `json:"channel,omitempty"` // optional scope for resolver + summary
+	Count   int    `json:"count,omitempty"`
+	Page    int    `json:"page,omitempty"`
+	Sort    string `json:"sort,omitempty"`
 }
 
 func (p *searchMessagesParams) validate() error {
