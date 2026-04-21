@@ -7,7 +7,7 @@ import (
 )
 
 func TestMergeSlackContextFromResourceDetailsIntoContext(t *testing.T) {
-	ctxIn := []byte(`{"description":"x","details":{"foo":"bar"}}`)
+	ctxIn := []byte(`{"description":"post","details":{"foo":"bar"}}`)
 	rd, _ := json.Marshal(map[string]any{
 		"slack_context": map[string]any{
 			"context_scope": "recent_channel",
