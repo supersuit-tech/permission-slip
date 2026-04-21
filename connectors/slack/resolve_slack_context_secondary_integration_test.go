@@ -3,9 +3,11 @@ package slack
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 // Integration-style coverage for issue #981 PR 3: ResolveResourceDetails returns
@@ -13,7 +15,9 @@ import (
 func TestResolveResourceDetails_SecondaryActions_SlackContext(t *testing.T) {
 	t.Parallel()
 
-	tsMsg := "100.000001"
+	sec := time.Now().UTC().Unix()
+	tsMsg := fmt.Sprintf("%d.%06d", sec, 0)
+	tsBefore := fmt.Sprintf("%d.%06d", sec-30, 0)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
@@ -46,7 +50,7 @@ func TestResolveResourceDetails_SecondaryActions_SlackContext(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
 				"messages": []map[string]any{
-					{"user": "U0", "text": "before", "ts": "99.000001"},
+					{"user": "U0", "text": "before", "ts": tsBefore},
 					{"user": "U1", "text": "hi", "ts": tsMsg},
 				},
 			})

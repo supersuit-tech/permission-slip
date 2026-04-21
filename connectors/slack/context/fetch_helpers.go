@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
@@ -223,4 +224,87 @@ func FetchDMHistory(ctx context.Context, api SlackAPI, peerUserID string, creds 
 		messages = append(messages, cm)
 	}
 	return SentinelNone, messages, imChannelID, nil
+}
+
+const (
+	surroundBefore = 3
+	surroundAfter  = 3
+)
+
+// MessageWindowAroundResult is the target message plus nearby channel messages (same 24h window as FetchRecentMessages).
+type MessageWindowAroundResult struct {
+	Target ContextMessage
+	// TargetThreadRootTS is set when the target is a thread reply (Slack thread_ts); empty for top-level messages.
+	TargetThreadRootTS string
+	RecentSurrounding  []ContextMessage
+}
+
+// FetchMessageWindowAroundTS loads messages from the last 24h, finds the message with ts,
+// and returns it as Target plus up to surroundBefore/surroundAfter neighbors (oldest first).
+// If the target ts is not in the window, Target.TS is empty and RecentSurrounding is nil.
+func FetchMessageWindowAroundTS(ctx context.Context, api SlackAPI, channelID, targetTS string, creds connectors.Credentials, cache *sessionCache, mcache *MentionCache) (MessageWindowAroundResult, error) {
+	var out MessageWindowAroundResult
+	if err := validateChannelID(channelID); err != nil {
+		return out, err
+	}
+	if strings.TrimSpace(targetTS) == "" {
+		return out, &connectors.ValidationError{Message: "missing message ts for Slack context"}
+	}
+	sess, err := resolveSession(ctx, api, creds, cache)
+	if err != nil {
+		return out, err
+	}
+	cutoff := time.Now().Add(-recentWindowHours * time.Hour).UTC()
+	oldestTS := fmt.Sprintf("%d.%06d", cutoff.Unix(), cutoff.Nanosecond()/1000)
+	body := readChannelHistoryRequest{
+		Channel: channelID,
+		Limit:   100,
+		Oldest:  oldestTS,
+	}
+	var resp messagesResponse
+	if err := api.Post(ctx, "conversations.history", creds, body, &resp); err != nil {
+		return out, err
+	}
+	if !resp.OK {
+		return out, mapSlackErr(resp.Error)
+	}
+	raw := filterMessagesByAge(resp.Messages, cutoff)
+	sortMessagesOldestFirst(raw)
+	idx := -1
+	for i := range raw {
+		if raw[i].TS == targetTS {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return out, nil
+	}
+	targetSlack := raw[idx]
+	tcm, err := messageToContextMessage(ctx, api, creds, sess.TeamDomain, channelID, targetSlack, mcache)
+	if err != nil {
+		return out, err
+	}
+	out.Target = tcm
+	if targetSlack.ThreadTS != "" && targetSlack.ThreadTS != targetSlack.TS {
+		out.TargetThreadRootTS = targetSlack.ThreadTS
+	}
+	start := idx - surroundBefore
+	if start < 0 {
+		start = 0
+	}
+	end := idx + surroundAfter + 1
+	if end > len(raw) {
+		end = len(raw)
+	}
+	window := raw[start:end]
+	out.RecentSurrounding = make([]ContextMessage, 0, len(window))
+	for _, m := range window {
+		cm, err := messageToContextMessage(ctx, api, creds, sess.TeamDomain, channelID, m, mcache)
+		if err != nil {
+			return out, err
+		}
+		out.RecentSurrounding = append(out.RecentSurrounding, cm)
+	}
+	return out, nil
 }

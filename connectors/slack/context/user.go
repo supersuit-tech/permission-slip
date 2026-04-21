@@ -6,6 +6,11 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
+// FetchUserRef loads display fields for a Slack user ID (users.info).
+func FetchUserRef(ctx context.Context, api SlackAPI, creds connectors.Credentials, userID string) (*UserRef, error) {
+	return fetchUserRef(ctx, api, creds, userID)
+}
+
 func fetchUserRef(ctx context.Context, api SlackAPI, creds connectors.Credentials, userID string) (*UserRef, error) {
 	if userID == "" {
 		return nil, nil

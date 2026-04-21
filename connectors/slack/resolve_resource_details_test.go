@@ -3,9 +3,11 @@ package slack
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 )
 
 func testSlackResolveServer(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *SlackConnector) {
@@ -35,10 +37,9 @@ func TestResolveResourceDetails_Channel(t *testing.T) {
 
 	// Actions that only resolve the channel name via conversations.info (no slack_context).
 	channelActions := []string{
-		"slack.send_message", "slack.read_channel_messages", "slack.read_thread",
-		"slack.schedule_message", "slack.set_topic",
-		"slack.upload_file", "slack.update_message",
-		"slack.delete_message",
+		"slack.read_channel_messages", "slack.read_thread",
+		"slack.set_topic",
+		"slack.upload_file",
 		"slack.rename_channel",
 	}
 
@@ -58,24 +59,50 @@ func TestResolveResourceDetails_Channel(t *testing.T) {
 func TestResolveResourceDetails_PrivateChannel(t *testing.T) {
 	t.Parallel()
 
-	srv, conn := testSlackResolveServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	now := time.Now().UTC()
+	ts := fmt.Sprintf("%d.%06d", now.Add(-1*time.Hour).Unix(), 0)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"ok": true,
-			"channel": map[string]any{
-				"name":       "secret-plans",
-				"is_private": true,
-			},
-		})
+		switch r.URL.Path {
+		case "/auth.test":
+			json.NewEncoder(w).Encode(map[string]any{"ok": true, "url": "https://x.slack.com/", "user_id": "U1"})
+		case "/conversations.info":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channel": map[string]any{
+					"id":          "G0AMRGKRTA4",
+					"name":        "secret-plans",
+					"is_private":  true,
+					"topic":       map[string]any{"value": ""},
+					"purpose":     map[string]any{"value": ""},
+					"num_members": 2,
+				},
+			})
+		case "/conversations.history":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{"user": "U1", "text": "x", "ts": ts},
+				},
+			})
+		case "/users.info":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]any{"id": "U1", "name": "a", "profile": map[string]any{}},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
 	}))
 	defer srv.Close()
+	conn := newForTest(srv.Client(), srv.URL)
 
-	params, _ := json.Marshal(map[string]string{"channel": "G0AMRGKRTA4"})
+	params, _ := json.Marshal(map[string]string{"channel": "G0AMRGKRTA4", "message": "hi"})
 	details, err := conn.ResolveResourceDetails(context.Background(), "slack.send_message", params, validCreds())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// Private channels should not get # prefix.
+	// Private channels should not get # prefix on legacy channel_name.
 	if details["channel_name"] != "secret-plans" {
 		t.Errorf("expected channel_name 'secret-plans', got %v", details["channel_name"])
 	}
@@ -191,6 +218,9 @@ func TestResolveResourceDetails_SearchMessages_WithChannelID(t *testing.T) {
 func TestResolveResourceDetails_AddReaction_IncludesSlackContext(t *testing.T) {
 	t.Parallel()
 
+	tsHi := fmt.Sprintf("%d.%06d", time.Now().UTC().Unix()-60, 0)
+	tsBefore := fmt.Sprintf("%d.%06d", time.Now().UTC().Unix()-120, 0)
+
 	srv, conn := testSlackResolveServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
@@ -215,7 +245,7 @@ func TestResolveResourceDetails_AddReaction_IncludesSlackContext(t *testing.T) {
 				json.NewEncoder(w).Encode(map[string]any{
 					"ok": true,
 					"messages": []map[string]any{
-						{"user": "U1", "text": "hello", "ts": "100.000001"},
+						{"user": "U1", "text": "hello", "ts": tsHi},
 					},
 				})
 				return
@@ -223,8 +253,8 @@ func TestResolveResourceDetails_AddReaction_IncludesSlackContext(t *testing.T) {
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
 				"messages": []map[string]any{
-					{"user": "U0", "text": "before", "ts": "99.000001"},
-					{"user": "U1", "text": "hello", "ts": "100.000001"},
+					{"user": "U0", "text": "before", "ts": tsBefore},
+					{"user": "U1", "text": "hello", "ts": tsHi},
 				},
 			})
 		case "/users.info":
@@ -244,7 +274,7 @@ func TestResolveResourceDetails_AddReaction_IncludesSlackContext(t *testing.T) {
 
 	params, _ := json.Marshal(map[string]string{
 		"channel":   "C01234567",
-		"timestamp": "100.000001",
+		"timestamp": tsHi,
 		"name":      "thumbsup",
 	})
 	details, err := conn.ResolveResourceDetails(context.Background(), "slack.add_reaction", params, validCreds())
