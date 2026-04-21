@@ -501,6 +501,10 @@ func main() {
 	}
 	handler = api.SecurityHeadersMiddleware(sentryCSPEndpoint, extraConnectSrc, extraScriptSrc)(handler)
 
+	// Trace ID + panic recovery wrap the entire server (API, webhooks, SPA).
+	// TraceID must be outermost so panics on any route get trace_id in logs/JSON.
+	handler = api.TraceIDMiddleware(api.PanicRecoverMiddleware(handler))
+
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: handler,

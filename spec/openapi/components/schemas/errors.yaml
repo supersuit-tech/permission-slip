@@ -71,6 +71,7 @@ Error:
         - monthly_quota_exceeded
         # 500 Internal Server Error
         - internal_error
+        - internal_panic
         # 502 Bad Gateway
         - upstream_error
         # 503 Service Unavailable
