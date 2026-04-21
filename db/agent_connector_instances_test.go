@@ -164,8 +164,14 @@ func TestResolveAgentConnectorInstance_AmbiguousDisplay(t *testing.T) {
 	oauth1 := testhelper.GenerateID(t, "oauth_")
 	oauth2 := testhelper.GenerateID(t, "oauth_")
 	sharedName, _ := json.Marshal(map[string]string{"name": "SharedOAuthName"})
-	testhelper.InsertOAuthConnectionFull(t, tx, oauth1, uid, "test_oauth", testhelper.OAuthConnectionOpts{ExtraData: sharedName})
-	testhelper.InsertOAuthConnectionFull(t, tx, oauth2, uid, "test_oauth", testhelper.OAuthConnectionOpts{ExtraData: sharedName})
+	testhelper.InsertOAuthConnectionFull(t, tx, oauth1, uid, "test_oauth", testhelper.OAuthConnectionOpts{
+		Scopes:    []string{},
+		ExtraData: sharedName,
+	})
+	testhelper.InsertOAuthConnectionFull(t, tx, oauth2, uid, "test_oauth", testhelper.OAuthConnectionOpts{
+		Scopes:    []string{},
+		ExtraData: sharedName,
+	})
 
 	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
 		ID: testhelper.GenerateID(t, "acc_"), AgentID: agentID, ConnectorID: connID,
