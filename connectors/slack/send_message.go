@@ -17,6 +17,10 @@ type sendMessageAction struct {
 type sendMessageParams struct {
 	Channel string `json:"channel"`
 	Message string `json:"message"`
+	// ThreadTS posts in a thread (chat.postMessage thread_ts). Optional.
+	ThreadTS string `json:"thread_ts,omitempty"`
+	// InResponseToTS anchors approval context only; not sent to Slack (issue #981).
+	InResponseToTS string `json:"in_response_to_ts,omitempty"`
 }
 
 func (p *sendMessageParams) validate() error {
@@ -25,6 +29,16 @@ func (p *sendMessageParams) validate() error {
 	}
 	if p.Message == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: message"}
+	}
+	if p.ThreadTS != "" {
+		if err := validateMessageTS(p.ThreadTS); err != nil {
+			return err
+		}
+	}
+	if p.InResponseToTS != "" {
+		if err := validateMessageTS(p.InResponseToTS); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -48,14 +62,26 @@ func (a *sendMessageAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
-	body := sendMessageRequest{
-		Channel: params.Channel,
-		Text:    params.Message,
-	}
-
 	var resp sendMessageResponse
-	if err := a.conn.doPost(ctx, "chat.postMessage", req.Credentials, body, &resp); err != nil {
-		return nil, err
+	var postErr error
+	if params.ThreadTS != "" {
+		postErr = a.conn.doPost(ctx, "chat.postMessage", req.Credentials, struct {
+			Channel  string `json:"channel"`
+			Text     string `json:"text"`
+			ThreadTS string `json:"thread_ts,omitempty"`
+		}{
+			Channel:  params.Channel,
+			Text:     params.Message,
+			ThreadTS: params.ThreadTS,
+		}, &resp)
+	} else {
+		postErr = a.conn.doPost(ctx, "chat.postMessage", req.Credentials, sendMessageRequest{
+			Channel: params.Channel,
+			Text:    params.Message,
+		}, &resp)
+	}
+	if postErr != nil {
+		return nil, postErr
 	}
 
 	if !resp.OK {

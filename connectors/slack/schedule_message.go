@@ -21,6 +21,10 @@ type scheduleMessageParams struct {
 	Channel string       `json:"channel"`
 	Message string       `json:"message"`
 	PostAt  flexDateTime `json:"post_at"`
+	// ThreadTS schedules as a thread reply (chat.scheduleMessage thread_ts). Optional.
+	ThreadTS string `json:"thread_ts,omitempty"`
+	// InResponseToTS anchors approval context only; not sent to Slack (issue #981).
+	InResponseToTS string `json:"in_response_to_ts,omitempty"`
 }
 
 // flexDateTime accepts both a string (RFC 3339, datetime-local) and a legacy
@@ -67,6 +71,16 @@ func (p *scheduleMessageParams) validate() error {
 	}
 	if p.PostAt == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: post_at"}
+	}
+	if p.ThreadTS != "" {
+		if err := validateMessageTS(p.ThreadTS); err != nil {
+			return err
+		}
+	}
+	if p.InResponseToTS != "" {
+		if err := validateMessageTS(p.InResponseToTS); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -141,15 +155,29 @@ func (a *scheduleMessageAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, err
 	}
 
-	body := scheduleMessageRequest{
-		Channel: params.Channel,
-		Text:    params.Message,
-		PostAt:  postAtUnix,
-	}
-
 	var resp scheduleMessageResponse
-	if err := a.conn.doPost(ctx, "chat.scheduleMessage", req.Credentials, body, &resp); err != nil {
-		return nil, err
+	var postErr error
+	if params.ThreadTS != "" {
+		postErr = a.conn.doPost(ctx, "chat.scheduleMessage", req.Credentials, struct {
+			Channel  string `json:"channel"`
+			Text     string `json:"text"`
+			PostAt   int64  `json:"post_at"`
+			ThreadTS string `json:"thread_ts,omitempty"`
+		}{
+			Channel:  params.Channel,
+			Text:     params.Message,
+			PostAt:   postAtUnix,
+			ThreadTS: params.ThreadTS,
+		}, &resp)
+	} else {
+		postErr = a.conn.doPost(ctx, "chat.scheduleMessage", req.Credentials, scheduleMessageRequest{
+			Channel: params.Channel,
+			Text:    params.Message,
+			PostAt:  postAtUnix,
+		}, &resp)
+	}
+	if postErr != nil {
+		return nil, postErr
 	}
 
 	if !resp.OK {
