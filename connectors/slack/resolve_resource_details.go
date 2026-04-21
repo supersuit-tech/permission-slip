@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
+	slackctx "github.com/supersuit-tech/permission-slip/connectors/slack/context"
 )
 
 // ResolveResourceDetails fetches human-readable metadata for resources
@@ -23,7 +24,21 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 		"slack.delete_message",
 		"slack.remove_from_channel", "slack.remove_reaction", "slack.pin_message",
 		"slack.unpin_message", "slack.archive_channel", "slack.rename_channel":
-		return c.resolveChannel(ctx, creds, params)
+		base, err := c.resolveChannel(ctx, creds, params)
+		if err != nil {
+			return nil, err
+		}
+		switch actionType {
+		case "slack.add_reaction", "slack.remove_reaction", "slack.pin_message", "slack.unpin_message",
+			"slack.archive_channel", "slack.invite_to_channel", "slack.remove_from_channel":
+			extra, xerr := c.resolveSlackApprovalContext(ctx, actionType, params, creds)
+			if xerr != nil {
+				return base, nil
+			}
+			return mergeResourceDetailMaps(base, extra), nil
+		default:
+			return base, nil
+		}
 
 	case "slack.search_messages":
 		return c.resolveSearchMessagesChannel(ctx, creds, params)
@@ -32,6 +47,98 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	case "slack.send_dm":
 		return c.resolveUser(ctx, creds, params)
 
+	default:
+		return nil, nil
+	}
+}
+
+func mergeResourceDetailMaps(a, b map[string]any) map[string]any {
+	if len(a) == 0 && len(b) == 0 {
+		return nil
+	}
+	if len(a) == 0 {
+		return b
+	}
+	if len(b) == 0 {
+		return a
+	}
+	out := make(map[string]any, len(a)+len(b))
+	for k, v := range a {
+		out[k] = v
+	}
+	for k, v := range b {
+		out[k] = v
+	}
+	return out
+}
+
+func (c *SlackConnector) resolveSlackApprovalContext(ctx context.Context, actionType string, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
+	var cache slackctx.MentionCache
+	switch actionType {
+	case "slack.add_reaction", "slack.remove_reaction":
+		var p struct {
+			Channel   string `json:"channel"`
+			Timestamp string `json:"timestamp"`
+		}
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, err
+		}
+		sc, err := slackctx.BuildReactionContext(ctx, c, p.Channel, p.Timestamp, creds, nil, &cache)
+		if err != nil {
+			return nil, err
+		}
+		return slackctx.DetailsResourceMap(sc), nil
+	case "slack.pin_message", "slack.unpin_message":
+		var p struct {
+			Channel string `json:"channel"`
+			TS      string `json:"ts"`
+		}
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, err
+		}
+		sc, err := slackctx.BuildPinUnpinContext(ctx, c, p.Channel, p.TS, creds, nil, &cache)
+		if err != nil {
+			return nil, err
+		}
+		return slackctx.DetailsResourceMap(sc), nil
+	case "slack.archive_channel":
+		var p struct {
+			Channel string `json:"channel"`
+		}
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, err
+		}
+		sc, err := slackctx.BuildArchiveContext(ctx, c, p.Channel, creds, nil, &cache)
+		if err != nil {
+			return nil, err
+		}
+		return slackctx.DetailsResourceMap(sc), nil
+	case "slack.invite_to_channel":
+		var p struct {
+			Channel string `json:"channel"`
+			Users   string `json:"users"`
+		}
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, err
+		}
+		sc, err := slackctx.BuildInviteContext(ctx, c, p.Channel, p.Users, creds, nil)
+		if err != nil {
+			return nil, err
+		}
+		return slackctx.DetailsResourceMap(sc), nil
+	case "slack.remove_from_channel":
+		var p struct {
+			Channel string `json:"channel"`
+			User    string `json:"user"`
+		}
+		if err := json.Unmarshal(params, &p); err != nil {
+			return nil, err
+		}
+		sc, err := slackctx.BuildRemoveFromChannelContext(ctx, c, p.Channel, p.User, creds, nil)
+		if err != nil {
+			return nil, err
+		}
+		return slackctx.DetailsResourceMap(sc), nil
 	default:
 		return nil, nil
 	}

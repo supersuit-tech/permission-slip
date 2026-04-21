@@ -96,11 +96,12 @@ type readThreadRequest struct {
 }
 
 type readChannelHistoryRequest struct {
-	Channel string `json:"channel"`
-	Limit   int    `json:"limit,omitempty"`
-	Oldest  string `json:"oldest,omitempty"`
-	Latest  string `json:"latest,omitempty"`
-	Cursor  string `json:"cursor,omitempty"`
+	Channel   string `json:"channel"`
+	Limit     int    `json:"limit,omitempty"`
+	Oldest    string `json:"oldest,omitempty"`
+	Latest    string `json:"latest,omitempty"`
+	Inclusive bool   `json:"inclusive,omitempty"`
+	Cursor    string `json:"cursor,omitempty"`
 }
 
 // ExtractFiles returns filename and size_bytes for each attached file on a message.

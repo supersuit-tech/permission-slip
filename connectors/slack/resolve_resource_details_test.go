@@ -33,13 +33,13 @@ func TestResolveResourceDetails_Channel(t *testing.T) {
 	}))
 	defer srv.Close()
 
+	// Actions that only resolve the channel name via conversations.info (no slack_context).
 	channelActions := []string{
 		"slack.send_message", "slack.read_channel_messages", "slack.read_thread",
-		"slack.schedule_message", "slack.set_topic", "slack.invite_to_channel",
-		"slack.upload_file", "slack.add_reaction", "slack.update_message",
+		"slack.schedule_message", "slack.set_topic",
+		"slack.upload_file", "slack.update_message",
 		"slack.delete_message",
-		"slack.remove_from_channel", "slack.remove_reaction", "slack.pin_message",
-		"slack.unpin_message", "slack.archive_channel", "slack.rename_channel",
+		"slack.rename_channel",
 	}
 
 	params, _ := json.Marshal(map[string]string{"channel": "C0AMRGKRTA4"})
@@ -185,6 +185,79 @@ func TestResolveResourceDetails_SearchMessages_WithChannelID(t *testing.T) {
 	}
 	if details["channel_name"] != "#engineering" {
 		t.Errorf("expected channel_name '#engineering', got %v", details["channel_name"])
+	}
+}
+
+func TestResolveResourceDetails_AddReaction_IncludesSlackContext(t *testing.T) {
+	t.Parallel()
+
+	srv, conn := testSlackResolveServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/conversations.info":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channel": map[string]any{
+					"id":          "C01234567",
+					"name":        "general",
+					"num_members": 5,
+				},
+			})
+		case "/conversations.history":
+			var body struct {
+				Latest    string `json:"latest"`
+				Inclusive bool   `json:"inclusive"`
+			}
+			_ = json.NewDecoder(r.Body).Decode(&body)
+			if body.Latest != "" && body.Inclusive {
+				json.NewEncoder(w).Encode(map[string]any{
+					"ok": true,
+					"messages": []map[string]any{
+						{"user": "U1", "text": "hello", "ts": "100.000001"},
+					},
+				})
+				return
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{"user": "U0", "text": "before", "ts": "99.000001"},
+					{"user": "U1", "text": "hello", "ts": "100.000001"},
+				},
+			})
+		case "/users.info":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"user": map[string]any{
+					"id":   "U1",
+					"name": "alice",
+				},
+			})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{
+		"channel":   "C01234567",
+		"timestamp": "100.000001",
+		"name":      "thumbsup",
+	})
+	details, err := conn.ResolveResourceDetails(context.Background(), "slack.add_reaction", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["channel_name"] != "#general" {
+		t.Errorf("channel_name = %v, want #general", details["channel_name"])
+	}
+	sc, ok := details["slack_context"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected slack_context map, got %T", details["slack_context"])
+	}
+	if sc["context_scope"] != "recent_channel" {
+		t.Errorf("context_scope = %v", sc["context_scope"])
 	}
 }
 

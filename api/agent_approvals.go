@@ -305,6 +305,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		}
 
 		contextForStore := mergeEmailThreadFromResourceDetailsIntoContext(req.Context, resourceDetails)
+		contextForStore = mergeSlackContextFromResourceDetailsIntoContext(contextForStore, resourceDetails)
 
 		approval, err := db.InsertApproval(r.Context(), deps.DB, db.InsertApprovalParams{
 			ApprovalID:      approvalID,
