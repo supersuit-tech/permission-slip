@@ -135,6 +135,60 @@ func TestSetDefaultAgentConnectorInstance_SwitchesDefault(t *testing.T) {
 	}
 }
 
+func TestResolveAgentConnectorInstance_AmbiguousDisplay(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	ctx := context.Background()
+
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	inst2, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
+	})
+	if err != nil {
+		t.Fatalf("CreateAgentConnectorInstance: %v", err)
+	}
+
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default: %v", defInst)
+	}
+
+	cred1 := testhelper.GenerateID(t, "cred_")
+	cred2 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, cred1, uid, connID, "Same", "00000000-0000-0000-0000-0000000000a1")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, cred2, uid, connID, "Same", "00000000-0000-0000-0000-0000000000a2")
+
+	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "acc_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, CredentialID: &cred1,
+	})
+	if err != nil {
+		t.Fatalf("bind default: %v", err)
+	}
+	_, err = db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "acc_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: inst2.ConnectorInstanceID, ApproverID: uid, CredentialID: &cred2,
+	})
+	if err != nil {
+		t.Fatalf("bind second: %v", err)
+	}
+
+	_, err = db.ResolveAgentConnectorInstance(ctx, tx, agentID, uid, connID, "Same")
+	var instErr *db.AgentConnectorInstanceError
+	if !errors.As(err, &instErr) || instErr.Code != db.AgentConnectorInstanceErrAmbiguousDisplay {
+		t.Fatalf("expected ambiguous display error, got %v", err)
+	}
+	if len(instErr.AmbiguousInstanceIDs) != 2 {
+		t.Fatalf("expected 2 ids, got %v", instErr.AmbiguousInstanceIDs)
+	}
+}
+
 func TestFindActiveStandingApprovalsForAgent_FiltersByInstance(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -71,6 +72,9 @@ func applyConnectorInstanceToAction(ctx context.Context, d db.DBTX, agent *db.Ag
 		} else {
 			resolved, err := db.ResolveAgentConnectorInstance(ctx, d, agent.AgentID, agent.ApproverID, connectorID, selector)
 			if err != nil {
+				if amb := ambiguousConnectorInstanceErr(err); amb != nil {
+					return "", amb
+				}
 				return "", err
 			}
 			if resolved == nil || resolved.ConnectorInstanceID != only.ConnectorInstanceID {
@@ -93,6 +97,9 @@ func applyConnectorInstanceToAction(ctx context.Context, d db.DBTX, agent *db.Ag
 		}
 		resolved, err := db.ResolveAgentConnectorInstance(ctx, d, agent.AgentID, agent.ApproverID, connectorID, selector)
 		if err != nil {
+			if amb := ambiguousConnectorInstanceErr(err); amb != nil {
+				return "", amb
+			}
 			return "", err
 		}
 		if resolved == nil {
@@ -109,4 +116,15 @@ func applyConnectorInstanceToAction(ctx context.Context, d db.DBTX, agent *db.Ag
 	displayRaw, _ := json.Marshal(inst.DisplayName)
 	actionObj["_connector_instance_display"] = displayRaw
 	return inst.ConnectorInstanceID, nil
+}
+
+func ambiguousConnectorInstanceErr(err error) *connectorInstanceResolutionError {
+	var instErr *db.AgentConnectorInstanceError
+	if !errors.As(err, &instErr) || instErr.Code != db.AgentConnectorInstanceErrAmbiguousDisplay {
+		return nil
+	}
+	resp := BadRequest(ErrConnectorInstanceAmbiguous,
+		"multiple connector instances match this display name; use connector_instance with a UUID from GET /agents/{id}/capabilities")
+	resp.Error.Details = map[string]any{"matching_instance_ids": instErr.AmbiguousInstanceIDs}
+	return &connectorInstanceResolutionError{status: http.StatusBadRequest, resp: resp}
 }

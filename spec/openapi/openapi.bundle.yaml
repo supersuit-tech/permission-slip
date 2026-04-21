@@ -11797,6 +11797,7 @@ components:
             - unsupported_action_version
             - agent_id_mismatch
             - invalid_public_key
+            - connector_instance_ambiguous
             - invalid_signature
             - timestamp_expired
             - invalid_code

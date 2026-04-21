@@ -184,8 +184,9 @@ export function ConnectorInstancesSection({
           <DialogHeader>
             <DialogTitle>Add connector instance</DialogTitle>
             <DialogDescription>
-              Creates another slot for this connector. Assign a credential below
-              to set how it appears in approvals and capabilities.
+              Creates another slot for this connector. After you add it, assign a
+              credential on that instance&apos;s card in the list (below this dialog)
+              so it has a name in approvals and capabilities.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -249,7 +250,7 @@ function InstanceCard({
   const isBusy = settingDefault || deleting;
   const displayName =
     instance.display?.trim() ||
-    `Instance ${instance.connector_instance_id.slice(0, 8)}…`;
+    "Unnamed instance — assign a credential";
 
   async function handleMakeDefault() {
     try {

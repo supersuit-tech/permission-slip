@@ -86,6 +86,22 @@ func ListAgentConnectors(ctx context.Context, db DBTX, agentID int64, approverID
 	return result, rows.Err()
 }
 
+func readEnabledAgentConnectorRow(ctx context.Context, db DBTX, agentID int64, approverID, connectorID string) (*AgentConnectorRow, error) {
+	var row AgentConnectorRow
+	err := db.QueryRow(ctx, `
+		SELECT ac.agent_id, ac.connector_id, ac.enabled_at
+		FROM agent_connectors ac
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3
+		ORDER BY ac.is_default DESC, ac.enabled_at ASC
+		LIMIT 1`,
+		agentID, approverID, connectorID,
+	).Scan(&row.AgentID, &row.ConnectorID, &row.EnabledAt)
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
 // EnableAgentConnector idempotently enables a connector for an agent.
 // The INSERT is guarded by an agent ownership check: if the agent does not
 // belong to the approver, no row is inserted and AgentConnectorErrAgentNotFound
@@ -104,6 +120,7 @@ func EnableAgentConnector(ctx context.Context, db DBTX, agentID int64, approverI
 			      SELECT 1 FROM agent_connectors ac0
 			      WHERE ac0.agent_id = $1 AND ac0.approver_id = $2 AND ac0.connector_id = $3
 			  )
+			ON CONFLICT (agent_id, connector_id) WHERE (is_default) DO NOTHING
 			RETURNING agent_id, connector_id, enabled_at
 		)
 		SELECT agent_id, connector_id, enabled_at FROM inserted
@@ -122,6 +139,10 @@ func EnableAgentConnector(ctx context.Context, db DBTX, agentID int64, approverI
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == PgCodeForeignKeyViolation {
 			return nil, &AgentConnectorError{Code: AgentConnectorErrConnectorNotFound}
+		}
+		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
+			// Concurrent enable: retry read of existing row (idempotent success).
+			return readEnabledAgentConnectorRow(ctx, db, agentID, approverID, connectorID)
 		}
 		return nil, err
 	}

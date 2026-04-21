@@ -37,7 +37,10 @@ ALTER TABLE agent_connectors
     ADD COLUMN label text;
 
 UPDATE agent_connectors ac
-SET label = c.name
+SET label = CASE
+        WHEN ac.is_default THEN c.name
+        ELSE c.name || ' (' || substr(ac.connector_instance_id::text, 1, 8) || ')'
+    END
 FROM connectors c
 WHERE c.id = ac.connector_id;
 

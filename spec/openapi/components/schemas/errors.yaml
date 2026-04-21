@@ -21,6 +21,7 @@ Error:
         - unsupported_action_version
         - agent_id_mismatch
         - invalid_public_key
+        - connector_instance_ambiguous
         # 401 Unauthorized
         - invalid_signature
         - timestamp_expired

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -23,7 +24,8 @@ type AgentConnectorInstance struct {
 
 // AgentConnectorInstanceError is a domain error for connector instance operations.
 type AgentConnectorInstanceError struct {
-	Code AgentConnectorInstanceErrCode
+	Code                 AgentConnectorInstanceErrCode
+	AmbiguousInstanceIDs []string // set when Code == AgentConnectorInstanceErrAmbiguousDisplay
 }
 
 func (e *AgentConnectorInstanceError) Error() string { return string(e.Code) }
@@ -34,6 +36,7 @@ type AgentConnectorInstanceErrCode string
 const (
 	AgentConnectorInstanceErrNotFound            AgentConnectorInstanceErrCode = "connector_instance_not_found"
 	AgentConnectorInstanceErrCannotDeleteDefault AgentConnectorInstanceErrCode = "cannot_delete_default_instance"
+	AgentConnectorInstanceErrAmbiguousDisplay    AgentConnectorInstanceErrCode = "connector_instance_ambiguous_display"
 )
 
 // agentConnectorInstanceSelect is the standard SELECT for an agent_connectors row with display name
@@ -300,6 +303,8 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 }
 
 // ResolveAgentConnectorInstance finds an instance by UUID or by credential display name (trimmed).
+// If multiple instances share the same display string, returns AgentConnectorInstanceError with
+// Code AgentConnectorInstanceErrAmbiguousDisplay (caller should surface HTTP 400 with matching UUIDs).
 func ResolveAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, selector string) (*AgentConnectorInstance, error) {
 	sel := strings.TrimSpace(selector)
 	if sel == "" {
@@ -310,17 +315,40 @@ func ResolveAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, 
 		return GetAgentConnectorInstance(ctx, db, agentID, approverID, connectorID, sel)
 	}
 
-	row := db.QueryRow(ctx, agentConnectorInstanceSelect+`
+	rows, err := db.Query(ctx, agentConnectorInstanceSelect+`
 		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3
-		  AND COALESCE(cr.label, oc.extra_data->>'name', '') = $4`,
+		  AND COALESCE(cr.label, oc.extra_data->>'name', '') = $4
+		ORDER BY ac.connector_instance_id ASC`,
 		agentID, approverID, connectorID, sel,
 	)
-	inst, err := scanAgentConnectorInstance(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, nil
-	}
 	if err != nil {
 		return nil, err
 	}
-	return inst, nil
+	defer rows.Close()
+
+	var list []*AgentConnectorInstance
+	for rows.Next() {
+		inst, err := scanAgentConnectorInstance(rows)
+		if err != nil {
+			return nil, err
+		}
+		list = append(list, inst)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(list) == 0 {
+		return nil, nil
+	}
+	if len(list) > 1 {
+		ids := make([]string, len(list))
+		for i, inst := range list {
+			ids[i] = inst.ConnectorInstanceID
+		}
+		return nil, &AgentConnectorInstanceError{
+			Code:                 AgentConnectorInstanceErrAmbiguousDisplay,
+			AmbiguousInstanceIDs: ids,
+		}
+	}
+	return list[0], nil
 }
