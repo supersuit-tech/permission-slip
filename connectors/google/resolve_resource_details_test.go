@@ -196,16 +196,24 @@ func TestResolveResourceDetails_Email(t *testing.T) {
 func TestResolveResourceDetails_EmailReply(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
 		"/gmail/v1/users/me/messages/": `{"payload":{"headers":[{"name":"Subject","value":"Re: Budget Discussion"}]}}`,
+		"/gmail/v1/users/me/threads/": `{"id":"th1","messages":[{"id":"msg456","internalDate":"1","payload":{"mimeType":"text/plain","headers":[{"name":"Subject","value":"Re: Budget Discussion"}],"body":{"data":"SGk="}}}]}`,
 	})
 	defer srv.Close()
 
-	params, _ := json.Marshal(map[string]string{"message_id": "msg456"})
+	params, _ := json.Marshal(map[string]string{"thread_id": "th1", "message_id": "msg456"})
 	details, err := conn.ResolveResourceDetails(context.Background(), "google.send_email_reply", params, validCreds())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if details["subject"] != "Re: Budget Discussion" {
 		t.Errorf("expected subject, got %v", details["subject"])
+	}
+	et, ok := details["email_thread"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected email_thread in details, got %T", details["email_thread"])
+	}
+	if et["subject"] != "Re: Budget Discussion" {
+		t.Errorf("email_thread.subject: %v", et["subject"])
 	}
 }
 

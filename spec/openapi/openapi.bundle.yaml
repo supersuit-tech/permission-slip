@@ -11706,6 +11706,10 @@ components:
             - `recipient_count`: Number of email recipients
             - `estimated_cost`: Estimated cost of a payment action
             - `affected_resources`: List of resources that will be modified
+            - `email_thread`: Full conversation for email reply actions (see EmailThread)
+          properties:
+            email_thread:
+              $ref: '#/components/schemas/EmailThread'
           example:
             recipient_count: 1
             estimated_time: 5 minutes
@@ -11715,6 +11719,70 @@ components:
         details:
           recipient_count: 1
           estimated_time: 5 minutes
+    EmailThread:
+      type: object
+      required:
+        - subject
+        - messages
+      properties:
+        subject:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailThreadMessage'
+    EmailThreadMessage:
+      type: object
+      required:
+        - from
+        - to
+        - cc
+        - date
+        - body_html
+        - body_text
+        - snippet
+        - message_id
+        - truncated
+      properties:
+        from:
+          type: string
+        to:
+          type: array
+          items:
+            type: string
+        cc:
+          type: array
+          items:
+            type: string
+        date:
+          type: string
+          description: ISO-8601 timestamp when available
+        body_html:
+          type: string
+        body_text:
+          type: string
+        snippet:
+          type: string
+        message_id:
+          type: string
+        truncated:
+          type: boolean
+          description: True when body_html or body_text was truncated server-side (~20 KB per field)
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailThreadAttachment'
+    EmailThreadAttachment:
+      type: object
+      required:
+        - filename
+        - size_bytes
+      properties:
+        filename:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
     AlternativeUrls:
       type: object
       description: |
