@@ -196,8 +196,9 @@ func TestResolveScheduleMessage_PostAtInResourceDetails(t *testing.T) {
 
 func TestResolveUpdateMessage_ThreadedTarget(t *testing.T) {
 	t.Parallel()
-	rootTS := "50.000000"
-	targetTS := "50.000001"
+	now := time.Now().UTC()
+	rootTS := fmt.Sprintf("%d.%06d", now.Add(-2*time.Hour).Unix(), 0)
+	targetTS := fmt.Sprintf("%d.%06d", now.Add(-1*time.Hour).Unix(), 0)
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
