@@ -668,6 +668,12 @@ components:
       $ref: './components/schemas/shared.yaml#/Action'
     ActionContext:
       $ref: './components/schemas/shared.yaml#/ActionContext'
+    EmailThread:
+      $ref: './components/schemas/shared.yaml#/EmailThread'
+    EmailThreadMessage:
+      $ref: './components/schemas/shared.yaml#/EmailThreadMessage'
+    EmailThreadAttachment:
+      $ref: './components/schemas/shared.yaml#/EmailThreadAttachment'
     SlackContext:
       $ref: './components/schemas/slack_context.yaml#/SlackContext'
     SlackContextChannel:

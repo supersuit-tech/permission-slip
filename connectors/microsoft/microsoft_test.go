@@ -21,6 +21,7 @@ func TestMicrosoftConnector_Actions(t *testing.T) {
 
 	expected := []string{
 		"microsoft.send_email",
+		"microsoft.send_email_reply",
 		"microsoft.list_emails",
 		"microsoft.create_calendar_event",
 		"microsoft.list_calendar_events",
@@ -111,8 +112,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	if m.Name != "Microsoft" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Microsoft")
 	}
-	if len(m.Actions) != 24 {
-		t.Fatalf("Manifest().Actions has %d items, want 24", len(m.Actions))
+	if len(m.Actions) != 25 {
+		t.Fatalf("Manifest().Actions has %d items, want 25", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -120,6 +121,7 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	}
 	for _, want := range []string{
 		"microsoft.send_email",
+		"microsoft.send_email_reply",
 		"microsoft.list_emails",
 		"microsoft.create_calendar_event",
 		"microsoft.list_calendar_events",
@@ -166,8 +168,8 @@ func TestMicrosoftConnector_Manifest(t *testing.T) {
 	}
 
 	// Validate templates.
-	if len(m.Templates) != 27 {
-		t.Errorf("Manifest().Templates has %d items, want 27", len(m.Templates))
+	if len(m.Templates) != 28 {
+		t.Errorf("Manifest().Templates has %d items, want 28", len(m.Templates))
 	}
 
 	// Validate the manifest passes validation.

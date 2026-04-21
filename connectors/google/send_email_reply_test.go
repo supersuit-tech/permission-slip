@@ -18,6 +18,23 @@ func replyTestHandler(t *testing.T, threadID, from, subject, messageID string, s
 	t.Helper()
 	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/threads/") {
+			json.NewEncoder(w).Encode(map[string]any{
+				"id": threadID,
+				"messages": []map[string]any{
+					{
+						"id": "msg001",
+						"payload": map[string]any{
+							"headers": []map[string]string{
+								{"name": "From", "value": from},
+								{"name": "Subject", "value": subject},
+							},
+						},
+					},
+				},
+			})
+			return
+		}
 		if r.Method == http.MethodGet && strings.Contains(r.URL.Path, "/messages/") {
 			json.NewEncoder(w).Encode(map[string]any{
 				"id":       "msg001",

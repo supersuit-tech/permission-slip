@@ -232,12 +232,34 @@ func (c *GoogleConnector) resolveEmail(ctx context.Context, creds connectors.Cre
 
 func (c *GoogleConnector) resolveEmailReply(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
 	var p struct {
+		ThreadID  string `json:"thread_id"`
 		MessageID string `json:"message_id"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil || p.MessageID == "" {
 		return nil, fmt.Errorf("missing message_id")
 	}
-	return c.fetchEmailMetadata(ctx, creds, p.MessageID)
+	meta, err := c.fetchEmailMetadata(ctx, creds, p.MessageID)
+	if err != nil {
+		return nil, err
+	}
+	if p.ThreadID == "" {
+		return meta, nil
+	}
+	thread, err := c.buildGmailEmailThread(ctx, creds, p.ThreadID)
+	if err != nil {
+		return meta, nil // non-fatal: keep subject/from for display template
+	}
+	extra := connectors.EmailThreadDetailsMap(thread)
+	if extra == nil {
+		return meta, nil
+	}
+	if meta == nil {
+		return extra, nil
+	}
+	for k, v := range extra {
+		meta[k] = v
+	}
+	return meta, nil
 }
 
 func (c *GoogleConnector) fetchEmailMetadata(ctx context.Context, creds connectors.Credentials, messageID string) (map[string]any, error) {

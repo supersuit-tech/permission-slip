@@ -73,6 +73,7 @@ type gmailFullMessage struct {
 type gmailMessagePart struct {
 	PartID   string `json:"partId"`
 	MimeType string `json:"mimeType"`
+	Filename string `json:"filename"`
 	Headers  []struct {
 		Name  string `json:"name"`
 		Value string `json:"value"`
@@ -87,17 +88,17 @@ type gmailMessagePart struct {
 
 // emailFullDetail is the shape returned to the agent.
 type emailFullDetail struct {
-	ID          string               `json:"id"`
-	ThreadID    string               `json:"thread_id"`
-	From        string               `json:"from,omitempty"`
-	To          string               `json:"to,omitempty"`
-	Cc          string               `json:"cc,omitempty"`
-	Subject     string               `json:"subject,omitempty"`
-	Date        string               `json:"date,omitempty"`
-	Snippet     string               `json:"snippet,omitempty"`
-	Labels      []string             `json:"labels,omitempty"`
-	ContentType string               `json:"content_type,omitempty"`
-	Body        string               `json:"body,omitempty"`
+	ID          string                `json:"id"`
+	ThreadID    string                `json:"thread_id"`
+	From        string                `json:"from,omitempty"`
+	To          string                `json:"to,omitempty"`
+	Cc          string                `json:"cc,omitempty"`
+	Subject     string                `json:"subject,omitempty"`
+	Date        string                `json:"date,omitempty"`
+	Snippet     string                `json:"snippet,omitempty"`
+	Labels      []string              `json:"labels,omitempty"`
+	ContentType string                `json:"content_type,omitempty"`
+	Body        string                `json:"body,omitempty"`
 	Attachments []gmailAttachmentInfo `json:"attachments,omitempty"`
 }
 
@@ -244,6 +245,9 @@ func collectAttachments(part *gmailMessagePart, out *[]gmailAttachmentInfo, dept
 				}
 			}
 		}
+		if info.Filename == "" && part.Filename != "" {
+			info.Filename = part.Filename
+		}
 		*out = append(*out, info)
 	}
 	for i := range part.Parts {
@@ -282,7 +286,7 @@ func parseFilename(headerValue string) string {
 	return plainName
 }
 
-// decodeRFC5987 decodes a RFC 5987 encoded value like "UTF-8''caf%C3%A9.pdf".
+// decodeRFC5987 decodes a RFC 5987 encoded value like "UTF-8”caf%C3%A9.pdf".
 // Only UTF-8 charset is supported; other charsets (e.g. ISO-8859-1) return ""
 // to avoid producing invalid UTF-8 strings.
 func decodeRFC5987(value string) string {
@@ -309,7 +313,10 @@ func decodeBase64URL(s string) string {
 	if err != nil {
 		b, err = base64.URLEncoding.DecodeString(s)
 		if err != nil {
-			return s // return as-is if decoding fails
+			b, err = base64.StdEncoding.DecodeString(s)
+			if err != nil {
+				return s // return as-is if decoding fails
+			}
 		}
 	}
 	return string(b)
