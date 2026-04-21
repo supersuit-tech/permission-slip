@@ -30,6 +30,7 @@ func TestBuildReactionContext_SurroundingMessages(t *testing.T) {
 		if err := json.Unmarshal(body, &req); err != nil {
 			return nil, err
 		}
+		// Single-message fetch for reaction target (latest + inclusive).
 		if req.Latest != "" && req.Inclusive {
 			return map[string]any{
 				"ok": true,
@@ -38,14 +39,18 @@ func TestBuildReactionContext_SurroundingMessages(t *testing.T) {
 				},
 			}, nil
 		}
-		return map[string]any{
-			"ok": true,
-			"messages": []map[string]any{
-				{"user": "U0", "text": "old", "ts": tsOlder},
-				{"user": "U1", "text": "target", "ts": tsTarget},
-				{"user": "U2", "text": "new", "ts": tsNewer},
-			},
-		}, nil
+		// 24h window fetch (oldest set) — surrounding messages for ±3 slice.
+		if req.Oldest != "" {
+			return map[string]any{
+				"ok": true,
+				"messages": []map[string]any{
+					{"user": "U0", "text": "old", "ts": tsOlder},
+					{"user": "U1", "text": "target", "ts": tsTarget},
+					{"user": "U2", "text": "new", "ts": tsNewer},
+				},
+			}, nil
+		}
+		return map[string]any{"ok": true, "messages": []map[string]any{}}, nil
 	}
 	api.getHandlers["users.info"] = func(params map[string]string) (any, error) {
 		uid := params["user"]

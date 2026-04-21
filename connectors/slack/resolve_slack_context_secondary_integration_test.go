@@ -84,7 +84,6 @@ func TestResolveResourceDetails_SecondaryActions_SlackContext(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.action, func(t *testing.T) {
-			t.Parallel()
 			details, err := conn.ResolveResourceDetails(ctx, tc.action, json.RawMessage(tc.params), creds)
 			if err != nil {
 				t.Fatalf("ResolveResourceDetails: %v", err)

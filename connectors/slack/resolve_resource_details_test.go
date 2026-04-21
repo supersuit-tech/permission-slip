@@ -194,6 +194,8 @@ func TestResolveResourceDetails_AddReaction_IncludesSlackContext(t *testing.T) {
 	srv, conn := testSlackResolveServer(t, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
+		case "/auth.test":
+			json.NewEncoder(w).Encode(map[string]any{"ok": true, "url": "https://acme.slack.com/", "user_id": "U_SELF"})
 		case "/conversations.info":
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
