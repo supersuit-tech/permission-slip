@@ -146,7 +146,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "List Calendar Events",
 				Description:     "List upcoming events from Google Calendar",
 				RiskLevel:       "low",
-				DisplayTemplate: "List calendar events from {{calendar_id}}",
+				DisplayTemplate: "List calendar events from {{calendar_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -463,7 +463,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Add Slide",
 				Description:     "Add a new slide to an existing Google Slides presentation",
 				RiskLevel:       "medium",
-				DisplayTemplate: "Add {{layout}} slide to presentation",
+				DisplayTemplate: "Add {{layout}} slide to {{presentation_title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["presentation_id"],
@@ -499,7 +499,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Send Chat Message",
 				Description:     "Send a message to a Google Chat space",
 				RiskLevel:       "medium",
-				DisplayTemplate: "Send message to {{space_name}} — {{text}}",
+				DisplayTemplate: "Send message to {{space_display_name}} — {{text}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["space_name", "text"],

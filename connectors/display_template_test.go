@@ -29,17 +29,23 @@ var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 //     • resolveFile          → file_name, title
 //     • resolveEmail         → subject, from
 //     • resolveSheet         → title, range
+//     • resolveChatSpace     → space_display_name
+//     • resolveCalendar      → calendar_name
+//     • resolvePresentation  → presentation_title (also title)
 var resourceDetailFields = map[string]bool{
 	// Slack (see connectors/slack/resolve_resource_details.go)
 	"channel_name": true,
 	"user_name":    true,
 	// Google (see connectors/google/resolve_resource_details.go)
-	"title":      true,
-	"file_name":  true,
-	"start_time": true,
-	"subject":    true,
-	"from":       true,
-	"range":      true,
+	"title":               true,
+	"presentation_title":  true,
+	"space_display_name":  true,
+	"calendar_name":       true,
+	"file_name":           true,
+	"start_time":          true,
+	"subject":             true,
+	"from":                true,
+	"range":               true,
 }
 
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a

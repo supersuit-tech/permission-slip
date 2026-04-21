@@ -32,6 +32,7 @@ func testResolveServer(t *testing.T, routes map[string]string) (*httptest.Server
 		sheetsBaseURL:   srv.URL,
 		docsBaseURL:     srv.URL,
 		driveBaseURL:    srv.URL,
+		chatBaseURL:     srv.URL,
 	}
 	return srv, conn
 }
@@ -159,6 +160,57 @@ func TestResolveResourceDetails_Presentation(t *testing.T) {
 		if details["title"] != "Q1 Review Deck" {
 			t.Errorf("%s: expected title 'Q1 Review Deck', got %v", actionType, details["title"])
 		}
+		if details["presentation_title"] != "Q1 Review Deck" {
+			t.Errorf("%s: expected presentation_title 'Q1 Review Deck', got %v", actionType, details["presentation_title"])
+		}
+	}
+}
+
+func TestResolveResourceDetails_ChatSpace(t *testing.T) {
+	srv, conn := testResolveServer(t, map[string]string{
+		"/v1/spaces/": `{"displayName":"Dev Team"}`,
+	})
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{"space_name": "spaces/AAQAohK4ZL0", "text": "Hello"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.send_chat_message", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["space_display_name"] != "Dev Team" {
+		t.Errorf("expected space_display_name 'Dev Team', got %v", details["space_display_name"])
+	}
+}
+
+func TestResolveResourceDetails_CalendarSummary(t *testing.T) {
+	srv, conn := testResolveServer(t, map[string]string{
+		"/calendars/work%40example.com": `{"summary":"Work Calendar"}`,
+	})
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{"calendar_id": "work@example.com"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.list_calendar_events", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["calendar_name"] != "Work Calendar" {
+		t.Errorf("expected calendar_name, got %v", details["calendar_name"])
+	}
+}
+
+func TestResolveResourceDetails_CalendarSummary_DefaultPrimary(t *testing.T) {
+	srv, conn := testResolveServer(t, map[string]string{
+		"/calendars/primary": `{"summary":"alice@example.com"}`,
+	})
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.list_calendar_events", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["calendar_name"] != "alice@example.com" {
+		t.Errorf("expected calendar_name for primary, got %v", details["calendar_name"])
 	}
 }
 
@@ -267,5 +319,11 @@ func TestResolveResourceDetails_MissingParams(t *testing.T) {
 	_, err = conn.ResolveResourceDetails(context.Background(), "google.get_presentation", params, validCreds())
 	if err == nil {
 		t.Error("expected error for missing presentation_id")
+	}
+
+	// Missing space_name
+	_, err = conn.ResolveResourceDetails(context.Background(), "google.send_chat_message", params, validCreds())
+	if err == nil {
+		t.Error("expected error for missing space_name")
 	}
 }
