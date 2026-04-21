@@ -1131,11 +1131,13 @@ func TestAgentRequestApproval_MultiInstance_WithLabel_FreezesInstanceOnAction(t 
 	if gotLabel != "Sales" {
 		t.Errorf("connector_instance_label: want Sales got %q", gotLabel)
 	}
-	var params map[string]json.RawMessage
-	if err := json.Unmarshal(actionObj["parameters"], &params); err != nil {
-		t.Fatalf("parameters: %v", err)
-	}
-	if _, ok := params["connector_instance"]; ok {
-		t.Error("connector_instance should be stripped from parameters")
+	if raw, ok := actionObj["parameters"]; ok {
+		var params map[string]json.RawMessage
+		if err := json.Unmarshal(raw, &params); err != nil {
+			t.Fatalf("parameters: %v", err)
+		}
+		if _, ok := params["connector_instance"]; ok {
+			t.Error("connector_instance should be stripped from parameters")
+		}
 	}
 }

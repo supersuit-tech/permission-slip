@@ -32,3 +32,12 @@ func InsertCredentialWithVaultSecretID(t *testing.T, d db.DBTX, credID, userID, 
 		`INSERT INTO credentials (id, user_id, service, vault_secret_id) VALUES ($1, $2, $3, $4)`,
 		credID, userID, service, vaultSecretID)
 }
+
+// InsertCredentialWithVaultSecretIDAndLabel creates a credential with vault secret and a disambiguating label
+// (required when the same user has multiple credentials for the same service).
+func InsertCredentialWithVaultSecretIDAndLabel(t *testing.T, d db.DBTX, credID, userID, service, label, vaultSecretID string) {
+	t.Helper()
+	mustExec(t, d,
+		`INSERT INTO credentials (id, user_id, service, label, vault_secret_id) VALUES ($1, $2, $3, $4, $5)`,
+		credID, userID, service, label, vaultSecretID)
+}

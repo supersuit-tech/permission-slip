@@ -45,7 +45,7 @@ func TestApprovalFlow_MultiInstance_UsesCorrectCredentialOnApprove(t *testing.T)
 		t.Fatalf("vault: %v", err)
 	}
 	credID1 := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID1, uid, connID, v1)
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID1, uid, connID, "default", v1)
 
 	credJSON2, _ := json.Marshal(map[string]string{"api_key": "token-sales"})
 	v2, err := v.CreateSecret(t.Context(), tx, "c2", credJSON2)
@@ -53,7 +53,7 @@ func TestApprovalFlow_MultiInstance_UsesCorrectCredentialOnApprove(t *testing.T)
 		t.Fatalf("vault: %v", err)
 	}
 	credID2 := testhelper.GenerateID(t, "cred_")
-	testhelper.InsertCredentialWithVaultSecretID(t, tx, credID2, uid, connID, v2)
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID2, uid, connID, "sales", v2)
 
 	_, err = db.UpsertAgentConnectorCredentialByInstance(t.Context(), tx, db.UpsertAgentConnectorCredentialByInstanceParams{
 		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
