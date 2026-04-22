@@ -2,16 +2,17 @@ package slack
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // searchMessagesAction implements connectors.Action for slack.search_messages.
-// It searches messages across channels via POST /search.messages.
+// It searches messages across Slack channels via GET /search.messages.
 //
 // This Slack endpoint requires a user token (xoxp-) with the legacy
-// search:read scope. The newer granular search:read.{public,private,im,mpim,files}
-// scopes only satisfy the Real-time Search API (assistant.search.context);
+// search:read scope. Uses GET (doGet) because search.messages does not
+// accept JSON body parameters — only query string args.
 // calling search.messages with only those scopes fails with invalid_arguments.
 type searchMessagesAction struct {
 	conn *SlackConnector
@@ -104,21 +105,25 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	body := searchMessagesRequest{
-		Query: params.Query,
-		Count: params.Count,
-		Page:  params.Page,
-		Sort:  params.Sort,
+	count := params.Count
+	if count == 0 {
+		count = 20
 	}
-	if body.Count == 0 {
-		body.Count = 20
+	page := params.Page
+	if page == 0 {
+		page = 1
 	}
-	if body.Page == 0 {
-		body.Page = 1
+	paramsMap := map[string]string{
+		"query": params.Query,
+		"count": strconv.Itoa(count),
+		"page":  strconv.Itoa(page),
+	}
+	if params.Sort != "" {
+		paramsMap["sort"] = params.Sort
 	}
 
 	var resp searchMessagesResponse
-	if err := a.conn.doPost(ctx, "search.messages", req.Credentials, body, &resp); err != nil {
+	if err := a.conn.doGet(ctx, "search.messages", req.Credentials, paramsMap, &resp); err != nil {
 		return nil, err
 	}
 
