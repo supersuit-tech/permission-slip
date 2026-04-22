@@ -120,6 +120,9 @@ func runOAuthRefresh(ctx context.Context, deps OAuthRefreshDeps, logger *slog.Lo
 
 // refreshSingleConnection refreshes the tokens for a single OAuth connection.
 func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger *slog.Logger, conn db.OAuthConnection) error {
+	lastKnownAccessVaultID := conn.AccessTokenVaultID
+	lastKnownTokenExpiry := conn.TokenExpiry
+
 	provider, ok := deps.Registry.Get(conn.Provider)
 	if !ok {
 		return fmt.Errorf("provider %q not found in registry", conn.Provider)
@@ -134,12 +137,21 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 	)
 
 	if conn.RefreshTokenVaultID == nil {
-		// Mark as needs_reauth — no refresh token available.
-		if err := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); err != nil {
-			connLog.Error("oauth refresh: failed to mark connection as needs_reauth", "error", err)
-			sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, err))
+		fresh, skipFlip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownAccessVaultID, lastKnownTokenExpiry)
+		if err != nil {
+			return err
 		}
-		return fmt.Errorf("no refresh token for connection %s", conn.ID)
+		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive && fresh.RefreshTokenVaultID != nil {
+			conn = *fresh
+			lastKnownAccessVaultID = conn.AccessTokenVaultID
+			lastKnownTokenExpiry = conn.TokenExpiry
+		} else {
+			if err := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); err != nil {
+				connLog.Error("oauth refresh: failed to mark connection as needs_reauth", "error", err)
+				sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, err))
+			}
+			return fmt.Errorf("no refresh token for connection %s", conn.ID)
+		}
 	}
 
 	refreshTokenBytes, err := deps.Vault.ReadSecret(ctx, deps.DB, *conn.RefreshTokenVaultID)
@@ -149,7 +161,13 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 
 	result, err := oauth.RefreshTokens(ctx, provider, string(refreshTokenBytes))
 	if err != nil {
-		// Refresh failed — mark as needs_reauth.
+		fresh, skipFlip, reloadErr := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownAccessVaultID, lastKnownTokenExpiry)
+		if reloadErr != nil {
+			return reloadErr
+		}
+		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive {
+			return nil
+		}
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
 			connLog.Error("oauth refresh: failed to mark connection as needs_reauth", "error", statusErr)
 			sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, statusErr))

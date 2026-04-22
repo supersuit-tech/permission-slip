@@ -443,7 +443,14 @@ func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OA
 // both paths produce valid tokens. The last writer wins in the DB, and the other's
 // vault secrets become orphaned. This is safe (no data loss or auth failure) but
 // may leave unused vault entries until the connection is deleted or re-authorized.
+//
+// When a provider rotates refresh tokens, a concurrent successful refresh invalidates
+// the old refresh token; the losing path may see invalid_grant. We re-read the row
+// before marking needs_reauth so we do not flip a healthy connection offline.
 func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConnection, providerID string) error {
+	lastKnownAccessVaultID := conn.AccessTokenVaultID
+	lastKnownTokenExpiry := conn.TokenExpiry
+
 	provider, ok := deps.OAuthProviders.Get(providerID)
 	if !ok {
 		return &connectors.OAuthRefreshError{
@@ -453,14 +460,24 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	}
 
 	if conn.RefreshTokenVaultID == nil {
-		// No refresh token — can't refresh. Mark as needs_reauth.
-		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
-			log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)
-			CaptureError(ctx, statusErr)
+		fresh, skipFlip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownAccessVaultID, lastKnownTokenExpiry)
+		if err != nil {
+			return err
 		}
-		return &connectors.OAuthRefreshError{
-			Provider: providerID,
-			Message:  "token expired and no refresh token available — user must re-authorize",
+		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive && fresh.RefreshTokenVaultID != nil {
+			*conn = *fresh
+			lastKnownAccessVaultID = conn.AccessTokenVaultID
+			lastKnownTokenExpiry = conn.TokenExpiry
+		} else {
+			// No refresh token — can't refresh. Mark as needs_reauth.
+			if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
+				log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)
+				CaptureError(ctx, statusErr)
+			}
+			return &connectors.OAuthRefreshError{
+				Provider: providerID,
+				Message:  "token expired and no refresh token available — user must re-authorize",
+			}
 		}
 	}
 
@@ -478,8 +495,16 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	defer refreshCancel()
 	result, err := oauth.RefreshTokens(refreshCtx, provider, string(refreshTokenBytes))
 	if err != nil {
-		// Refresh failed (token revoked, expired, etc.). Mark as needs_reauth.
-		// Log the full error server-side for debugging; return a sanitized message to the caller.
+		// Refresh failed (token revoked, expired, invalid_grant after rotation, etc.).
+		// Re-read: another goroutine may have refreshed successfully and invalidated our refresh token.
+		fresh, skipFlip, reloadErr := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownAccessVaultID, lastKnownTokenExpiry)
+		if reloadErr != nil {
+			return reloadErr
+		}
+		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive {
+			*conn = *fresh
+			return nil
+		}
 		log.Printf("oauth refresh failed for provider %q connection %s: %v", providerID, conn.ID, err)
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
 			log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)

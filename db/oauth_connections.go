@@ -20,29 +20,29 @@ const (
 
 // OAuthConnection represents a row from the oauth_connections table.
 type OAuthConnection struct {
-	ID                   string
-	UserID               string
-	Provider             string
-	AccessTokenVaultID   string
-	RefreshTokenVaultID  *string
-	Scopes               []string
-	TokenExpiry          *time.Time
-	Status               string
-	ExtraData            json.RawMessage // provider-specific data (e.g. Salesforce instance_url)
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	ID                  string
+	UserID              string
+	Provider            string
+	AccessTokenVaultID  string
+	RefreshTokenVaultID *string
+	Scopes              []string
+	TokenExpiry         *time.Time
+	Status              string
+	ExtraData           json.RawMessage // provider-specific data (e.g. Salesforce instance_url)
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
 }
 
 // CreateOAuthConnectionParams holds the parameters for inserting a new OAuth connection.
 type CreateOAuthConnectionParams struct {
-	ID                   string
-	UserID               string
-	Provider             string
-	AccessTokenVaultID   string
-	RefreshTokenVaultID  *string
-	Scopes               []string
-	TokenExpiry          *time.Time
-	ExtraData            json.RawMessage // optional provider-specific data
+	ID                  string
+	UserID              string
+	Provider            string
+	AccessTokenVaultID  string
+	RefreshTokenVaultID *string
+	Scopes              []string
+	TokenExpiry         *time.Time
+	ExtraData           json.RawMessage // optional provider-specific data
 }
 
 // OAuthConnectionError represents a domain-specific error from OAuth connection operations.
@@ -97,13 +97,16 @@ func ListOAuthConnectionsByUser(ctx context.Context, db DBTX, userID string) ([]
 	return conns, rows.Err()
 }
 
-// GetOAuthConnectionByProvider returns the OAuth connection for a given user and provider.
-// Returns nil if no connection exists.
+// GetOAuthConnectionByProvider returns the most recent OAuth connection for a given user and
+// provider (ORDER BY created_at DESC, id DESC LIMIT 1). When multiple connections exist for the same
+// user+provider, ordering is deterministic even if created_at ties. Returns nil if no connection exists.
 func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider string) (*OAuthConnection, error) {
 	row := db.QueryRow(ctx, `
 		SELECT `+oauthConnectionColumns+`
 		FROM oauth_connections
-		WHERE user_id = $1 AND provider = $2`,
+		WHERE user_id = $1 AND provider = $2
+		ORDER BY created_at DESC, id DESC
+		LIMIT 1`,
 		userID, provider,
 	)
 	c, err := scanOAuthConnection(row.Scan)
@@ -116,31 +119,34 @@ func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider
 	return &c, nil
 }
 
-// GetOAuthConnectionsByProvider returns all OAuth connections for a given user
-// and provider, ordered by created_at descending (newest first). Use this when
-// multiple connections per provider are allowed.
-func GetOAuthConnectionsByProvider(ctx context.Context, db DBTX, userID, provider string) ([]OAuthConnection, error) {
-	rows, err := db.Query(ctx, `
-		SELECT `+oauthConnectionColumns+`
-		FROM oauth_connections
-		WHERE user_id = $1 AND provider = $2
-		ORDER BY created_at DESC`,
-		userID, provider,
-	)
+// ReloadOAuthConnectionIfConcurrentRefreshSucceeded re-reads the connection row after a failed
+// token refresh. If another path refreshed successfully in the meantime, the access-token vault ID
+// and/or token_expiry typically change while status stays active. We only treat the row as a
+// concurrent success when status is still active and at least one refresh-specific signal changed
+// — not on updated_at alone (another path may have flipped to needs_reauth and also bumped updated_at).
+//
+// Returns (freshConn, true) when the re-read shows an active connection that looks successfully
+// refreshed vs. the caller's snapshot; the caller should use freshConn and skip flipping to
+// needs_reauth. On false, the caller may proceed to mark needs_reauth.
+// Returns (nil, false, nil) if the row disappeared.
+func ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx context.Context, db DBTX, connID, userID string, lastKnownAccessVaultID string, lastKnownTokenExpiry *time.Time) (*OAuthConnection, bool, error) {
+	fresh, err := GetOAuthConnectionByID(ctx, db, connID)
 	if err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	defer rows.Close()
-
-	var conns []OAuthConnection
-	for rows.Next() {
-		c, err := scanOAuthConnection(rows.Scan)
-		if err != nil {
-			return nil, err
-		}
-		conns = append(conns, c)
+	if fresh == nil || fresh.UserID != userID {
+		return nil, false, nil
 	}
-	return conns, rows.Err()
+	if fresh.Status != OAuthStatusActive {
+		return fresh, false, nil
+	}
+	accessRotated := fresh.AccessTokenVaultID != "" && fresh.AccessTokenVaultID != lastKnownAccessVaultID
+	expiryAdvanced := lastKnownTokenExpiry != nil && fresh.TokenExpiry != nil && fresh.TokenExpiry.After(*lastKnownTokenExpiry)
+	expiryBackfilled := lastKnownTokenExpiry == nil && fresh.TokenExpiry != nil
+	if accessRotated || expiryAdvanced || expiryBackfilled {
+		return fresh, true, nil
+	}
+	return fresh, false, nil
 }
 
 // CreateOAuthConnection inserts a new OAuth connection row.
