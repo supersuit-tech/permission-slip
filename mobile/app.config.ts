@@ -24,7 +24,7 @@ const config: ExpoConfig = {
   name: "Permission Slip",
   slug: "permission-slip",
   owner: process.env.EXPO_OWNER || "supersuit-tech",
-  version: "1.0.0",
+  version: "1.0.1",
   runtimeVersion: { policy: "appVersion" as const },
   scheme: "permissionslip",
   orientation: "portrait",
