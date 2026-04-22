@@ -12,10 +12,15 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
-// columnOnlyRange matches ranges like "Sheet1!A:C" or "Sheet1!A:A" where the
-// column range has no row anchors. The Sheets API values.append endpoint does
-// not accept these; callers should pass just the sheet name instead.
-var columnOnlyRange = regexp.MustCompile(`^([^!]+)![A-Za-z]+:[A-Za-z]+$`)
+// columnOnlyRange matches ranges like "Sheet1!A:C" or "Sheet1!A:A" where both
+// sides of the colon are column letters only (no row numbers). The Sheets API
+// values.append endpoint rejects these column-only spans; normalize to the
+// sheet name so append behaves like passing "Sheet1".
+//
+// Whitespace is trimmed first so JSON/parameters with trailing newlines or
+// spaces still normalize (fixes mis-detection where the raw "Sheet1!A:C" was
+// sent through to Google unchanged).
+var columnOnlyRange = regexp.MustCompile(`^([^!]+)!\s*([A-Za-z]+)\s*:\s*([A-Za-z]+)\s*$`)
 
 // sheetsAppendRowsAction implements connectors.Action for google.sheets_append_rows.
 // It appends rows to a sheet via the Google Sheets API
@@ -36,6 +41,7 @@ type sheetsAppendRowsParams struct {
 // sheet name "Sheet1". values.append requires a cell anchor, not a bare column
 // span, so callers who pass "Sheet1!A:C" get the same result as "Sheet1".
 func normalizeAppendRange(r string) string {
+	r = strings.TrimSpace(r)
 	if m := columnOnlyRange.FindStringSubmatch(r); m != nil {
 		return strings.TrimSpace(m[1])
 	}

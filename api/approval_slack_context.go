@@ -45,7 +45,7 @@ func mergeSlackContextFromResourceDetailsIntoContext(contextJSON json.RawMessage
 	if err != nil {
 		return contextJSON
 	}
-	if len(out) > 65536 {
+	if len(out) > maxApprovalContextJSONBytes {
 		return contextJSON
 	}
 	return out

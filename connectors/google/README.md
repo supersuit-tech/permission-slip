@@ -22,7 +22,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `gmail.readonly` | `google.list_emails`, `google.read_email` |
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events`, `google.create_meeting` |
 | `presentations` | `google.create_presentation`, `google.get_presentation`, `google.add_slide` |
-| `spreadsheets` | `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets` |
+| `spreadsheets` | `google.create_spreadsheet`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets` |
 | `documents` | `google.create_document`, `google.get_document`, `google.update_document` |
 | `chat.spaces.readonly` | `google.list_chat_spaces` |
 | `chat.messages.create` | `google.send_chat_message` |
@@ -457,6 +457,37 @@ Lists all worksheets (tabs) in a Google Sheets spreadsheet.
 **Sheets API:** `GET /v4/spreadsheets/{id}?fields=sheets.properties` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/get))
 
 The response includes `row_count` and `column_count` from the sheet's grid properties, which can be used to determine sheet dimensions before read/write operations.
+
+---
+
+### `google.create_spreadsheet`
+
+Creates a new Google Sheets spreadsheet (same API family as `google.sheets_read_range` / write / append, but creates an empty file you can pass to those actions).
+
+**Risk level:** medium
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `title` | string | Yes | Title of the new spreadsheet |
+| `sheet_titles` | string[] | No | Optional list of initial worksheet tab names. If omitted, Google defaults to a single `Sheet1` tab. |
+
+**Response:**
+
+```json
+{
+  "spreadsheet_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "spreadsheet_url": "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms/edit",
+  "title": "Q1 Report"
+}
+```
+
+**Sheets API:** `POST /v4/spreadsheets` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/create))
+
+**Implementation notes:**
+- Returns `spreadsheet_id` for use with `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, and `google.sheets_list_sheets`.
+- If the API omits `spreadsheetUrl` in the response, the connector builds an edit URL from `spreadsheet_id`.
 
 ---
 
@@ -1087,6 +1118,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Append to specific spreadsheet | `sheets_append_rows` | `spreadsheet_id` locked; agent chooses range and values |
 | Read from any spreadsheet | `sheets_read_range` | Nothing — agent controls all parameters |
 | List worksheets in any spreadsheet | `sheets_list_sheets` | Nothing — agent controls spreadsheet |
+| Create spreadsheets | `create_spreadsheet` | Nothing — agent controls title and optional tab names |
 | Create documents | `create_document` | Nothing — agent controls title and body |
 | Create empty documents | `create_document` | `body` omitted — title only |
 | Read any document | `get_document` | Nothing — agent can read any doc by ID |
@@ -1131,7 +1163,7 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 ```
 connectors/google/
 ├── google.go                       # GoogleConnector struct, New(), Actions(), doJSON(), doRawGet(), wrapHTTPError(), ValidateCredentials()
-├── manifest.go                     # Manifest() — 28 action schemas and 40+ templates
+├── manifest.go                     # Manifest() — 30 action schemas and 41+ templates
 ├── docs_types.go                   # Shared Docs API types (batchUpdate request) and helpers (documentEditURL)
 ├── email_helpers.go                # buildGmailRaw() — shared RFC 2822 message builder used by send_email and send_email_reply
 ├── send_email.go                   # google.send_email action
@@ -1152,6 +1184,7 @@ connectors/google/
 ├── sheets_append.go                # google.sheets_append_rows action
 ├── sheets_list.go                  # google.sheets_list_sheets action
 ├── sheets_helpers.go               # Shared validation helpers for Sheets actions
+├── create_spreadsheet.go           # google.create_spreadsheet action (Sheets API)
 ├── create_document.go              # google.create_document action
 ├── get_document.go                 # google.get_document action
 ├── update_document.go              # google.update_document action
@@ -1184,6 +1217,7 @@ connectors/google/
 ├── sheets_append_test.go           # Sheets append rows tests
 ├── sheets_list_test.go             # Sheets list worksheets tests
 ├── sheets_helpers_test.go          # Sheets validation helpers tests
+├── create_spreadsheet_test.go      # Create spreadsheet tests
 ├── create_document_test.go         # Create document tests (including partial failure handling)
 ├── get_document_test.go            # Get document tests (including plain text extraction)
 ├── update_document_test.go         # Update document tests (append and insert-at-index)

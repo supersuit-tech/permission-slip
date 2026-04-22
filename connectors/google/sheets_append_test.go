@@ -81,6 +81,28 @@ func TestSheetsAppendRows_Success(t *testing.T) {
 	}
 }
 
+func TestNormalizeAppendRange_ColumnOnlyAndWhitespace(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		in   string
+		want string
+	}{
+		{"Sheet1!A:C", "Sheet1"},
+		{"  Sheet1!A:C  ", "Sheet1"},
+		{"Sheet1! A : C", "Sheet1"},
+		{"Sheet1!A:C\n", "Sheet1"},
+		{"My Sheet!A:C", "My Sheet"},
+		{"Sheet1!A1:C10", "Sheet1!A1:C10"},
+		{"Sheet1", "Sheet1"},
+	}
+	for _, tt := range tests {
+		if got := normalizeAppendRange(tt.in); got != tt.want {
+			t.Errorf("normalizeAppendRange(%q) = %q, want %q", tt.in, got, tt.want)
+		}
+	}
+}
+
 func TestSheetsAppendRows_ColumnOnlyRangeNormalized(t *testing.T) {
 	t.Parallel()
 

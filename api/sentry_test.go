@@ -373,6 +373,39 @@ func TestCaptureConnectorError_5xxExternalErrorStaysError(t *testing.T) {
 	}
 }
 
+func TestCaptureConnectorError_OAuthRefreshIsWarning(t *testing.T) {
+	t.Parallel()
+
+	transport := &sentryTestTransport{}
+	client, err := sentry.NewClient(sentry.ClientOptions{
+		Dsn:       "https://key@sentry.example.com/1",
+		Transport: transport,
+	})
+	if err != nil {
+		t.Fatalf("failed to create sentry client: %v", err)
+	}
+
+	hub := sentry.NewHub(client, sentry.NewScope())
+	ctx := sentry.SetHubOnContext(context.Background(), hub)
+
+	CaptureConnectorError(ctx, &connectors.OAuthRefreshError{
+		Provider: "slack",
+		Message:  "OAuth connection for \"slack\" has status \"needs_reauth\" — user must re-authorize",
+	}, ConnectorContext{
+		ConnectorID: "slack",
+		ActionType:  "slack.list_channels",
+		AgentID:     3,
+	})
+
+	events := transport.getEvents()
+	if len(events) == 0 {
+		t.Fatal("expected event to be captured")
+	}
+	if got := events[0].Level; got != sentry.LevelWarning {
+		t.Errorf("level = %q, want %q (oauth_refresh is user-action-required, should not page)", got, sentry.LevelWarning)
+	}
+}
+
 // sentryTestTransport captures events in memory for test assertions.
 // A mutex guards the events slice in case the SDK delivers events from a
 // background goroutine (defensive — our tests are single-goroutine but
