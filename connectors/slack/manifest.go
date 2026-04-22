@@ -98,7 +98,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "slack.list_channels",
 				Name:            "List Channels",
-				Description:     "List Slack channels via conversations.list, merged with the authorizing user's DMs and private conversations from users.conversations when a matching profile email is available. Returns all channel types (public, private, group DMs, DMs) by default when email is set.",
+				Description:     "List Slack channels for the authorizing user's OAuth token via conversations.list, with users.conversations merged to add conversations missing from that list. Defaults to all channel types (public, private, group DMs, DMs).",
 				RiskLevel:       "low",
 				DisplayTemplate: "List Slack channels",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
@@ -108,7 +108,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"default": "public_channel,private_channel,mpim,im",
 							"enum": ["public_channel", "private_channel", "mpim", "im"],
-							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set. im/mpim/private_channel results are filtered to the authorizing user; user-token merge fills in human-only DMs when configured.",
+							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types. Slack scopes results to the token owner; merge adds DMs/private rows missing from conversations.list.",
 							"x-ui": {"label": "Channel types", "widget": "multi-select", "help_text": "public_channel, private_channel, mpim (group DMs), im (direct messages)"}
 						},
 						"limit": {
@@ -863,7 +863,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				ID:               "tpl_slack_list_channels",
 				ActionType:       "slack.list_channels",
 				Name:             "List channels",
-				Description:      "Agent can list channels, including the authorizing user's DMs when profile email matches Slack.",
+				Description:      "Agent can list channels visible to the authorizing user's Slack user token.",
 				Parameters:       json.RawMessage(`{"types":"*","limit":"*","cursor":"*"}`),
 				StandingApproval: neverExpire,
 			},

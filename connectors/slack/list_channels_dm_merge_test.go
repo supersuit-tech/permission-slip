@@ -15,11 +15,6 @@ func TestListChannels_MergesHumanDMNotVisibleToBot(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]string{"id": "U_CALLER"},
-			})
 		case "/users.conversations":
 			if got := r.Header.Get("Authorization"); got != "Bearer xoxp-user" {
 				t.Errorf("users.conversations: expected user token, got %q", got)

@@ -1698,7 +1698,7 @@ paths:
         Used by the dashboard to populate channel pickers for Slack actions.
 
         Requires session authentication (Supabase JWT). The agent must belong to the current user.
-        Private channels and DMs require the user's profile email to match their Slack account (same rules as `slack.list_channels`).
+        Listing uses the connected Slack user OAuth token; channel visibility follows Slack's token scoping (same model as `slack.list_channels`).
       tags:
         - Agents
       security:

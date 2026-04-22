@@ -2,7 +2,6 @@ package slack
 
 import (
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -112,11 +111,6 @@ func TestListChannels_DefaultTypes(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]string{"id": "U_CALLER"},
-			})
 		case "/users.conversations":
 			var body usersConversationsRequest
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -198,11 +192,6 @@ func TestListChannels_IMChannels(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]string{"id": "U_CALLER"},
-			})
 		case "/users.conversations":
 			var body usersConversationsRequest
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -211,13 +200,9 @@ func TestListChannels_IMChannels(t *testing.T) {
 			if body.User != "" {
 				t.Errorf("expected empty user param on users.conversations, got %q", body.User)
 			}
-			// Return the IM channel as one the caller belongs to.
 			json.NewEncoder(w).Encode(map[string]any{
-				"ok": true,
-				"channels": []map[string]any{
-					{"id": "D001"},
-					{"id": "D002"},
-				},
+				"ok":       true,
+				"channels": []map[string]any{},
 			})
 		case "/conversations.list":
 			var body listChannelsRequest
@@ -244,7 +229,6 @@ func TestListChannels_IMChannels(t *testing.T) {
 						"num_members": 0,
 					},
 					{
-						// DM the caller is NOT a member of — should be filtered out.
 						"id":          "D999",
 						"user":        "U_STRANGER",
 						"is_private":  true,
@@ -277,9 +261,9 @@ func TestListChannels_IMChannels(t *testing.T) {
 	if err := json.Unmarshal(result.Data, &data); err != nil {
 		t.Fatalf("failed to unmarshal result: %v", err)
 	}
-	// D999 should be filtered out (not in caller's membership set).
-	if len(data.Channels) != 2 {
-		t.Fatalf("expected 2 IM channels, got %d", len(data.Channels))
+	// User-token listing trusts conversations.list for IM rows; no email merge intersection.
+	if len(data.Channels) != 3 {
+		t.Fatalf("expected 3 IM channels, got %d", len(data.Channels))
 	}
 	if data.Channels[0].ID != "D001" {
 		t.Errorf("expected first channel D001, got %q", data.Channels[0].ID)
@@ -418,38 +402,48 @@ func TestListChannels_InvalidJSON(t *testing.T) {
 	}
 }
 
-func TestListChannels_DefaultFallbackWithoutEmail(t *testing.T) {
+func TestListChannels_DefaultWithoutEmail(t *testing.T) {
 	t.Parallel()
 
-	// When no types are specified (using the default) and no UserEmail is set,
-	// list_channels should gracefully fall back to public_channel only instead
-	// of returning a ValidationError. This preserves backward compatibility.
+	// Default types include private/DM kinds; user OAuth scopes both calls — no profile email required.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/conversations.list" {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.conversations":
+			var body usersConversationsRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode: %v", err)
+			}
+			if body.Types != "private_channel,mpim,im" {
+				t.Errorf("expected users.conversations types 'private_channel,mpim,im', got %q", body.Types)
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":       true,
+				"channels": []map[string]any{},
+			})
+		case "/conversations.list":
+			var body listChannelsRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode: %v", err)
+			}
+			if body.Types != "public_channel,private_channel,mpim,im" {
+				t.Errorf("expected default types on conversations.list, got %q", body.Types)
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "C001", "name": "general", "is_private": false, "num_members": 5},
+				},
+			})
+		default:
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
-		var body listChannelsRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode: %v", err)
-		}
-		if body.Types != "public_channel" {
-			t.Errorf("expected fallback types 'public_channel', got %q", body.Types)
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]any{
-			"ok": true,
-			"channels": []map[string]any{
-				{"id": "C001", "name": "general", "is_private": false, "num_members": 5},
-			},
-		})
 	}))
 	defer srv.Close()
 
 	conn := newForTest(srv.Client(), srv.URL)
 	action := &listChannelsAction{conn: conn}
 
-	// No types param, no UserEmail — should fall back to public_channel.
 	params, _ := json.Marshal(listChannelsParams{})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -458,7 +452,7 @@ func TestListChannels_DefaultFallbackWithoutEmail(t *testing.T) {
 		Credentials: validCreds(),
 	})
 	if err != nil {
-		t.Fatalf("expected graceful fallback, got error: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
 
 	var data listChannelsResult
@@ -484,11 +478,6 @@ func TestListChannels_IMFiltersStrayPublicChannels(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]string{"id": "U_CALLER"},
-			})
 		case "/users.conversations":
 			var body usersConversationsRequest
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -558,23 +547,46 @@ func TestListChannels_IMFiltersStrayPublicChannels(t *testing.T) {
 func TestListChannels_ExplicitPrivateTypesWithoutEmail(t *testing.T) {
 	t.Parallel()
 
-	// When the caller explicitly requests private types (e.g. types=im) but
-	// has no UserEmail set, list_channels must return a ValidationError —
-	// not silently fall back to public_channel.
-	conn := newForTest(http.DefaultClient, "http://unused")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.conversations":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":       true,
+				"channels": []map[string]any{},
+			})
+		case "/conversations.list":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "D001", "user": "U_X", "is_im": true, "is_private": true, "num_members": 0},
+				},
+			})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
 	action := &listChannelsAction{conn: conn}
 
 	params, _ := json.Marshal(listChannelsParams{Types: "im"})
 
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "slack.list_channels",
 		Parameters:  params,
 		Credentials: validCreds(),
-		// UserEmail intentionally omitted
 	})
-	var valErr *connectors.ValidationError
-	if !errors.As(err, &valErr) {
-		t.Fatalf("expected ValidationError for explicit private types without email, got: %v", err)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var data listChannelsResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(data.Channels) != 1 || data.Channels[0].ID != "D001" {
+		t.Fatalf("expected one DM D001, got %+v", data.Channels)
 	}
 }
 
@@ -592,11 +604,6 @@ func TestListChannels_IMReturnsUserDMsWhenConversationsListEmpty(t *testing.T) {
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]string{"id": "U_CALLER"},
-			})
 		case "/users.conversations":
 			var body usersConversationsRequest
 			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -669,11 +676,6 @@ func TestListChannels_DMsFromConversationsListWhenUsersConversationsEmpty_issue1
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]string{"id": "U_CALLER"},
-			})
 		case "/users.conversations":
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok":       true,
