@@ -132,6 +132,15 @@ func listChannelEntryMatchesTypes(types string, ch listChannelEntry) bool {
 			if ch.IsPrivate && len(ch.ID) > 0 && (ch.ID[0] == 'C' || ch.ID[0] == 'G') {
 				return true
 			}
+		case "public_channel":
+			// Public C-channels only — exclude DMs/MPIMs (which may carry is_private)
+			// and exclude private channels (C or legacy G with is_private=true).
+			if ch.IsIM || ch.IsMPIM {
+				break
+			}
+			if !ch.IsPrivate && len(ch.ID) > 0 && ch.ID[0] == 'C' {
+				return true
+			}
 		}
 	}
 	return false

@@ -79,6 +79,12 @@ func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connector
 		Channels: make([]listChannelSummary, 0, len(resp.Channels)+len(userPrivateMerge)),
 	}
 	for _, ch := range resp.Channels {
+		// Defend against conversations.list returning channels outside the
+		// requested types (e.g. bot tokens missing im:read silently return
+		// public channels instead of an error). See issue #1028.
+		if !listChannelEntryMatchesTypes(types, ch) {
+			continue
+		}
 		if userChannelIDs != nil && (ch.IsPrivate || strings.HasPrefix(ch.ID, "D") || strings.HasPrefix(ch.ID, "G")) {
 			if !userChannelIDs[ch.ID] {
 				continue
