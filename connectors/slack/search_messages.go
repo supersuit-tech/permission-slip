@@ -3,6 +3,7 @@ package slack
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -11,6 +12,8 @@ import (
 // It searches messages across channels via POST /search.messages.
 //
 // This Slack endpoint requires a user token (xoxp-) with search:read.
+// Uses GET (doGet) because search.messages is a read-only endpoint that does
+// not accept JSON body parameters.
 type searchMessagesAction struct {
 	conn *SlackConnector
 }
@@ -119,21 +122,28 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		}
 	}
 
-	body := searchMessagesRequest{
-		Query: params.Query,
-		Count: params.Count,
-		Page:  params.Page,
-		Sort:  params.Sort,
+	// Use doGet: search.messages is a read-only GET endpoint that does not
+	// accept JSON body parameters. This matches the fix in commit b958bcbd
+	// for conversations.info and users.info.
+	count := params.Count
+	if count == 0 {
+		count = 20
 	}
-	if body.Count == 0 {
-		body.Count = 20
+	page := params.Page
+	if page == 0 {
+		page = 1
 	}
-	if body.Page == 0 {
-		body.Page = 1
+	paramsMap := map[string]string{
+		"query": params.Query,
+		"count": strconv.Itoa(count),
+		"page":  strconv.Itoa(page),
+	}
+	if params.Sort != "" {
+		paramsMap["sort"] = params.Sort
 	}
 
 	var resp searchMessagesResponse
-	if err := a.conn.doPost(ctx, "search.messages", req.Credentials, body, &resp); err != nil {
+	if err := a.conn.doGet(ctx, "search.messages", req.Credentials, paramsMap, &resp); err != nil {
 		return nil, err
 	}
 

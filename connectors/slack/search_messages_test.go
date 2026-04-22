@@ -36,19 +36,16 @@ func TestSearchMessages_Success(t *testing.T) {
 			return
 		}
 
-		if r.Method != http.MethodPost {
-			t.Errorf("expected POST, got %s", r.Method)
+		if r.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", r.Method)
 		}
 
-		var body searchMessagesRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+		query := r.URL.Query()
+		if query.Get("query") != "deploy in:#engineering" {
+			t.Errorf("expected query 'deploy in:#engineering', got %q", query.Get("query"))
 		}
-		if body.Query != "deploy in:#engineering" {
-			t.Errorf("expected query 'deploy in:#engineering', got %q", body.Query)
-		}
-		if body.Count != 20 {
-			t.Errorf("expected count 20, got %d", body.Count)
+		if query.Get("count") != "20" {
+			t.Errorf("expected count 20, got %q", query.Get("count"))
 		}
 
 		json.NewEncoder(w).Encode(map[string]any{
