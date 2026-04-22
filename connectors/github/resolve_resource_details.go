@@ -40,7 +40,7 @@ func (c *GitHubConnector) resolveWorkflow(ctx context.Context, creds connectors.
 		return nil, err
 	}
 	if p.WorkflowID == "" {
-		return nil, fmt.Errorf("missing workflow_id")
+		return nil, &connectors.ValidationError{Message: "missing required parameter: workflow_id"}
 	}
 
 	path := fmt.Sprintf("/repos/%s/%s/actions/workflows/%s",
@@ -91,8 +91,12 @@ func (c *GitHubConnector) resolveWebhook(ctx context.Context, creds connectors.C
 	if u := strings.TrimSpace(resp.Config.URL); u != "" {
 		out["webhook_url"] = u
 	}
-	if len(resp.Events) > 0 {
-		out["webhook_events"] = strings.Join(resp.Events, ", ")
+	if n := len(resp.Events); n > 0 {
+		if n <= 3 {
+			out["webhook_events"] = strings.Join(resp.Events, ", ")
+		} else {
+			out["webhook_events"] = fmt.Sprintf("%s, +%d more", strings.Join(resp.Events[:3], ", "), n-3)
+		}
 	}
 	if len(out) == 0 {
 		return nil, nil

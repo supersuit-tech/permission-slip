@@ -593,7 +593,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Trigger Workflow",
 				Description:     "Trigger a GitHub Actions workflow dispatch event",
 				RiskLevel:       "medium",
-				DisplayTemplate: "Trigger workflow {{workflow_name}} in {{owner}}/{{repo}}",
+				DisplayTemplate: "Trigger workflow {{workflow_name}} ({{workflow_id}}) in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "workflow_id", "ref"],
@@ -1267,7 +1267,7 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Delete Webhook",
 				Description:     "Delete a repository webhook by numeric hook ID",
 				RiskLevel:       "high",
-				DisplayTemplate: "Delete webhook {{webhook_url}} in {{owner}}/{{repo}}",
+				DisplayTemplate: "Delete webhook {{webhook_url}} (#{{hook_id}}) in {{owner}}/{{repo}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["owner", "repo", "hook_id"],
