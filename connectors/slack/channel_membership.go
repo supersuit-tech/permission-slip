@@ -232,8 +232,11 @@ func describeChannelType(channelID string) string {
 }
 
 // usersConversationsRequest is the Slack API request for users.conversations.
+// Leave User empty on user-token (xoxp-) calls so Slack returns the token
+// owner's own conversations. Passing the token owner's own ID triggers the
+// "browse another user" path and can silently return empty — see #1031.
 type usersConversationsRequest struct {
-	User   string `json:"user"`
+	User   string `json:"user,omitempty"`
 	Types  string `json:"types,omitempty"`
 	Limit  int    `json:"limit,omitempty"`
 	Cursor string `json:"cursor,omitempty"`
@@ -248,17 +251,16 @@ type usersConversationsResponse struct {
 // maxUserConversationPages limits pagination when fetching a user's channel list.
 const maxUserConversationPages = 50
 
-// getUserPrivateConversations returns conversation objects for the given Slack user
-// and types via users.conversations. This uses the user token (xoxp-), which only
-// returns conversations the token owner belongs to. A bot token with the `user`
-// parameter would require admin.conversations:read scope — we intentionally
-// use the user token to avoid that requirement.
-func (c *SlackConnector) getUserPrivateConversations(ctx context.Context, creds connectors.Credentials, slackUserID, types string) ([]listChannelEntry, error) {
+// getUserPrivateConversations returns the token owner's conversations for the
+// requested types via users.conversations. The Slack user token (xoxp-)
+// implicitly scopes the response to the caller, so we must NOT pass a `user`
+// parameter — doing so switches Slack to the admin-style "browse another
+// user" path and returns empty for non-admin tokens (#1031).
+func (c *SlackConnector) getUserPrivateConversations(ctx context.Context, creds connectors.Credentials, types string) ([]listChannelEntry, error) {
 	var out []listChannelEntry
 	cursor := ""
 	for page := 0; page < maxUserConversationPages; page++ {
 		body := usersConversationsRequest{
-			User:   slackUserID,
 			Types:  types,
 			Limit:  200,
 			Cursor: cursor,

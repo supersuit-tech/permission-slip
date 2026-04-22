@@ -60,8 +60,10 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 	var entries []unreadChannelEntry
 	cursor := ""
 	for page := 0; page < maxUserConversationPages; page++ {
+		// Omit User: the xoxp- user token implicitly scopes users.conversations
+		// to the token owner. Passing the owner's own ID triggers the admin
+		// "browse another user" path and returns empty (#1031).
 		body := usersConversationsRequest{
-			User:   slackUserID,
 			Types:  types,
 			Limit:  200,
 			Cursor: cursor,

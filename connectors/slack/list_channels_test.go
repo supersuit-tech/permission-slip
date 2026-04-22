@@ -126,6 +126,12 @@ func TestListChannels_DefaultTypes(t *testing.T) {
 			if body.Types != "private_channel,mpim,im" {
 				t.Errorf("expected types 'private_channel,mpim,im' for users.conversations, got %q", body.Types)
 			}
+			// User must be empty on user-token calls. Passing the token
+			// owner's own ID flips Slack to the admin "browse another
+			// user" path and returns empty (#1031).
+			if body.User != "" {
+				t.Errorf("expected empty user param on users.conversations, got %q", body.User)
+			}
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
 				"channels": []map[string]any{
@@ -198,6 +204,13 @@ func TestListChannels_IMChannels(t *testing.T) {
 				"user": map[string]string{"id": "U_CALLER"},
 			})
 		case "/users.conversations":
+			var body usersConversationsRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode users.conversations body: %v", err)
+			}
+			if body.User != "" {
+				t.Errorf("expected empty user param on users.conversations, got %q", body.User)
+			}
 			// Return the IM channel as one the caller belongs to.
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
@@ -477,6 +490,13 @@ func TestListChannels_IMFiltersStrayPublicChannels(t *testing.T) {
 				"user": map[string]string{"id": "U_CALLER"},
 			})
 		case "/users.conversations":
+			var body usersConversationsRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode users.conversations body: %v", err)
+			}
+			if body.User != "" {
+				t.Errorf("expected empty user param on users.conversations, got %q", body.User)
+			}
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
 				"channels": []map[string]any{
@@ -555,5 +575,85 @@ func TestListChannels_ExplicitPrivateTypesWithoutEmail(t *testing.T) {
 	var valErr *connectors.ValidationError
 	if !errors.As(err, &valErr) {
 		t.Fatalf("expected ValidationError for explicit private types without email, got: %v", err)
+	}
+}
+
+func TestListChannels_IMReturnsUserDMsWhenConversationsListEmpty(t *testing.T) {
+	t.Parallel()
+
+	// Regression for issue #1031. Before the fix, getUserPrivateConversations
+	// passed `user: slackUserID` to users.conversations. With a non-admin user
+	// token that flips Slack into the "browse another user" path and returns
+	// empty, leaving only conversations.list (which silently falls back to
+	// public channels for types=im) — and #1029 now filters those out. Result:
+	// empty, even though the caller has DMs. The fix is to omit `user` on
+	// user-token calls so Slack returns the token owner's conversations.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]string{"id": "U_CALLER"},
+			})
+		case "/users.conversations":
+			var body usersConversationsRequest
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("failed to decode users.conversations body: %v", err)
+			}
+			if body.User != "" {
+				t.Errorf("user param must be omitted on user-token calls, got %q", body.User)
+			}
+			if body.Types != "im" {
+				t.Errorf("expected users.conversations types=im, got %q", body.Types)
+			}
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "D_PETER", "user": "U_PETER", "is_private": true},
+				},
+			})
+		case "/conversations.list":
+			// Simulate a token whose conversations.list scope falls back to
+			// public channels when types=im is requested.
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "C001", "name": "ihubs-general", "is_private": false, "num_members": 42},
+				},
+			})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "user@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data listChannelsResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if len(data.Channels) != 1 {
+		t.Fatalf("expected 1 DM, got %d: %+v", len(data.Channels), data.Channels)
+	}
+	if data.Channels[0].ID != "D_PETER" {
+		t.Errorf("expected D_PETER, got %q", data.Channels[0].ID)
+	}
+	if data.Channels[0].User != "U_PETER" {
+		t.Errorf("expected user U_PETER, got %q", data.Channels[0].User)
 	}
 }

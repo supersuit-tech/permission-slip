@@ -351,6 +351,10 @@ func TestListUnread_PaginatesUsersConversations(t *testing.T) {
 		case "/users.conversations":
 			var body usersConversationsRequest
 			_ = json.NewDecoder(r.Body).Decode(&body)
+			// User must be omitted on user-token calls (#1031).
+			if body.User != "" {
+				t.Errorf("expected empty user param on users.conversations, got %q", body.User)
+			}
 			page++
 			if page == 1 {
 				json.NewEncoder(w).Encode(map[string]any{
