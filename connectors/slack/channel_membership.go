@@ -3,6 +3,8 @@ package slack
 import (
 	"context"
 	"strings"
+
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // usersConversationsRequest is the Slack API request for users.conversations.
