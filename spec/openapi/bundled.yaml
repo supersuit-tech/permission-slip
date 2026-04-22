@@ -1524,11 +1524,16 @@ paths:
       operationId: assignAgentConnectorCredential
       summary: Assign Credential to Agent Connector
       description: |
+        **Deprecated:** targets the **default** connector instance only. Prefer
+        `PUT /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential`
+        for per-instance bindings.
+
         Assign a credential or OAuth connection to an agent-connector pair. This determines
         which credential the agent uses when executing actions through this connector.
 
         Exactly one of `credential_id` or `oauth_connection_id` must be provided.
         If a credential is already assigned, it is replaced (upsert behavior).
+      deprecated: true
       tags:
         - Agents
       security:
@@ -1580,8 +1585,12 @@ paths:
       operationId: removeAgentConnectorCredential
       summary: Remove Credential from Agent Connector
       description: |
+        **Deprecated:** removes the binding for the **default** instance only. Prefer
+        `DELETE .../instances/{instance_id}/credential` for per-instance removal.
+
         Remove the credential binding for an agent-connector pair. After removal,
         the agent falls back to user-global credential resolution for this connector.
+      deprecated: true
       tags:
         - Agents
       security:
@@ -1616,7 +1625,11 @@ paths:
       operationId: getAgentConnectorCredential
       summary: Get Agent Connector Credential
       description: |
+        **Deprecated:** returns the binding for the **default** instance only. Prefer
+        `GET .../instances/{instance_id}/credential` for a specific instance.
+
         Get the current credential binding for an agent-connector pair.
+      deprecated: true
       tags:
         - Agents
       security:
@@ -1751,6 +1764,328 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '429':
           $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances:
+    get:
+      operationId: listAgentConnectorInstances
+      summary: List connector instances for an agent
+      description: |
+        Returns all instances of a connector type enabled for the agent (including the default instance).
+
+        Requires session authentication (Supabase JWT).
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      responses:
+        '200':
+          description: Instances listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorInstanceListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent not found or not owned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    post:
+      operationId: createAgentConnectorInstance
+      summary: Create an additional connector instance
+      description: |
+        Creates an additional instance row for this connector type. The first instance is created
+        when the connector is enabled; this endpoint adds further instances. Assign a credential to
+        the instance to set its display name.
+
+        Requires session authentication (Supabase JWT).
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAgentConnectorInstanceRequest'
+      responses:
+        '201':
+          description: Instance created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorInstance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: Agent or connector not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}:
+    get:
+      operationId: getAgentConnectorInstance
+      summary: Get a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Instance found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorInstance'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      operationId: patchAgentConnectorInstance
+      summary: Set default connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PatchAgentConnectorInstanceRequest'
+      responses:
+        '200':
+          description: Instance updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorInstance'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      operationId: deleteAgentConnectorInstance
+      summary: Delete a non-default connector instance
+      description: |
+        Deletes an additional instance. The default instance cannot be deleted; disable the connector type instead.
+
+        Active standing approvals scoped to this instance are revoked.
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '204':
+          description: Instance deleted
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential:
+    put:
+      operationId: assignAgentConnectorInstanceCredential
+      summary: Assign credential to a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignCredentialRequest'
+      responses:
+        '200':
+          description: Credential assigned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorCredentialResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      operationId: removeAgentConnectorInstanceCredential
+      summary: Remove credential from a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Binding removed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: removed
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      operationId: getAgentConnectorInstanceCredential
+      summary: Get credential binding for a connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Binding (possibly empty)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorCredentialResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/calendars:
+    get:
+      operationId: listAgentConnectorInstanceCalendars
+      summary: List calendars for a specific connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Calendars listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorCalendarListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/channels:
+    get:
+      operationId: listAgentConnectorInstanceChannels
+      summary: List channels for a specific connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Channels listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorChannelListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/users:
+    get:
+      operationId: listAgentConnectorInstanceUsers
+      summary: List users for a specific connector instance
+      tags:
+        - Agents
+      security:
+        - SupabaseSession: []
+      parameters:
+        - $ref: '#/components/parameters/AgentId'
+        - $ref: '#/components/parameters/ConnectorId'
+        - $ref: '#/components/parameters/ConnectorInstanceId'
+      responses:
+        '200':
+          description: Users listed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentConnectorUserListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
         '503':
@@ -4679,7 +5014,7 @@ paths:
         - All approval history and audit log events
         - All standing approvals and their execution history
         - Subscription and usage data
-        - Notification preferences and push subscriptions
+        - Notification preferences, notification type preferences, and push subscriptions
         - The Supabase authentication user (best-effort)
       tags:
         - Profiles
@@ -4846,6 +5181,75 @@ paths:
                   details:
                     current_plan: free
                     required_plan: pay_as_you_go
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /v1/profile/notification-type-preferences:
+    get:
+      operationId: getNotificationTypePreferences
+      summary: Get notification type preferences
+      description: |
+        Returns per-notification-type preferences (e.g. whether to notify about
+        standing approval / auto-approval executions). Types without an explicit
+        row default to enabled.
+      tags:
+        - Profiles
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Notification type preferences retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTypePreferencesResponse'
+              example:
+                preferences:
+                  - notification_type: standing_execution
+                    enabled: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: updateNotificationTypePreferences
+      summary: Update notification type preferences
+      description: |
+        Updates per-notification-type preferences. Accepts an array of
+        notification_type/enabled pairs. Types not included in the request are left
+        unchanged.
+      tags:
+        - Profiles
+      security:
+        - SupabaseSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateNotificationTypePreferencesRequest'
+            example:
+              preferences:
+                - notification_type: standing_execution
+                  enabled: false
+      responses:
+        '200':
+          description: Notification type preferences updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationTypePreferencesResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -6913,7 +7317,20 @@ components:
           description: Agent that requested the approval
           example: 42
         action:
-          $ref: '#/components/schemas/Action'
+          description: |
+            Same as `Action`, plus optional frozen connector instance fields when the
+            request targeted a specific instance (`_connector_instance_id`, `_connector_instance_display`).
+          allOf:
+            - $ref: '#/components/schemas/Action'
+            - type: object
+              properties:
+                _connector_instance_id:
+                  type: string
+                  format: uuid
+                  description: Frozen UUID of the connector instance for this approval (if any).
+                _connector_instance_display:
+                  type: string
+                  description: Snapshot of the credential display name at request time (if any). Legacy actions may still expose `_connector_instance_label` instead.
         context:
           $ref: '#/components/schemas/ActionContext'
         status:
@@ -9106,6 +9523,13 @@ components:
             `credentials_ready` is `false`. The agent can present this URL to the
             user to prompt credential setup.
           example: https://app.permissionslip.dev/connect/stripe
+        instances:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConnectorInstanceCapability'
+          description: |
+            Enabled connector instances for this agent (one row per workspace/account binding).
+            Use `display` (credential nickname) or `id` as `action.parameters.connector_instance` when multiple instances exist.
         actions:
           type: array
           items:
@@ -9179,6 +9603,13 @@ components:
             JSON Schema describing the expected parameters for this action. Agents
             should validate parameters against this schema before submitting approval
             requests or executing actions.
+
+            When the user has **multiple connector instances** for this connector
+            (multiple workspaces/accounts), the server injects an optional
+            `connector_instance` property: a `string` with `format: uuid`, `enum` listing
+            allowed instance IDs, and a `description` that maps each UUID to its display
+            name. Omit it to use the **default** instance when one is configured; otherwise
+            pass a UUID or nickname from `GET /agents/{id}/capabilities`.
 
             The schema follows standard JSON Schema (draft-07) conventions and includes
             `type`, `required`, `properties`, and validation keywords like `maxLength`,
@@ -9305,6 +9736,13 @@ components:
             the standing approval is inactive and the agent must use one-off
             approval or the user must create a new standing approval.
           example: '2026-05-15T00:00:00Z'
+        connector_instance_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: |
+            When set, this standing approval applies only to that connector instance.
+            Omitted or null means type-wide (legacy) and matches any instance.
       example:
         standing_approval_id: sa_def456
         constraints:
@@ -9486,6 +9924,55 @@ components:
         connector_id: gmail
         disabled_at: '2026-02-18T12:00:00Z'
         revoked_standing_approvals: 2
+    AgentConnectorInstance:
+      type: object
+      required:
+        - connector_instance_id
+        - agent_id
+        - connector_id
+        - is_default
+        - enabled_at
+      properties:
+        connector_instance_id:
+          type: string
+          format: uuid
+          description: Surrogate identifier for this connector instance on the agent.
+        agent_id:
+          type: integer
+          format: int64
+        connector_id:
+          type: string
+          maxLength: 128
+        display:
+          type: string
+          description: Human-readable name from the credential bound to this instance (API key nickname or OAuth workspace/team name). Omitted when no credential is assigned yet.
+        is_default:
+          type: boolean
+          description: True for the default instance used when no instance is specified (legacy routes).
+        enabled_at:
+          type: string
+          format: date-time
+    AgentConnectorInstanceListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentConnectorInstance'
+    CreateAgentConnectorInstanceRequest:
+      type: object
+      description: Creates an additional instance row for this connector type. Display names come from the credential assigned per instance, not from this request.
+    PatchAgentConnectorInstanceRequest:
+      type: object
+      description: '`is_default` must be provided and set to `true` to mark this instance as the default for the agent and connector type.'
+      required:
+        - is_default
+      properties:
+        is_default:
+          type: boolean
+          description: Must be `true` — marks this instance as the default.
     CreateRegistrationInviteRequest:
       type: object
       description: Request to create a registration invite.
@@ -11164,6 +11651,14 @@ components:
 
             **Security**: Permission Slip verifies that request parameters match the stored
             params_hash before executing actions.
+
+            **Multi-instance connectors**: When an agent has more than one instance of the
+            same connector (e.g. two Slack workspaces), include `connector_instance` in this
+            object with the instance UUID or credential nickname from `GET /agents/{id}/capabilities`
+            (`connectors[].instances[]`). Omit it when only one instance exists — the server
+            auto-selects. The field is stripped before schema validation and does not appear on
+            stored approvals; resolved routing is frozen as `_connector_instance_id` and
+            `_connector_instance_display` on the action object in responses.
           example:
             from: alice@example.com
             to:
@@ -11218,6 +11713,15 @@ components:
             - `recipient_count`: Number of email recipients
             - `estimated_cost`: Estimated cost of a payment action
             - `affected_resources`: List of resources that will be modified
+            - `email_thread`: Full conversation for email reply actions (see EmailThread)
+
+            Slack connector actions may include `slack_context` (see `SlackContext`) with
+            channel/thread/DM surroundings for the reviewer.
+          properties:
+            email_thread:
+              $ref: '#/components/schemas/EmailThread'
+            slack_context:
+              $ref: '#/components/schemas/SlackContext'
           example:
             recipient_count: 1
             estimated_time: 5 minutes
@@ -11227,6 +11731,211 @@ components:
         details:
           recipient_count: 1
           estimated_time: 5 minutes
+    EmailThread:
+      type: object
+      required:
+        - subject
+        - messages
+      properties:
+        subject:
+          type: string
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailThreadMessage'
+    EmailThreadMessage:
+      type: object
+      required:
+        - from
+        - to
+        - cc
+        - date
+        - body_html
+        - body_text
+        - snippet
+        - message_id
+        - truncated
+      properties:
+        from:
+          type: string
+        to:
+          type: array
+          items:
+            type: string
+        cc:
+          type: array
+          items:
+            type: string
+        date:
+          type: string
+          description: ISO-8601 timestamp when available
+        body_html:
+          type: string
+        body_text:
+          type: string
+        snippet:
+          type: string
+        message_id:
+          type: string
+        truncated:
+          type: boolean
+          description: True when body_html or body_text was truncated server-side (~20 KB per field)
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/EmailThreadAttachment'
+    EmailThreadAttachment:
+      type: object
+      required:
+        - filename
+        - size_bytes
+      properties:
+        filename:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+    SlackContext:
+      type: object
+      description: |
+        Normalized Slack surroundings for human approval of Slack connector actions.
+        Populated by the Slack connector under `details.slack_context`. Fields not relevant
+        to the action may be omitted.
+      required:
+        - context_scope
+      properties:
+        channel:
+          $ref: '#/components/schemas/SlackContextChannel'
+        recipient:
+          $ref: '#/components/schemas/SlackContextUserRef'
+          description: DM peer when relevant (e.g. send_dm, invite).
+        target_message:
+          $ref: '#/components/schemas/SlackContextMessage'
+        thread:
+          $ref: '#/components/schemas/SlackContextThread'
+        recent_messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlackContextMessage'
+        context_scope:
+          type: string
+          enum:
+            - thread
+            - recent_channel
+            - recent_dm
+            - self_dm
+            - first_contact_dm
+            - metadata_only
+        context_window:
+          $ref: '#/components/schemas/SlackContextWindow'
+    SlackContextChannel:
+      type: object
+      description: Channel or conversation metadata for Slack approval context.
+      required:
+        - id
+        - permalink
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        is_private:
+          type: boolean
+        is_dm:
+          type: boolean
+        topic:
+          type: string
+        purpose:
+          type: string
+        member_count:
+          type: integer
+        last_activity_at:
+          type: string
+          description: ISO-8601 time of the latest message in scope when known.
+        permalink:
+          type: string
+          format: uri
+          description: Opens the channel/conversation in Slack (archives URL).
+    SlackContextWindow:
+      type: object
+      description: Describes the recent-message window when context_scope is recent_channel or recent_dm.
+      properties:
+        message_count:
+          type: integer
+        hours:
+          type: integer
+          description: Rolling window in hours (e.g. 24).
+        truncated:
+          type: boolean
+    SlackContextFileMeta:
+      type: object
+      description: File attachment metadata only (no content fetch).
+      required:
+        - filename
+        - size_bytes
+      properties:
+        filename:
+          type: string
+        size_bytes:
+          type: integer
+          format: int64
+    SlackContextMessage:
+      type: object
+      description: A Slack message with resolved mentions and a permalink.
+      required:
+        - text
+        - ts
+        - permalink
+      properties:
+        user:
+          $ref: '#/components/schemas/SlackContextUserRef'
+        text:
+          type: string
+          description: Message text with mentions resolved for display.
+        ts:
+          type: string
+          description: Slack message timestamp (e.g. 1711234567.000100).
+        permalink:
+          type: string
+          format: uri
+        is_bot:
+          type: boolean
+        truncated:
+          type: boolean
+          description: True when body was truncated to the per-message cap (4 KB).
+        files:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlackContextFileMeta'
+    SlackContextThread:
+      type: object
+      properties:
+        parent:
+          $ref: '#/components/schemas/SlackContextMessage'
+        replies:
+          type: array
+          items:
+            $ref: '#/components/schemas/SlackContextMessage'
+        truncated:
+          type: boolean
+          description: True when the thread was capped (e.g. more than 20 messages).
+    SlackContextUserRef:
+      type: object
+      description: Minimal Slack user display for approval context.
+      properties:
+        id:
+          type: string
+          description: Slack user ID (e.g. U…).
+        name:
+          type: string
+          description: Slack username / handle.
+        real_name:
+          type: string
+        title:
+          type: string
+        avatar_url:
+          type: string
+          format: uri
     AlternativeUrls:
       type: object
       description: |
@@ -11239,7 +11948,7 @@ components:
           maxLength: 4096
           description: |
             Native app deep link URL. Opens directly in the mobile app if installed, bypassing 
-            the browser. Uses custom URI scheme (e.g., `permissionslip://`) or universal link.
+            the browser. Uses a custom URI scheme (e.g., `permissionslip://`).
           example: permissionslip://permission-slip/approve?token=eyJ...
         web:
           type: string
@@ -11309,6 +12018,7 @@ components:
             - unsupported_action_version
             - agent_id_mismatch
             - invalid_public_key
+            - connector_instance_ambiguous
             - invalid_signature
             - timestamp_expired
             - invalid_code
@@ -11319,12 +12029,14 @@ components:
             - token_already_used
             - insufficient_scope
             - invalid_parameters
+            - connector_instance_required
             - agent_not_found
             - approver_not_found
             - approval_not_found
             - credential_not_found
             - connector_not_found
             - agent_connector_not_found
+            - connector_instance_not_found
             - credentials_not_found
             - no_matching_standing_approval
             - agent_limit_reached
@@ -11346,6 +12058,7 @@ components:
             - rate_limited
             - monthly_quota_exceeded
             - internal_error
+            - internal_panic
             - upstream_error
             - service_unavailable
             - billing_not_enabled
@@ -11448,6 +12161,22 @@ components:
             next page. Only present when `has_more` is true. Do not construct
             or parse cursor values — they may change format without notice.
           example: 2026-02-11T13:15:00.123456Z,42
+    ConnectorInstanceCapability:
+      type: object
+      required:
+        - id
+        - credentials_ready
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Instance identifier (also accepted as `connector_instance`).
+        display:
+          type: string
+          description: Credential nickname / workspace name for this instance (from the bound credential). Omitted when unset. Use `id` or this value as `action.parameters.connector_instance` when multiple instances exist.
+        credentials_ready:
+          type: boolean
+          description: Whether this specific instance has required credentials bound.
     AgentConnectorCredentialResponse:
       type: object
       required:
@@ -11785,6 +12514,62 @@ components:
           type: boolean
           description: Whether notifications should be enabled for this channel
           example: true
+    NotificationTypePreference:
+      type: object
+      description: |
+        Per-notification-type preference (e.g. auto-approval execution notifications).
+        Types without an explicit row default to enabled.
+      required:
+        - notification_type
+        - enabled
+      properties:
+        notification_type:
+          type: string
+          description: Logical notification category
+          enum:
+            - standing_execution
+          example: standing_execution
+        enabled:
+          type: boolean
+          description: When false, this notification category is silenced on all channels.
+          example: true
+    NotificationTypePreferencesResponse:
+      type: object
+      description: All per-type notification preferences for the authenticated user.
+      required:
+        - preferences
+      properties:
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTypePreference'
+    NotificationTypePreferenceUpdate:
+      type: object
+      description: A notification type preference update (request-only).
+      required:
+        - notification_type
+        - enabled
+      properties:
+        notification_type:
+          type: string
+          enum:
+            - standing_execution
+          example: standing_execution
+        enabled:
+          type: boolean
+          example: false
+    UpdateNotificationTypePreferencesRequest:
+      type: object
+      description: Request body for updating per-type notification preferences.
+      required:
+        - preferences
+      properties:
+        preferences:
+          type: array
+          items:
+            $ref: '#/components/schemas/NotificationTypePreferenceUpdate'
+          description: Type preferences to update. Types not included are unchanged.
+          minItems: 1
     PlanLimits:
       type: object
       required:
@@ -12039,6 +12824,16 @@ components:
         maxLength: 128
         pattern: ^[a-z][a-z0-9_.-]*$
       example: gmail
+    ConnectorInstanceId:
+      name: instance_id
+      in: path
+      required: true
+      description: |
+        Connector instance UUID (`connector_instance_id` from list/create instance responses).
+      schema:
+        type: string
+        format: uuid
+      example: 550e8400-e29b-41d4-a716-446655440000
     InviteCode:
       name: invite_code
       in: path
