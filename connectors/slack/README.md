@@ -89,7 +89,7 @@ Creates a new Slack channel.
 
 ### `slack.list_channels`
 
-Lists Slack channels visible to the bot. When listing private channel types (`private_channel`, `mpim`, `im`), results are filtered to channels the executing user belongs to.
+Lists Slack channels visible to the **connected user OAuth token** (`xoxp-`). The implementation calls `conversations.list` as the primary source, then merges in rows from `users.conversations` **only** for channel IDs missing from the first response (so human DMs that never appear on `conversations.list` still show up). Rows are filtered with `listChannelEntryMatchesTypes` so a mis-honored `types` parameter on `conversations.list` cannot surface public channels when the caller asked for DMs only ([#1028](https://github.com/supersuit-tech/permission-slip/issues/1028)).
 
 **Risk level:** low
 
@@ -97,7 +97,7 @@ Lists Slack channels visible to the bot. When listing private channel types (`pr
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `types` | string | No | `public_channel,private_channel,mpim,im` | Comma-separated channel types: `public_channel`, `private_channel`, `mpim`, `im`. Defaults to all types when user email is available; falls back to `public_channel` only when no email is set. |
+| `types` | string | No | `public_channel,private_channel,mpim,im` | Comma-separated channel types: `public_channel`, `private_channel`, `mpim`, `im`. Defaults to all types; Slack scopes results to the token owner. |
 | `limit` | integer | No | `100` | Max channels to return (1–1000) |
 | `cursor` | string | No | — | Pagination cursor from a previous response |
 | `exclude_archived` | boolean | No | `true` | Exclude archived channels from results |
@@ -128,9 +128,13 @@ Lists Slack channels visible to the bot. When listing private channel types (`pr
 
 > **Note:** IM channels (DMs) don't have a `name` field. Instead, they include a `user` field with the other participant's Slack user ID.
 
-**Slack API:** `POST /conversations.list` ([docs](https://api.slack.com/methods/conversations.list))
+**Slack API:** `POST /conversations.list`, `POST /users.conversations` ([docs](https://api.slack.com/methods/conversations.list))
 
-**Required bot token scopes:** `channels:read` (public), `groups:read` (private), `im:read` (DMs), `mpim:read` (group DMs)
+**Required user token scopes:** `channels:read` (public), `groups:read` (private), `im:read` (DMs), `mpim:read` (group DMs)
+
+#### Listing vs identity (user tokens)
+
+Each Slack connection stores one **user** access token tied to a single Permission Slip user. Listing does **not** call `users.lookupByEmail` or require the Permission Slip profile email to match Slack; both Web API calls run as the token owner, and Slack enforces membership. Other actions (read, search, unread) may still use email-backed membership checks where the product requires them.
 
 ---
 

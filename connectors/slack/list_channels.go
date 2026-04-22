@@ -18,7 +18,6 @@ type listChannelsParams struct {
 	// Types filters by channel type. Comma-separated list of:
 	// public_channel, private_channel, mpim, im.
 	// Defaults to all types: public_channel,private_channel,mpim,im.
-	// Falls back to public_channel if UserEmail is not set (required for private types).
 	Types string `json:"types,omitempty"`
 	// Limit is the max number of channels to return (1-1000, default 100).
 	Limit int `json:"limit,omitempty"`
@@ -87,9 +86,10 @@ type listChannelSummary struct {
 	NumMembers int    `json:"num_members"`
 }
 
-// Execute lists Slack channels visible to the bot, merged with the authorizing
-// user's DMs/group DMs/private channels from users.conversations when a user
-// token is present (so 1:1 DMs where the bot is not a member still appear).
+// Execute lists Slack channels for the authorizing user's OAuth token via
+// conversations.list, with users.conversations merged in to fill gaps (e.g.
+// human DMs missing from conversations.list). Results are filtered to the
+// requested types even when Slack mis-honors the types parameter (#1028).
 func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionRequest) (*connectors.ActionResult, error) {
 	var params listChannelsParams
 	if err := parseAndValidate(req.Parameters, &params); err != nil {
