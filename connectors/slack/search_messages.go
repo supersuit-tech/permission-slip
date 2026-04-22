@@ -43,14 +43,6 @@ func (p *searchMessagesParams) validate() error {
 	return nil
 }
 
-// searchMessagesRequest is the Slack API request body for search.messages.
-type searchMessagesRequest struct {
-	Query string `json:"query"`
-	Count int    `json:"count,omitempty"`
-	Page  int    `json:"page,omitempty"`
-	Sort  string `json:"sort,omitempty"`
-}
-
 type searchMessagesResponse struct {
 	slackResponse
 	Messages struct {
