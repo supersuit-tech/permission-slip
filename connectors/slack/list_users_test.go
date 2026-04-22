@@ -13,19 +13,16 @@ func TestListUsers_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("expected POST, got %s", r.Method)
+		if r.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", r.Method)
 		}
 		if r.URL.Path != "/users.list" {
 			t.Errorf("expected path /users.list, got %s", r.URL.Path)
 		}
 
-		var body listUsersRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
-		}
-		if body.Limit != 100 {
-			t.Errorf("expected limit 100, got %d", body.Limit)
+		query := r.URL.Query()
+		if query.Get("limit") != "100" {
+			t.Errorf("expected limit 100, got %q", query.Get("limit"))
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -106,15 +103,12 @@ func TestListUsers_WithPagination(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body listUsersRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+		query := r.URL.Query()
+		if query.Get("cursor") != "dXNlcjpVMDAy" {
+			t.Errorf("expected cursor 'dXNlcjpVMDAy', got %q", query.Get("cursor"))
 		}
-		if body.Cursor != "dXNlcjpVMDAy" {
-			t.Errorf("expected cursor 'dXNlcjpVMDAy', got %q", body.Cursor)
-		}
-		if body.Limit != 50 {
-			t.Errorf("expected limit 50, got %d", body.Limit)
+		if query.Get("limit") != "50" {
+			t.Errorf("expected limit 50, got %q", query.Get("limit"))
 		}
 
 		w.Header().Set("Content-Type", "application/json")
