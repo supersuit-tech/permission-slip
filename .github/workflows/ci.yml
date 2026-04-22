@@ -55,12 +55,9 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
 
       - name: Install dependencies
-        run: cd frontend && npm ci
+        run: cd frontend && npm ci --ignore-scripts
 
-      - name: Generate API client
-        run: make generate-frontend
-
-      - name: Verify bundled OpenAPI spec is up-to-date
+      - name: Bundle OpenAPI spec and verify it is committed
         run: |
           make bundle
           if ! git diff --exit-code spec/openapi/openapi.bundle.yaml; then
@@ -68,13 +65,20 @@ jobs:
             exit 1
           fi
 
+      - name: Generate frontend API client
+        run: make generate-frontend-from-bundle
+
       - name: Run frontend tests
         run: make test-frontend
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [backend, frontend]
+    # Runs in parallel with backend and frontend so wall time is max(job), not sum.
+    env:
+      # Vite inlines these at build time; CI only needs deterministic placeholders.
+      VITE_SUPABASE_URL: https://ci-placeholder.local
+      VITE_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
 
     steps:
       - uses: actions/checkout@v6
@@ -89,11 +93,24 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Install dependencies
-        run: make install
+      - name: Ensure frontend/dist exists for go:embed
+        run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
-      - name: Build
-        run: make build
+      - name: Install build dependencies
+        run: make install-build-deps
+
+      - name: Bundle OpenAPI spec and generate frontend API types
+        run: make bundle generate-frontend-from-bundle
+
+      - name: Verify bundled OpenAPI spec is up-to-date
+        run: |
+          if ! git diff --exit-code spec/openapi/openapi.bundle.yaml; then
+            echo "::error::spec/openapi/openapi.bundle.yaml is out of date. Run 'make bundle' and commit the result."
+            exit 1
+          fi
+
+      - name: Build server (frontend + Go)
+        run: make build-ci
 
   notify-failure:
     name: Notify on Failure
