@@ -581,6 +581,210 @@ func TestExecuteConnectorAction_OAuthPath_RefreshesExpiredToken(t *testing.T) {
 	}
 }
 
+// TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentSuccessDoesNotNeedReauth
+// simulates a rotation race: the in-flight refresh fails with invalid_grant because another
+// path already refreshed and invalidated the refresh token, but the row was updated — we
+// must not mark needs_reauth.
+func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentSuccessDoesNotNeedReauth(t *testing.T) {
+	t.Parallel()
+
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	// Run the concurrent DB bump on a dedicated goroutine so we never touch pgx.Tx
+	// from the httptest server goroutine (tx is not safe for concurrent use).
+	bumpCh := make(chan struct{})
+	bumpDone := make(chan struct{})
+	go func() {
+		defer close(bumpDone)
+		<-bumpCh
+		newAccessID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+		testhelper.MustExec(t, tx,
+			`UPDATE oauth_connections SET
+				token_expiry = now() + interval '2 hours',
+				updated_at = now(),
+				access_token_vault_id = $1,
+				status = $2
+			WHERE id = $3 AND user_id = $4`,
+			newAccessID, db.OAuthStatusActive, "oconn_race", uid,
+		)
+	}()
+
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(bumpCh)
+		<-bumpDone
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":             "invalid_grant",
+			"error_description": "refresh token already used",
+		})
+	}))
+	defer tokenSrv.Close()
+
+	v := vault.NewMockVaultStore()
+	v.SeedSecretForTest("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", []byte("concurrent-winner-access"))
+
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           "google",
+		TokenURL:     tokenSrv.URL,
+		ClientID:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+
+	deps := &Deps{
+		DB:             tx,
+		Vault:          v,
+		OAuthProviders: oauthReg,
+	}
+
+	refreshVault := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	v.SeedSecretForTest(refreshVault, []byte("stale-refresh"))
+	pastExpiry := time.Now().Add(-10 * time.Minute)
+	testhelper.InsertOAuthConnectionFull(t, tx, "oconn_race", uid, "google", testhelper.OAuthConnectionOpts{
+		AccessTokenVaultID:  "cccccccc-cccc-cccc-cccc-cccccccccccc",
+		RefreshTokenVaultID: &refreshVault,
+		TokenExpiry:         &pastExpiry,
+		Scopes:              []string{},
+		Status:              "active",
+	})
+	v.SeedSecretForTest("cccccccc-cccc-cccc-cccc-cccccccccccc", []byte("stale-access"))
+
+	conn, err := db.GetOAuthConnectionByID(t.Context(), tx, "oconn_race")
+	if err != nil || conn == nil {
+		t.Fatalf("get connection: %v", conn)
+	}
+
+	err = refreshOAuthConnection(t.Context(), deps, conn, "google")
+	if err != nil {
+		t.Fatalf("expected reload to absorb invalid_grant, got %v", err)
+	}
+
+	updated, err := db.GetOAuthConnectionByID(t.Context(), tx, "oconn_race")
+	if err != nil || updated == nil {
+		t.Fatalf("reload connection: %v", updated)
+	}
+	if updated.Status != db.OAuthStatusActive {
+		t.Fatalf("expected status active, got %q", updated.Status)
+	}
+
+	creds, err := credentialsFromOAuthConnection(t.Context(), deps, updated)
+	if err != nil {
+		t.Fatalf("credentialsFromOAuthConnection: %v", err)
+	}
+	tok, _ := creds.Get("access_token")
+	if tok != "concurrent-winner-access" {
+		t.Errorf("expected access from concurrent refresh vault, got %q", tok)
+	}
+}
+
+// TestCredentialsFromOAuthConnection_MultiInstanceSameProvider serially refreshes two
+// connections for the same user+provider and asserts each credential set matches its own vault.
+func TestCredentialsFromOAuthConnection_MultiInstanceSameProvider(t *testing.T) {
+	t.Parallel()
+
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if err := r.ParseForm(); err != nil {
+			t.Errorf("parse form: %v", err)
+		}
+		rt := r.FormValue("refresh_token")
+		w.Header().Set("Content-Type", "application/json")
+		switch rt {
+		case "refresh-alpha":
+			json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "new-access-alpha",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+		case "refresh-beta":
+			json.NewEncoder(w).Encode(map[string]any{
+				"access_token": "new-access-beta",
+				"token_type":   "Bearer",
+				"expires_in":   3600,
+			})
+		default:
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]any{"error": "invalid_grant"})
+		}
+	}))
+	defer tokenSrv.Close()
+
+	v := vault.NewMockVaultStore()
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           "slack",
+		TokenURL:     tokenSrv.URL,
+		ClientID:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
+
+	refreshA := "11111111-1111-1111-1111-111111111111"
+	refreshB := "22222222-2222-2222-2222-222222222222"
+	v.SeedSecretForTest(refreshA, []byte("refresh-alpha"))
+	v.SeedSecretForTest(refreshB, []byte("refresh-beta"))
+
+	pastExpiry := time.Now().Add(-10 * time.Minute)
+	testhelper.InsertOAuthConnectionFull(t, tx, "oconn_slack_a", uid, "slack", testhelper.OAuthConnectionOpts{
+		AccessTokenVaultID:  "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		RefreshTokenVaultID: &refreshA,
+		TokenExpiry:         &pastExpiry,
+		Scopes:              []string{},
+	})
+	testhelper.InsertOAuthConnectionFull(t, tx, "oconn_slack_b", uid, "slack", testhelper.OAuthConnectionOpts{
+		AccessTokenVaultID:  "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
+		RefreshTokenVaultID: &refreshB,
+		TokenExpiry:         &pastExpiry,
+		Scopes:              []string{},
+	})
+	v.SeedSecretForTest("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", []byte("old-a"))
+	v.SeedSecretForTest("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb", []byte("old-b"))
+
+	connA, err := db.GetOAuthConnectionByID(t.Context(), tx, "oconn_slack_a")
+	if err != nil || connA == nil {
+		t.Fatalf("conn A: %v", connA)
+	}
+	connB, err := db.GetOAuthConnectionByID(t.Context(), tx, "oconn_slack_b")
+	if err != nil || connB == nil {
+		t.Fatalf("conn B: %v", connB)
+	}
+
+	credsA, err := credentialsFromOAuthConnection(t.Context(), deps, connA)
+	if err != nil {
+		t.Fatalf("credentials A: %v", err)
+	}
+	tokA, _ := credsA.Get("access_token")
+	if tokA != "new-access-alpha" {
+		t.Errorf("conn A: want new-access-alpha, got %q", tokA)
+	}
+
+	credsB, err := credentialsFromOAuthConnection(t.Context(), deps, connB)
+	if err != nil {
+		t.Fatalf("credentials B: %v", err)
+	}
+	tokB, _ := credsB.Get("access_token")
+	if tokB != "new-access-beta" {
+		t.Errorf("conn B: want new-access-beta, got %q", tokB)
+	}
+
+	rowA, _ := db.GetOAuthConnectionByID(t.Context(), tx, "oconn_slack_a")
+	rowB, _ := db.GetOAuthConnectionByID(t.Context(), tx, "oconn_slack_b")
+	if rowA == nil || rowB == nil {
+		t.Fatal("reload rows")
+	}
+	if rowA.AccessTokenVaultID == rowB.AccessTokenVaultID {
+		t.Error("expected distinct access_token_vault_id per connection")
+	}
+}
+
 // TestExecuteConnectorAction_OAuthPath_RefreshFailsTokenRevoked verifies that
 // when the OAuth provider rejects the refresh token (e.g., revoked), the connection
 // is marked needs_reauth and an OAuthRefreshError is returned.
