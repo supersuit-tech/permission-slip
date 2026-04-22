@@ -3,13 +3,13 @@ package slack
 // slackMessage is the Slack API representation of a single message.
 // Used by both conversations.history and conversations.replies responses.
 type slackMessage struct {
-	Type       string `json:"type"`
-	User       string `json:"user,omitempty"`
-	BotID      string `json:"bot_id,omitempty"`
-	Text       string `json:"text"`
-	TS         string `json:"ts"`
-	ThreadTS   string `json:"thread_ts,omitempty"`
-	ReplyCount int    `json:"reply_count,omitempty"`
+	Type       string            `json:"type"`
+	User       string            `json:"user,omitempty"`
+	BotID      string            `json:"bot_id,omitempty"`
+	Text       slackNullableText `json:"text"`
+	TS         string            `json:"ts"`
+	ThreadTS   string            `json:"thread_ts,omitempty"`
+	ReplyCount int               `json:"reply_count,omitempty"`
 }
 
 // messagesResponse is the shared Slack API response shape for endpoints
@@ -50,7 +50,7 @@ func toMessagesResult(resp *messagesResponse) messagesResult {
 		result.Messages = append(result.Messages, messageSummary{
 			User:       msg.User,
 			BotID:      msg.BotID,
-			Text:       msg.Text,
+			Text:       msg.Text.String(),
 			TS:         msg.TS,
 			ThreadTS:   msg.ThreadTS,
 			ReplyCount: msg.ReplyCount,

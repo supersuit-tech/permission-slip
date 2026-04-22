@@ -13,13 +13,13 @@ type paginationMeta struct {
 
 // slackMessage is the subset of a Slack message object used for context.
 type slackMessage struct {
-	Type     string      `json:"type"`
-	User     string      `json:"user,omitempty"`
-	BotID    string      `json:"bot_id,omitempty"`
-	Text     string      `json:"text"`
-	TS       string      `json:"ts"`
-	ThreadTS string      `json:"thread_ts,omitempty"`
-	Files    []slackFile `json:"files,omitempty"`
+	Type     string            `json:"type"`
+	User     string            `json:"user,omitempty"`
+	BotID    string            `json:"bot_id,omitempty"`
+	Text     slackNullableText `json:"text"`
+	TS       string            `json:"ts"`
+	ThreadTS string            `json:"thread_ts,omitempty"`
+	Files    []slackFile       `json:"files,omitempty"`
 }
 
 type slackFile struct {

@@ -24,7 +24,7 @@ type RecentMessagesOpts struct {
 }
 
 func messageToContextMessage(ctx context.Context, api SlackAPI, creds connectors.Credentials, teamDomain, channelID string, msg slackMessage, mcache *MentionCache) (ContextMessage, error) {
-	text := msg.Text
+	text := msg.Text.String()
 	resolved, err := ResolveMentions(ctx, text, api, creds, mcache)
 	if err != nil {
 		return ContextMessage{}, err
