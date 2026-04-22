@@ -117,7 +117,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action exceeds maximum size"))
 			return
 		}
-		if len(req.Context) > 65536 {
+		if len(req.Context) > maxApprovalContextJSONBytes {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "context exceeds maximum size"))
 			return
 		}

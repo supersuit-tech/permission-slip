@@ -32,10 +32,10 @@ func TestMergeEmailThreadFromResourceDetailsIntoContext(t *testing.T) {
 }
 
 func TestMergeEmailThreadFromResourceDetailsIntoContext_SizeCap(t *testing.T) {
-	// Context stays under 65536; merged output would exceed the cap — merge must no-op.
-	long := strings.Repeat("a", 65380)
+	// Context stays under maxApprovalContextJSONBytes; merged output would exceed the cap — merge must no-op.
+	long := strings.Repeat("a", maxApprovalContextJSONBytes-200)
 	ctxIn := []byte(`{"description":"` + long + `","details":{}}`)
-	if len(ctxIn) >= 65536 {
+	if len(ctxIn) >= maxApprovalContextJSONBytes {
 		t.Fatalf("setup: context len %d", len(ctxIn))
 	}
 	thread := connectors.EmailThreadPayload{
@@ -46,7 +46,7 @@ func TestMergeEmailThreadFromResourceDetailsIntoContext_SizeCap(t *testing.T) {
 	}
 	b, _ := json.Marshal(map[string]any{"email_thread": thread})
 	out := mergeEmailThreadFromResourceDetailsIntoContext(ctxIn, b)
-	if len(out) > 65536 {
+	if len(out) > maxApprovalContextJSONBytes {
 		t.Fatalf("merged unexpectedly long: %d", len(out))
 	}
 	if string(out) != string(ctxIn) {
