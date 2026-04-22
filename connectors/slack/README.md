@@ -519,7 +519,7 @@ Lists workspace users visible to the bot, with cursor-based pagination.
 
 ### `slack.search_messages`
 
-Searches messages across Slack channels. **Requires a user token** (`xoxp-`) with the granular `search:read.*` scopes (`search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`) — bot tokens (`xoxb-`) do not support this endpoint. Slack returns only content visible to that user; results are not post-filtered in Permission Slip.
+Searches messages across Slack channels. **Requires a user token** (`xoxp-`) with the legacy `search:read` scope — bot tokens (`xoxb-`) do not support this endpoint. The granular `search:read.{public,private,im,mpim,files}` scopes only satisfy the newer Real-time Search API (`assistant.search.context`); they do **not** satisfy `search.messages`, which rejects tokens that only carry the granular scopes with `invalid_arguments`. Slack returns only content visible to that user; results are not post-filtered in Permission Slip.
 
 **Risk level:** low
 
@@ -555,7 +555,7 @@ Searches messages across Slack channels. **Requires a user token** (`xoxp-`) wit
 
 **Slack API:** `POST /search.messages` ([docs](https://api.slack.com/methods/search.messages))
 
-**Required scopes:** `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files` (user token only)
+**Required scopes:** `search:read` (user token only; legacy monolithic scope — granular `search:read.*` scopes do not satisfy this endpoint)
 
 > **Note:** This action will return a `missing_scope` error when invoked with a bot token. To use it, the OAuth flow must persist the user's access token (the `authed_user.access_token` field from Slack's OAuth v2 response).
 
@@ -718,11 +718,7 @@ When connecting via OAuth, scopes are requested automatically. If you're creatin
 
 | Scope | Purpose |
 |-------|---------|
-| `search:read.public` | Search public channel messages |
-| `search:read.private` | Search private channel messages |
-| `search:read.im` | Search DM messages |
-| `search:read.mpim` | Search group DM messages |
-| `search:read.files` | Search shared files |
+| `search:read` | Search workspace messages via `search.messages` (legacy scope; still required — the granular `search:read.*` scopes only work with the Real-time Search API, not `search.messages`) |
 
 ## Testing
 
