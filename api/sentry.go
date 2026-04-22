@@ -143,6 +143,14 @@ func CaptureConnectorError(ctx context.Context, err error, cc ConnectorContext) 
 				scope.SetLevel(sentry.LevelWarning)
 			}
 		}
+		// OAuth refresh failures are a user-action-required state, not a
+		// backend failure: the user's token was revoked, expired without a
+		// refresh token, or the connection was force-flipped to needs_reauth
+		// by a scope-change migration. Keep it in Sentry for visibility but
+		// don't page — same rationale as 4xx external errors above.
+		if errorType == "oauth_refresh" {
+			scope.SetLevel(sentry.LevelWarning)
+		}
 		scope.SetFingerprint(fp)
 
 		hub.CaptureException(err)
