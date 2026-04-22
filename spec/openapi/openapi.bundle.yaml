@@ -11948,7 +11948,7 @@ components:
           maxLength: 4096
           description: |
             Native app deep link URL. Opens directly in the mobile app if installed, bypassing 
-            the browser. Uses custom URI scheme (e.g., `permissionslip://`) or universal link.
+            the browser. Uses a custom URI scheme (e.g., `permissionslip://`).
           example: permissionslip://permission-slip/approve?token=eyJ...
         web:
           type: string

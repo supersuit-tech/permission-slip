@@ -1021,7 +1021,7 @@ When a matching standing approval exists, the action is auto-approved and execut
 **Fields (pending response):**
 
 - `approval_id` (string, required): Unique approval identifier
-- `approval_url` (string, required): Primary approval URL (universal link)
+- `approval_url` (string, required): Primary approval URL (HTTPS; opens in browser on mobile)
 - `alternative_urls` (object, optional): Optional alternative URL formats for specific platforms
 - `status` (string, required): Approval status (`pending`)
 - `expires_at` (string, required): ISO 8601 timestamp when approval expires

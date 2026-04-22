@@ -968,41 +968,25 @@ Approval URLs and webhook secrets are sensitive credentials that require explici
 
 **Implementation Note:** Short-lived tokens reduce risk but do not eliminate it. Services SHOULD implement rate limiting on approval endpoints and monitor for suspicious access patterns.
 
-### Universal Links / App Links
+### Mobile deep links (custom URL scheme)
 
-For mobile apps, services SHOULD support universal links (iOS) and App Links (Android) to enable direct app opening from notifications.
+The hosted Permission Slip app does **not** use iOS Universal Links or Android App Links for `app.permissionslip.dev`, so HTTPS approval URLs open in the mobile browser (including OAuth flows). Native deep linking uses the custom scheme only.
 
-**iOS Universal Link:**
+**Primary approval URL (web):**
 ```
 https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
 ```
 
-Associated domain: `app.permissionslip.dev`
-
-**Android App Link:**
+**Native deep link (optional `alternative_urls.deeplink`):**
 ```
-https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
+permissionslip://permission-slip/approve/appr_xyz789
 ```
 
-Intent filter matches `app.permissionslip.dev` with path `/permission-slip/approve/*`
+Services MAY document both; agents SHOULD use `alternative_urls.deeplink` when the approver is expected to complete the action in the installed app.
 
-**Fallback:** If mobile app is not installed, URL opens in mobile web browser.
+### Universal Links / App Links (optional for other deployments)
 
-### Custom URL Schemes (Optional)
-
-Services MAY support custom URL schemes for mobile app deep linking.
-
-**iOS:**
-```
-permissionslip://approve/appr_xyz789
-```
-
-**Android:**
-```
-permissionslip://approve/appr_xyz789
-```
-
-**Note:** Custom URL schemes are less reliable than universal links/app links and should be used as fallback only.
+Other services MAY still support universal links (iOS) and App Links (Android) to open their own app from HTTPS notification URLs.
 
 ---
 

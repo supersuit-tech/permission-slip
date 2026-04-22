@@ -38,7 +38,6 @@ const config: ExpoConfig = {
   ios: {
     supportsTablet: false,
     bundleIdentifier: process.env.APP_BUNDLE_ID || "dev.permissionslip.app",
-    associatedDomains: ["applinks:app.permissionslip.dev"],
     infoPlist: {
       UIBackgroundModes: ["remote-notification"],
       NSFaceIDUsageDescription:
@@ -65,20 +64,6 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/android-icon-background.png",
       monochromeImage: "./assets/android-icon-monochrome.png",
     },
-    intentFilters: [
-      {
-        action: "VIEW",
-        autoVerify: true,
-        data: [
-          {
-            scheme: "https",
-            host: "app.permissionslip.dev",
-            pathPrefix: "/permission-slip/approve/",
-          },
-        ],
-        category: ["DEFAULT", "BROWSABLE"],
-      },
-    ],
     predictiveBackGestureEnabled: false,
   },
   web: {

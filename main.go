@@ -420,14 +420,6 @@ func main() {
 	// versioned API resource.
 	mux.Handle("/invite/", api.InviteHandler(&deps))
 
-	// Apple App Site Association — required for iOS universal links.
-	// Must be served at /.well-known/apple-app-site-association with
-	// content-type application/json (no file extension).
-	mux.HandleFunc("/.well-known/apple-app-site-association", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(`{"applinks":{"apps":[],"details":[{"appID":"AWUV887E3B.dev.permissionslip.app","paths":["*"]}]}}`))
-	})
-
 	// Supabase reverse proxy — lets the frontend reach Supabase Auth through
 	// the same origin as the app, eliminating CORS issues and extra port
 	// exposure. Active when SUPABASE_URL is set. The frontend falls back to

@@ -5,9 +5,8 @@ jest.mock("expo-linking", () => ({
 import { linking } from "../linking";
 
 describe("linking config", () => {
-  it("includes custom scheme and universal link prefixes", () => {
+  it("includes custom scheme prefix", () => {
     expect(linking.prefixes).toContain("permissionslip://");
-    expect(linking.prefixes).toContain("https://app.permissionslip.dev");
   });
 
   it("maps approval deep link to DeepLinkDetail screen", () => {
