@@ -2,7 +2,6 @@ package slack
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -104,24 +103,6 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
-	// Search results may include DMs and private channels. Require the user
-	// to have a verified Slack identity so results can be filtered.
-	if req.UserEmail == "" {
-		return nil, &connectors.ValidationError{
-			Message: "search_messages may return private content — add an email to your Permission Slip profile that matches your Slack account to proceed",
-		}
-	}
-
-	slackUserID, err := a.conn.lookupSlackUserByEmail(ctx, req.Credentials, req.UserEmail)
-	if err != nil {
-		return nil, fmt.Errorf("unable to verify Slack identity: %w", err)
-	}
-	if slackUserID == "" {
-		return nil, &connectors.ValidationError{
-			Message: fmt.Sprintf("no Slack user found matching email %q — ensure your Permission Slip email matches your Slack account", req.UserEmail),
-		}
-	}
-
 	body := searchMessagesRequest{
 		Query: params.Query,
 		Count: params.Count,
@@ -144,25 +125,9 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, resp.asError()
 	}
 
-	// Filter search results to only include matches from channels the user
-	// has access to. Cache membership checks to avoid repeated API calls for
-	// multiple matches in the same channel.
-	membershipCache := make(map[string]bool)
 	filtered := make([]searchMatchSummary, 0, len(resp.Messages.Matches))
 	for _, m := range resp.Messages.Matches {
 		chID := m.Channel.ID
-		allowed, cached := membershipCache[chID]
-		if !cached {
-			var accessErr error
-			allowed, accessErr = a.conn.hasChannelAccess(ctx, req.Credentials, chID, slackUserID)
-			if accessErr != nil {
-				return nil, fmt.Errorf("checking access to channel %s: %w", chID, accessErr)
-			}
-			membershipCache[chID] = allowed
-		}
-		if !allowed {
-			continue
-		}
 		filtered = append(filtered, searchMatchSummary{
 			ChannelID:   chID,
 			ChannelName: m.Channel.Name,
@@ -178,7 +143,7 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 		Matches: filtered,
 		Total:   len(filtered),
 		Page:    resp.Messages.Paging.Page,
-		Pages:   resp.Messages.Paging.Pages, // upper bound; actual pages may be fewer after membership filtering
+		Pages:   resp.Messages.Paging.Pages,
 	}
 
 	return connectors.JSONResult(result)

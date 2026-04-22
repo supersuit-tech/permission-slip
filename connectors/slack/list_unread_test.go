@@ -10,23 +10,38 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
-func TestListUnread_NoEmail(t *testing.T) {
+func TestListUnread_NoEmail_Succeeds(t *testing.T) {
 	t.Parallel()
 
-	conn := newForTest(http.DefaultClient, "http://unused.example")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.conversations":
+			json.NewEncoder(w).Encode(map[string]any{"ok": true, "channels": []any{}})
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
 	action := &listUnreadAction{conn: conn}
 
-	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+	res, err := action.Execute(t.Context(), connectors.ActionRequest{
 		ActionType:  "slack.list_unread",
 		Parameters:  []byte(`{}`),
 		Credentials: validCreds(),
 		UserEmail:   "",
 	})
-	if err == nil {
-		t.Fatal("expected error for missing user email")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if !connectors.IsValidationError(err) {
-		t.Fatalf("expected ValidationError, got %T: %v", err, err)
+	var out listUnreadResult
+	if err := json.Unmarshal(res.Data, &out); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(out.UnreadChannels) != 0 {
+		t.Fatalf("expected no unreads, got %+v", out.UnreadChannels)
 	}
 }
 
@@ -36,11 +51,6 @@ func TestListUnread_NoUnreads(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]any{"id": "U111"},
-			})
 		case "/users.conversations":
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
@@ -97,11 +107,6 @@ func TestListUnread_MixedTypes_WithPreview(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]any{"id": "U111"},
-			})
 		case "/users.conversations":
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
@@ -218,8 +223,6 @@ func TestListUnread_EmptyChannelList(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{"ok": true, "user": map[string]any{"id": "U1"}})
 		case "/users.conversations":
 			json.NewEncoder(w).Encode(map[string]any{"ok": true, "channels": []any{}})
 		default:
@@ -253,8 +256,6 @@ func TestListUnread_MissingLatestOmitsPreview(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{"ok": true, "user": map[string]any{"id": "U1"}})
 		case "/users.conversations":
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok":       true,
@@ -303,9 +304,6 @@ func TestListUnread_RateLimitOnInfo(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode(map[string]any{"ok": true, "user": map[string]any{"id": "U1"}})
 		case "/users.conversations":
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(map[string]any{
@@ -313,8 +311,9 @@ func TestListUnread_RateLimitOnInfo(t *testing.T) {
 				"channels": []map[string]any{{"id": "C1"}},
 			})
 		case "/conversations.info":
-			w.WriteHeader(http.StatusTooManyRequests)
+			w.Header().Set("Content-Type", "application/json")
 			w.Header().Set("Retry-After", "2")
+			w.WriteHeader(http.StatusTooManyRequests)
 			json.NewEncoder(w).Encode(map[string]any{"ok": false, "error": "ratelimited"})
 		default:
 			t.Errorf("unexpected path %s", r.URL.Path)
@@ -346,8 +345,6 @@ func TestListUnread_PaginatesUsersConversations(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{"ok": true, "user": map[string]any{"id": "U1"}})
 		case "/users.conversations":
 			var body usersConversationsRequest
 			_ = json.NewDecoder(r.Body).Decode(&body)

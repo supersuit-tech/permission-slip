@@ -20,6 +20,8 @@ func (c *SlackConnector) ChannelListCredentialActionType() string {
 // rules as slack.list_channels. Paginates until Slack returns no next_cursor
 // or a safety cap is hit.
 func (c *SlackConnector) ListChannels(ctx context.Context, creds connectors.Credentials, userEmail string) ([]connectors.ChannelListItem, error) {
+	_ = userEmail // listing is scoped to the Slack user token only; kept for ChannelLister API compatibility.
+
 	var all []listChannelSummary
 	seen := make(map[string]bool)
 	cursor := ""
@@ -29,7 +31,7 @@ func (c *SlackConnector) ListChannels(ctx context.Context, creds connectors.Cred
 			Cursor:          cursor,
 			ExcludeArchived: boolPtr(true),
 		}
-		batch, err := c.listChannelsMerged(ctx, creds, userEmail, params)
+		batch, err := c.listChannelsMerged(ctx, creds, params)
 		if err != nil {
 			return nil, err
 		}

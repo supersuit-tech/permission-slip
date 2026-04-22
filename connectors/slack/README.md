@@ -132,15 +132,15 @@ Lists Slack channels visible to the **connected user OAuth token** (`xoxp-`). Th
 
 **Required user token scopes:** `channels:read` (public), `groups:read` (private), `im:read` (DMs), `mpim:read` (group DMs)
 
-#### Listing vs identity (user tokens)
+#### User tokens (xoxp-)
 
-Each Slack connection stores one **user** access token tied to a single Permission Slip user. Listing does **not** call `users.lookupByEmail` or require the Permission Slip profile email to match Slack; both Web API calls run as the token owner, and Slack enforces membership. Other actions (read, search, unread) may still use email-backed membership checks where the product requires them.
+Each Slack connection stores one **user** access token. Web API calls run as that Slack user; Slack enforces channel membership and scopes. Permission Slip does not cross-check the executing user's profile email before read, search, or unread actions.
 
 ---
 
 ### `slack.read_channel_messages`
 
-Reads recent messages from a Slack channel. For private channels, DMs, and group DMs, verifies the executing user is a member before allowing access.
+Reads recent messages from a Slack channel, DM, or group DM using `conversations.history` as the authorizing Slack user.
 
 **Risk level:** low
 
@@ -188,7 +188,7 @@ To answer “do I have unread Slack messages?” or load only unread content, us
 
 ### `slack.list_unread`
 
-Lists conversations where the authorizing user has unread messages. Uses `users.conversations` to enumerate conversations, then `conversations.info` per channel for `last_read`, `unread_count_display`, and `latest`. Requires a Permission Slip profile email that matches the Slack account (same identity model as other private/DM flows).
+Lists conversations where the authorizing user has unread messages. Uses `users.conversations` to enumerate conversations, then `conversations.info` per channel for `last_read`, `unread_count_display`, and `latest`.
 
 **Slack API:** `POST /users.conversations`, `GET /conversations.info`
 
@@ -204,7 +204,7 @@ Sets the read cursor for a conversation (`conversations.mark`). **`channel_id`**
 
 ### `slack.read_thread`
 
-Reads replies in a Slack message thread. For private channels, DMs, and group DMs, verifies the executing user is a member of the parent channel before allowing access.
+Reads replies in a Slack message thread via `conversations.replies` as the authorizing Slack user.
 
 **Risk level:** low
 
@@ -519,7 +519,7 @@ Lists workspace users visible to the bot, with cursor-based pagination.
 
 ### `slack.search_messages`
 
-Searches messages across Slack channels. Requires the executing user to have a verified Slack identity (email match). Results are post-filtered to only include matches from channels the user belongs to. **Requires a user token** (`xoxp-`) with the granular `search:read.*` scopes (`search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`) — bot tokens (`xoxb-`) do not support this endpoint.
+Searches messages across Slack channels. **Requires a user token** (`xoxp-`) with the granular `search:read.*` scopes (`search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`) — bot tokens (`xoxb-`) do not support this endpoint. Slack returns only content visible to that user; results are not post-filtered in Permission Slip.
 
 **Risk level:** low
 
@@ -561,33 +561,9 @@ Searches messages across Slack channels. Requires the executing user to have a v
 
 ---
 
-### Access Control (Private Channels, DMs, Group DMs)
+### Access control (Slack-side)
 
-Read actions (`read_channel_messages`, `read_thread`, `list_channels`, `search_messages`) enforce per-user access control to prevent users from reading private content they don't belong to. The bot token has workspace-wide scopes, so without this check any Permission Slip user could read any DM or private channel.
-
-**How it works:**
-
-1. The executing user's Permission Slip profile email is resolved from the database.
-2. For private channels, DMs (`D`-prefixed), and group DMs (`G`-prefixed), the email is mapped to a Slack user ID via `users.lookupByEmail`.
-3. Channel membership is verified via `conversations.members`.
-4. Public channels (`C`-prefixed, `is_private: false`) are accessible without verification.
-
-**Requirements:**
-
-- The user must have an email set on their Permission Slip profile.
-- The email must match their Slack workspace account.
-- The bot token must have the `users:read.email` scope for email-based lookups.
-
-**Behavior by action:**
-
-| Action | Access check |
-|--------|-------------|
-| `read_channel_messages` | Verifies membership before fetching history |
-| `read_thread` | Verifies membership in the parent channel |
-| `list_channels` | Filters results to channels the user belongs to (when listing private types) |
-| `search_messages` | Requires email; post-filters results by channel membership |
-
-If access is denied, the action returns a `ValidationError` with a message describing the channel type and what the user needs to do (e.g., add an email to their profile).
+Read, thread, list, search, and unread actions use the **stored Slack user token**. Slack applies its own membership and scope rules to each API call. Permission Slip does not resolve the Permission Slip user's email to a Slack user ID for these actions.
 
 ---
 
@@ -686,7 +662,7 @@ When adding a new action, add it to the `Manifest()` return value in `manifest.g
 connectors/slack/
 ├── slack.go                        # SlackConnector, New(), Actions(), doPost(), shared validators
 ├── manifest.go                     # Manifest() — action schemas, templates, credentials
-├── channel_membership.go           # Per-user access control: verifyChannelAccess, hasChannelAccess, lookupSlackUserByEmail
+├── channel_membership.go           # users.conversations merge helpers for list_channels
 ├── messages.go                     # Shared types: slackMessage, messageSummary, messagesResponse
 ├── send_message.go                 # slack.send_message action
 ├── create_channel.go               # slack.create_channel action
@@ -736,7 +712,7 @@ When connecting via OAuth, scopes are requested automatically. If you're creatin
 | `mpim:write` | Open group DM conversations |
 | `reactions:write` | Add emoji reactions |
 | `users:read` | List workspace users |
-| `users:read.email` | Access user email addresses (needed for identity verification) |
+| `users:read.email` | Access user email addresses (e.g. `users.list` / profile fields) |
 
 **User token scopes (`xoxp-`)** — only needed for `search_messages`:
 

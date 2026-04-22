@@ -50,7 +50,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"message": {
@@ -150,7 +150,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"limit": {
@@ -198,7 +198,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"thread_ts": {
@@ -239,7 +239,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"message": {
@@ -286,7 +286,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"topic": {
@@ -316,7 +316,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"users": {
@@ -354,7 +354,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"filename": {
@@ -394,7 +394,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"timestamp": {
@@ -461,7 +461,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"ts": {
@@ -496,7 +496,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 								"remote_select_id_key": "id",
 								"remote_select_label_key": "display_label",
 								"remote_select_fallback_placeholder": "Channel ID (e.g. C01234567)",
-								"help_text": "Choose a channel or enter an ID. Private channels and DMs need your profile email to match Slack."
+								"help_text": "Choose a channel or enter an ID (C…, D…, or G…)."
 							}
 						},
 						"ts": {
