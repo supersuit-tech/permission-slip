@@ -132,43 +132,56 @@ func (a *addSlideAction) Execute(ctx context.Context, req connectors.ActionReque
 		createReq.InsertionIndex = params.InsertionIndex
 	}
 
-	requests := []slidesBatchRequest{{CreateSlide: createReq}}
-
+	// When a title is provided, map the layout's TITLE placeholder to a known
+	// objectId so we can target it with a follow-up InsertText. The ID must be
+	// unique within the presentation, so we derive it from a nanosecond timestamp.
+	var titleID string
 	if params.Title != "" {
-		// Generate a unique ID per call — the Slides API requires object IDs to
-		// be unique within a presentation, so a fixed constant would fail on any
-		// second titled slide. The Google Slides API applies batchUpdate requests
-		// sequentially, so InsertText safely references the placeholder created
-		// in the preceding CreateSlide request:
-		// https://developers.google.com/slides/api/reference/rest/v1/presentations/batchUpdate
-		titleID := fmt.Sprintf("ps_title_%x", time.Now().UnixNano())
+		titleID = fmt.Sprintf("ps_title_%x", time.Now().UnixNano())
 		createReq.PlaceholderIdMappings = []slidePlaceholderIDMapping{
 			{
 				LayoutPlaceholder: slidePlaceholderRef{Type: "TITLE", Index: 0},
 				ObjectId:          titleID,
 			},
 		}
-		requests = append(requests, slidesBatchRequest{
-			InsertText: &slidesInsertTextReq{
-				ObjectId: titleID,
-				Text:     params.Title,
-			},
-		})
 	}
 
-	body := slidesBatchUpdateRequest{
-		Requests: requests,
-	}
-
-	var resp slidesBatchUpdateResponse
 	batchURL := a.conn.slidesBaseURL + "/v1/presentations/" + url.PathEscape(params.PresentationID) + ":batchUpdate"
-	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, batchURL, body, &resp); err != nil {
+
+	// First batchUpdate: create the slide (and mint the title placeholder ID via
+	// placeholderIdMappings). We deliberately do NOT combine CreateSlide and
+	// InsertText into a single batchUpdate: the Slides API validates the full
+	// request batch before applying any of it, and InsertText targeting a
+	// placeholder that only exists after CreateSlide runs can be silently
+	// dropped. Google's own samples use two separate batchUpdate calls for this
+	// pattern — see
+	// https://developers.google.com/slides/api/samples/slide
+	createBody := slidesBatchUpdateRequest{
+		Requests: []slidesBatchRequest{{CreateSlide: createReq}},
+	}
+	var createResp slidesBatchUpdateResponse
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, batchURL, createBody, &createResp); err != nil {
 		return nil, err
 	}
 
 	slideID := ""
-	if len(resp.Replies) > 0 && resp.Replies[0].CreateSlide != nil {
-		slideID = resp.Replies[0].CreateSlide.ObjectID
+	if len(createResp.Replies) > 0 && createResp.Replies[0].CreateSlide != nil {
+		slideID = createResp.Replies[0].CreateSlide.ObjectID
+	}
+
+	// Second batchUpdate: populate the title placeholder with the user's text.
+	if titleID != "" {
+		textBody := slidesBatchUpdateRequest{
+			Requests: []slidesBatchRequest{{
+				InsertText: &slidesInsertTextReq{
+					ObjectId: titleID,
+					Text:     params.Title,
+				},
+			}},
+		}
+		if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, batchURL, textBody, nil); err != nil {
+			return nil, err
+		}
 	}
 
 	return connectors.JSONResult(map[string]string{
