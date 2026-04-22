@@ -51,8 +51,8 @@ func mergeEmailThreadFromResourceDetailsIntoContext(contextJSON json.RawMessage,
 	if err != nil {
 		return contextJSON
 	}
-	// Preserve the 65536-byte cap from the request validator.
-	if len(out) > 65536 {
+	// Preserve the cap from maxApprovalContextJSONBytes (validator + DB).
+	if len(out) > maxApprovalContextJSONBytes {
 		return contextJSON
 	}
 	return out
