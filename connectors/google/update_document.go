@@ -20,15 +20,24 @@ type updateDocumentAction struct {
 // updateDocumentParams is the user-facing parameter schema.
 type updateDocumentParams struct {
 	DocumentID string `json:"document_id"`
-	Content    string `json:"content"`
-	Index      int    `json:"index"`
+	Content    string `json:"content,omitempty"`
+	// Text is deprecated: prefer Content (aligned with google.create_document).
+	Text  string `json:"text,omitempty"`
+	Index int    `json:"index"`
+}
+
+func (p *updateDocumentParams) insertText() string {
+	if p.Content != "" {
+		return p.Content
+	}
+	return p.Text
 }
 
 func (p *updateDocumentParams) validate() error {
 	if p.DocumentID == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: document_id"}
 	}
-	if p.Content == "" {
+	if p.insertText() == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: content"}
 	}
 	if p.Index < 0 {
@@ -47,15 +56,16 @@ func (a *updateDocumentAction) Execute(ctx context.Context, req connectors.Actio
 		return nil, err
 	}
 
+	text := params.insertText()
 	var insertReq docsRequest
 	if params.Index > 0 {
 		insertReq.InsertText = &docsInsertTextRequest{
-			Text:     params.Content,
+			Text:     text,
 			Location: &docsLocation{Index: params.Index},
 		}
 	} else {
 		insertReq.InsertText = &docsInsertTextRequest{
-			Text:                 params.Content,
+			Text:                 text,
 			EndOfSegmentLocation: &docsEndOfSegmentLocation{},
 		}
 	}
