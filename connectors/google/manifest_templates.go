@@ -298,7 +298,7 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.add_slide",
 			Name:        "Add slides to presentations",
 			Description: "Agent can add new slides to any Google Slides presentation.",
-			Parameters:  json.RawMessage(`{"presentation_id":"*","layout":"*","insertion_index":"*"}`),
+			Parameters:  json.RawMessage(`{"presentation_id":"*","layout":"*","insertion_index":"*","title":"*"}`),
 		},
 		// --- Chat ---
 		{

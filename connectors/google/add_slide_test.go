@@ -78,47 +78,31 @@ func TestAddSlide_Success(t *testing.T) {
 func TestAddSlide_WithTitle(t *testing.T) {
 	t.Parallel()
 
+	// The Slides API validates the full request batch before applying any of
+	// it, so CreateSlide + InsertText must be sent as two separate batchUpdate
+	// calls. Record each call and assert on both in order.
+	type capturedCall struct {
+		body slidesBatchUpdateRequest
+	}
+	var calls []capturedCall
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		var body slidesBatchUpdateRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("failed to decode request body: %v", err)
 		}
-		if len(body.Requests) != 2 {
-			t.Fatalf("expected 2 requests (createSlide + insertText), got %d", len(body.Requests))
-		}
-		cs := body.Requests[0].CreateSlide
-		if cs == nil {
-			t.Fatal("expected createSlide in first request")
-		}
-		if len(cs.PlaceholderIdMappings) != 1 {
-			t.Fatalf("expected 1 placeholder mapping, got %d", len(cs.PlaceholderIdMappings))
-		}
-		if cs.PlaceholderIdMappings[0].LayoutPlaceholder.Type != "TITLE" {
-			t.Errorf("expected TITLE placeholder, got %q", cs.PlaceholderIdMappings[0].LayoutPlaceholder.Type)
-		}
-		it := body.Requests[1].InsertText
-		if it == nil {
-			t.Fatal("expected insertText in second request")
-		}
-		if it.Text != "Hello World" {
-			t.Errorf("expected title text 'Hello World', got %q", it.Text)
-		}
-		// The placeholder objectId must be unique per call (not a fixed constant)
-		// and must match between the mapping and the insertText request.
-		mappingID := cs.PlaceholderIdMappings[0].ObjectId
-		if it.ObjectId != mappingID {
-			t.Errorf("insertText objectId %q must match placeholderIdMapping objectId %q", it.ObjectId, mappingID)
-		}
-		if mappingID == "" {
-			t.Error("expected non-empty placeholder objectId")
-		}
+		calls = append(calls, capturedCall{body: body})
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(slidesBatchUpdateResponse{
-			Replies: []slidesBatchReply{
-				{CreateSlide: &createSlideReply{ObjectID: "slide-title-001"}},
-			},
-		})
+		switch len(calls) {
+		case 1:
+			json.NewEncoder(w).Encode(slidesBatchUpdateResponse{
+				Replies: []slidesBatchReply{
+					{CreateSlide: &createSlideReply{ObjectID: "slide-title-001"}},
+				},
+			})
+		default:
+			json.NewEncoder(w).Encode(slidesBatchUpdateResponse{})
+		}
 	}))
 	defer srv.Close()
 
@@ -138,6 +122,46 @@ func TestAddSlide_WithTitle(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(calls) != 2 {
+		t.Fatalf("expected 2 batchUpdate calls (createSlide, then insertText), got %d", len(calls))
+	}
+
+	// First call: CreateSlide with a TITLE placeholder mapping.
+	first := calls[0].body
+	if len(first.Requests) != 1 {
+		t.Fatalf("first call: expected 1 request (createSlide), got %d", len(first.Requests))
+	}
+	cs := first.Requests[0].CreateSlide
+	if cs == nil {
+		t.Fatal("first call: expected createSlide request")
+	}
+	if len(cs.PlaceholderIdMappings) != 1 {
+		t.Fatalf("first call: expected 1 placeholder mapping, got %d", len(cs.PlaceholderIdMappings))
+	}
+	if cs.PlaceholderIdMappings[0].LayoutPlaceholder.Type != "TITLE" {
+		t.Errorf("first call: expected TITLE placeholder, got %q", cs.PlaceholderIdMappings[0].LayoutPlaceholder.Type)
+	}
+	mappingID := cs.PlaceholderIdMappings[0].ObjectId
+	if mappingID == "" {
+		t.Error("first call: expected non-empty placeholder objectId")
+	}
+
+	// Second call: InsertText targeting the mapped placeholder.
+	second := calls[1].body
+	if len(second.Requests) != 1 {
+		t.Fatalf("second call: expected 1 request (insertText), got %d", len(second.Requests))
+	}
+	it := second.Requests[0].InsertText
+	if it == nil {
+		t.Fatal("second call: expected insertText request")
+	}
+	if it.Text != "Hello World" {
+		t.Errorf("second call: expected title text 'Hello World', got %q", it.Text)
+	}
+	if it.ObjectId != mappingID {
+		t.Errorf("second call: insertText objectId %q must match placeholderIdMapping objectId %q", it.ObjectId, mappingID)
 	}
 
 	var data map[string]string
