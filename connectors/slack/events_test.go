@@ -109,6 +109,42 @@ func TestVerifyAndParseEvent_MessageIM(t *testing.T) {
 	}
 }
 
+func TestVerifyAndParseEvent_MessageIM_NullText(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	payload := []byte(`{
+		"type": "event_callback",
+		"team_id": "T01234",
+		"api_app_id": "A01234",
+		"event": {
+			"type": "message",
+			"channel_type": "im",
+			"channel": "D01234",
+			"user": "U01234",
+			"text": null,
+			"ts": "1710000000.123456"
+		},
+		"event_id": "EvNullText",
+		"event_time": 1710000000
+	}`)
+	headers := signPayload(t, payload, testSigningSecret)
+
+	envelope, err := conn.VerifyAndParseEvent(payload, headers, testSigningSecret)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if envelope.Event == nil || envelope.Event.EventType != "message.im" {
+		t.Fatalf("event: %#v", envelope.Event)
+	}
+	var msg IMMessagePayload
+	if err := json.Unmarshal(envelope.Event.Payload, &msg); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if msg.Text != "" {
+		t.Errorf("expected empty text for null, got %q", msg.Text)
+	}
+}
+
 func TestVerifyAndParseEvent_NonIMMessage(t *testing.T) {
 	conn := New()
 	payload := []byte(`{

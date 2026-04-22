@@ -62,11 +62,11 @@ type searchMatch struct {
 		ID   string `json:"id"`
 		Name string `json:"name"`
 	} `json:"channel"`
-	User      string `json:"user"`
-	Username  string `json:"username"`
-	Text      string `json:"text"`
-	TS        string `json:"ts"`
-	Permalink string `json:"permalink"`
+	User      string            `json:"user"`
+	Username  string            `json:"username"`
+	Text      slackNullableText `json:"text"`
+	TS        string            `json:"ts"`
+	Permalink string            `json:"permalink"`
 }
 
 type searchMessagePaging struct {
@@ -133,7 +133,7 @@ func (a *searchMessagesAction) Execute(ctx context.Context, req connectors.Actio
 			ChannelName: m.Channel.Name,
 			User:        m.User,
 			Username:    m.Username,
-			Text:        m.Text,
+			Text:        m.Text.String(),
 			TS:          m.TS,
 			Permalink:   m.Permalink,
 		})

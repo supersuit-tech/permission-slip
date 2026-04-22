@@ -71,7 +71,7 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 			var previewPtr *latestMessagePreview
 			if info.Latest != nil {
 				p := latestMessagePreview{
-					Text: truncatePreviewText(info.Latest.Text),
+					Text: truncatePreviewText(info.Latest.Text.String()),
 					User: info.Latest.User,
 					TS:   info.Latest.TS,
 				}

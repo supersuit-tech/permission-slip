@@ -38,13 +38,13 @@ type slackEventEnvelope struct {
 
 // slackInnerEvent is the inner event structure within an event_callback.
 type slackInnerEvent struct {
-	Type        string `json:"type"`
-	ChannelType string `json:"channel_type"` // "im", "mpim", "channel", "group"
-	Channel     string `json:"channel"`
-	User        string `json:"user"`
-	Text        string `json:"text"`
-	TS          string `json:"ts"`
-	BotID       string `json:"bot_id,omitempty"`
+	Type        string            `json:"type"`
+	ChannelType string            `json:"channel_type"` // "im", "mpim", "channel", "group"
+	Channel     string            `json:"channel"`
+	User        string            `json:"user"`
+	Text        slackNullableText `json:"text"`
+	TS          string            `json:"ts"`
+	BotID       string            `json:"bot_id,omitempty"`
 }
 
 // IMMessagePayload is the typed payload for message.im events.
@@ -92,7 +92,7 @@ func (c *SlackConnector) VerifyAndParseEvent(payload []byte, headers http.Header
 		p := IMMessagePayload{
 			User:      inner.User,
 			Channel:   inner.Channel,
-			Text:      inner.Text,
+			Text:      inner.Text.String(),
 			Timestamp: inner.TS,
 		}
 		var marshalErr error
