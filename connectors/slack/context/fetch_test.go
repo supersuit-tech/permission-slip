@@ -67,7 +67,7 @@ func TestFetchThread_Truncation(t *testing.T) {
 	var list []slackMessage
 	list = append(list, slackMessage{User: "U1", Text: "parent", TS: "10.0"})
 	for i := 1; i <= 25; i++ {
-		list = append(list, slackMessage{User: "U1", Text: fmt.Sprintf("r%d", i), TS: fmt.Sprintf("10.%06d", i)})
+		list = append(list, slackMessage{User: "U1", Text: slackNullableText(fmt.Sprintf("r%d", i)), TS: fmt.Sprintf("10.%06d", i)})
 	}
 	api.postHandlers["conversations.replies"] = func(body json.RawMessage) (any, error) {
 		return messagesResponse{slackResponse: slackResponse{OK: true}, Messages: list}, nil
