@@ -43,7 +43,7 @@ func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connector
 				}
 			}
 			privateTypes := filterPrivateTypes(types)
-			userPrivateChs, err := c.getUserPrivateConversations(ctx, creds, slackUserID, privateTypes)
+			userPrivateChs, err := c.getUserPrivateConversations(ctx, creds, privateTypes)
 			if err != nil {
 				return nil, fmt.Errorf("fetching user channel memberships: %w", err)
 			}
