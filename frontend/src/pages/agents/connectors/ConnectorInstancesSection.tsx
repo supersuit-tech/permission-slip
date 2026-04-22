@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Loader2, Settings, Star, Trash2 } from "lucide-react";
+import { AlertTriangle, Loader2, LogIn, Settings, Star, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,11 +11,16 @@ import {
   CardDescription,
   CardContent,
 } from "@/components/ui/card";
+import { useAuth } from "@/auth/AuthContext";
 import { useCredentials } from "@/hooks/useCredentials";
 import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
-import { providerLabel } from "@/lib/oauth";
+import {
+  providerLabel,
+  getOAuthAuthorizeUrl,
+  SHOP_REQUIRED_PROVIDERS,
+} from "@/lib/oauth";
 import { serviceLabel } from "@/lib/labels";
 import {
   useAgentConnectorInstances,
@@ -62,6 +67,7 @@ export function ConnectorInstancesSection({
     [connectorId, requiredCredentials],
   );
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
+  const { session } = useAuth();
 
   useAutoAssignOAuthCredential(agentId, connectorId);
 
@@ -127,8 +133,11 @@ export function ConnectorInstancesSection({
   } = useConnectorInstanceCredentialBindings(agentId, connectorId, instanceIds);
 
   const rows: CredentialRow[] = useMemo(() => {
-    const activeConnections = connections.filter(
-      (c) => c.status === "active" && c.id && c.provider === connectorId,
+    const usableConnections = connections.filter(
+      (c) =>
+        (c.status === "active" || c.status === "needs_reauth") &&
+        c.id &&
+        c.provider === connectorId,
     );
     const scopedCredentials = credentials
       .filter((c) => credentialServiceIds.has(c.service))
@@ -139,7 +148,7 @@ export function ConnectorInstancesSection({
         return la.localeCompare(lb);
       });
 
-    const oauthRows: CredentialRow[] = activeConnections
+    const oauthRows: CredentialRow[] = usableConnections
       .slice()
       .sort((a, b) =>
         (a.display_name ?? a.id).localeCompare(b.display_name ?? b.id),
@@ -158,6 +167,24 @@ export function ConnectorInstancesSection({
 
     return [...oauthRows, ...credRows];
   }, [connections, connectorId, credentials, credentialServiceIds]);
+
+  const oauthScopesByProvider = useMemo(() => {
+    const m = new Map<string, string[] | undefined>();
+    for (const rc of requiredCredentials) {
+      if (rc.auth_type === "oauth2" && rc.oauth_provider) {
+        m.set(rc.oauth_provider, rc.oauth_scopes);
+      }
+    }
+    return m;
+  }, [requiredCredentials]);
+
+  const reauthCount = useMemo(
+    () =>
+      rows.filter(
+        (r) => r.kind === "oauth" && r.connection.status === "needs_reauth",
+      ).length,
+    [rows],
+  );
 
   const instanceByRowKey = useMemo(() => {
     const map = new Map<string, AgentConnectorInstance>();
@@ -333,9 +360,30 @@ export function ConnectorInstancesSection({
 
   function rowMeta(row: CredentialRow): string {
     if (row.kind === "oauth") {
+      if (row.connection.status === "needs_reauth") {
+        return "Needs re-authorization";
+      }
       return `Connected ${new Date(row.connection.connected_at).toLocaleDateString()}`;
     }
     return `Added ${new Date(row.credential.created_at).toLocaleDateString()}`;
+  }
+
+  function handleReauthorize(connection: OAuthConnection) {
+    if (!session?.access_token) return;
+    // Shop-required providers (e.g. shopify) prompt for a shop subdomain —
+    // defer to the Manage credentials dialog, which owns that flow.
+    if (SHOP_REQUIRED_PROVIDERS.has(connection.provider)) {
+      setManageDialogOpen(true);
+      return;
+    }
+    window.location.href = getOAuthAuthorizeUrl(
+      connection.provider,
+      session.access_token,
+      {
+        scopes: oauthScopesByProvider.get(connection.provider),
+        replaceId: connection.id,
+      },
+    );
   }
 
   return (
@@ -369,6 +417,19 @@ export function ConnectorInstancesSection({
                 Failed to load credential links. Refresh the page to retry.
               </p>
             )}
+            {reauthCount > 0 && (
+              <div
+                role="alert"
+                className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm dark:border-amber-900/50 dark:bg-amber-950/40"
+              >
+                <AlertTriangle className="mt-0.5 size-4 shrink-0 text-amber-500" />
+                <p className="text-amber-900 dark:text-amber-200">
+                  {reauthCount === 1
+                    ? "1 credential needs re-authorization before this agent can use it."
+                    : `${reauthCount} credentials need re-authorization before this agent can use them.`}
+                </p>
+              </div>
+            )}
             {rows.length === 0 && (
               <p className="text-muted-foreground text-sm">
                 No credentials found for this connector. Add one using Manage
@@ -380,6 +441,8 @@ export function ConnectorInstancesSection({
               const enabled = !!inst;
               const isDefault = !!inst?.is_default;
               const showDefaultControls = enabled && enabledInstanceCount > 1;
+              const needsReauth =
+                row.kind === "oauth" && row.connection.status === "needs_reauth";
 
               return (
                 <div
@@ -397,14 +460,39 @@ export function ConnectorInstancesSection({
                     <div className="min-w-0 flex-1">
                       <label
                         htmlFor={`cred-row-${row.rowKey}`}
-                        className="cursor-pointer font-medium"
+                        className="flex cursor-pointer flex-wrap items-center gap-2 font-medium"
                       >
                         {rowLabel(row)}
+                        {needsReauth && (
+                          <Badge
+                            variant="outline"
+                            className="gap-1 border-amber-300 text-amber-700 dark:border-amber-700 dark:text-amber-300"
+                          >
+                            <AlertTriangle className="size-3" />
+                            Needs re-authorization
+                          </Badge>
+                        )}
                       </label>
-                      <p className="text-muted-foreground text-xs">{rowMeta(row)}</p>
+                      <p
+                        className={`text-xs ${needsReauth ? "text-amber-700 dark:text-amber-300" : "text-muted-foreground"}`}
+                      >
+                        {rowMeta(row)}
+                      </p>
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 sm:justify-end">
+                    {needsReauth && row.kind === "oauth" && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={busyRow || !session?.access_token}
+                        onClick={() => handleReauthorize(row.connection)}
+                      >
+                        <LogIn className="size-3.5" />
+                        Re-authorize
+                      </Button>
+                    )}
                     {enabled && isDefault && (
                       <Badge variant="secondary">Default</Badge>
                     )}

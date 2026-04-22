@@ -88,7 +88,10 @@ function normalizeMockPath(path: unknown): string {
 const LIST_INSTANCES_PATH =
   "/v1/agents/{agent_id}/connectors/{connector_id}/instances";
 
-function mockStandardGets(twoInstances = false) {
+function mockStandardGets(
+  twoInstances = false,
+  options?: { secondNeedsReauth?: boolean },
+) {
   mockGet.mockImplementation((path: unknown) => {
     const p = normalizeMockPath(path);
     if (path === LIST_INSTANCES_PATH || (p.includes("/connectors/") && p.endsWith("/instances") && !p.includes("/credential"))) {
@@ -125,7 +128,7 @@ function mockStandardGets(twoInstances = false) {
             {
               id: "oconn_2",
               provider: "slack",
-              status: "active",
+              status: options?.secondNeedsReauth ? "needs_reauth" : "active",
               display_name: "Sales",
               connected_at: "2026-02-12T10:00:00Z",
             },
@@ -316,5 +319,82 @@ describe("ConnectorInstancesSection", () => {
     expect(instDelete?.[1]?.params?.path?.instance_id).toBe(
       secondInstance.connector_instance_id,
     );
+  });
+
+  it("shows needs_reauth credentials in the checklist with a warning and re-authorize button", async () => {
+    mockStandardGets(true, { secondNeedsReauth: true });
+    mockUseConnectorInstanceCredentialBindings.mockReturnValue(
+      bindingsQueryResult(true),
+    );
+    renderWithProviders(
+      <ConnectorInstancesSection
+        agentId={42}
+        connectorId="slack"
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2",
+            oauth_provider: "slack",
+          },
+        ]}
+      />,
+    );
+    // Row still appears, checkbox reflects the binding (enabled).
+    const salesCheckbox = await screen.findByRole("checkbox", {
+      name: /Slack OAuth — Sales/i,
+    });
+    expect(salesCheckbox).toBeChecked();
+    // Badge next to the row conveys the re-auth state.
+    expect(screen.getAllByText(/Needs re-authorization/i).length).toBeGreaterThan(0);
+    // Re-authorize button is rendered.
+    expect(
+      screen.getByRole("button", { name: /Re-authorize/i }),
+    ).toBeInTheDocument();
+    // Summary banner at the top shows the count.
+    expect(
+      screen.getByText(/1 credential needs re-authorization/i),
+    ).toBeInTheDocument();
+  });
+
+  it("re-authorize button navigates to the OAuth authorize URL with replace param", async () => {
+    mockStandardGets(true, { secondNeedsReauth: true });
+    mockUseConnectorInstanceCredentialBindings.mockReturnValue(
+      bindingsQueryResult(true),
+    );
+    const assignHref = vi.fn();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: {
+        ...window.location,
+        set href(url: string) {
+          assignHref(url);
+        },
+        get href() {
+          return "http://localhost/";
+        },
+      },
+    });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ConnectorInstancesSection
+        agentId={42}
+        connectorId="slack"
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2",
+            oauth_provider: "slack",
+            oauth_scopes: ["chat:write"],
+          },
+        ]}
+      />,
+    );
+    const button = await screen.findByRole("button", { name: /Re-authorize/i });
+    await user.click(button);
+    expect(assignHref).toHaveBeenCalled();
+    const url = assignHref.mock.calls[0]?.[0] as string;
+    expect(url).toContain("/v1/oauth/slack/authorize");
+    expect(url).toContain("replace=oconn_2");
+    expect(url).toContain("scope=chat%3Awrite");
   });
 });
