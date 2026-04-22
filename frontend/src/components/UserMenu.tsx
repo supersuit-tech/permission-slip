@@ -4,20 +4,17 @@ import {
   User,
   Shield,
   CreditCard,
-  Moon,
   LifeBuoy,
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useSignOut } from "@/hooks/useSignOut";
-import { useTheme } from "@/components/ThemeContext";
 import { isSaas } from "@/lib/saas";
 import { Avatar } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
-  DropdownMenuCheckboxItem,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -27,7 +24,6 @@ import {
 export function UserMenu() {
   const { user } = useAuth();
   const { profile } = useProfile();
-  const { theme, toggleTheme } = useTheme();
   const handleSignOut = useSignOut();
   const navigate = useNavigate();
 
@@ -80,14 +76,6 @@ export function UserMenu() {
               </DropdownMenuItem>
             </>
           )}
-          <DropdownMenuSeparator />
-          <DropdownMenuCheckboxItem
-            checked={theme === "dark"}
-            onCheckedChange={toggleTheme}
-          >
-            <Moon />
-            <span>Dark Mode</span>
-          </DropdownMenuCheckboxItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut} variant="destructive">
             <LogOut />
