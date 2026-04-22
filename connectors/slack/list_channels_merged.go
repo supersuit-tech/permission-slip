@@ -2,6 +2,8 @@ package slack
 
 import (
 	"context"
+
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // listChannelsMerged lists Slack channels for the user OAuth token (xoxp-).
