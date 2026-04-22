@@ -448,7 +448,7 @@ func credentialsFromOAuthConnection(ctx context.Context, deps *Deps, conn *db.OA
 // the old refresh token; the losing path may see invalid_grant. We re-read the row
 // before marking needs_reauth so we do not flip a healthy connection offline.
 func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConnection, providerID string) error {
-	lastKnownUpdatedAt := conn.UpdatedAt
+	lastKnownAccessVaultID := conn.AccessTokenVaultID
 	lastKnownTokenExpiry := conn.TokenExpiry
 
 	provider, ok := deps.OAuthProviders.Get(providerID)
@@ -460,13 +460,13 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	}
 
 	if conn.RefreshTokenVaultID == nil {
-		fresh, skipFlip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownUpdatedAt, lastKnownTokenExpiry)
+		fresh, skipFlip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownAccessVaultID, lastKnownTokenExpiry)
 		if err != nil {
 			return err
 		}
-		if skipFlip && fresh != nil && fresh.RefreshTokenVaultID != nil {
+		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive && fresh.RefreshTokenVaultID != nil {
 			*conn = *fresh
-			lastKnownUpdatedAt = conn.UpdatedAt
+			lastKnownAccessVaultID = conn.AccessTokenVaultID
 			lastKnownTokenExpiry = conn.TokenExpiry
 		} else {
 			// No refresh token — can't refresh. Mark as needs_reauth.
@@ -497,11 +497,11 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 	if err != nil {
 		// Refresh failed (token revoked, expired, invalid_grant after rotation, etc.).
 		// Re-read: another goroutine may have refreshed successfully and invalidated our refresh token.
-		fresh, skipFlip, reloadErr := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownUpdatedAt, lastKnownTokenExpiry)
+		fresh, skipFlip, reloadErr := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownAccessVaultID, lastKnownTokenExpiry)
 		if reloadErr != nil {
 			return reloadErr
 		}
-		if skipFlip && fresh != nil {
+		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive {
 			*conn = *fresh
 			return nil
 		}

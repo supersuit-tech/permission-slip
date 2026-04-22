@@ -596,12 +596,13 @@ func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentSuccessDo
 	// from the httptest server goroutine (tx is not safe for concurrent use).
 	bumpCh := make(chan struct{})
 	bumpDone := make(chan struct{})
+	var bumpErr error
 	go func() {
 		defer close(bumpDone)
 		<-bumpCh
 		newAccessID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-		testhelper.MustExec(t, tx,
-			`UPDATE oauth_connections SET
+		_, bumpErr = tx.Exec(t.Context(), `
+			UPDATE oauth_connections SET
 				token_expiry = now() + interval '2 hours',
 				updated_at = now(),
 				access_token_vault_id = $1,
@@ -614,6 +615,10 @@ func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentSuccessDo
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(bumpCh)
 		<-bumpDone
+		if bumpErr != nil {
+			http.Error(w, bumpErr.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]any{
@@ -679,6 +684,101 @@ func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentSuccessDo
 	if tok != "concurrent-winner-access" {
 		t.Errorf("expected access from concurrent refresh vault, got %q", tok)
 	}
+	if bumpErr != nil {
+		t.Fatalf("concurrent DB bump: %v", bumpErr)
+	}
+}
+
+// TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentNeedsReauthReturnsError
+// ensures we do not treat another path's needs_reauth flip as a successful concurrent refresh.
+func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentNeedsReauthReturnsError(t *testing.T) {
+	t.Parallel()
+
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	bumpCh := make(chan struct{})
+	bumpDone := make(chan struct{})
+	var bumpErr error
+	go func() {
+		defer close(bumpDone)
+		<-bumpCh
+		_, bumpErr = tx.Exec(t.Context(), `
+			UPDATE oauth_connections SET
+				token_expiry = now() + interval '2 hours',
+				updated_at = now(),
+				access_token_vault_id = $1,
+				status = $2
+			WHERE id = $3 AND user_id = $4`,
+			"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", db.OAuthStatusNeedsReauth, "oconn_race_fail", uid,
+		)
+	}()
+
+	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		close(bumpCh)
+		<-bumpDone
+		if bumpErr != nil {
+			http.Error(w, bumpErr.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]any{
+			"error":             "invalid_grant",
+			"error_description": "refresh failed",
+		})
+	}))
+	defer tokenSrv.Close()
+
+	v := vault.NewMockVaultStore()
+	v.SeedSecretForTest("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa", []byte("other-path-access"))
+
+	oauthReg := oauth.NewRegistry()
+	_ = oauthReg.Register(oauth.Provider{
+		ID:           "google",
+		TokenURL:     tokenSrv.URL,
+		ClientID:     "test-client-id",
+		ClientSecret: "test-client-secret",
+		Source:       oauth.SourceBuiltIn,
+	})
+	deps := &Deps{DB: tx, Vault: v, OAuthProviders: oauthReg}
+
+	refreshVault := "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+	v.SeedSecretForTest(refreshVault, []byte("stale-refresh"))
+	pastExpiry := time.Now().Add(-10 * time.Minute)
+	testhelper.InsertOAuthConnectionFull(t, tx, "oconn_race_fail", uid, "google", testhelper.OAuthConnectionOpts{
+		AccessTokenVaultID:  "cccccccc-cccc-cccc-cccc-cccccccccccc",
+		RefreshTokenVaultID: &refreshVault,
+		TokenExpiry:         &pastExpiry,
+		Scopes:              []string{},
+		Status:              "active",
+	})
+	v.SeedSecretForTest("cccccccc-cccc-cccc-cccc-cccccccccccc", []byte("stale-access"))
+
+	conn, err := db.GetOAuthConnectionByID(t.Context(), tx, "oconn_race_fail")
+	if err != nil || conn == nil {
+		t.Fatalf("get connection: %v", conn)
+	}
+
+	err = refreshOAuthConnection(t.Context(), deps, conn, "google")
+	if err == nil {
+		t.Fatal("expected OAuthRefreshError when concurrent path set needs_reauth")
+	}
+	if !connectors.IsOAuthRefreshError(err) {
+		t.Fatalf("expected OAuthRefreshError, got %T: %v", err, err)
+	}
+
+	updated, err := db.GetOAuthConnectionByID(t.Context(), tx, "oconn_race_fail")
+	if err != nil || updated == nil {
+		t.Fatalf("reload: %v", updated)
+	}
+	if updated.Status != db.OAuthStatusNeedsReauth {
+		t.Fatalf("expected needs_reauth preserved, got %q", updated.Status)
+	}
+	if bumpErr != nil {
+		t.Fatalf("concurrent DB bump: %v", bumpErr)
+	}
 }
 
 // TestCredentialsFromOAuthConnection_MultiInstanceSameProvider serially refreshes two
@@ -692,7 +792,8 @@ func TestCredentialsFromOAuthConnection_MultiInstanceSameProvider(t *testing.T) 
 
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Errorf("parse form: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		rt := r.FormValue("refresh_token")
 		w.Header().Set("Content-Type", "application/json")

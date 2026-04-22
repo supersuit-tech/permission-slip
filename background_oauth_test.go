@@ -88,7 +88,8 @@ func TestRefreshSingleConnection_MultiInstanceNoCrossContamination(t *testing.T)
 
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if err := r.ParseForm(); err != nil {
-			t.Errorf("parse form: %v", err)
+			http.Error(w, err.Error(), http.StatusBadRequest)
+			return
 		}
 		rt := r.FormValue("refresh_token")
 		w.Header().Set("Content-Type", "application/json")
@@ -195,12 +196,13 @@ func TestRefreshSingleConnection_InvalidGrantAfterConcurrentRefreshStaysActive(t
 
 	bumpCh := make(chan struct{})
 	bumpDone := make(chan struct{})
+	var bumpErr error
 	go func() {
 		defer close(bumpDone)
 		<-bumpCh
 		newAccessID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-		testhelper.MustExec(t, tx,
-			`UPDATE oauth_connections SET
+		_, bumpErr = tx.Exec(t.Context(), `
+			UPDATE oauth_connections SET
 				token_expiry = now() + interval '2 hours',
 				updated_at = now(),
 				access_token_vault_id = $1,
@@ -213,6 +215,10 @@ func TestRefreshSingleConnection_InvalidGrantAfterConcurrentRefreshStaysActive(t
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		close(bumpCh)
 		<-bumpDone
+		if bumpErr != nil {
+			http.Error(w, bumpErr.Error(), http.StatusInternalServerError)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusBadRequest)
 		json.NewEncoder(w).Encode(map[string]any{
@@ -262,5 +268,8 @@ func TestRefreshSingleConnection_InvalidGrantAfterConcurrentRefreshStaysActive(t
 	}
 	if updated.Status != db.OAuthStatusActive {
 		t.Fatalf("expected active, got %q", updated.Status)
+	}
+	if bumpErr != nil {
+		t.Fatalf("concurrent DB bump: %v", bumpErr)
 	}
 }

@@ -36,7 +36,7 @@ func TestReloadOAuthConnectionIfConcurrentRefreshSucceeded_DetectsNewerExpiry(t 
 		newExpiry, connID,
 	)
 
-	fresh, skip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(context.Background(), tx, connID, uid, before.UpdatedAt, before.TokenExpiry)
+	fresh, skip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(context.Background(), tx, connID, uid, before.AccessTokenVaultID, before.TokenExpiry)
 	if err != nil {
 		t.Fatalf("reload: %v", err)
 	}
@@ -79,5 +79,44 @@ func TestGetOAuthConnectionByProvider_ReturnsMostRecent(t *testing.T) {
 	}
 	if conn == nil || conn.ID != "oconn_new" {
 		t.Fatalf("expected newest connection oconn_new, got %+v", conn)
+	}
+}
+
+func TestReloadOAuthConnectionIfConcurrentRefreshSucceeded_NeedsReauthDoesNotSkip(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	connID := "oconn_needs"
+	refreshVault := "00000000-0000-0000-0000-000000000002"
+	expiry := time.Now().Add(10 * time.Minute)
+	testhelper.InsertOAuthConnectionFull(t, tx, connID, uid, "google", testhelper.OAuthConnectionOpts{
+		AccessTokenVaultID:  "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+		RefreshTokenVaultID: &refreshVault,
+		TokenExpiry:         &expiry,
+		Scopes:              []string{"openid"},
+	})
+
+	before, err := db.GetOAuthConnectionByID(context.Background(), tx, connID)
+	if err != nil || before == nil {
+		t.Fatalf("get connection: %v", before)
+	}
+
+	testhelper.MustExec(t, tx,
+		`UPDATE oauth_connections SET status = $1, updated_at = now() WHERE id = $2`,
+		db.OAuthStatusNeedsReauth, connID,
+	)
+
+	fresh, skip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(context.Background(), tx, connID, uid, before.AccessTokenVaultID, before.TokenExpiry)
+	if err != nil {
+		t.Fatalf("reload: %v", err)
+	}
+	if skip {
+		t.Fatalf("expected skip=false when concurrent path set needs_reauth, got skip=true fresh=%+v", fresh)
+	}
+	if fresh == nil || fresh.Status != db.OAuthStatusNeedsReauth {
+		t.Fatalf("expected fresh needs_reauth row, got %+v", fresh)
 	}
 }

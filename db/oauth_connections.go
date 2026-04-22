@@ -98,14 +98,14 @@ func ListOAuthConnectionsByUser(ctx context.Context, db DBTX, userID string) ([]
 }
 
 // GetOAuthConnectionByProvider returns the most recent OAuth connection for a given user and
-// provider (ORDER BY created_at DESC LIMIT 1). When multiple connections exist for the same
-// user+provider, this is deterministic. Returns nil if no connection exists.
+// provider (ORDER BY created_at DESC, id DESC LIMIT 1). When multiple connections exist for the same
+// user+provider, ordering is deterministic even if created_at ties. Returns nil if no connection exists.
 func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider string) (*OAuthConnection, error) {
 	row := db.QueryRow(ctx, `
 		SELECT `+oauthConnectionColumns+`
 		FROM oauth_connections
 		WHERE user_id = $1 AND provider = $2
-		ORDER BY created_at DESC
+		ORDER BY created_at DESC, id DESC
 		LIMIT 1`,
 		userID, provider,
 	)
@@ -120,15 +120,16 @@ func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider
 }
 
 // ReloadOAuthConnectionIfConcurrentRefreshSucceeded re-reads the connection row after a failed
-// token refresh. If another path refreshed successfully in the meantime, token_expiry may have
-// moved forward and/or updated_at may be newer than when the caller read the row — in that case
-// the caller must not flip status to needs_reauth (e.g. invalid_grant from a rotated refresh
-// token after a concurrent refresh invalidated the old token).
+// token refresh. If another path refreshed successfully in the meantime, the access-token vault ID
+// and/or token_expiry typically change while status stays active. We only treat the row as a
+// concurrent success when status is still active and at least one refresh-specific signal changed
+// — not on updated_at alone (another path may have flipped to needs_reauth and also bumped updated_at).
 //
-// Returns (freshConn, true) when the row looks newer than lastKnownUpdatedAt / lastKnownTokenExpiry;
-// the caller should use freshConn and skip the status flip. On false, the caller may proceed to
-// mark needs_reauth. Returns (nil, false, nil) if the row disappeared.
-func ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx context.Context, db DBTX, connID, userID string, lastKnownUpdatedAt time.Time, lastKnownTokenExpiry *time.Time) (*OAuthConnection, bool, error) {
+// Returns (freshConn, true) when the re-read shows an active connection that looks successfully
+// refreshed vs. the caller's snapshot; the caller should use freshConn and skip flipping to
+// needs_reauth. On false, the caller may proceed to mark needs_reauth.
+// Returns (nil, false, nil) if the row disappeared.
+func ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx context.Context, db DBTX, connID, userID string, lastKnownAccessVaultID string, lastKnownTokenExpiry *time.Time) (*OAuthConnection, bool, error) {
 	fresh, err := GetOAuthConnectionByID(ctx, db, connID)
 	if err != nil {
 		return nil, false, err
@@ -136,14 +137,13 @@ func ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx context.Context, db D
 	if fresh == nil || fresh.UserID != userID {
 		return nil, false, nil
 	}
-	if fresh.UpdatedAt.After(lastKnownUpdatedAt) {
-		return fresh, true, nil
+	if fresh.Status != OAuthStatusActive {
+		return fresh, false, nil
 	}
-	if lastKnownTokenExpiry != nil && fresh.TokenExpiry != nil && fresh.TokenExpiry.After(*lastKnownTokenExpiry) {
-		return fresh, true, nil
-	}
-	// Another path may have set token_expiry when we had none (unlikely for refresh, but safe).
-	if lastKnownTokenExpiry == nil && fresh.TokenExpiry != nil {
+	accessRotated := fresh.AccessTokenVaultID != "" && fresh.AccessTokenVaultID != lastKnownAccessVaultID
+	expiryAdvanced := lastKnownTokenExpiry != nil && fresh.TokenExpiry != nil && fresh.TokenExpiry.After(*lastKnownTokenExpiry)
+	expiryBackfilled := lastKnownTokenExpiry == nil && fresh.TokenExpiry != nil
+	if accessRotated || expiryAdvanced || expiryBackfilled {
 		return fresh, true, nil
 	}
 	return fresh, false, nil

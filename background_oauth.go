@@ -120,7 +120,7 @@ func runOAuthRefresh(ctx context.Context, deps OAuthRefreshDeps, logger *slog.Lo
 
 // refreshSingleConnection refreshes the tokens for a single OAuth connection.
 func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger *slog.Logger, conn db.OAuthConnection) error {
-	lastKnownUpdatedAt := conn.UpdatedAt
+	lastKnownAccessVaultID := conn.AccessTokenVaultID
 	lastKnownTokenExpiry := conn.TokenExpiry
 
 	provider, ok := deps.Registry.Get(conn.Provider)
@@ -137,13 +137,13 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 	)
 
 	if conn.RefreshTokenVaultID == nil {
-		fresh, skipFlip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownUpdatedAt, lastKnownTokenExpiry)
+		fresh, skipFlip, err := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownAccessVaultID, lastKnownTokenExpiry)
 		if err != nil {
 			return err
 		}
-		if skipFlip && fresh != nil && fresh.RefreshTokenVaultID != nil {
+		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive && fresh.RefreshTokenVaultID != nil {
 			conn = *fresh
-			lastKnownUpdatedAt = conn.UpdatedAt
+			lastKnownAccessVaultID = conn.AccessTokenVaultID
 			lastKnownTokenExpiry = conn.TokenExpiry
 		} else {
 			if err := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); err != nil {
@@ -161,11 +161,11 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 
 	result, err := oauth.RefreshTokens(ctx, provider, string(refreshTokenBytes))
 	if err != nil {
-		fresh, skipFlip, reloadErr := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownUpdatedAt, lastKnownTokenExpiry)
+		fresh, skipFlip, reloadErr := db.ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx, deps.DB, conn.ID, conn.UserID, lastKnownAccessVaultID, lastKnownTokenExpiry)
 		if reloadErr != nil {
 			return reloadErr
 		}
-		if skipFlip && fresh != nil {
+		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive {
 			return nil
 		}
 		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
