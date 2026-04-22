@@ -553,7 +553,7 @@ Under **Scopes**, add **Bot Token Scopes** and **User Token Scopes** to match wh
 
 **User Token Scopes** (required for search actions that only work with user tokens)
 
-- `search:read.public`, `search:read.private`, `search:read.im`, `search:read.mpim`, `search:read.files`
+- `search:read` — legacy monolithic scope, still the only one that satisfies `search.messages`. The granular `search:read.public/.private/.im/.mpim/.files` scopes only work with the newer `assistant.search.context` endpoint.
 
 ### 4. Configure environment
 
@@ -868,7 +868,7 @@ If using `OAUTH_REDIRECT_BASE_URL`, the callback URL is `{OAUTH_REDIRECT_BASE_UR
 
 - **`missing_scope`** — The Slack app is missing bot or user scopes listed in [Slack OAuth Setup](#slack-oauth-setup). Add them under **OAuth & Permissions**, then have the user **Re-authorize** so Slack issues new tokens.
 - **`invalid_auth` / `token_revoked`** — The workspace uninstalled the app or tokens were rotated. **Re-authorize** from the connector settings.
-- **Search actions fail but messaging works** — Search uses a user token (`xoxp-`). Ensure **User Token Scopes** (especially `search:read.*`) are configured in the Slack app and the user completed consent for user scopes.
+- **Search actions fail but messaging works** — Search uses a user token (`xoxp-`). Ensure the **`search:read`** user token scope is configured in the Slack app and the user completed consent for user scopes. Granular `search:read.*` scopes alone are **not** enough: `search.messages` rejects them with `invalid_arguments`.
 
 ### "Failed to initiate OAuth flow" error
 

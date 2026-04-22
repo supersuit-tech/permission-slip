@@ -39,9 +39,12 @@ const (
 // authorization URL (no bot "scope" param). The resulting user token (xoxp-)
 // is stored as the connection's primary access_token.
 //
-// Search uses the granular search:read.* scopes. The legacy monolithic
-// search:read scope is no longer sufficient for search.messages — the API
-// rejects it with invalid_arguments at runtime.
+// Search uses the legacy monolithic search:read scope. The granular
+// search:read.{public,private,im,mpim,files} scopes only satisfy the new
+// Real-time Search API (assistant.search.context) introduced in Feb 2026.
+// They do NOT satisfy search.messages, which still requires search:read.
+// See https://docs.slack.dev/reference/methods/search.messages and
+// https://docs.slack.dev/apis/web-api/real-time-search-api/.
 var OAuthScopes = []string{
 	"channels:history",
 	"channels:read",
@@ -61,11 +64,7 @@ var OAuthScopes = []string{
 	"mpim:write",
 	"reactions:read",
 	"reactions:write",
-	"search:read.public",
-	"search:read.private",
-	"search:read.im",
-	"search:read.mpim",
-	"search:read.files",
+	"search:read",
 	"users:read",
 	"users:read.email",
 	"pins:read",
@@ -405,6 +404,12 @@ func mapSlackError(slackErr string) error {
 		return &connectors.AuthError{Message: "Slack token is missing a required OAuth scope — re-authorize the Slack connection at https://api.slack.com/apps"}
 	case "not_allowed_token_type":
 		return &connectors.AuthError{Message: "Slack rejected this request for the token type in use — reconnect Slack"}
+	case "invalid_arguments", "invalid_arg_name":
+		// search.messages returns invalid_arguments when the user token is
+		// missing the legacy search:read scope (the granular search:read.*
+		// scopes only work with assistant.search.context). Surface that as a
+		// re-auth hint so operators aren't left chasing phantom 502s.
+		return &connectors.AuthError{Message: "Slack rejected the request arguments — if this is search_messages, your token likely lacks the legacy \"search:read\" user scope; re-authorize the Slack connection"}
 
 	// Rate limiting
 	case "ratelimited":

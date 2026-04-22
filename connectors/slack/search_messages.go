@@ -9,9 +9,10 @@ import (
 // searchMessagesAction implements connectors.Action for slack.search_messages.
 // It searches messages across channels via POST /search.messages.
 //
-// This Slack endpoint requires a user token (xoxp-) with the granular
-// search:read.* scopes (public/private/im/mpim/files). The legacy monolithic
-// search:read scope is no longer sufficient and causes invalid_arguments.
+// This Slack endpoint requires a user token (xoxp-) with the legacy
+// search:read scope. The newer granular search:read.{public,private,im,mpim,files}
+// scopes only satisfy the Real-time Search API (assistant.search.context);
+// calling search.messages with only those scopes fails with invalid_arguments.
 type searchMessagesAction struct {
 	conn *SlackConnector
 }
