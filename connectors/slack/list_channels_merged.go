@@ -85,7 +85,12 @@ func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connector
 		if !listChannelEntryMatchesTypes(types, ch) {
 			continue
 		}
-		if userChannelIDs != nil && (ch.IsPrivate || strings.HasPrefix(ch.ID, "D") || strings.HasPrefix(ch.ID, "G")) {
+		// When users.conversations returned at least one channel, intersect
+		// private/DM/group IDs with that set so we never surface another user's
+		// DMs from a mis-honored conversations.list. If the merge list is empty,
+		// do not filter — otherwise every DM from conversations.list is dropped
+		// and list_channels looks "DM-less" (#1033).
+		if len(userChannelIDs) > 0 && (ch.IsPrivate || strings.HasPrefix(ch.ID, "D") || strings.HasPrefix(ch.ID, "G")) {
 			if !userChannelIDs[ch.ID] {
 				continue
 			}

@@ -232,22 +232,22 @@ func TestListChannels_IMChannels(t *testing.T) {
 				"ok": true,
 				"channels": []map[string]any{
 					{
-						"id":         "D001",
-						"user":       "U_OTHER",
-						"is_private": true,
+						"id":          "D001",
+						"user":        "U_OTHER",
+						"is_private":  true,
 						"num_members": 0,
 					},
 					{
-						"id":         "D002",
-						"user":       "U_ANOTHER",
-						"is_private": true,
+						"id":          "D002",
+						"user":        "U_ANOTHER",
+						"is_private":  true,
 						"num_members": 0,
 					},
 					{
 						// DM the caller is NOT a member of — should be filtered out.
-						"id":         "D999",
-						"user":       "U_STRANGER",
-						"is_private": true,
+						"id":          "D999",
+						"user":        "U_STRANGER",
+						"is_private":  true,
 						"num_members": 0,
 					},
 				},
@@ -655,5 +655,74 @@ func TestListChannels_IMReturnsUserDMsWhenConversationsListEmpty(t *testing.T) {
 	}
 	if data.Channels[0].User != "U_PETER" {
 		t.Errorf("expected user U_PETER, got %q", data.Channels[0].User)
+	}
+}
+
+func TestListChannels_DMsFromConversationsListWhenUsersConversationsEmpty_issue1033(t *testing.T) {
+	t.Parallel()
+
+	// Regression #1033: userChannelIDs was built from users.conversations even
+	// when that response was empty. A non-nil empty map made the merge loop
+	// drop every D/G/private row from conversations.list, so default listings
+	// showed only public channels and types=im returned [].
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]string{"id": "U_CALLER"},
+			})
+		case "/users.conversations":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":       true,
+				"channels": []map[string]any{},
+			})
+		case "/conversations.list":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{
+						"id":          "D001",
+						"user":        "U_COLLEAGUE",
+						"is_im":       true,
+						"is_private":  true,
+						"num_members": 0,
+					},
+				},
+			})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "user@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data listChannelsResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if len(data.Channels) != 1 {
+		t.Fatalf("expected 1 DM from conversations.list, got %d: %+v", len(data.Channels), data.Channels)
+	}
+	if data.Channels[0].ID != "D001" {
+		t.Errorf("expected D001, got %q", data.Channels[0].ID)
+	}
+	if data.Channels[0].User != "U_COLLEAGUE" {
+		t.Errorf("expected user U_COLLEAGUE, got %q", data.Channels[0].User)
 	}
 }
