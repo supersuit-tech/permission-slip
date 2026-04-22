@@ -276,6 +276,9 @@ func TestReadChannelMessages_DMUsesAccessTokenForMembersAndHistory(t *testing.T)
 				"user": map[string]any{"id": "U_ALICE"},
 			})
 		case "/conversations.members":
+			if r.Method != http.MethodGet {
+				t.Errorf("conversations.members: expected GET, got %s", r.Method)
+			}
 			membersAuth = r.Header.Get("Authorization")
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok":      true,
@@ -376,6 +379,9 @@ func TestReadThread_DMUsesAccessTokenForReplies(t *testing.T) {
 				"user": map[string]any{"id": "U_ALICE"},
 			})
 		case "/conversations.members":
+			if r.Method != http.MethodGet {
+				t.Errorf("conversations.members: expected GET, got %s", r.Method)
+			}
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok":      true,
 				"members": []string{"U_ALICE", "U_BOB"},

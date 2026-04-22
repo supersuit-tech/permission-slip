@@ -553,7 +553,7 @@ Searches messages across Slack channels. **Requires a user token** (`xoxp-`) wit
 }
 ```
 
-**Slack API:** `POST /search.messages` ([docs](https://api.slack.com/methods/search.messages))
+**Slack API:** `GET /search.messages` ([docs](https://api.slack.com/methods/search.messages))
 
 **Required scopes:** `search:read` (user token only; legacy monolithic scope — granular `search:read.*` scopes do not satisfy this endpoint)
 
