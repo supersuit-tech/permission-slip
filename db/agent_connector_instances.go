@@ -11,7 +11,9 @@ import (
 )
 
 // AgentConnectorInstance is a row in agent_connectors (one instance of a connector type for an agent).
-// DisplayName is derived from the bound credential (API key label or OAuth workspace name in extra_data).
+// DisplayName is derived from the bound credential: the static API key label, or for OAuth
+// connections the identifier in extra_data (display_name / email, optionally suffixed with
+// " @ <team_name>" for Slack). See connectorInstanceDisplayNameSQL for the exact priority.
 type AgentConnectorInstance struct {
 	ConnectorInstanceID string
 	AgentID             int64
@@ -21,6 +23,32 @@ type AgentConnectorInstance struct {
 	IsDefault           bool
 	EnabledAt           time.Time
 }
+
+// connectorInstanceDisplayNameSQL is the shared SQL expression that derives a human-readable
+// display name for a connector instance. It must stay in sync with the Go helper
+// api.displayNameFromExtraData: priority is cr.label → "<display_name> @ <team_name>" →
+// "<email> @ <team_name>" → display_name → email → team_name → "".
+//
+// Callers must alias LEFT JOINs on credentials as cr and oauth_connections as oc.
+const connectorInstanceDisplayNameSQL = `COALESCE(
+    cr.label,
+    CASE
+        WHEN NULLIF(oc.extra_data->>'display_name', '') IS NOT NULL
+             AND NULLIF(oc.extra_data->>'team_name', '') IS NOT NULL
+            THEN (oc.extra_data->>'display_name') || ' @ ' || (oc.extra_data->>'team_name')
+        WHEN NULLIF(oc.extra_data->>'email', '') IS NOT NULL
+             AND NULLIF(oc.extra_data->>'team_name', '') IS NOT NULL
+            THEN (oc.extra_data->>'email') || ' @ ' || (oc.extra_data->>'team_name')
+        WHEN NULLIF(oc.extra_data->>'display_name', '') IS NOT NULL
+            THEN oc.extra_data->>'display_name'
+        WHEN NULLIF(oc.extra_data->>'email', '') IS NOT NULL
+            THEN oc.extra_data->>'email'
+        WHEN NULLIF(oc.extra_data->>'team_name', '') IS NOT NULL
+            THEN oc.extra_data->>'team_name'
+        ELSE ''
+    END,
+    ''
+)`
 
 // AgentConnectorInstanceError is a domain error for connector instance operations.
 type AgentConnectorInstanceError struct {
@@ -40,10 +68,10 @@ const (
 )
 
 // agentConnectorInstanceSelect is the standard SELECT for an agent_connectors row with display name
-// from the assigned credential (static API key label or OAuth extra_data name).
+// from the assigned credential (static API key label or OAuth extra_data identifier).
 const agentConnectorInstanceSelect = `
 	SELECT ac.connector_instance_id, ac.agent_id, ac.connector_id, ac.approver_id,
-	       COALESCE(cr.label, oc.extra_data->>'name', '') AS display_name,
+	       ` + connectorInstanceDisplayNameSQL + ` AS display_name,
 	       ac.is_default, ac.enabled_at
 	FROM agent_connectors ac
 	LEFT JOIN agent_connector_credentials acc
@@ -317,7 +345,7 @@ func ResolveAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, 
 
 	rows, err := db.Query(ctx, agentConnectorInstanceSelect+`
 		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3
-		  AND COALESCE(cr.label, oc.extra_data->>'name', '') = $4
+		  AND `+connectorInstanceDisplayNameSQL+` = $4
 		ORDER BY ac.connector_instance_id ASC`,
 		agentID, approverID, connectorID, sel,
 	)

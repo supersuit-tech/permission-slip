@@ -631,3 +631,151 @@ func TestConnectorRequiredCredentials_MixedAuthTypeRejectedOnUpdate(t *testing.T
 		t.Fatal("expected error when updating auth_type to create mixed auth types, got nil")
 	}
 }
+
+// TestGetAgentCapabilities_ConnectorInstanceDisplayName exercises each shape of
+// oauth_connections.extra_data the soft enrichers produce, and asserts that the
+// display string matches api.displayNameFromExtraData. This guards the CLI
+// `capabilities` output against the "display is empty for every OAuth instance"
+// regression where the SQL looked up a key that no enricher ever writes.
+func TestGetAgentCapabilities_ConnectorInstanceDisplayName(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		provider  string
+		extraData map[string]string
+		want      string
+	}{
+		{
+			name:      "slack_team_name_only",
+			provider:  "slack",
+			extraData: map[string]string{"team_name": "stauntonhub"},
+			want:      "stauntonhub",
+		},
+		{
+			name:      "slack_oidc_email_and_team",
+			provider:  "slack",
+			extraData: map[string]string{"email": "alice@example.com", "team_name": "innovation hub"},
+			want:      "alice@example.com @ innovation hub",
+		},
+		{
+			name:      "slack_display_name_and_team",
+			provider:  "slack",
+			extraData: map[string]string{"display_name": "Alice Example", "team_name": "supersuit-tech"},
+			want:      "Alice Example @ supersuit-tech",
+		},
+		{
+			name:      "google_email_only",
+			provider:  "google",
+			extraData: map[string]string{"email": "alice@example.com", "display_name": "Alice Example"},
+			want:      "Alice Example",
+		},
+		{
+			name:      "github_login",
+			provider:  "github",
+			extraData: map[string]string{"display_name": "octocat", "email": "oct@example.com"},
+			want:      "octocat",
+		},
+		{
+			name:      "microsoft_display_name_preferred",
+			provider:  "microsoft",
+			extraData: map[string]string{"display_name": "Alice Example", "email": "alice@contoso.com"},
+			want:      "Alice Example",
+		},
+		{
+			name:      "email_fallback_when_no_display_name",
+			provider:  "google",
+			extraData: map[string]string{"email": "alice@example.com"},
+			want:      "alice@example.com",
+		},
+		{
+			name:      "empty_when_nothing_recognizable",
+			provider:  "google",
+			extraData: map[string]string{},
+			want:      "",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			tx := testhelper.SetupTestDB(t)
+
+			uid := testhelper.GenerateUID(t)
+			agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+			connID := testhelper.GenerateID(t, "conn_")
+			testhelper.InsertConnector(t, tx, connID)
+			testhelper.InsertConnectorRequiredCredentialOAuth(t, tx, connID, "svc", tc.provider, []string{"scope"})
+
+			extra, err := json.Marshal(tc.extraData)
+			if err != nil {
+				t.Fatalf("marshal extra: %v", err)
+			}
+			ocID := testhelper.GenerateID(t, "oc_")
+			testhelper.InsertOAuthConnectionFull(t, tx, ocID, uid, tc.provider, testhelper.OAuthConnectionOpts{
+				Scopes:    []string{"scope"},
+				ExtraData: extra,
+			})
+
+			testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+			testhelper.InsertAgentConnectorCredentialOAuth(t, tx, testhelper.GenerateID(t, "acc_"), agentID, uid, connID, ocID)
+
+			caps, err := db.GetAgentCapabilities(t.Context(), tx, agentID, uid)
+			if err != nil {
+				t.Fatalf("GetAgentCapabilities: %v", err)
+			}
+			if len(caps.ConnectorInstances) != 1 {
+				t.Fatalf("expected 1 instance, got %d", len(caps.ConnectorInstances))
+			}
+			if got := caps.ConnectorInstances[0].DisplayName; got != tc.want {
+				t.Errorf("DisplayName: got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+// TestListAgentConnectorInstances_OAuthDisplayName mirrors the capabilities
+// display-name test on the ListAgentConnectorInstances code path, which uses
+// the same SQL fragment via agentConnectorInstanceSelect.
+func TestListAgentConnectorInstances_OAuthDisplayName(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	defInst, err := db.GetDefaultAgentConnectorInstance(t.Context(), tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default: err=%v inst=%v", err, defInst)
+	}
+
+	extra, _ := json.Marshal(map[string]string{"display_name": "octocat", "email": "oct@example.com"})
+	ocID := testhelper.GenerateID(t, "oc_")
+	testhelper.InsertOAuthConnectionFull(t, tx, ocID, uid, "github", testhelper.OAuthConnectionOpts{
+		Scopes:    []string{},
+		ExtraData: extra,
+	})
+	_, err = db.UpsertAgentConnectorCredentialByInstance(t.Context(), tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "acc_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, OAuthConnectionID: &ocID,
+	})
+	if err != nil {
+		t.Fatalf("bind: %v", err)
+	}
+
+	instances, err := db.ListAgentConnectorInstances(t.Context(), tx, agentID, uid, connID)
+	if err != nil {
+		t.Fatalf("ListAgentConnectorInstances: %v", err)
+	}
+	if len(instances) != 1 {
+		t.Fatalf("expected 1 instance, got %d", len(instances))
+	}
+	if got := instances[0].DisplayName; got != "octocat" {
+		t.Errorf("DisplayName: got %q, want %q", got, "octocat")
+	}
+}
