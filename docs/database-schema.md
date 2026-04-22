@@ -420,7 +420,7 @@ All TEXT primary keys and unbounded text columns have inline CHECK length constr
 
 ### JSONB size constraints
 
-All JSONB columns have `CHECK (pg_column_size(column) <= 65536)` constraints to prevent oversized payloads from bloating storage and indexes. The 64 KB limit applies to: `agents.metadata`, `approvals.action`, `approvals.context`, `connector_actions.parameters_schema`, and `standing_approvals.constraints`. `pg_column_size` measures the actual on-disk JSONB representation, which is more accurate than casting to text.
+Most JSONB columns use `CHECK (pg_column_size(column) <= 65536)` to prevent oversized payloads from bloating storage and indexes. `approvals.context` allows up to 256 KiB so enriched approval payloads (e.g. Slack preview data merged from `resource_details`) can persist. The 64 KB limit still applies to: `agents.metadata`, `approvals.action`, `connector_actions.parameters_schema`, and `standing_approvals.constraints`. `pg_column_size` measures the actual on-disk JSONB representation, which is more accurate than casting to text.
 
 ### pg_cron helper functions
 

@@ -16,22 +16,27 @@ func TestSheetsReadRange_Success(t *testing.T) {
 		if r.Method != http.MethodGet {
 			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if r.URL.Path != "/spreadsheets/spreadsheet-123/values/Sheet1!A1:D3" {
+		if r.URL.Path != "/spreadsheets/spreadsheet-123/values:batchGet" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+		if got := r.URL.Query().Get("ranges"); got != "Sheet1!A1:D3" {
+			t.Errorf("unexpected ranges query: %q", got)
 		}
 		if got := r.Header.Get("Authorization"); got != "Bearer ya29.test-access-token-123" {
 			t.Errorf("unexpected auth header: %s", got)
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(sheetsValueRange{
-			Range:          "Sheet1!A1:D3",
-			MajorDimension: "ROWS",
-			Values: [][]any{
-				{"Name", "Age", "City"},
-				{"Alice", 30, "NYC"},
-				{"Bob", 25, "LA"},
-			},
+		json.NewEncoder(w).Encode(sheetsBatchGetValuesResponse{
+			ValueRanges: []sheetsValueRange{{
+				Range:          "Sheet1!A1:D3",
+				MajorDimension: "ROWS",
+				Values: [][]any{
+					{"Name", "Age", "City"},
+					{"Alice", 30, "NYC"},
+					{"Bob", 25, "LA"},
+				},
+			}},
 		})
 	}))
 	defer srv.Close()
@@ -73,8 +78,10 @@ func TestSheetsReadRange_EmptyResult(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(sheetsValueRange{
-			Range: "Sheet1!A1:D3",
+		json.NewEncoder(w).Encode(sheetsBatchGetValuesResponse{
+			ValueRanges: []sheetsValueRange{{
+				Range: "Sheet1!A1:D3",
+			}},
 		})
 	}))
 	defer srv.Close()

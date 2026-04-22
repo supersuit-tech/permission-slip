@@ -271,6 +271,13 @@ func googleTemplates() []connectors.ManifestTemplate {
 			Description: "Locks the spreadsheet; agent chooses the range and rows to append.",
 			Parameters:  json.RawMessage(`{"spreadsheet_id":"SPREADSHEET_ID","range":"*","values":"*"}`),
 		},
+		{
+			ID:          "tpl_google_create_spreadsheet",
+			ActionType:  "google.create_spreadsheet",
+			Name:        "Create spreadsheets",
+			Description: "Agent can create new Google Sheets spreadsheets with any title and optional worksheet tab names.",
+			Parameters:  json.RawMessage(`{"title":"*","sheet_titles":"*"}`),
+		},
 		// --- Slides ---
 		{
 			ID:          "tpl_google_create_presentation",

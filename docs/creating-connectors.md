@@ -1051,7 +1051,7 @@ connectors/
 │   └── *_test.go             # Per-action + connector + response tests
 ├── google/
 │   ├── google.go             # GoogleConnector struct, New(), Actions(), doJSON(), OAuth2 auth
-│   ├── manifest.go           # Manifest() with 27 action schemas and 39+ templates
+│   ├── manifest.go           # Manifest() with 30 action schemas and 41+ templates
 │   ├── email_helpers.go      # buildGmailRaw() shared RFC 2822 builder (send_email + send_email_reply)
 │   ├── send_email.go         # google.send_email action (RFC 2822 + base64url)
 │   ├── list_emails.go        # google.list_emails action (list + metadata fetch)
@@ -1068,6 +1068,7 @@ connectors/
 │   ├── sheets_write.go       # google.sheets_write_range action
 │   ├── sheets_append.go      # google.sheets_append_rows action
 │   ├── sheets_list.go        # google.sheets_list_sheets action
+│   ├── create_spreadsheet.go # google.create_spreadsheet action (Sheets API)
 │   ├── sheets_helpers.go     # Shared validation (row/cell limits, ragged row check)
 │   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)
 │   ├── list_chat_spaces.go   # google.list_chat_spaces action (Google Chat API)
