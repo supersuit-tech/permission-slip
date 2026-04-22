@@ -43,6 +43,22 @@ func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connector
 				}
 			}
 			privateTypes := filterPrivateTypes(types)
+			// Verify the user token actually has the scopes needed to enumerate
+			// the requested private types. Slack's users.conversations silently
+			// returns {"ok":true,"channels":[]} when the token lacks im:read /
+			// mpim:read / groups:read instead of returning missing_scope, so we
+			// have to probe scopes up front to surface that failure mode (#1033).
+			if required := requiredPrivateTypeScopes(privateTypes); len(required) > 0 {
+				granted, err := c.probeGrantedScopes(ctx, creds)
+				if err != nil {
+					return nil, fmt.Errorf("verifying Slack OAuth scopes: %w", err)
+				}
+				if missing := missingScopes(granted, required...); len(missing) > 0 {
+					return nil, &connectors.AuthError{
+						Message: fmt.Sprintf("Slack token is missing OAuth scope(s) %s required to list %s — re-authorize the Slack connection to grant them", strings.Join(missing, ", "), privateTypes),
+					}
+				}
+			}
 			userPrivateChs, err := c.getUserPrivateConversations(ctx, creds, privateTypes)
 			if err != nil {
 				return nil, fmt.Errorf("fetching user channel memberships: %w", err)

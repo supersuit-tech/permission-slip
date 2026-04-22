@@ -310,3 +310,33 @@ func filterPrivateTypes(types string) string {
 	}
 	return strings.Join(private, ",")
 }
+
+// requiredPrivateTypeScopes returns the user-token OAuth scopes required to
+// enumerate the caller's own conversations for the given comma-separated types.
+// Slack's users.conversations silently returns an empty channel list (with
+// ok=true, no error) when the token lacks the scope for a requested type,
+// instead of returning missing_scope — so we have to verify scopes up front
+// to distinguish "user has no DMs" from "token can't see DMs". See #1033.
+func requiredPrivateTypeScopes(types string) []string {
+	seen := make(map[string]bool)
+	var out []string
+	for _, raw := range strings.Split(types, ",") {
+		t := strings.TrimSpace(raw)
+		var scope string
+		switch t {
+		case "im":
+			scope = "im:read"
+		case "mpim":
+			scope = "mpim:read"
+		case "private_channel":
+			scope = "groups:read"
+		default:
+			continue
+		}
+		if !seen[scope] {
+			seen[scope] = true
+			out = append(out, scope)
+		}
+	}
+	return out
+}

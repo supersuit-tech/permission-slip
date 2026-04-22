@@ -108,7 +108,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"default": "public_channel,private_channel,mpim,im",
 							"enum": ["public_channel", "private_channel", "mpim", "im"],
-							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set. im/mpim/private_channel results are filtered to the authorizing user; user-token merge fills in human-only DMs when configured.",
+							"description": "Comma-separated channel types: public_channel, private_channel, mpim, im. Defaults to all types when a user email is available; falls back to public_channel only when no email is set. im/mpim/private_channel results are filtered to the authorizing user; requires user-scope OAuth grants im:read (DMs), mpim:read (group DMs), groups:read (private channels), and users:read.email on the Slack connection.",
 							"x-ui": {"label": "Channel types", "widget": "multi-select", "help_text": "public_channel, private_channel, mpim (group DMs), im (direct messages)"}
 						},
 						"limit": {

@@ -402,3 +402,68 @@ func TestValidateMessageTS(t *testing.T) {
 		})
 	}
 }
+
+func TestGrantedScopes(t *testing.T) {
+	t.Parallel()
+
+	h := http.Header{}
+	if got := grantedScopes(h); got != nil {
+		t.Errorf("missing header should return nil, got %v", got)
+	}
+
+	h.Set("X-OAuth-Scopes", "im:read, users:read.email ,channels:read,")
+	got := grantedScopes(h)
+	for _, want := range []string{"im:read", "users:read.email", "channels:read"} {
+		if !got[want] {
+			t.Errorf("expected scope %q in %v", want, got)
+		}
+	}
+	if got[""] {
+		t.Error("empty scope entries must not be kept")
+	}
+}
+
+func TestMissingScopes(t *testing.T) {
+	t.Parallel()
+
+	if got := missingScopes(nil, "im:read"); got != nil {
+		t.Errorf("nil granted header must return nil (no false positives), got %v", got)
+	}
+	granted := map[string]bool{"im:read": true, "users:read.email": true}
+	if got := missingScopes(granted, "im:read"); len(got) != 0 {
+		t.Errorf("expected no missing, got %v", got)
+	}
+	got := missingScopes(granted, "im:read", "mpim:read", "groups:read")
+	if len(got) != 2 || got[0] != "mpim:read" || got[1] != "groups:read" {
+		t.Errorf("expected [mpim:read groups:read], got %v", got)
+	}
+}
+
+func TestRequiredPrivateTypeScopes(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		types string
+		want  []string
+	}{
+		{"", nil},
+		{"public_channel", nil},
+		{"im", []string{"im:read"}},
+		{"mpim", []string{"mpim:read"}},
+		{"private_channel", []string{"groups:read"}},
+		{"im,mpim,private_channel", []string{"im:read", "mpim:read", "groups:read"}},
+		{"im, im ,im", []string{"im:read"}}, // dedupe
+	}
+	for _, tt := range tests {
+		got := requiredPrivateTypeScopes(tt.types)
+		if len(got) != len(tt.want) {
+			t.Errorf("requiredPrivateTypeScopes(%q) = %v, want %v", tt.types, got, tt.want)
+			continue
+		}
+		for i, s := range tt.want {
+			if got[i] != s {
+				t.Errorf("requiredPrivateTypeScopes(%q)[%d] = %q, want %q", tt.types, i, got[i], s)
+			}
+		}
+	}
+}

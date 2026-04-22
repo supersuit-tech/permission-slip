@@ -2,6 +2,8 @@ package slack
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -57,6 +59,23 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 	}
 
 	types := "public_channel,private_channel,mpim,im"
+
+	// Verify the user token has the scopes needed to enumerate private
+	// conversations. Slack's users.conversations silently returns an empty
+	// channel list when the token lacks im:read / mpim:read / groups:read
+	// instead of returning missing_scope — same failure mode as #1033.
+	privateTypes := filterPrivateTypes(types)
+	if required := requiredPrivateTypeScopes(privateTypes); len(required) > 0 {
+		granted, scopeErr := a.conn.probeGrantedScopes(ctx, req.Credentials)
+		if scopeErr != nil {
+			return nil, fmt.Errorf("verifying Slack OAuth scopes: %w", scopeErr)
+		}
+		if missing := missingScopes(granted, required...); len(missing) > 0 {
+			return nil, &connectors.AuthError{
+				Message: fmt.Sprintf("Slack token is missing OAuth scope(s) %s required to list unread conversations — re-authorize the Slack connection to grant them", strings.Join(missing, ", ")),
+			}
+		}
+	}
 	var entries []unreadChannelEntry
 	cursor := ""
 	for page := 0; page < maxUserConversationPages; page++ {

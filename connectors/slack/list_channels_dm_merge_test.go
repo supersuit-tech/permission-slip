@@ -13,6 +13,12 @@ func TestListChannels_MergesHumanDMNotVisibleToBot(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth.test":
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/users.lookupByEmail":

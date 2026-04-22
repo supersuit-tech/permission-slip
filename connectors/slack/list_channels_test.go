@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
@@ -109,6 +110,12 @@ func TestListChannels_DefaultTypes(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth.test":
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
@@ -195,6 +202,12 @@ func TestListChannels_IMChannels(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth.test":
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
@@ -481,6 +494,12 @@ func TestListChannels_IMFiltersStrayPublicChannels(t *testing.T) {
 	// im:read scope it silently falls back instead of erroring). The merged
 	// result must still honor the requested types and exclude public channels.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth.test":
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
@@ -589,6 +608,12 @@ func TestListChannels_IMReturnsUserDMsWhenConversationsListEmpty(t *testing.T) {
 	// empty, even though the caller has DMs. The fix is to omit `user` on
 	// user-token calls so Slack returns the token owner's conversations.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth.test":
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
+
 		w.Header().Set("Content-Type", "application/json")
 
 		switch r.URL.Path {
@@ -655,5 +680,175 @@ func TestListChannels_IMReturnsUserDMsWhenConversationsListEmpty(t *testing.T) {
 	}
 	if data.Channels[0].User != "U_PETER" {
 		t.Errorf("expected user U_PETER, got %q", data.Channels[0].User)
+	}
+}
+
+// TestListChannels_IMReturnsClearErrorWhenScopeMissing is the regression for
+// issue #1033. When the user token lacks im:read, Slack's users.conversations
+// silently returns {"ok":true,"channels":[]} instead of a missing_scope error,
+// and conversations.list falls back to public channels that get filtered out —
+// so the user saw an empty result with no hint that re-authorization was
+// needed. The scope probe must surface this as an AuthError naming im:read.
+func TestListChannels_IMReturnsClearErrorWhenScopeMissing(t *testing.T) {
+	t.Parallel()
+
+	var authTestHit, usersConversationsHit bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]string{"id": "U_CALLER"},
+			})
+		case "/auth.test":
+			authTestHit = true
+			// Token missing im:read — mirrors the real-world failure where
+			// the OAuth install didn't grant the scope but the token is
+			// otherwise valid.
+			writeAuthTestResponse(w, "users:read,users:read.email,channels:read,mpim:read")
+		case "/users.conversations":
+			usersConversationsHit = true
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "user@example.com",
+	})
+	if err == nil {
+		t.Fatal("expected AuthError when im:read is missing, got nil")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Fatalf("expected AuthError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "im:read") {
+		t.Errorf("expected error to name the missing scope im:read, got %q", err.Error())
+	}
+	if !authTestHit {
+		t.Error("expected auth.test probe to be called")
+	}
+	if usersConversationsHit {
+		t.Error("users.conversations must not be called after scope check fails")
+	}
+}
+
+// TestListChannels_IMSucceedsWhenScopesPresent is the positive counterpart to
+// TestListChannels_IMReturnsClearErrorWhenScopeMissing: when X-OAuth-Scopes
+// includes im:read and users:read.email, the scope probe must pass and the
+// merge must return the DM. Regression guard against the new check blocking
+// the happy path.
+func TestListChannels_IMSucceedsWhenScopesPresent(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth.test":
+			writeAuthTestResponse(w, "im:read,mpim:read,groups:read,users:read,users:read.email,channels:read")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]string{"id": "U_CALLER"},
+			})
+		case "/users.conversations":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "D_PETER", "user": "U_PETER", "is_private": true},
+				},
+			})
+		case "/conversations.list":
+			json.NewEncoder(w).Encode(map[string]any{"ok": true, "channels": []any{}})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "user@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var data listChannelsResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if len(data.Channels) != 1 || data.Channels[0].ID != "D_PETER" {
+		t.Fatalf("expected D_PETER in result, got %+v", data.Channels)
+	}
+}
+
+// TestListChannels_IMScopeCheckIgnoresMissingHeader guards against false
+// positives: when X-OAuth-Scopes is absent (e.g. a test stub or a Slack
+// response variant), we must not block the call — missingScopes returns
+// nil in that case and the merge proceeds normally.
+func TestListChannels_IMScopeCheckIgnoresMissingHeader(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/auth.test":
+			// No X-OAuth-Scopes header — pass "" to writeAuthTestResponse.
+			writeAuthTestResponse(w, "")
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]string{"id": "U_CALLER"},
+			})
+		case "/users.conversations":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "D_PETER", "user": "U_PETER", "is_private": true},
+				},
+			})
+		case "/conversations.list":
+			json.NewEncoder(w).Encode(map[string]any{"ok": true, "channels": []any{}})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "user@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error when X-OAuth-Scopes is absent: %v", err)
 	}
 }

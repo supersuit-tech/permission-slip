@@ -34,6 +34,10 @@ func TestListUnread_NoUnreads(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth.test" {
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/users.lookupByEmail":
@@ -95,6 +99,10 @@ func TestListUnread_MixedTypes_WithPreview(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth.test" {
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/users.lookupByEmail":
@@ -216,6 +224,10 @@ func TestListUnread_EmptyChannelList(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth.test" {
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/users.lookupByEmail":
@@ -251,6 +263,10 @@ func TestListUnread_MissingLatestOmitsPreview(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth.test" {
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/users.lookupByEmail":
@@ -302,6 +318,10 @@ func TestListUnread_RateLimitOnInfo(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth.test" {
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
 		switch r.URL.Path {
 		case "/users.lookupByEmail":
 			w.Header().Set("Content-Type", "application/json")
@@ -344,6 +364,10 @@ func TestListUnread_PaginatesUsersConversations(t *testing.T) {
 
 	page := 0
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/auth.test" {
+			writeAuthTestResponse(w, testFullSlackScopes)
+			return
+		}
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/users.lookupByEmail":
@@ -405,5 +429,54 @@ func TestListUnread_PaginatesUsersConversations(t *testing.T) {
 	_ = json.Unmarshal(res.Data, &out)
 	if len(out.UnreadChannels) != 1 || out.UnreadChannels[0].ChannelID != "C2" {
 		t.Fatalf("expected single unread on C2, got %+v", out.UnreadChannels)
+	}
+}
+
+// TestListUnread_ReturnsClearErrorWhenScopeMissing mirrors the list_channels
+// scope-probe regression (#1033) for list_unread, which uses the same
+// users.conversations call pattern and the same silent-empty failure mode
+// when im:read / mpim:read are missing.
+func TestListUnread_ReturnsClearErrorWhenScopeMissing(t *testing.T) {
+	t.Parallel()
+
+	var usersConversationsHit bool
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]any{"id": "U1"},
+			})
+		case "/auth.test":
+			writeAuthTestResponse(w, "users:read,users:read.email,channels:read")
+		case "/users.conversations":
+			usersConversationsHit = true
+		default:
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listUnreadAction{conn: conn}
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_unread",
+		Parameters:  []byte(`{}`),
+		Credentials: validCreds(),
+		UserEmail:   "a@b.com",
+	})
+	if err == nil {
+		t.Fatal("expected AuthError for missing scopes, got nil")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Fatalf("expected AuthError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "im:read") {
+		t.Errorf("expected error to name missing im:read scope, got %q", err.Error())
+	}
+	if usersConversationsHit {
+		t.Error("users.conversations must not be called after scope check fails")
 	}
 }

@@ -159,6 +159,40 @@ func (r slackResponse) asError() error {
 	return mapSlackError(r.Error)
 }
 
+// grantedScopes parses Slack's X-OAuth-Scopes response header into a set.
+// Slack returns granted scopes as a comma-separated list on every API
+// response, so any endpoint (e.g. auth.test) can be used as a probe.
+// Returns nil when the header is absent.
+func grantedScopes(h http.Header) map[string]bool {
+	raw := h.Get("X-OAuth-Scopes")
+	if raw == "" {
+		return nil
+	}
+	scopes := make(map[string]bool)
+	for _, s := range strings.Split(raw, ",") {
+		if s = strings.TrimSpace(s); s != "" {
+			scopes[s] = true
+		}
+	}
+	return scopes
+}
+
+// missingScopes returns the subset of required scopes not present in granted.
+// Returns nil when granted is nil (header was absent) so callers don't
+// produce false positives against non-Slack test servers or mocks.
+func missingScopes(granted map[string]bool, required ...string) []string {
+	if granted == nil {
+		return nil
+	}
+	var missing []string
+	for _, s := range required {
+		if !granted[s] {
+			missing = append(missing, s)
+		}
+	}
+	return missing
+}
+
 // validatable is implemented by action param structs to validate their fields.
 type validatable interface {
 	validate() error
@@ -268,24 +302,51 @@ func (c *SlackConnector) getToken(creds connectors.Credentials) (string, error) 
 	return "", &connectors.ValidationError{Message: "credential is missing: access_token"}
 }
 
+// probeGrantedScopes calls auth.test and returns the scopes granted to the
+// current user token, parsed from the X-OAuth-Scopes response header. auth.test
+// works with any valid token so it's a safe probe. Used to detect silent scope
+// gaps before calling endpoints (like users.conversations) that return empty
+// results instead of missing_scope errors. See #1033.
+func (c *SlackConnector) probeGrantedScopes(ctx context.Context, creds connectors.Credentials) (map[string]bool, error) {
+	var resp slackResponse
+	header, err := c.doPostWithHeaders(ctx, "auth.test", creds, struct{}{}, &resp)
+	if err != nil {
+		return nil, err
+	}
+	if !resp.OK {
+		return nil, resp.asError()
+	}
+	return grantedScopes(header), nil
+}
+
 // doPost is the shared request lifecycle for all Slack actions. It marshals
 // body as JSON, sends a POST to the given Slack API method with auth headers,
 // handles rate limiting and timeouts, and unmarshals the response into dest.
 // Callers are responsible for checking the Slack-level ok/error fields in dest.
 func (c *SlackConnector) doPost(ctx context.Context, method string, creds connectors.Credentials, body any, dest any) error {
+	_, err := c.doPostWithHeaders(ctx, method, creds, body, dest)
+	return err
+}
+
+// doPostWithHeaders is doPost that also returns the response headers. Used by
+// callers that need to inspect X-OAuth-Scopes (granted token scopes) to detect
+// silent scope gaps — Slack returns {"ok":true, "channels":[]} from endpoints
+// like users.conversations when the token lacks im:read / mpim:read instead of
+// a missing_scope error. See issue #1033.
+func (c *SlackConnector) doPostWithHeaders(ctx context.Context, method string, creds connectors.Credentials, body any, dest any) (http.Header, error) {
 	token, err := c.getToken(creds)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	payload, err := json.Marshal(body)
 	if err != nil {
-		return fmt.Errorf("marshaling request body: %w", err)
+		return nil, fmt.Errorf("marshaling request body: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/"+method, bytes.NewReader(payload))
 	if err != nil {
-		return fmt.Errorf("creating request: %w", err)
+		return nil, fmt.Errorf("creating request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+token)
 	req.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -293,35 +354,35 @@ func (c *SlackConnector) doPost(ctx context.Context, method string, creds connec
 	resp, err := c.client.Do(req)
 	if err != nil {
 		if connectors.IsTimeout(err) {
-			return &connectors.TimeoutError{Message: fmt.Sprintf("Slack API request timed out: %v", err)}
+			return nil, &connectors.TimeoutError{Message: fmt.Sprintf("Slack API request timed out: %v", err)}
 		}
 		if errors.Is(err, context.Canceled) {
-			return &connectors.CanceledError{Message: "Slack API request canceled"}
+			return nil, &connectors.CanceledError{Message: "Slack API request canceled"}
 		}
-		return &connectors.ExternalError{Message: fmt.Sprintf("Slack API request failed: %v", err)}
+		return nil, &connectors.ExternalError{Message: fmt.Sprintf("Slack API request failed: %v", err)}
 	}
 	defer resp.Body.Close()
 
 	respBody, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
 	if err != nil {
-		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
+		return resp.Header, &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}
 
 	// Handle HTTP-level errors before attempting JSON unmarshal.
 	// Slack normally returns 200 with {"ok": false} for app-level errors,
 	// but can return non-200 for rate limits, auth failures, and server errors.
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return checkHTTPStatus(resp.StatusCode, resp.Header, respBody)
+		return resp.Header, checkHTTPStatus(resp.StatusCode, resp.Header, respBody)
 	}
 
 	if err := json.Unmarshal(respBody, dest); err != nil {
-		return &connectors.ExternalError{
+		return resp.Header, &connectors.ExternalError{
 			StatusCode: resp.StatusCode,
 			Message:    "failed to decode Slack API response",
 		}
 	}
 
-	return nil
+	return resp.Header, nil
 }
 
 // Post and Get expose the Slack Web API request lifecycle for helpers in
