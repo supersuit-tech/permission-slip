@@ -579,13 +579,13 @@ export const GoogleCreateDocument: Story = {
     riskLevel: "medium",
     displayTemplate: "Create document {{title}}",
     preview: null,
-    parameters: { title: "Q1 Sprint Retrospective", body: "## What went well\n\n- Shipped API v2 on time\n- Zero downtime deployments\n\n## What could improve\n\n- Test coverage on edge cases" },
+    parameters: { title: "Q1 Sprint Retrospective", content: "## What went well\n\n- Shipped API v2 on time\n- Zero downtime deployments\n\n## What could improve\n\n- Test coverage on edge cases" },
     schema: {
       type: "object",
       required: ["title"],
       properties: {
         title: { type: "string", description: "Title of the new Google Doc" },
-        body: { type: "string", description: "Optional initial body content (plain text)" },
+        content: { type: "string", description: "Optional initial document body (plain text); same field as Update Document" },
       },
     },
   },
@@ -627,14 +627,14 @@ export const GoogleUpdateDocument: Story = {
     preview: null,
     parameters: {
       document_id: "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
-      text: "## New Section: Security Considerations\n\nAll API endpoints must validate JWT tokens before processing requests.",
+      content: "## New Section: Security Considerations\n\nAll API endpoints must validate JWT tokens before processing requests.",
     },
     schema: {
       type: "object",
-      required: ["document_id", "text"],
+      required: ["document_id", "content"],
       properties: {
         document_id: { type: "string", description: "The ID of the Google Doc to update" },
-        text: { type: "string", description: "Text to insert into the document" },
+        content: { type: "string", description: "Text to insert into the document" },
         index: { type: "integer", description: "Character index to insert at (1-based)" },
       },
     },

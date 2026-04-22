@@ -76,21 +76,13 @@ describe("UserMenu", () => {
     expect(screen.getByText("Profile")).toBeInTheDocument();
     expect(screen.getByText("Security")).toBeInTheDocument();
     expect(screen.getByText("Billing")).toBeInTheDocument();
-    expect(screen.getByText("Dark Mode")).toBeInTheDocument();
     expect(screen.getByText("Sign Out")).toBeInTheDocument();
   });
 
-  it("toggles dark mode when clicked", async () => {
+  it("does not show a theme toggle (moved to Profile)", async () => {
     renderWithProviders(<UserMenu />);
     await userEvent.click(screen.getByLabelText("User menu"));
-    const checkbox = screen.getByRole("menuitemcheckbox", { name: /dark mode/i });
-    expect(checkbox).not.toBeChecked();
-
-    await userEvent.click(checkbox);
-
-    // Re-open the menu to check updated state
-    await userEvent.click(screen.getByLabelText("User menu"));
-    expect(screen.getByRole("menuitemcheckbox", { name: /dark mode/i })).toBeChecked();
+    expect(screen.queryByText(/dark mode/i)).not.toBeInTheDocument();
   });
 
   it("calls signOut when Sign Out is clicked", async () => {

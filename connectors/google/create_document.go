@@ -19,8 +19,17 @@ type createDocumentAction struct {
 
 // createDocumentParams is the user-facing parameter schema.
 type createDocumentParams struct {
-	Title string `json:"title"`
-	Body  string `json:"body"`
+	Title   string `json:"title"`
+	Content string `json:"content,omitempty"`
+	// Body is deprecated: prefer Content for the same field as google.update_document.
+	Body string `json:"body,omitempty"`
+}
+
+func (p *createDocumentParams) initialBodyText() string {
+	if p.Content != "" {
+		return p.Content
+	}
+	return p.Body
 }
 
 func (p *createDocumentParams) validate() error {
@@ -62,12 +71,12 @@ func (a *createDocumentAction) Execute(ctx context.Context, req connectors.Actio
 	documentURL := documentEditURL(resp.DocumentID)
 
 	// If body text was provided, insert it via batchUpdate.
-	if params.Body != "" {
+	if text := params.initialBodyText(); text != "" {
 		batchReq := docsBatchUpdateRequest{
 			Requests: []docsRequest{
 				{
 					InsertText: &docsInsertTextRequest{
-						Text:               params.Body,
+						Text:                 text,
 						EndOfSegmentLocation: &docsEndOfSegmentLocation{},
 					},
 				},

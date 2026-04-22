@@ -219,7 +219,7 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.create_document",
 			Name:        "Create documents",
 			Description: "Agent can create new Google Docs with any title and body.",
-			Parameters:  json.RawMessage(`{"title":"*","body":"*"}`),
+			Parameters:  json.RawMessage(`{"title":"*","content":"*"}`),
 		},
 		{
 			ID:          "tpl_google_create_document_title_only",
@@ -298,7 +298,7 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.add_slide",
 			Name:        "Add slides to presentations",
 			Description: "Agent can add new slides to any Google Slides presentation.",
-			Parameters:  json.RawMessage(`{"presentation_id":"*","layout":"*","insertion_index":"*"}`),
+			Parameters:  json.RawMessage(`{"presentation_id":"*","layout":"*","insertion_index":"*","title":"*"}`),
 		},
 		// --- Chat ---
 		{

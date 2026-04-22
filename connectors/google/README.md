@@ -493,7 +493,7 @@ Creates a new Google Sheets spreadsheet (same API family as `google.sheets_read_
 
 ### `google.create_document`
 
-Creates a new Google Doc with a title and optional initial body content.
+Creates a new Google Doc with a title and optional initial document body text.
 
 **Risk level:** medium
 
@@ -502,7 +502,8 @@ Creates a new Google Doc with a title and optional initial body content.
 | Name | Type | Required | Description |
 |------|------|----------|-------------|
 | `title` | string | Yes | Title of the new Google Doc |
-| `body` | string | No | Optional initial body content (plain text) |
+| `content` | string | No | Optional initial document body (plain text); same field name as `google.update_document` |
+| `body` | string | No | Deprecated — use `content` instead |
 
 **Response:**
 
@@ -566,6 +567,7 @@ Appends or inserts text into an existing Google Doc using the Docs API batchUpda
 |------|------|----------|---------|-------------|
 | `document_id` | string | Yes | — | The ID of the Google Doc to update |
 | `content` | string | Yes | — | Text to insert into the document |
+| `text` | string | — | — | Deprecated — use `content` instead |
 | `index` | integer | No | end | Character index to insert at (1-based). Defaults to end of document. |
 
 **Response:**
@@ -1119,8 +1121,8 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Read from any spreadsheet | `sheets_read_range` | Nothing — agent controls all parameters |
 | List worksheets in any spreadsheet | `sheets_list_sheets` | Nothing — agent controls spreadsheet |
 | Create spreadsheets | `create_spreadsheet` | Nothing — agent controls title and optional tab names |
-| Create documents | `create_document` | Nothing — agent controls title and body |
-| Create empty documents | `create_document` | `body` omitted — title only |
+| Create documents | `create_document` | Nothing — agent controls title and content |
+| Create empty documents | `create_document` | `content` omitted — title only |
 | Read any document | `get_document` | Nothing — agent can read any doc by ID |
 | Edit any document | `update_document` | Nothing — agent controls all parameters |
 | Search documents | `list_documents` | Nothing — agent controls query and count |
