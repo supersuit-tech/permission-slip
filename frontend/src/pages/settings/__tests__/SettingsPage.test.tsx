@@ -6,6 +6,7 @@ import { setupAuthMocks, mockMfa } from "../../../auth/__tests__/fixtures";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
 import { AuthProvider } from "../../../auth/AuthContext";
 import { CookieConsentProvider } from "../../../components/CookieConsentContext";
+import { ThemeProvider } from "../../../components/ThemeContext";
 import { SettingsLayout } from "../SettingsLayout";
 
 vi.mock("../../../lib/supabaseClient");
@@ -73,13 +74,15 @@ function renderSettingsAt(path: string) {
   return render(
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
-        <CookieConsentProvider>
-          <AuthProvider>
-            <Routes>
-              <Route path="/settings/*" element={<SettingsLayout />} />
-            </Routes>
-          </AuthProvider>
-        </CookieConsentProvider>
+        <ThemeProvider>
+          <CookieConsentProvider>
+            <AuthProvider>
+              <Routes>
+                <Route path="/settings/*" element={<SettingsLayout />} />
+              </Routes>
+            </AuthProvider>
+          </CookieConsentProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );
