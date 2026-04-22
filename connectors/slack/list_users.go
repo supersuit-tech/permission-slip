@@ -2,12 +2,13 @@ package slack
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // listUsersAction implements connectors.Action for slack.list_users.
-// It lists workspace users via POST /users.list.
+// It lists workspace users via GET /users.list.
 type listUsersAction struct {
 	conn *SlackConnector
 }
@@ -73,16 +74,19 @@ func (a *listUsersAction) Execute(ctx context.Context, req connectors.ActionRequ
 		return nil, err
 	}
 
-	body := listUsersRequest{
-		Limit:  params.Limit,
-		Cursor: params.Cursor,
+	limit := params.Limit
+	if limit == 0 {
+		limit = 100
 	}
-	if body.Limit == 0 {
-		body.Limit = 100
+	paramsMap := map[string]string{
+		"limit": strconv.Itoa(limit),
+	}
+	if params.Cursor != "" {
+		paramsMap["cursor"] = params.Cursor
 	}
 
 	var resp listUsersResponse
-	if err := a.conn.doPost(ctx, "users.list", req.Credentials, body, &resp); err != nil {
+	if err := a.conn.doGet(ctx, "users.list", req.Credentials, paramsMap, &resp); err != nil {
 		return nil, err
 	}
 

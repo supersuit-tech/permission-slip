@@ -23,13 +23,13 @@ func (c *SlackConnector) ListUsers(ctx context.Context, creds connectors.Credent
 	seen := make(map[string]bool)
 	cursor := ""
 	for page := 0; page < slackUserListMaxPages; page++ {
-		body := listUsersRequest{
-			Limit:  200,
-			Cursor: cursor,
+		paramsMap := map[string]string{"limit": "200"}
+		if cursor != "" {
+			paramsMap["cursor"] = cursor
 		}
 
 		var resp listUsersResponse
-		if err := c.doPost(ctx, "users.list", creds, body, &resp); err != nil {
+		if err := c.doGet(ctx, "users.list", creds, paramsMap, &resp); err != nil {
 			return nil, err
 		}
 		if !resp.OK {
