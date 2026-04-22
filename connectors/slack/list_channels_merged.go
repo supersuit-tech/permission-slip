@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -34,18 +35,21 @@ func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connector
 		userPrivateMerge = userPrivateChs
 	}
 
-	body := listChannelsRequest{
-		Types:           types,
-		Limit:           params.Limit,
-		Cursor:          params.Cursor,
-		ExcludeArchived: excludeArchived,
+	limit := params.Limit
+	if limit == 0 {
+		limit = 100
 	}
-	if body.Limit == 0 {
-		body.Limit = 100
+	paramsMap := map[string]string{
+		"types":             types,
+		"limit":             strconv.Itoa(limit),
+		"exclude_archived":  strconv.FormatBool(excludeArchived),
+	}
+	if params.Cursor != "" {
+		paramsMap["cursor"] = params.Cursor
 	}
 
 	var resp listChannelsResponse
-	if err := c.doPost(ctx, "conversations.list", creds, body, &resp); err != nil {
+	if err := c.doGet(ctx, "conversations.list", creds, paramsMap, &resp); err != nil {
 		return nil, err
 	}
 

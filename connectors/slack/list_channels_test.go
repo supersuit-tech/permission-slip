@@ -13,25 +13,22 @@ func TestListChannels_Success(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			t.Errorf("expected POST, got %s", r.Method)
+		if r.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", r.Method)
 		}
 		if r.URL.Path != "/conversations.list" {
 			t.Errorf("expected path /conversations.list, got %s", r.URL.Path)
 		}
 
-		var body listChannelsRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+		query := r.URL.Query()
+		if query.Get("types") != "public_channel" {
+			t.Errorf("expected types 'public_channel', got %q", query.Get("types"))
 		}
-		if body.Types != "public_channel" {
-			t.Errorf("expected types 'public_channel', got %q", body.Types)
+		if query.Get("limit") != "100" {
+			t.Errorf("expected limit 100, got %q", query.Get("limit"))
 		}
-		if body.Limit != 100 {
-			t.Errorf("expected limit 100, got %d", body.Limit)
-		}
-		if !body.ExcludeArchived {
-			t.Error("expected exclude_archived to be true")
+		if query.Get("exclude_archived") != "true" {
+			t.Errorf("expected exclude_archived 'true', got %q", query.Get("exclude_archived"))
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -134,12 +131,12 @@ func TestListChannels_DefaultTypes(t *testing.T) {
 				},
 			})
 		case "/conversations.list":
-			var body listChannelsRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("failed to decode: %v", err)
+			if r.Method != http.MethodGet {
+				t.Errorf("expected GET, got %s", r.Method)
 			}
-			if body.Types != "public_channel,private_channel,mpim,im" {
-				t.Errorf("expected default types 'public_channel,private_channel,mpim,im', got %q", body.Types)
+			query := r.URL.Query()
+			if query.Get("types") != "public_channel,private_channel,mpim,im" {
+				t.Errorf("expected default types 'public_channel,private_channel,mpim,im', got %q", query.Get("types"))
 			}
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
@@ -205,12 +202,12 @@ func TestListChannels_IMChannels(t *testing.T) {
 				"channels": []map[string]any{},
 			})
 		case "/conversations.list":
-			var body listChannelsRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("failed to decode: %v", err)
+			if r.Method != http.MethodGet {
+				t.Errorf("expected GET, got %s", r.Method)
 			}
-			if body.Types != "im" {
-				t.Errorf("expected types 'im', got %q", body.Types)
+			query := r.URL.Query()
+			if query.Get("types") != "im" {
+				t.Errorf("expected types 'im', got %q", query.Get("types"))
 			}
 			// IM channels have no name — they have a user field instead.
 			json.NewEncoder(w).Encode(map[string]any{
@@ -283,15 +280,15 @@ func TestListChannels_WithPagination(t *testing.T) {
 	t.Parallel()
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		var body listChannelsRequest
-		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-			t.Fatalf("failed to decode request body: %v", err)
+		if r.Method != http.MethodGet {
+			t.Errorf("expected GET, got %s", r.Method)
 		}
-		if body.Cursor != "dGVhbTpDMDI=" {
-			t.Errorf("expected cursor 'dGVhbTpDMDI=', got %q", body.Cursor)
+		query := r.URL.Query()
+		if query.Get("cursor") != "dGVhbTpDMDI=" {
+			t.Errorf("expected cursor 'dGVhbTpDMDI=', got %q", query.Get("cursor"))
 		}
-		if body.Limit != 10 {
-			t.Errorf("expected limit 10, got %d", body.Limit)
+		if query.Get("limit") != "10" {
+			t.Errorf("expected limit 10, got %q", query.Get("limit"))
 		}
 
 		w.Header().Set("Content-Type", "application/json")
@@ -422,12 +419,12 @@ func TestListChannels_DefaultWithoutEmail(t *testing.T) {
 				"channels": []map[string]any{},
 			})
 		case "/conversations.list":
-			var body listChannelsRequest
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
-				t.Fatalf("failed to decode: %v", err)
+			if r.Method != http.MethodGet {
+				t.Errorf("expected GET, got %s", r.Method)
 			}
-			if body.Types != "public_channel,private_channel,mpim,im" {
-				t.Errorf("expected default types on conversations.list, got %q", body.Types)
+			query := r.URL.Query()
+			if query.Get("types") != "public_channel,private_channel,mpim,im" {
+				t.Errorf("expected default types on conversations.list, got %q", query.Get("types"))
 			}
 			json.NewEncoder(w).Encode(map[string]any{
 				"ok": true,
