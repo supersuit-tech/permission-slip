@@ -533,7 +533,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "slack.search_messages",
 				Name:            "Search Messages",
-				Description:     "Search messages across Slack channels (requires search:read)",
+				Description:     "Search messages across Slack channels (requires granular search:read.* scopes)",
 				RiskLevel:       "low",
 				DisplayTemplate: "Search {{channel_name}} for {{query}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
