@@ -329,7 +329,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "google.create_document",
 				Name:            "Create Document",
-				Description:     "Create a new Google Doc with a title and optional body content",
+				Description:     "Create a new Google Doc with a title and optional document body text",
 				RiskLevel:       "medium",
 				DisplayTemplate: "Create document {{title}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
@@ -341,10 +341,15 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"description": "Title of the new Google Doc",
 							"x-ui": {"label": "Title", "placeholder": "Meeting Notes"}
 						},
+						"content": {
+							"type": "string",
+							"description": "Optional initial document body (plain text). Same field as google.update_document.",
+							"x-ui": {"label": "Content", "widget": "textarea"}
+						},
 						"body": {
 							"type": "string",
-							"description": "Optional initial body content (plain text)",
-							"x-ui": {"label": "Body", "widget": "textarea"}
+							"description": "Deprecated: use content instead. Optional initial body (plain text).",
+							"x-ui": {"label": "Body (deprecated)", "widget": "textarea"}
 						}
 					}
 				}`)),
@@ -384,8 +389,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"content": {
 							"type": "string",
-							"description": "Text to insert into the document",
+							"description": "Text to insert into the document (same field name as google.create_document).",
 							"x-ui": {"label": "Content", "widget": "textarea"}
+						},
+						"text": {
+							"type": "string",
+							"description": "Deprecated: use content instead. Text to insert into the document.",
+							"x-ui": {"label": "Text (deprecated)", "widget": "textarea"}
 						},
 						"index": {
 							"type": "integer",

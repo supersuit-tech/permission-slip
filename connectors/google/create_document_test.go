@@ -49,8 +49,8 @@ func TestCreateDocument_Success(t *testing.T) {
 	action := &createDocumentAction{conn: conn}
 
 	params, _ := json.Marshal(createDocumentParams{
-		Title: "My New Doc",
-		Body:  "Hello, world!",
+		Title:   "My New Doc",
+		Content: "Hello, world!",
 	})
 
 	result, err := action.Execute(t.Context(), connectors.ActionRequest{
@@ -77,6 +77,47 @@ func TestCreateDocument_Success(t *testing.T) {
 	}
 	if calls != 2 {
 		t.Errorf("expected 2 API calls (create + batchUpdate), got %d", calls)
+	}
+}
+
+func TestCreateDocument_DeprecatedBodyAlias(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/documents" {
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode(docsCreateResponse{
+				DocumentID: "doc-alias",
+				Title:      "Alias Doc",
+			})
+		} else if r.URL.Path == "/v1/documents/doc-alias:batchUpdate" {
+			var batch docsBatchUpdateRequest
+			if err := json.NewDecoder(r.Body).Decode(&batch); err != nil {
+				t.Fatalf("decode batch: %v", err)
+			}
+			if batch.Requests[0].InsertText == nil || batch.Requests[0].InsertText.Text != "from body" {
+				t.Fatalf("expected InsertText from deprecated body, got %+v", batch.Requests[0].InsertText)
+			}
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{}`))
+		} else {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTestDocs(srv.Client(), srv.URL, "")
+	action := &createDocumentAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{"title": "Alias Doc", "body": "from body"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
 }
 
@@ -244,8 +285,8 @@ func TestCreateDocument_BodyInsertionFailure(t *testing.T) {
 	action := &createDocumentAction{conn: conn}
 
 	params, _ := json.Marshal(createDocumentParams{
-		Title: "Partial Doc",
-		Body:  "some text",
+		Title:   "Partial Doc",
+		Content: "some text",
 	})
 
 	// Should succeed with a warning, not error — the document was created.

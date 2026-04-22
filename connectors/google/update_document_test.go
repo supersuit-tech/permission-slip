@@ -9,6 +9,40 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
+func TestUpdateDocument_DeprecatedTextAlias(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body docsBatchUpdateRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Requests[0].InsertText == nil || body.Requests[0].InsertText.Text != "via text" {
+			t.Fatalf("expected text via deprecated alias, got %+v", body.Requests[0].InsertText)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{}`))
+	}))
+	defer srv.Close()
+
+	conn := newForTestDocs(srv.Client(), srv.URL, "")
+	action := &updateDocumentAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]string{
+		"document_id": "doc-abc-123",
+		"text":        "via text",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.update_document",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestUpdateDocument_SuccessAppend(t *testing.T) {
 	t.Parallel()
 
