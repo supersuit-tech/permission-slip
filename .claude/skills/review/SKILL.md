@@ -357,7 +357,49 @@ After the review loop ends, collect every finding that is still unresolved and i
 
 If there are **zero** qualifying follow-up recommendations, skip this step entirely and render the "Follow-up Issue" section of the final summary as "None — no follow-up recommendations."
 
-If there is at least one qualifying recommendation, create a single GitHub issue:
+### 4a. Check for Duplicate Issues
+
+Before creating a new follow-up issue, search open issues to avoid creating duplicates (common when re-running `/review` on the same PR, or when the same underlying concern has been flagged across multiple PRs).
+
+**Check 1 — exact PR match:** Look for an existing open follow-up issue for this same PR.
+
+```bash
+EXISTING_FOLLOWUP=$($GH_CMD issue list \
+  --state open \
+  --search "Follow-ups from #${PR_NUMBER} review in:title" \
+  --json number,url \
+  --jq '.[0]')
+```
+
+If `EXISTING_FOLLOWUP` is non-empty, **skip creating a new issue**. Render the final summary's "Follow-up Issue" section as:
+
+> Existing follow-up issue already open for this PR: {url} — not creating a duplicate. If the current recommendations differ from what's tracked there, update that issue manually.
+
+Also post a short PR comment pointing to the existing issue instead of creating a new one.
+
+**Check 2 — per-recommendation keyword match:** For each recommendation you plan to include, search open issues for semantic duplicates (same file, same concern, or same short-title keywords):
+
+```bash
+$GH_CMD issue list \
+  --state open \
+  --search "<short title keywords> in:title,body" \
+  --json number,title,url \
+  --limit 3
+```
+
+Use judgement when comparing results:
+- A match on the same `file.ext:line` reference or clearly overlapping wording → drop that recommendation from the new issue and note the existing issue URL inline in the final summary under Outstanding Issues.
+- A loose keyword match with a different subject → keep the recommendation.
+
+If **all** recommendations are dropped as duplicates, skip issue creation entirely and render the "Follow-up Issue" section as:
+
+> None — all non-blocking recommendations are already tracked in existing open issues (see Outstanding Issues for links).
+
+Otherwise, proceed to create the issue with the remaining (non-duplicate) recommendations.
+
+### 4b. Create the Issue
+
+If there is at least one qualifying recommendation remaining after the duplicate check, create a single GitHub issue:
 
 ```bash
 ISSUE_BODY=$(cat <<'EOF'
