@@ -1,5 +1,5 @@
-import { useMemo, useState } from "react";
-import { AlertTriangle, Loader2, LogIn, Settings, Star, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertTriangle, Loader2, LogIn, Settings, Star } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -233,16 +233,16 @@ export function ConnectorInstancesSection({
     }
   }
 
-  async function handleRemoveOrphan(instanceId: string) {
-    try {
-      await deleteInstance({ agentId, connectorId, instanceId });
-      toast.success("Unused connector slot removed.");
-    } catch (err) {
-      toast.error(
-        err instanceof Error ? err.message : "Failed to remove connector slot.",
-      );
+  const cleaningUpRef = useRef(new Set<string>());
+  useEffect(() => {
+    for (const id of orphanInstanceIds) {
+      if (cleaningUpRef.current.has(id)) continue;
+      cleaningUpRef.current.add(id);
+      deleteInstance({ agentId, connectorId, instanceId: id }).finally(() => {
+        cleaningUpRef.current.delete(id);
+      });
     }
-  }
+  }, [orphanInstanceIds, agentId, connectorId, deleteInstance]);
 
   async function enableRow(row: CredentialRow) {
     const created = await create({ agentId, connectorId });
@@ -515,37 +515,6 @@ export function ConnectorInstancesSection({
                 </div>
               );
             })}
-
-            {orphanInstanceIds.length > 0 && (
-              <div className="rounded-md border border-dashed p-3">
-                <p className="text-muted-foreground mb-2 text-sm">
-                  These connector slots are not linked to a credential. Remove
-                  them to clean up.
-                </p>
-                <ul className="space-y-2">
-                  {orphanInstanceIds.map((id) => (
-                    <li
-                      key={id}
-                      className="flex items-center justify-between gap-2 text-sm"
-                    >
-                      <span className="text-muted-foreground font-mono text-xs">
-                        {id.slice(0, 8)}…
-                      </span>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        disabled={busyRow}
-                        onClick={() => void handleRemoveOrphan(id)}
-                      >
-                        <Trash2 className="size-3.5" />
-                        Remove slot
-                      </Button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         )}
 
