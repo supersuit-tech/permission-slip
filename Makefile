@@ -1,13 +1,14 @@
-.PHONY: dev dev-backend dev-frontend build run install setup \
+.PHONY: dev dev-backend dev-frontend build build-ci run install install-build-deps setup \
        test test-backend test-frontend test-integration typecheck \
        mobile-install mobile-start mobile-test mobile-typecheck \
        mobile-build-dev mobile-build-preview mobile-build-prod \
        mobile-build-dev-ios mobile-build-dev-android \
        mobile-build-preview-ios mobile-build-preview-android \
        mobile-submit mobile-update \
-       generate-frontend generate-mobile \
+       generate generate-frontend generate-mobile \
+       generate-frontend-from-bundle generate-mobile-from-bundle \
        migrate-up migrate-down migrate-create db-setup seed \
-       bundle generate generate-vapid-keys install-connectors \
+       bundle generate-vapid-keys install-connectors \
        audit audit-backend audit-frontend audit-mobile \
        docker-build deploy \
        cli cli-install cli-build cli-test
@@ -17,6 +18,13 @@ install:
 	cd frontend && npm install
 	cd mobile && npm install
 	cd cli && npm install
+	go mod download
+
+# Minimal install for server production build (CI): frontend + Go only.
+# Uses npm ci --ignore-scripts to skip postinstall (openapi-typescript); run
+# make bundle && make generate-frontend-from-bundle before frontend build.
+install-build-deps:
+	cd frontend && npm ci --ignore-scripts
 	go mod download
 
 # Full setup: install deps + generate API client
@@ -42,13 +50,17 @@ dev-frontend:
 bundle:
 	npx @redocly/cli@2.19.1 bundle spec/openapi/openapi.yaml -o spec/openapi/openapi.bundle.yaml
 
-# Generate typed API clients from the bundled OpenAPI spec
-generate: generate-frontend generate-mobile
+# Generate typed API clients from the bundled OpenAPI spec (bundles once).
+generate: bundle generate-frontend-from-bundle generate-mobile-from-bundle
 
-generate-frontend: bundle
+generate-frontend: bundle generate-frontend-from-bundle
+
+generate-frontend-from-bundle:
 	cd frontend && npm run generate:api
 
-generate-mobile: bundle
+generate-mobile: bundle generate-mobile-from-bundle
+
+generate-mobile-from-bundle:
 	cd mobile && npm run generate:api
 
 # Type-check frontend (generates API client first, then runs tsc --noEmit)
@@ -59,6 +71,13 @@ typecheck: generate-frontend
 # Embeds the git SHA as the Sentry release version via -ldflags.
 GIT_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 build: generate
+	cd frontend && npm run build
+	touch frontend/dist/.gitkeep
+	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
+
+# CI / slim server build: expects bundle + generate-frontend-from-bundle already
+# (see install-build-deps). Does not install mobile or CLI npm dependencies.
+build-ci:
 	cd frontend && npm run build
 	touch frontend/dist/.gitkeep
 	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
