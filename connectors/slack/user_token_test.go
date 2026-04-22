@@ -80,7 +80,11 @@ func TestOAuthScopes_IncludesRequiredUserScopes(t *testing.T) {
 		"mpim:write":           {},
 		"reactions:read":       {},
 		"reactions:write":      {},
-		"search:read":          {},
+		"search:read.public":   {},
+		"search:read.private":  {},
+		"search:read.im":       {},
+		"search:read.mpim":     {},
+		"search:read.files":    {},
 		"users:read":           {},
 		"users:read.email":     {},
 	}

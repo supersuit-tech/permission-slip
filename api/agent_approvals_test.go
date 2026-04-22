@@ -1447,3 +1447,106 @@ func TestAgentRequestApproval_MultiInstance_WithLabel_FreezesInstanceOnAction(t 
 		}
 	}
 }
+
+// Regression: when connector_instance is the only parameter, the routing code
+// must leave parameters as "{}" instead of deleting it. Otherwise downstream
+// action parsers that json.Unmarshal(req.Parameters, &p) fail with
+// "unexpected end of JSON input" and zero-param actions (list_channels,
+// list_users, etc.) become unusable on any non-default instance.
+func TestAgentRequestApproval_MultiInstance_OnlyConnectorInstance_PreservesEmptyParameters(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	connID := "mi_only_inst_conn"
+	testhelper.InsertConnector(t, tx, connID)
+	testhelper.InsertConnectorAction(t, tx, connID, connID+".ping", "Ping")
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+	ctx := context.Background()
+	inst2, err := db.CreateAgentConnectorInstance(ctx, tx, db.CreateAgentConnectorInstanceParams{
+		AgentID: agentID, ApproverID: uid, ConnectorID: connID,
+	})
+	if err != nil {
+		t.Fatalf("second instance: %v", err)
+	}
+
+	v := vault.NewMockVaultStore()
+	credJSON1, _ := json.Marshal(map[string]string{"api_key": "k1"})
+	v1, err := v.CreateSecret(ctx, tx, "c1", credJSON1)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID1 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID1, uid, connID, "Alpha", v1)
+
+	credJSON2, _ := json.Marshal(map[string]string{"api_key": "k2"})
+	v2, err := v.CreateSecret(ctx, tx, "c2", credJSON2)
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	credID2 := testhelper.GenerateID(t, "cred_")
+	testhelper.InsertCredentialWithVaultSecretIDAndLabel(t, tx, credID2, uid, connID, "Beta", v2)
+
+	defInst, err := db.GetDefaultAgentConnectorInstance(ctx, tx, agentID, uid, connID)
+	if err != nil || defInst == nil {
+		t.Fatalf("default instance: %v", defInst)
+	}
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: defInst.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID1,
+	}); err != nil {
+		t.Fatalf("bind default: %v", err)
+	}
+	if _, err := db.UpsertAgentConnectorCredentialByInstance(ctx, tx, db.UpsertAgentConnectorCredentialByInstanceParams{
+		ID: testhelper.GenerateID(t, "accr_"), AgentID: agentID, ConnectorID: connID,
+		ConnectorInstanceID: inst2.ConnectorInstanceID, ApproverID: uid, CredentialID: &credID2,
+	}); err != nil {
+		t.Fatalf("bind second: %v", err)
+	}
+
+	reg := connectors.NewRegistry()
+	reg.Register(newTestStubConnector(connID, connID+".ping"))
+	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	router := NewRouter(deps)
+
+	// Body sends connector_instance as the ONLY parameter.
+	reqBody := `{"request_id":"req_mi_only_inst","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"` + inst2.ConnectorInstanceID + `"}},"context":{"description":"x"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var createResp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	appr, err := db.GetApprovalByIDAndAgent(t.Context(), tx, createResp.ApprovalID, agentID)
+	if err != nil || appr == nil {
+		t.Fatalf("get approval: %v", err)
+	}
+	var actionObj map[string]json.RawMessage
+	if err := json.Unmarshal(appr.Action, &actionObj); err != nil {
+		t.Fatalf("unmarshal action: %v", err)
+	}
+
+	raw, ok := actionObj["parameters"]
+	if !ok {
+		t.Fatal("parameters key missing — downstream action parsers will fail with 'unexpected end of JSON input'")
+	}
+	var params map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &params); err != nil {
+		t.Fatalf("parameters must be valid JSON object, got %q: %v", string(raw), err)
+	}
+	if len(params) != 0 {
+		t.Errorf("parameters should be empty after stripping connector_instance, got %v", params)
+	}
+}

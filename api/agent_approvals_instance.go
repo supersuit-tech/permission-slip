@@ -62,15 +62,15 @@ func applyConnectorInstanceToAction(ctx context.Context, d db.DBTX, agent *db.Ag
 			_ = json.Unmarshal(raw, &selector)
 			selector = strings.TrimSpace(selector)
 			delete(paramsObj, "connector_instance")
-			if len(paramsObj) == 0 {
-				delete(actionObj, "parameters")
-			} else {
-				b, mErr := json.Marshal(paramsObj)
-				if mErr != nil {
-					return "", mErr
-				}
-				actionObj["parameters"] = b
+			// Always write back a valid JSON object — even an empty one — so
+			// downstream action parsers (which json.Unmarshal req.Parameters)
+			// don't fail with "unexpected end of JSON input" when
+			// connector_instance was the only parameter.
+			b, mErr := json.Marshal(paramsObj)
+			if mErr != nil {
+				return "", mErr
 			}
+			actionObj["parameters"] = b
 		}
 	}
 

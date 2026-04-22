@@ -38,6 +38,10 @@ const (
 // These are requested via the "user_scope" parameter in the Slack OAuth v2
 // authorization URL (no bot "scope" param). The resulting user token (xoxp-)
 // is stored as the connection's primary access_token.
+//
+// Search uses the granular search:read.* scopes. The legacy monolithic
+// search:read scope is no longer sufficient for search.messages — the API
+// rejects it with invalid_arguments at runtime.
 var OAuthScopes = []string{
 	"channels:history",
 	"channels:read",
@@ -57,7 +61,11 @@ var OAuthScopes = []string{
 	"mpim:write",
 	"reactions:read",
 	"reactions:write",
-	"search:read",
+	"search:read.public",
+	"search:read.private",
+	"search:read.im",
+	"search:read.mpim",
+	"search:read.files",
 	"users:read",
 	"users:read.email",
 	"pins:read",
