@@ -30,6 +30,32 @@ func TestListUnread_NoEmail(t *testing.T) {
 	}
 }
 
+func TestListUnread_RequiresUserOAuthToken(t *testing.T) {
+	t.Parallel()
+
+	conn := newForTest(http.DefaultClient, "http://unused.example")
+	action := &listUnreadAction{conn: conn}
+	legacyBotCreds := connectors.NewCredentials(map[string]string{
+		"access_token": "xoxb-legacy-bot-token",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_unread",
+		Parameters:  []byte(`{}`),
+		Credentials: legacyBotCreds,
+		UserEmail:   "user@example.com",
+	})
+	if err == nil {
+		t.Fatal("expected auth error for legacy bot token")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Fatalf("expected AuthError, got %T: %v", err, err)
+	}
+	if !strings.Contains(err.Error(), "reconnect Slack") {
+		t.Fatalf("expected reconnect guidance, got %v", err)
+	}
+}
+
 func TestListUnread_NoUnreads(t *testing.T) {
 	t.Parallel()
 

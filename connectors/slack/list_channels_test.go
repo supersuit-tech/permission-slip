@@ -232,22 +232,22 @@ func TestListChannels_IMChannels(t *testing.T) {
 				"ok": true,
 				"channels": []map[string]any{
 					{
-						"id":         "D001",
-						"user":       "U_OTHER",
-						"is_private": true,
+						"id":          "D001",
+						"user":        "U_OTHER",
+						"is_private":  true,
 						"num_members": 0,
 					},
 					{
-						"id":         "D002",
-						"user":       "U_ANOTHER",
-						"is_private": true,
+						"id":          "D002",
+						"user":        "U_ANOTHER",
+						"is_private":  true,
 						"num_members": 0,
 					},
 					{
 						// DM the caller is NOT a member of — should be filtered out.
-						"id":         "D999",
-						"user":       "U_STRANGER",
-						"is_private": true,
+						"id":          "D999",
+						"user":        "U_STRANGER",
+						"is_private":  true,
 						"num_members": 0,
 					},
 				},
@@ -470,6 +470,30 @@ func TestListChannels_DefaultFallbackWithoutEmail(t *testing.T) {
 	}
 	if data.Channels[0].ID != "C001" {
 		t.Errorf("expected channel C001, got %q", data.Channels[0].ID)
+	}
+}
+
+func TestListChannels_PrivateTypesRequireUserToken(t *testing.T) {
+	t.Parallel()
+
+	conn := newForTest(http.DefaultClient, "http://unused")
+	action := &listChannelsAction{conn: conn}
+
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType: "slack.list_channels",
+		Parameters: params,
+		Credentials: connectors.NewCredentials(map[string]string{
+			"access_token": "xoxb-legacy-bot-token",
+		}),
+		UserEmail: "user@example.com",
+	})
+	if err == nil {
+		t.Fatal("expected error for bot token on private channel listing")
+	}
+	if !connectors.IsAuthError(err) {
+		t.Fatalf("expected AuthError, got %T: %v", err, err)
 	}
 }
 

@@ -40,6 +40,10 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
+	if err := a.conn.requireUserOAuthToken(req.Credentials, "slack.list_unread"); err != nil {
+		return nil, err
+	}
+
 	if req.UserEmail == "" {
 		return nil, &connectors.ValidationError{
 			Message: "listing unread conversations requires your Permission Slip profile to have an email address matching your Slack account",

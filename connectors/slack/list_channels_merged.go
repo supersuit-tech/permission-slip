@@ -33,6 +33,9 @@ func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connector
 			}
 			types = "public_channel"
 		} else {
+			if err := c.requireUserOAuthToken(creds, "slack.list_channels for private channels, group DMs, or DMs"); err != nil {
+				return nil, err
+			}
 			slackUserID, err := c.lookupSlackUserByEmail(ctx, creds, userEmail)
 			if err != nil {
 				return nil, fmt.Errorf("unable to verify Slack identity: %w", err)
