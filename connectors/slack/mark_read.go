@@ -34,10 +34,6 @@ func (a *markReadAction) Execute(ctx context.Context, req connectors.ActionReque
 		return nil, err
 	}
 
-	if err := a.conn.verifyChannelAccess(ctx, req.Credentials, params.ChannelID, req.UserEmail); err != nil {
-		return nil, err
-	}
-
 	body := markReadRequest{
 		Channel: params.ChannelID,
 		TS:      params.TS,

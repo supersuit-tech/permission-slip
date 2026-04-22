@@ -96,7 +96,7 @@ func (a *listChannelsAction) Execute(ctx context.Context, req connectors.ActionR
 		return nil, err
 	}
 
-	result, err := a.conn.listChannelsMerged(ctx, req.Credentials, req.UserEmail, params)
+	result, err := a.conn.listChannelsMerged(ctx, req.Credentials, params)
 	if err != nil {
 		return nil, err
 	}

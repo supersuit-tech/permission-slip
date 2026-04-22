@@ -15,23 +15,7 @@ func TestSearchMessages_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		switch r.URL.Path {
-		case "/users.lookupByEmail":
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]any{"id": "U_SEARCHER"},
-			})
-			return
-		case "/conversations.info":
-			// Return public channel for the access filter.
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":      true,
-				"channel": map[string]any{"id": "C001", "is_private": false},
-			})
-			return
-		case "/search.messages":
-			// Continue with existing logic.
-		default:
+		if r.URL.Path != "/search.messages" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 			return
 		}
@@ -123,6 +107,55 @@ func TestSearchMessages_Success(t *testing.T) {
 	}
 }
 
+func TestSearchMessages_WithoutEmail_Succeeds(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/search.messages" {
+			t.Errorf("unexpected path %s", r.URL.Path)
+			return
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"messages": map[string]any{
+				"matches": []map[string]any{
+					{
+						"channel": map[string]string{"id": "D_PRIVATE", "name": "dm"},
+						"user":    "U002",
+						"text":    "private dm",
+						"ts":      "2.2",
+					},
+				},
+				"paging": map[string]int{"count": 20, "total": 1, "page": 1, "pages": 1},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &searchMessagesAction{conn: conn}
+
+	params, _ := json.Marshal(searchMessagesParams{Query: "hello"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.search_messages",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var data searchMessagesResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(data.Matches) != 1 || data.Matches[0].ChannelID != "D_PRIVATE" {
+		t.Fatalf("expected one DM match, got %+v", data.Matches)
+	}
+}
+
 func TestSearchMessages_MissingQuery(t *testing.T) {
 	t.Parallel()
 
@@ -173,13 +206,6 @@ func TestSearchMessages_SlackAPIError(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path == "/users.lookupByEmail" {
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":   true,
-				"user": map[string]any{"id": "U_TEST"},
-			})
-			return
-		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":    false,
 			"error": "missing_scope",

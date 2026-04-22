@@ -40,22 +40,6 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 		return nil, err
 	}
 
-	if req.UserEmail == "" {
-		return nil, &connectors.ValidationError{
-			Message: "listing unread conversations requires your Permission Slip profile to have an email address matching your Slack account",
-		}
-	}
-
-	slackUserID, err := a.conn.lookupSlackUserByEmail(ctx, req.Credentials, req.UserEmail)
-	if err != nil {
-		return nil, err
-	}
-	if slackUserID == "" {
-		return nil, &connectors.ValidationError{
-			Message: "no Slack user found matching your email — ensure your Permission Slip email matches your Slack account",
-		}
-	}
-
 	types := "public_channel,private_channel,mpim,im"
 	var entries []unreadChannelEntry
 	cursor := ""

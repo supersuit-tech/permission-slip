@@ -12,8 +12,7 @@ import (
 // When the request includes private types, users.conversations is merged in
 // only to add conversations missing from conversations.list (same token;
 // no email lookup). Slack scopes each call to the token owner.
-func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connectors.Credentials, userEmail string, params listChannelsParams) (*listChannelsResult, error) {
-	_ = userEmail // listing uses token scoping only; email is unused (kept for API stability).
+func (c *SlackConnector) listChannelsMerged(ctx context.Context, creds connectors.Credentials, params listChannelsParams) (*listChannelsResult, error) {
 
 	excludeArchived := true
 	if params.ExcludeArchived != nil {

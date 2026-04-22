@@ -15,17 +15,7 @@ func TestReadChannelMessages_Success(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		switch r.URL.Path {
-		case "/conversations.info":
-			// Return public channel info for the access check.
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":      true,
-				"channel": map[string]any{"id": "C01234567", "is_private": false},
-			})
-			return
-		case "/conversations.history":
-			// Continue with existing logic.
-		default:
+		if r.URL.Path != "/conversations.history" {
 			t.Errorf("unexpected path %s", r.URL.Path)
 			return
 		}
@@ -119,14 +109,6 @@ func TestReadChannelMessages_WithTimeRange(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 
-		if r.URL.Path == "/conversations.info" {
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":      true,
-				"channel": map[string]any{"id": "C01234567", "is_private": false},
-			})
-			return
-		}
-
 		var body readChannelMessagesRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 			t.Fatalf("failed to decode request body: %v", err)
@@ -203,7 +185,6 @@ func TestReadChannelMessages_ChannelNotFound(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// Both conversations.info and conversations.history return channel_not_found.
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":    false,
 			"error": "channel_not_found",
@@ -226,8 +207,6 @@ func TestReadChannelMessages_ChannelNotFound(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected error for channel_not_found")
 	}
-	// The error now comes from verifyChannelAccess (ValidationError wrapping the Slack error)
-	// rather than directly from conversations.history.
 }
 
 func TestReadChannelMessages_InvalidChannelName(t *testing.T) {
@@ -282,14 +261,6 @@ func TestReadChannelMessages_MissingScope(t *testing.T) {
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path == "/conversations.info" {
-			// Return public channel so access check passes.
-			json.NewEncoder(w).Encode(map[string]any{
-				"ok":      true,
-				"channel": map[string]any{"id": "C01234567", "is_private": false},
-			})
-			return
-		}
 		json.NewEncoder(w).Encode(map[string]any{
 			"ok":    false,
 			"error": "missing_scope",
@@ -314,6 +285,49 @@ func TestReadChannelMessages_MissingScope(t *testing.T) {
 	}
 	if !connectors.IsAuthError(err) {
 		t.Errorf("expected AuthError for missing_scope, got: %T", err)
+	}
+}
+
+func TestReadChannelMessages_DMChannel_WithoutEmail_Succeeds(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path != "/conversations.history" {
+			t.Errorf("unexpected path %s", r.URL.Path)
+		}
+		json.NewEncoder(w).Encode(map[string]any{
+			"ok": true,
+			"messages": []map[string]any{
+				{"type": "message", "user": "U_ALICE", "text": "hi", "ts": "1.1"},
+			},
+			"has_more": false,
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &readChannelMessagesAction{conn: conn}
+
+	params, _ := json.Marshal(readChannelMessagesParams{
+		Channel: "D01234567",
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.read_channel_messages",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "",
+	})
+	if err != nil {
+		t.Fatalf("expected success reading DM without Permission Slip email, got: %v", err)
+	}
+	var data messagesResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if len(data.Messages) != 1 {
+		t.Errorf("expected 1 message, got %d", len(data.Messages))
 	}
 }
 
