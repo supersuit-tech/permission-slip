@@ -74,6 +74,10 @@ func (a *readChannelMessagesAction) Execute(ctx context.Context, req connectors.
 		body.Limit = 20
 	}
 
+	if err := a.conn.ensureUserCanReadDMChannel(ctx, req.Credentials, params.Channel, req.UserEmail); err != nil {
+		return nil, err
+	}
+
 	var resp messagesResponse
 	if err := a.conn.doPost(ctx, "conversations.history", req.Credentials, body, &resp); err != nil {
 		return nil, err
