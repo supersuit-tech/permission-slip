@@ -460,6 +460,81 @@ func TestListChannels_DefaultFallbackWithoutEmail(t *testing.T) {
 	}
 }
 
+func TestListChannels_IMFiltersStrayPublicChannels(t *testing.T) {
+	t.Parallel()
+
+	// Regression for issue #1028: Slack's conversations.list can return public
+	// channels even when types=im is requested (e.g. when the bot token lacks
+	// im:read scope it silently falls back instead of erroring). The merged
+	// result must still honor the requested types and exclude public channels.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		switch r.URL.Path {
+		case "/users.lookupByEmail":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok":   true,
+				"user": map[string]string{"id": "U_CALLER"},
+			})
+		case "/users.conversations":
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{"id": "D001"},
+				},
+			})
+		case "/conversations.list":
+			// Slack mis-honors types=im and returns a public channel alongside the DM.
+			json.NewEncoder(w).Encode(map[string]any{
+				"ok": true,
+				"channels": []map[string]any{
+					{
+						"id":          "C001",
+						"name":        "ihubs-general",
+						"is_private":  false,
+						"num_members": 42,
+					},
+					{
+						"id":          "D001",
+						"user":        "U_OTHER",
+						"is_private":  true,
+						"num_members": 0,
+					},
+				},
+			})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), srv.URL)
+	action := &listChannelsAction{conn: conn}
+
+	params, _ := json.Marshal(listChannelsParams{Types: "im"})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "slack.list_channels",
+		Parameters:  params,
+		Credentials: validCreds(),
+		UserEmail:   "user@example.com",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data listChannelsResult
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if len(data.Channels) != 1 {
+		t.Fatalf("expected 1 channel (DM only), got %d: %+v", len(data.Channels), data.Channels)
+	}
+	if data.Channels[0].ID != "D001" {
+		t.Errorf("expected D001, got %q", data.Channels[0].ID)
+	}
+}
+
 func TestListChannels_ExplicitPrivateTypesWithoutEmail(t *testing.T) {
 	t.Parallel()
 

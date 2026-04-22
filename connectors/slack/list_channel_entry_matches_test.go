@@ -83,6 +83,30 @@ func TestListChannelEntryMatchesTypes(t *testing.T) {
 			ch:    listChannelEntry{ID: "C0123", IsPrivate: false},
 			want:  false,
 		},
+		{
+			name:  "public_channel C not private",
+			types: "public_channel",
+			ch:    listChannelEntry{ID: "C0123", IsPrivate: false},
+			want:  true,
+		},
+		{
+			name:  "public_channel C private excluded",
+			types: "public_channel",
+			ch:    listChannelEntry{ID: "C0123", IsPrivate: true},
+			want:  false,
+		},
+		{
+			name:  "public_channel DM excluded",
+			types: "public_channel",
+			ch:    listChannelEntry{ID: "D0123", IsIM: true},
+			want:  false,
+		},
+		{
+			name:  "public_channel MPIM excluded",
+			types: "public_channel",
+			ch:    listChannelEntry{ID: "G0123", IsMPIM: true},
+			want:  false,
+		},
 	}
 
 	for _, tt := range tests {
