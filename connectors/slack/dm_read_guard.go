@@ -69,12 +69,6 @@ func (c *SlackConnector) lookupSlackUserIDByEmail(ctx context.Context, creds con
 	return resp.User.ID, nil
 }
 
-type conversationsMembersRequest struct {
-	Channel string `json:"channel"`
-	Limit   int    `json:"limit,omitempty"`
-	Cursor  string `json:"cursor,omitempty"`
-}
-
 type conversationsMembersResponse struct {
 	slackResponse
 	Members []string        `json:"members,omitempty"`
@@ -86,13 +80,15 @@ const maxConversationMemberPages = 50
 func (c *SlackConnector) slackUserIsConversationMember(ctx context.Context, creds connectors.Credentials, channelID, slackUserID string) (bool, error) {
 	cursor := ""
 	for page := 0; page < maxConversationMemberPages; page++ {
-		body := conversationsMembersRequest{
-			Channel: channelID,
-			Limit:   200,
-			Cursor:  cursor,
+		params := map[string]string{
+			"channel": channelID,
+			"limit":   "200",
+		}
+		if cursor != "" {
+			params["cursor"] = cursor
 		}
 		var resp conversationsMembersResponse
-		if err := c.doPost(ctx, "conversations.members", creds, body, &resp); err != nil {
+		if err := c.doGet(ctx, "conversations.members", creds, params, &resp); err != nil {
 			return false, err
 		}
 		if !resp.OK {
