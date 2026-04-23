@@ -1085,6 +1085,10 @@ func instanceFromExtraData(extraData json.RawMessage) string {
 // login or Microsoft displayName), falls back to "email". When "team_name"
 // is present (Slack), appends " @ <workspace>" to help distinguish
 // connections to different workspaces. Returns "" if no identifier is found.
+//
+// The SQL mirror of this logic lives in db.connectorInstanceDisplayNameSQL and
+// powers the CLI capabilities endpoint. Keep the two in sync: any change to the
+// priority order or to the set of recognized keys must be applied in both places.
 func displayNameFromExtraData(extraData json.RawMessage) string {
 	if len(extraData) == 0 {
 		return ""

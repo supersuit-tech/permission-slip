@@ -160,10 +160,10 @@ func TestResolveAgentConnectorInstance_AmbiguousDisplay(t *testing.T) {
 		t.Fatalf("default: %v", defInst)
 	}
 
-	// Two OAuth connections with the same extra_data->>'name' (credentials cannot duplicate label per user+service).
+	// Two OAuth connections with the same extra_data display_name (credentials cannot duplicate label per user+service).
 	oauth1 := testhelper.GenerateID(t, "oauth_")
 	oauth2 := testhelper.GenerateID(t, "oauth_")
-	sharedName, _ := json.Marshal(map[string]string{"name": "SharedOAuthName"})
+	sharedName, _ := json.Marshal(map[string]string{"display_name": "SharedOAuthName"})
 	testhelper.InsertOAuthConnectionFull(t, tx, oauth1, uid, "test_oauth", testhelper.OAuthConnectionOpts{
 		Scopes:    []string{},
 		ExtraData: sharedName,

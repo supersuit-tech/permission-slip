@@ -146,9 +146,11 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	}
 
 	// 1b. Per-instance credential readiness (one row per agent_connectors instance).
+	// Display name uses the shared connectorInstanceDisplayNameSQL fragment so the CLI
+	// capabilities output matches the UI's Settings → Credentials page.
 	instRows, err := db.Query(ctx, `
 		SELECT ac.connector_id, ac.connector_instance_id::text,
-		       COALESCE(cr.label, oc.extra_data->>'name', ''),
+		       `+connectorInstanceDisplayNameSQL+`,
 		       NOT EXISTS (
 		           SELECT 1 FROM connector_required_credentials crc
 		           WHERE crc.connector_id = ac.connector_id
