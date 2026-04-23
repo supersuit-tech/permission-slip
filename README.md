@@ -130,16 +130,6 @@ Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/p
 
 ---
 
-## 🤖 Built for Openclaw
-
-Permission Slip is purpose-built for [Openclaw](https://openclaw.org). Openclaw has full local shell access and unrestricted networking — everything it needs to register, sign requests, and submit actions through Permission Slip.
-
-### Claude Code skills
-
-This repo includes [Claude Code](https://docs.anthropic.com/en/docs/claude-code/overview) skills under [`.claude/skills/`](.claude/skills/). For example, **`/fix-ci`** (see [`fix-ci/SKILL.md`](.claude/skills/fix-ci/SKILL.md)) triggers **CI + audit** on the current branch, pulls failure logs, and loops on fix → push → re-run until green (with a round cap).
-
----
-
 ## 🛠️ Getting Started (local dev)
 
 **Prerequisites:** Go 1.24+, Node.js 20+, Supabase CLI, Docker
