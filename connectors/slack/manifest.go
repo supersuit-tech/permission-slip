@@ -1070,6 +1070,14 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				Parameters:       json.RawMessage(`{"channel_id":"*","ts":"*"}`),
 				StandingApproval: neverExpire,
 			},
+			{
+				ID:               "tpl_slack_client_counts",
+				ActionType:       "slack.client_counts",
+				Name:             "Get unread counts",
+				Description:      "Agent can read per-conversation unread state via Slack client.counts (undocumented; may change without notice).",
+				Parameters:       json.RawMessage(`{}`),
+				StandingApproval: neverExpire,
+			},
 		},
 	}
 }
