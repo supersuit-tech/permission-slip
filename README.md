@@ -45,6 +45,16 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 
 ---
 
+## Beta status & how we build
+
+The project is **in beta**: behavior, APIs, and connectors will keep evolving, and you should expect rough edges.
+
+The **architecture and product direction are designed by humans**; **the codebase is largely written with AI-assisted development** (with human review and iteration layered on top). Treat the implementation as fast-moving software, not a formally verified system.
+
+**Want to run, build, or change the code?** Start with the **[Developer guide](docs/development.md)** — local setup, production builds, testing, and tech stack — then [CONTRIBUTING.md](CONTRIBUTING.md) for workflow and standards.
+
+---
+
 ## 🔑 Key Features
 
 - 🛡️ **Action-based security** — Openclaw submits structured actions, not raw API calls
@@ -62,7 +72,7 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 
 ## 🔌 Connector Health
 
-> **⚠️ Permission Slip is in active development and currently in beta.** Not all features are complete, and connectors are being tested incrementally. Expect rough edges.
+Connectors are being tested incrementally during the beta; maturity varies by integration.
 
 | Connector | Status |
 |-----------|--------|
@@ -130,107 +140,13 @@ Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/p
 
 ---
 
-## 🛠️ Getting Started (local dev)
-
-**Prerequisites:** Go 1.24+, Node.js 20+, Supabase CLI, Docker
-
-```bash
-# 1. Clone and install
-git clone https://github.com/supersuit-tech/permission-slip.git
-cd permission-slip
-make install
-
-# 2. Configure environment
-cp .env.example .env
-# Edit .env — see .env.example for all options
-
-# 3. Start Supabase (auth + local Postgres)
-supabase start
-# Copy the publishable key from `supabase status` into VITE_SUPABASE_PUBLISHABLE_KEY
-
-# 4. Run migrations and generate types
-make migrate-up
-make generate
-
-# 5. Start the dev servers
-make dev-backend   # Go API server → http://localhost:8080
-make dev-frontend  # Vite + HMR   → http://localhost:5173
-```
-
-For the full walkthrough including PostgreSQL setup and test database configuration, see the [self-hosted deployment guide](docs/deployment-self-hosted.md).
-
----
-
-## 📱 Mobile App
-
-The approval app lives in `mobile/` (React Native / Expo). Approve or deny Openclaw's requests from your phone with push notifications, biometric lock, and deep linking.
-
-```bash
-make mobile-install  # install dependencies
-make mobile-start    # start Expo dev server (scan QR with Expo Go)
-make mobile-test     # run mobile tests
-```
-
-For builds, code signing, OTA updates, and App Store submission, see [docs/mobile-builds.md](docs/mobile-builds.md).
-
----
-
-## 🏗️ Production Build
-
-```bash
-make build   # single Go binary with embedded React frontend
-./bin/server
-```
-
-The server serves both the API and frontend on a single port (default 8080). The most critical environment variables:
-
-| Variable | Required | Description |
-|---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `SUPABASE_URL` | Yes | Supabase project URL for JWT verification |
-| `BASE_URL` | Yes | Public URL (e.g. `https://app.permissionslip.dev`) |
-| `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | For Web Push | Generate with `make generate-vapid-keys` |
-
-For the full environment variable reference, Dockerfile, Fly.io setup, and hardening checklist, see [docs/deployment-self-hosted.md](docs/deployment-self-hosted.md).
-
----
-
-## 🔭 Observability
-
-Set `SENTRY_DSN` (backend) and `VITE_SENTRY_DSN` (frontend) to enable Sentry error tracking. Set `VITE_POSTHOG_KEY` to enable PostHog analytics — fully consent-gated, no data collected until the user accepts cookies.
-
----
-
-## 🧪 Testing
-
-```bash
-make test            # all tests (backend + frontend + mobile)
-make test-backend    # Go tests (requires Postgres)
-make test-frontend   # frontend tests (no database needed)
-make mobile-test     # mobile tests (no database needed)
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy and development workflow.
-
----
-
-## ⚙️ Tech Stack
-
-| Layer | Technology |
-|---|---|
-| Backend | Go, PostgreSQL (pgx), JWT (ES256/HS256), goose migrations |
-| Frontend | React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui |
-| Mobile | React Native (Expo 55), TypeScript |
-| API Client | openapi-fetch with generated TypeScript types |
-| Auth | Supabase Auth (JWT-based, MFA support) |
-| Credential Vault | Supabase Vault (AES-256-GCM encryption at rest) |
-| State | React Query (TanStack Query) |
-| Testing | Go test + real Postgres, Vitest + RTL, Jest (mobile) |
-
----
-
 ## 📚 Documentation
+
+### 👩‍💻 For developers & contributors
+
+**[Developer guide](docs/development.md)** — clone the repo, local dev servers, production `make build`, observability env vars, testing commands, and tech stack overview.
+
+**[CONTRIBUTING.md](CONTRIBUTING.md)** — issue workflow, code standards, migrations, and pull request expectations.
 
 ### 📖 Getting Started
 - [Self-Hosted Deployment](docs/deployment-self-hosted.md) — Docker, Fly.io, bare metal
@@ -256,6 +172,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy and develop
 - [Mobile Builds](docs/mobile-builds.md) — EAS builds, OTA updates, App Store submission
 
 ### 🧪 Contributing & Testing
+- [Developer guide](docs/development.md) — local dev, builds, tests, stack
 - [CONTRIBUTING.md](CONTRIBUTING.md) — development workflow and code standards
 - [Integration Testing](docs/integration-testing.md) — end-to-end test strategy
 - [Manual Testing: Agent Registration](docs/manual-testing-agent-registration.md) — invite/registration flow walkthrough
@@ -264,7 +181,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full testing strategy and develop
 
 ## 🤝 Contributing
 
-Contributions are welcome! Check [CONTRIBUTING.md](CONTRIBUTING.md) to get started, or browse [open issues](https://github.com/supersuit-tech/permission-slip/issues).
+Contributions are welcome! For setup and commands, see the **[Developer guide](docs/development.md)**; for process and standards, see [CONTRIBUTING.md](CONTRIBUTING.md). Browse [open issues](https://github.com/supersuit-tech/permission-slip/issues) to find something to work on.
 
 ---
 
