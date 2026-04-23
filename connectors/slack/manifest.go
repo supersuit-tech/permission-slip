@@ -797,17 +797,6 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:      "slack.client_counts",
-				Name:            "Get Unread Counts",
-				Description:     "Get unread state for all channels, DMs, and group DMs via Slack's undocumented client.counts endpoint. Returns has_unreads, mention_count, and latest timestamp per conversation. This is the only way to get per-channel unread state — conversations.info only provides it for DMs. WARNING: This endpoint is undocumented and may change or break without notice.",
-				RiskLevel:       "low",
-				DisplayTemplate: "Get Slack unread counts",
-				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
-					"type": "object",
-					"properties": {}
-				}`)),
-			},
-			{
 				ActionType:      "slack.mark_read",
 				Name:            "Mark Read",
 				Description:     "Set the read cursor for a conversation (conversations.mark). Requires channel_id and ts — pass the Slack message timestamp of the last message you showed the user (no default).",
