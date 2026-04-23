@@ -40,6 +40,9 @@ func TestListUnread_NoEmail_Succeeds(t *testing.T) {
 	if err := json.Unmarshal(res.Data, &out); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
+	if out.Notes != listUnreadResponseNotes {
+		t.Fatalf("notes mismatch")
+	}
 	if len(out.UnreadChannels) != 0 {
 		t.Fatalf("expected no unreads, got %+v", out.UnreadChannels)
 	}
@@ -96,6 +99,9 @@ func TestListUnread_NoUnreads(t *testing.T) {
 	if err := json.Unmarshal(res.Data, &out); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
+	if out.Notes != listUnreadResponseNotes {
+		t.Fatalf("notes mismatch")
+	}
 	if len(out.UnreadChannels) != 0 {
 		t.Fatalf("expected no unreads, got %+v", out.UnreadChannels)
 	}
@@ -120,16 +126,17 @@ func TestListUnread_MixedTypes_WithPreview(t *testing.T) {
 			ch := r.URL.Query().Get("channel")
 			switch ch {
 			case "Cpub":
+				// Slack does not surface unread_count_display for public channels; still listed in users.conversations.
 				json.NewEncoder(w).Encode(map[string]any{
 					"ok": true,
 					"channel": map[string]any{
 						"id":                   "Cpub",
 						"name":                 "announce",
 						"is_private":           false,
-						"unread_count_display": 2,
+						"unread_count_display": 0,
 						"last_read":            "100.0",
 						"latest": map[string]any{
-							"text": strings.Repeat("a", 250),
+							"text": "would not be treated as unread",
 							"user": "U9",
 							"ts":   "200.0",
 						},
@@ -145,7 +152,7 @@ func TestListUnread_MixedTypes_WithPreview(t *testing.T) {
 						"unread_count_display": 1,
 						"last_read":            "1.0",
 						"latest": map[string]any{
-							"text": "dm hello",
+							"text": strings.Repeat("a", 250),
 							"user": "U222",
 							"ts":   "2.0",
 						},
@@ -192,27 +199,30 @@ func TestListUnread_MixedTypes_WithPreview(t *testing.T) {
 	if err := json.Unmarshal(res.Data, &out); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if len(out.UnreadChannels) != 3 {
-		t.Fatalf("expected 3 unreads, got %d", len(out.UnreadChannels))
+	if out.Notes != listUnreadResponseNotes {
+		t.Fatalf("notes mismatch")
 	}
-	// Find Cpub and check truncation
-	var pub *unreadChannelEntry
+	if len(out.UnreadChannels) != 2 {
+		t.Fatalf("expected 2 unreads (DM + mpim; public channel omitted by Slack), got %d", len(out.UnreadChannels))
+	}
+	// Find Ddm and check truncation on preview text
+	var dm *unreadChannelEntry
 	for i := range out.UnreadChannels {
-		if out.UnreadChannels[i].ChannelID == "Cpub" {
-			pub = &out.UnreadChannels[i]
+		if out.UnreadChannels[i].ChannelID == "Ddm" {
+			dm = &out.UnreadChannels[i]
 			break
 		}
 	}
-	if pub == nil {
-		t.Fatal("missing Cpub entry")
+	if dm == nil {
+		t.Fatal("missing Ddm entry")
 	}
-	if pub.ChannelType != "public_channel" {
-		t.Errorf("Cpub type: got %q", pub.ChannelType)
+	if dm.ChannelType != "direct_message" {
+		t.Errorf("Ddm type: got %q", dm.ChannelType)
 	}
-	if pub.LatestMessagePreview == nil {
+	if dm.LatestMessagePreview == nil {
 		t.Fatal("missing preview")
 	}
-	if got := len([]rune(pub.LatestMessagePreview.Text)); got != 201 { // 200 runes + ellipsis
+	if got := len([]rune(dm.LatestMessagePreview.Text)); got != 201 { // 200 runes + ellipsis
 		t.Errorf("expected truncated text length 201 runes, got %d", got)
 	}
 }
@@ -245,6 +255,9 @@ func TestListUnread_EmptyChannelList(t *testing.T) {
 	}
 	var out listUnreadResult
 	_ = json.Unmarshal(res.Data, &out)
+	if out.Notes != listUnreadResponseNotes {
+		t.Fatalf("notes mismatch")
+	}
 	if len(out.UnreadChannels) != 0 {
 		t.Fatalf("expected empty, got %d", len(out.UnreadChannels))
 	}
@@ -291,6 +304,9 @@ func TestListUnread_MissingLatestOmitsPreview(t *testing.T) {
 	}
 	var out listUnreadResult
 	_ = json.Unmarshal(res.Data, &out)
+	if out.Notes != listUnreadResponseNotes {
+		t.Fatalf("notes mismatch")
+	}
 	if len(out.UnreadChannels) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(out.UnreadChannels))
 	}
@@ -400,6 +416,9 @@ func TestListUnread_PaginatesUsersConversations(t *testing.T) {
 	}
 	var out listUnreadResult
 	_ = json.Unmarshal(res.Data, &out)
+	if out.Notes != listUnreadResponseNotes {
+		t.Fatalf("notes mismatch")
+	}
 	if len(out.UnreadChannels) != 1 || out.UnreadChannels[0].ChannelID != "C2" {
 		t.Fatalf("expected single unread on C2, got %+v", out.UnreadChannels)
 	}

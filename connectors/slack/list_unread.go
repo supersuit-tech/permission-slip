@@ -7,6 +7,10 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
+// listUnreadResponseNotes is returned on every slack.list_unread response so
+// agents and API clients learn Slack platform limits without relying on UI copy alone.
+const listUnreadResponseNotes = "Slack only populates unread_count on conversations.info for DMs (im) and group DMs (mpim). Public and private channels never appear here even when the user has unreads. For a specific channel, use slack.read_channel_messages (conversations.history) and compare the latest message ts to conversations.info last_read for that channel; scanning all channels that way is not feasible (many API calls, rate limits). If the user marks messages as unread in the Slack client, last_read may not reflect that, so this read-cursor check can miss those cases."
+
 // listUnreadAction implements slack.list_unread.
 type listUnreadAction struct {
 	conn *SlackConnector
@@ -32,6 +36,7 @@ type unreadChannelEntry struct {
 }
 
 type listUnreadResult struct {
+	Notes          string               `json:"notes"`
 	UnreadChannels []unreadChannelEntry `json:"unread_channels"`
 }
 
@@ -166,7 +171,10 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 		})
 	}
 
-	return connectors.JSONResult(listUnreadResult{UnreadChannels: entries})
+	return connectors.JSONResult(listUnreadResult{
+		Notes:          listUnreadResponseNotes,
+		UnreadChannels: entries,
+	})
 }
 
 func channelDisplayNameFromListEntry(ch listChannelEntry) string {
