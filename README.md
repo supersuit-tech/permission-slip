@@ -49,7 +49,7 @@ Permission Slip solves this with a **secure proxy + human-in-the-loop approval**
 
 The project is **in beta**: behavior, APIs, and connectors will keep evolving, and you should expect rough edges.
 
-The **architecture and product direction are designed by humans**; **the codebase is largely written with AI-assisted development** (with human review and iteration layered on top). Treat the implementation as fast-moving software, not a formally verified system.
+The **architecture and product direction are designed by humans**; **the codebase is largely written with AI-assisted development** (with human review and iteration layered on top). Treat the implementation as fast-moving software, not a formally verified system while it is in beta. If this ever gets more enough use, I'll update some processes, get a formal security review done, etc. Still just exploring at the moment.
 
 **Want to run, build, or change the code?** Start with the **[Developer guide](docs/development.md)** — local setup, production builds, testing, and tech stack — then [CONTRIBUTING.md](CONTRIBUTING.md) for workflow and standards.
 
