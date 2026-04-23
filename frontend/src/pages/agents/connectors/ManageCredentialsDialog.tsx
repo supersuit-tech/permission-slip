@@ -40,6 +40,7 @@ import {
   GoogleBetaInlineNote,
   GoogleBetaNoticeDialog,
 } from "@/components/GoogleBetaNoticeDialog";
+import { isSaas } from "@/lib/saas";
 
 export interface ManageCredentialsDialogProps {
   open: boolean;
@@ -259,7 +260,7 @@ function OAuthCredentialRow({
       setShopDialogState({});
       return;
     }
-    if (providerId === "google") {
+    if (providerId === "google" && isSaas) {
       setGoogleNoticeState({ mode: "connect" });
       return;
     }
@@ -272,7 +273,7 @@ function OAuthCredentialRow({
       setShopDialogState({ replaceId: connectionId });
       return;
     }
-    if (providerId === "google") {
+    if (providerId === "google" && isSaas) {
       setGoogleNoticeState({ mode: "reconnect", replaceId: connectionId });
       return;
     }
@@ -397,7 +398,7 @@ function OAuthCredentialRow({
           </div>
         )}
 
-        {providerId === "google" && (
+        {providerId === "google" && isSaas && (
           <div className="mt-3">
             <GoogleBetaInlineNote />
           </div>
@@ -429,18 +430,20 @@ function OAuthCredentialRow({
         />
       )}
 
-      <GoogleBetaNoticeDialog
-        open={!!googleNoticeState}
-        mode={googleNoticeState?.mode ?? "connect"}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) setGoogleNoticeState(null);
-        }}
-        onContinue={() => {
-          const replaceId = googleNoticeState?.replaceId;
-          setGoogleNoticeState(null);
-          performOAuthRedirect(replaceId);
-        }}
-      />
+      {isSaas && (
+        <GoogleBetaNoticeDialog
+          open={!!googleNoticeState}
+          mode={googleNoticeState?.mode ?? "connect"}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setGoogleNoticeState(null);
+          }}
+          onContinue={() => {
+            const replaceId = googleNoticeState?.replaceId;
+            setGoogleNoticeState(null);
+            performOAuthRedirect(replaceId);
+          }}
+        />
+      )}
     </>
   );
 }

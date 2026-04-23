@@ -6,6 +6,14 @@ import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { GoogleReauthBanner } from "../GoogleReauthBanner";
 
+const saasMode = vi.hoisted(() => ({ isSaas: true }));
+
+vi.mock("@/lib/saas", () => ({
+  get isSaas() {
+    return saasMode.isSaas;
+  },
+}));
+
 vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
@@ -26,7 +34,25 @@ describe("GoogleReauthBanner", () => {
     vi.restoreAllMocks();
     resetClientMocks();
     sessionStorage.clear();
+    saasMode.isSaas = true;
     wrapper = createAuthWrapper(["/"]);
+  });
+
+  it("renders nothing for self-hosted when Google needs reauth", async () => {
+    saasMode.isSaas = false;
+    mockConnections([
+      {
+        id: "conn-1",
+        provider: "google",
+        scopes: ["openid"],
+        status: "needs_reauth",
+        connected_at: "2026-03-05T10:00:00Z",
+      },
+    ]);
+    const { container } = render(<GoogleReauthBanner />, { wrapper });
+    await waitFor(() => {
+      expect(container.firstChild).toBeNull();
+    });
   });
 
   it("renders nothing when there are no Google connections", async () => {

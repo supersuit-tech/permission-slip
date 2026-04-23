@@ -39,6 +39,7 @@ import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import type { OAuthConnection } from "@/hooks/useOAuthConnections";
 import { ManageCredentialsDialog } from "./ManageCredentialsDialog";
 import { GoogleBetaNoticeDialog } from "@/components/GoogleBetaNoticeDialog";
+import { isSaas } from "@/lib/saas";
 import type { InstanceCredentialBinding } from "@/hooks/useConnectorInstanceCredentialBindings";
 
 export interface ConnectorInstancesSectionProps {
@@ -393,7 +394,7 @@ export function ConnectorInstancesSection({
       setManageDialogOpen(true);
       return;
     }
-    if (connection.provider === "google") {
+    if (connection.provider === "google" && isSaas) {
       setGoogleNoticeState({
         providerId: connection.provider,
         replaceId: connection.id,
@@ -569,18 +570,20 @@ export function ConnectorInstancesSection({
         oauthError={oauthError}
       />
 
-      <GoogleBetaNoticeDialog
-        open={!!googleNoticeState}
-        mode="reconnect"
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) setGoogleNoticeState(null);
-        }}
-        onContinue={() => {
-          const s = googleNoticeState;
-          setGoogleNoticeState(null);
-          if (s) performReauthRedirect(s.providerId, s.replaceId);
-        }}
-      />
+      {isSaas && (
+        <GoogleBetaNoticeDialog
+          open={!!googleNoticeState}
+          mode="reconnect"
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setGoogleNoticeState(null);
+          }}
+          onContinue={() => {
+            const s = googleNoticeState;
+            setGoogleNoticeState(null);
+            if (s) performReauthRedirect(s.providerId, s.replaceId);
+          }}
+        />
+      )}
     </Card>
   );
 }
