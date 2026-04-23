@@ -8,6 +8,7 @@ import { Footer } from "./Footer";
 import { UserMenu } from "./UserMenu";
 import { PendingAgentBanners } from "./PendingAgentBanners";
 import { BetaBanner } from "./BetaBanner";
+import { GoogleReauthBanner } from "./GoogleReauthBanner";
 
 interface NavItem {
   label: string;
@@ -83,6 +84,7 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </nav>
       <main className="mx-auto max-w-[1200px]">
+        <GoogleReauthBanner />
         <PendingAgentBanners />
         {children}
       </main>

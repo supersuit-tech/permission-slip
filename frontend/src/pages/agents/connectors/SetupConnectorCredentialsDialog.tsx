@@ -17,6 +17,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConnectorLogo } from "@/components/ConnectorLogo";
+import {
+  GoogleBetaInlineNote,
+  GoogleBetaNoticeDialog,
+} from "@/components/GoogleBetaNoticeDialog";
 import { useAuth } from "@/auth/AuthContext";
 import { useConnectorDetail } from "@/hooks/useConnectorDetail";
 import { useOAuthProviders } from "@/hooks/useOAuthProviders";
@@ -73,6 +77,7 @@ export function SetupConnectorCredentialsDialog({
     useState(false);
   const [addCredentialTarget, setAddCredentialTarget] =
     useState<RequiredCredential | null>(null);
+  const [googleNoticeOpen, setGoogleNoticeOpen] = useState(false);
   const { tryAssign } = useTryAutoAssign(agentId, connectorId);
 
   const isLoading = detailLoading || providersLoading || connectionsLoading;
@@ -118,7 +123,7 @@ export function SetupConnectorCredentialsDialog({
     effectiveOAuthProvider != null &&
     SHOP_REQUIRED_PROVIDERS.has(effectiveOAuthProvider);
 
-  function handleOAuthConnect() {
+  function performOAuthRedirect() {
     if (!session?.access_token || !effectiveOAuthProvider) return;
 
     if (needsShopDomain) {
@@ -139,6 +144,15 @@ export function SetupConnectorCredentialsDialog({
       session.access_token,
       oauthCredential?.oauth_scopes,
     );
+  }
+
+  function handleOAuthConnect() {
+    if (!session?.access_token || !effectiveOAuthProvider) return;
+    if (effectiveOAuthProvider === "google") {
+      setGoogleNoticeOpen(true);
+      return;
+    }
+    performOAuthRedirect();
   }
 
   function handleUseApiKey(credential: RequiredCredential) {
@@ -200,6 +214,13 @@ export function SetupConnectorCredentialsDialog({
               shopSubdomain={shopSubdomain}
               onShopSubdomainChange={setShopSubdomain}
               onConnect={handleOAuthConnect}
+              footer={
+                effectiveOAuthProvider === "google" ? (
+                  <div className="w-full max-w-sm">
+                    <GoogleBetaInlineNote />
+                  </div>
+                ) : null
+              }
             />
           ) : hasOAuth && !hasOAuthCredentials ? (
             <OAuthUnavailableContent
@@ -266,6 +287,16 @@ export function SetupConnectorCredentialsDialog({
           }}
         />
       )}
+
+      <GoogleBetaNoticeDialog
+        open={googleNoticeOpen}
+        mode={needsReauth ? "reconnect" : "connect"}
+        onOpenChange={setGoogleNoticeOpen}
+        onContinue={() => {
+          setGoogleNoticeOpen(false);
+          performOAuthRedirect();
+        }}
+      />
     </>
   );
 }
@@ -342,12 +373,14 @@ function OAuthSetupContent({
   shopSubdomain,
   onShopSubdomainChange,
   onConnect,
+  footer,
 }: {
   providerName: string;
   needsShopDomain: boolean;
   shopSubdomain: string;
   onShopSubdomainChange: (value: string) => void;
   onConnect: () => void;
+  footer?: React.ReactNode;
 }) {
   return (
     <div className="flex flex-col items-center gap-4 py-6 text-center">
@@ -379,6 +412,7 @@ function OAuthSetupContent({
         Connect with {providerName}
       </Button>
 
+      {footer}
     </div>
   );
 }

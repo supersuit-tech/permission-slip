@@ -31,6 +31,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { DisconnectOAuthDialog } from "@/pages/agents/connectors/DisconnectOAuthDialog";
+import {
+  GoogleBetaInlineNote,
+  GoogleBetaNoticeDialog,
+} from "@/components/GoogleBetaNoticeDialog";
 
 /**
  * Config for providers that need a per-instance subdomain before the OAuth
@@ -104,16 +108,31 @@ export function ConnectedAccountsSection() {
     displayName?: string;
   } | null>(null);
 
+  const [googleNoticeState, setGoogleNoticeState] = useState<{
+    mode: "connect" | "reconnect";
+    replaceId?: string;
+  } | null>(null);
+
+  function redirectToProvider(providerId: string, replaceId?: string) {
+    if (!session?.access_token) return;
+    window.location.href = getOAuthAuthorizeUrl(
+      providerId,
+      session.access_token,
+      replaceId ? { replaceId } : undefined,
+    );
+  }
+
   function handleConnect(providerId: string) {
     if (!session?.access_token) return;
     if (providerId in INSTANCE_SUBDOMAIN_PROVIDERS) {
       setInstanceDialogState({ provider: providerId });
       return;
     }
-    window.location.href = getOAuthAuthorizeUrl(
-      providerId,
-      session.access_token,
-    );
+    if (providerId === "google") {
+      setGoogleNoticeState({ mode: "connect" });
+      return;
+    }
+    redirectToProvider(providerId);
   }
 
   function handleReconnect(connectionId: string, providerId: string) {
@@ -122,11 +141,11 @@ export function ConnectedAccountsSection() {
       setInstanceDialogState({ provider: providerId, replaceId: connectionId });
       return;
     }
-    window.location.href = getOAuthAuthorizeUrl(
-      providerId,
-      session.access_token,
-      { replaceId: connectionId },
-    );
+    if (providerId === "google") {
+      setGoogleNoticeState({ mode: "reconnect", replaceId: connectionId });
+      return;
+    }
+    redirectToProvider(providerId, connectionId);
   }
 
   // Providers that are ready to connect (have credentials configured)
@@ -278,6 +297,15 @@ export function ConnectedAccountsSection() {
               </div>
             )}
 
+            {/* Inline beta note shown whenever Google is offered as a
+                connection option, so users have context before clicking. */}
+            {(connections.some((c) => c.provider === "google") ||
+              configuredProviders.some((p) => p.id === "google")) && (
+              <div className="pt-2">
+                <GoogleBetaInlineNote />
+              </div>
+            )}
+
             {connections.length === 0 && configuredProviders.length === 0 && (
               <p className="text-muted-foreground py-4 text-center text-sm">
                 No OAuth providers are configured yet. Set up client credentials
@@ -325,6 +353,19 @@ export function ConnectedAccountsSection() {
           displayName={disconnectTarget.displayName}
         />
       )}
+
+      <GoogleBetaNoticeDialog
+        open={!!googleNoticeState}
+        mode={googleNoticeState?.mode ?? "connect"}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setGoogleNoticeState(null);
+        }}
+        onContinue={() => {
+          const replaceId = googleNoticeState?.replaceId;
+          setGoogleNoticeState(null);
+          redirectToProvider("google", replaceId);
+        }}
+      />
     </Card>
   );
 }
