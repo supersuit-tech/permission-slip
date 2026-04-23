@@ -788,7 +788,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "slack.list_unread",
 				Name:            "List Unread",
-				Description:     "List Slack conversations where the authorizing user has unread messages (users.conversations + conversations.info per channel). Use slack.read_channel_messages with oldest = last_read_ts from an entry to load only unread messages; optionally clear read state with slack.mark_read using the ts of the last message you surfaced (required parameter).",
+				Description:     "List Slack conversations where Slack exposes an unread count (typically DMs and group DMs only). Slack does not populate unread_count on conversations.info for public/private channels, so those never appear here even when the user has unreads — this is a Slack API limitation, not a Permission Slip bug. The action response includes a notes field explaining limits and how to approximate unreads per channel via read_channel_messages vs last_read. Use slack.read_channel_messages with oldest = last_read_ts from an entry to load only unread messages; optionally clear read state with slack.mark_read using the ts of the last message you surfaced (required parameter). Manual \"mark as unread\" in Slack clients may not update last_read.",
 				RiskLevel:       "low",
 				DisplayTemplate: "List unread Slack conversations",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
@@ -1047,7 +1047,7 @@ func (c *SlackConnector) Manifest() *connectors.ConnectorManifest {
 				ID:               "tpl_slack_list_unread",
 				ActionType:       "slack.list_unread",
 				Name:             "List unread conversations",
-				Description:      "Agent can list conversations with unread messages for the authorizing user.",
+				Description:      "Agent can list conversations where Slack reports unreads (DMs and group DMs; not public/private channels — see response notes).",
 				Parameters:       json.RawMessage(`{}`),
 				StandingApproval: neverExpire,
 			},

@@ -180,7 +180,7 @@ Reads recent messages from a Slack channel, DM, or group DM using `conversations
 
 To answer “do I have unread Slack messages?” or load only unread content, use this flow (no extra OAuth scopes beyond the connector’s user token):
 
-1. Call **`slack.list_unread`** — returns conversations where `unread_count` &gt; 0, with `last_read_ts` and a short `latest_message_preview` when Slack provides `latest`.
+1. Call **`slack.list_unread`** — returns conversations where Slack’s `conversations.info` reports `unread_count` &gt; 0 (in practice **DMs and group DMs**; public/private channels are omitted because Slack does not surface unread counts there), plus a fixed **`notes`** field on every response describing the limitation and per-channel workarounds. Each row includes `last_read_ts` and a short `latest_message_preview` when Slack provides `latest`.
 2. For a given conversation, call **`slack.read_channel_messages`** with **`oldest` = `last_read_ts`** from that row (Slack accepts the same timestamp format as in `list_unread`). That limits history to messages after the user’s read cursor instead of guessing from “recent” history alone.
 3. Optionally **`slack.mark_read`** with **`channel_id`** and an explicit **`ts`** — the Slack message timestamp of the last message you surfaced to the user. **`ts` is required** (there is no default) so the agent cannot clear unreads it never showed.
 
@@ -188,7 +188,9 @@ To answer “do I have unread Slack messages?” or load only unread content, us
 
 ### `slack.list_unread`
 
-Lists conversations where the authorizing user has unread messages. Uses `users.conversations` to enumerate conversations, then `conversations.info` per channel for `last_read`, `unread_count_display`, and `latest`.
+Lists conversations where Slack reports an unread count via `conversations.info` (`unread_count_display` &gt; 0). **Slack only fills those fields for IMs and MPIMs**; public and private channels are not included even when the user has unread messages in the client. Every JSON response includes **`notes`** with the same limitation text, the impracticality of scanning all channels, and that comparing `last_read` to the latest message for **specific** channels via `read_channel_messages` is the supported workaround (manual “mark as unread” in Slack may not move `last_read`).
+
+Uses `users.conversations` to enumerate conversations, then `conversations.info` per channel for `last_read`, `unread_count_display`, and `latest`.
 
 **Slack API:** `POST /users.conversations`, `GET /conversations.info`
 
