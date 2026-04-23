@@ -36,6 +36,10 @@ import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 import { DisconnectOAuthDialog } from "./DisconnectOAuthDialog";
+import {
+  GoogleBetaInlineNote,
+  GoogleBetaNoticeDialog,
+} from "@/components/GoogleBetaNoticeDialog";
 
 export interface ManageCredentialsDialogProps {
   open: boolean;
@@ -218,6 +222,10 @@ function OAuthCredentialRow({
     id: string;
     displayName?: string;
   } | null>(null);
+  const [googleNoticeState, setGoogleNoticeState] = useState<{
+    mode: "connect" | "reconnect";
+    replaceId?: string;
+  } | null>(null);
 
   const providerId = requiredCredential.oauth_provider ?? "";
   const providerConnections = connections.filter(
@@ -233,17 +241,29 @@ function OAuthCredentialRow({
   const hasAnyConnection = providerConnections.length > 0;
   const isConnected = activeConnections.length > 0;
 
+  function performOAuthRedirect(replaceId?: string) {
+    if (!session?.access_token || !providerId) return;
+    window.location.href = getOAuthAuthorizeUrl(
+      providerId,
+      session.access_token,
+      {
+        scopes: requiredCredential.oauth_scopes,
+        ...(replaceId ? { replaceId } : {}),
+      },
+    );
+  }
+
   function handleConnect() {
     if (!session?.access_token || !providerId) return;
     if (SHOP_REQUIRED_PROVIDERS.has(providerId)) {
       setShopDialogState({});
       return;
     }
-    window.location.href = getOAuthAuthorizeUrl(
-      providerId,
-      session.access_token,
-      { scopes: requiredCredential.oauth_scopes },
-    );
+    if (providerId === "google") {
+      setGoogleNoticeState({ mode: "connect" });
+      return;
+    }
+    performOAuthRedirect();
   }
 
   function handleReconnect(connectionId: string) {
@@ -252,11 +272,11 @@ function OAuthCredentialRow({
       setShopDialogState({ replaceId: connectionId });
       return;
     }
-    window.location.href = getOAuthAuthorizeUrl(
-      providerId,
-      session.access_token,
-      { scopes: requiredCredential.oauth_scopes, replaceId: connectionId },
-    );
+    if (providerId === "google") {
+      setGoogleNoticeState({ mode: "reconnect", replaceId: connectionId });
+      return;
+    }
+    performOAuthRedirect(connectionId);
   }
 
   return (
@@ -377,6 +397,12 @@ function OAuthCredentialRow({
           </div>
         )}
 
+        {providerId === "google" && (
+          <div className="mt-3">
+            <GoogleBetaInlineNote />
+          </div>
+        )}
+
       </div>
 
       {SHOP_REQUIRED_PROVIDERS.has(providerId) && shopDialogState && (
@@ -402,6 +428,19 @@ function OAuthCredentialRow({
           displayName={disconnectTarget.displayName}
         />
       )}
+
+      <GoogleBetaNoticeDialog
+        open={!!googleNoticeState}
+        mode={googleNoticeState?.mode ?? "connect"}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setGoogleNoticeState(null);
+        }}
+        onContinue={() => {
+          const replaceId = googleNoticeState?.replaceId;
+          setGoogleNoticeState(null);
+          performOAuthRedirect(replaceId);
+        }}
+      />
     </>
   );
 }

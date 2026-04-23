@@ -39,7 +39,19 @@ export function useOAuthCallbackToast() {
       const detail = oauthError
         ? `Failed to connect ${label}: ${oauthError}`
         : `Failed to connect ${label}. Please try again.`;
-      toast.error(detail);
+      // While Permission Slip is in closed beta, the most common Google
+      // failure is "access_denied" from an account that isn't on the test
+      // user list. Surface the beta waitlist email so users know what to
+      // do next.
+      const isGoogleAccessDenied =
+        oauthProvider === "google" &&
+        !!oauthError &&
+        /access.?denied|admin.?policy|verification/i.test(oauthError);
+      toast.error(detail, {
+        description: isGoogleAccessDenied
+          ? "Google blocked the sign-in. If you haven't already, email support@supersuit.tech to be added to the Permission Slip beta."
+          : undefined,
+      });
     }
 
     // Remove OAuth params without a full navigation.

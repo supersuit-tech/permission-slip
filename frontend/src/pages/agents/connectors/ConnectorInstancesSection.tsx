@@ -38,6 +38,7 @@ import { useAutoAssignOAuthCredential } from "@/hooks/useAutoAssignOAuthCredenti
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import type { OAuthConnection } from "@/hooks/useOAuthConnections";
 import { ManageCredentialsDialog } from "./ManageCredentialsDialog";
+import { GoogleBetaNoticeDialog } from "@/components/GoogleBetaNoticeDialog";
 import type { InstanceCredentialBinding } from "@/hooks/useConnectorInstanceCredentialBindings";
 
 export interface ConnectorInstancesSectionProps {
@@ -67,6 +68,10 @@ export function ConnectorInstancesSection({
     [connectorId, requiredCredentials],
   );
   const [manageDialogOpen, setManageDialogOpen] = useState(false);
+  const [googleNoticeState, setGoogleNoticeState] = useState<{
+    providerId: string;
+    replaceId: string;
+  } | null>(null);
   const { session } = useAuth();
 
   useAutoAssignOAuthCredential(agentId, connectorId);
@@ -368,6 +373,18 @@ export function ConnectorInstancesSection({
     return `Added ${new Date(row.credential.created_at).toLocaleDateString()}`;
   }
 
+  function performReauthRedirect(providerId: string, replaceId: string) {
+    if (!session?.access_token) return;
+    window.location.href = getOAuthAuthorizeUrl(
+      providerId,
+      session.access_token,
+      {
+        scopes: oauthScopesByProvider.get(providerId),
+        replaceId,
+      },
+    );
+  }
+
   function handleReauthorize(connection: OAuthConnection) {
     if (!session?.access_token) return;
     // Shop-required providers (e.g. shopify) prompt for a shop subdomain —
@@ -376,14 +393,14 @@ export function ConnectorInstancesSection({
       setManageDialogOpen(true);
       return;
     }
-    window.location.href = getOAuthAuthorizeUrl(
-      connection.provider,
-      session.access_token,
-      {
-        scopes: oauthScopesByProvider.get(connection.provider),
+    if (connection.provider === "google") {
+      setGoogleNoticeState({
+        providerId: connection.provider,
         replaceId: connection.id,
-      },
-    );
+      });
+      return;
+    }
+    performReauthRedirect(connection.provider, connection.id);
   }
 
   return (
@@ -550,6 +567,19 @@ export function ConnectorInstancesSection({
         anyLoading={anyLoading}
         error={credsError}
         oauthError={oauthError}
+      />
+
+      <GoogleBetaNoticeDialog
+        open={!!googleNoticeState}
+        mode="reconnect"
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setGoogleNoticeState(null);
+        }}
+        onContinue={() => {
+          const s = googleNoticeState;
+          setGoogleNoticeState(null);
+          if (s) performReauthRedirect(s.providerId, s.replaceId);
+        }}
       />
     </Card>
   );
