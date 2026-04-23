@@ -216,8 +216,21 @@ func TestListUnread_MixedTypes_WithPreview(t *testing.T) {
 	if dm == nil {
 		t.Fatal("missing Ddm entry")
 	}
-	if dm.ChannelType != "direct_message" {
+	if dm.ChannelType != "im" {
 		t.Errorf("Ddm type: got %q", dm.ChannelType)
+	}
+	var mpim *unreadChannelEntry
+	for i := range out.UnreadChannels {
+		if out.UnreadChannels[i].ChannelID == "Ggrp" {
+			mpim = &out.UnreadChannels[i]
+			break
+		}
+	}
+	if mpim == nil {
+		t.Fatal("missing Ggrp entry")
+	}
+	if mpim.ChannelType != "mpim" {
+		t.Errorf("Ggrp type: got %q", mpim.ChannelType)
 	}
 	if dm.LatestMessagePreview == nil {
 		t.Fatal("missing preview")
