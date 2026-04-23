@@ -2,6 +2,7 @@ package slack
 
 import (
 	"context"
+	"strconv"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -43,17 +44,37 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 	types := "public_channel,private_channel,mpim,im"
 	var entries []unreadChannelEntry
 	cursor := ""
+
+	// Track channel IDs processed to avoid duplicates across pages.
+	processed := make(map[string]bool)
+
+	// Fetch all private channels once via POST (GET omits private channels for
+	// some workspaces). POST ignores pagination limit but we only need all private
+	// channels once.
+	var privateChannels []listChannelEntry
+	privateTypes := filterPrivateTypes(types)
+	if privateTypes != "" {
+		privateBody := usersConversationsRequest{
+			Types: privateTypes,
+			Limit: 200,
+		}
+		var privateResp usersConversationsResponse
+		if err := a.conn.doPost(ctx, "users.conversations", req.Credentials, privateBody, &privateResp); err == nil && privateResp.OK {
+			privateChannels = privateResp.Channels
+		}
+	}
+
 	for page := 0; page < maxUserConversationPages; page++ {
-		// Omit User: the xoxp- user token implicitly scopes users.conversations
-		// to the token owner. Passing the owner's own ID triggers the admin
-		// "browse another user" path and returns empty (#1031).
-		body := usersConversationsRequest{
-			Types:  types,
-			Limit:  200,
-			Cursor: cursor,
+		// Use GET for pagination: POST ignores limit/cursor for users.conversations.
+		paramsMap := map[string]string{
+			"types": types,
+			"limit": strconv.Itoa(200),
+		}
+		if cursor != "" {
+			paramsMap["cursor"] = cursor
 		}
 		var resp usersConversationsResponse
-		if err := a.conn.doPost(ctx, "users.conversations", req.Credentials, body, &resp); err != nil {
+		if err := a.conn.doGet(ctx, "users.conversations", req.Credentials, paramsMap, &resp); err != nil {
 			return nil, err
 		}
 		if !resp.OK {
@@ -61,6 +82,11 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 		}
 
 		for _, ch := range resp.Channels {
+			if processed[ch.ID] {
+				continue
+			}
+			processed[ch.ID] = true
+
 			info, err := a.conn.fetchConversationInfo(ctx, req.Credentials, ch.ID)
 			if err != nil {
 				return nil, err
@@ -98,6 +124,46 @@ func (a *listUnreadAction) Execute(ctx context.Context, req connectors.ActionReq
 			break
 		}
 		cursor = resp.Meta.NextCursor
+	}
+
+	// Process private channels that were not already covered by GET pages.
+	for _, ch := range privateChannels {
+		if processed[ch.ID] {
+			continue
+		}
+		processed[ch.ID] = true
+
+		info, err := a.conn.fetchConversationInfo(ctx, req.Credentials, ch.ID)
+		if err != nil {
+			return nil, err
+		}
+		if info.UnreadCountDisplay <= 0 {
+			continue
+		}
+		var previewPtr *latestMessagePreview
+		if info.Latest != nil {
+			pv := latestMessagePreview{
+				Text: truncatePreviewText(info.Latest.Text.String()),
+				User: info.Latest.User,
+				TS:   info.Latest.TS,
+			}
+			if info.Latest.BotID != "" && pv.User == "" {
+				pv.User = info.Latest.BotID
+			}
+			previewPtr = &pv
+		}
+		name := channelDisplayName(info)
+		if name == "" {
+			name = channelDisplayNameFromListEntry(ch)
+		}
+		entries = append(entries, unreadChannelEntry{
+			ChannelID:            info.ID,
+			ChannelName:          name,
+			ChannelType:          channelTypeLabel(info),
+			UnreadCount:          info.UnreadCountDisplay,
+			LastReadTS:           info.LastRead,
+			LatestMessagePreview: previewPtr,
+		})
 	}
 
 	return connectors.JSONResult(listUnreadResult{UnreadChannels: entries})
