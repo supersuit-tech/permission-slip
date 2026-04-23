@@ -30,6 +30,7 @@ import {
   getOAuthAuthorizeUrl,
   SHOP_REQUIRED_PROVIDERS,
 } from "@/lib/oauth";
+import { isSaas } from "@/lib/saas";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
 import { AddCredentialDialog } from "./AddCredentialDialog";
@@ -148,7 +149,7 @@ export function SetupConnectorCredentialsDialog({
 
   function handleOAuthConnect() {
     if (!session?.access_token || !effectiveOAuthProvider) return;
-    if (effectiveOAuthProvider === "google") {
+    if (effectiveOAuthProvider === "google" && isSaas) {
       setGoogleNoticeOpen(true);
       return;
     }
@@ -215,7 +216,7 @@ export function SetupConnectorCredentialsDialog({
               onShopSubdomainChange={setShopSubdomain}
               onConnect={handleOAuthConnect}
               footer={
-                effectiveOAuthProvider === "google" ? (
+                effectiveOAuthProvider === "google" && isSaas ? (
                   <div className="w-full max-w-sm">
                     <GoogleBetaInlineNote />
                   </div>
@@ -288,15 +289,17 @@ export function SetupConnectorCredentialsDialog({
         />
       )}
 
-      <GoogleBetaNoticeDialog
-        open={googleNoticeOpen}
-        mode={needsReauth ? "reconnect" : "connect"}
-        onOpenChange={setGoogleNoticeOpen}
-        onContinue={() => {
-          setGoogleNoticeOpen(false);
-          performOAuthRedirect();
-        }}
-      />
+      {isSaas && (
+        <GoogleBetaNoticeDialog
+          open={googleNoticeOpen}
+          mode={needsReauth ? "reconnect" : "connect"}
+          onOpenChange={setGoogleNoticeOpen}
+          onContinue={() => {
+            setGoogleNoticeOpen(false);
+            performOAuthRedirect();
+          }}
+        />
+      )}
     </>
   );
 }

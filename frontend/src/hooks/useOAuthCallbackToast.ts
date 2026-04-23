@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { providerLabel } from "@/lib/labels";
+import { isSaas } from "@/lib/saas";
 
 /**
  * Global handler for OAuth callback query parameters. After the backend
@@ -44,6 +45,7 @@ export function useOAuthCallbackToast() {
       // user list. Surface the beta waitlist email so users know what to
       // do next.
       const isGoogleAccessDenied =
+        isSaas &&
         oauthProvider === "google" &&
         !!oauthError &&
         /access.?denied|admin.?policy|verification/i.test(oauthError);

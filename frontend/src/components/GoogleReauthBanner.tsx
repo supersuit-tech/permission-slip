@@ -4,6 +4,7 @@ import { AlertTriangle, LogIn, X } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { useOAuthConnections } from "@/hooks/useOAuthConnections";
 import { getOAuthAuthorizeUrl } from "@/lib/oauth";
+import { isSaas } from "@/lib/saas";
 import { Button } from "@/components/ui/button";
 import { GoogleBetaNoticeDialog } from "./GoogleBetaNoticeDialog";
 
@@ -26,9 +27,11 @@ export function GoogleReauthBanner() {
   const [pendingReconnect, setPendingReconnect] = useState<string | null>(null);
   const [dismissedTick, setDismissedTick] = useState(0);
 
-  const needsReauthGoogleConnections = connections.filter(
-    (c) => c.provider === "google" && c.status === "needs_reauth",
-  );
+  const needsReauthGoogleConnections = isSaas
+    ? connections.filter(
+        (c) => c.provider === "google" && c.status === "needs_reauth",
+      )
+    : [];
 
   // Re-read dismissal state each render (cheap). `dismissedTick` forces a
   // rerender after the user dismisses.
@@ -45,16 +48,25 @@ export function GoogleReauthBanner() {
 
   function handleReconnectClick(connectionId: string) {
     setPendingReconnect(connectionId);
-    setBetaNoticeOpen(true);
+    if (isSaas) {
+      setBetaNoticeOpen(true);
+      return;
+    }
+    handleContinueToGoogleFor(connectionId);
   }
 
-  function handleContinueToGoogle() {
-    if (!session?.access_token || !pendingReconnect) return;
+  function handleContinueToGoogleFor(connectionId: string) {
+    if (!session?.access_token) return;
     window.location.href = getOAuthAuthorizeUrl(
       "google",
       session.access_token,
-      { replaceId: pendingReconnect },
+      { replaceId: connectionId },
     );
+  }
+
+  function handleContinueToGoogle() {
+    if (!pendingReconnect) return;
+    handleContinueToGoogleFor(pendingReconnect);
   }
 
   function handleDismiss(connectionId: string) {

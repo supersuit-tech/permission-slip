@@ -35,6 +35,7 @@ import {
   GoogleBetaInlineNote,
   GoogleBetaNoticeDialog,
 } from "@/components/GoogleBetaNoticeDialog";
+import { isSaas } from "@/lib/saas";
 
 /**
  * Config for providers that need a per-instance subdomain before the OAuth
@@ -128,7 +129,7 @@ export function ConnectedAccountsSection() {
       setInstanceDialogState({ provider: providerId });
       return;
     }
-    if (providerId === "google") {
+    if (providerId === "google" && isSaas) {
       setGoogleNoticeState({ mode: "connect" });
       return;
     }
@@ -141,7 +142,7 @@ export function ConnectedAccountsSection() {
       setInstanceDialogState({ provider: providerId, replaceId: connectionId });
       return;
     }
-    if (providerId === "google") {
+    if (providerId === "google" && isSaas) {
       setGoogleNoticeState({ mode: "reconnect", replaceId: connectionId });
       return;
     }
@@ -299,12 +300,13 @@ export function ConnectedAccountsSection() {
 
             {/* Inline beta note shown whenever Google is offered as a
                 connection option, so users have context before clicking. */}
-            {(connections.some((c) => c.provider === "google") ||
-              configuredProviders.some((p) => p.id === "google")) && (
-              <div className="pt-2">
-                <GoogleBetaInlineNote />
-              </div>
-            )}
+            {isSaas &&
+              (connections.some((c) => c.provider === "google") ||
+                configuredProviders.some((p) => p.id === "google")) && (
+                <div className="pt-2">
+                  <GoogleBetaInlineNote />
+                </div>
+              )}
 
             {connections.length === 0 && configuredProviders.length === 0 && (
               <p className="text-muted-foreground py-4 text-center text-sm">
@@ -354,18 +356,20 @@ export function ConnectedAccountsSection() {
         />
       )}
 
-      <GoogleBetaNoticeDialog
-        open={!!googleNoticeState}
-        mode={googleNoticeState?.mode ?? "connect"}
-        onOpenChange={(nextOpen) => {
-          if (!nextOpen) setGoogleNoticeState(null);
-        }}
-        onContinue={() => {
-          const replaceId = googleNoticeState?.replaceId;
-          setGoogleNoticeState(null);
-          redirectToProvider("google", replaceId);
-        }}
-      />
+      {isSaas && (
+        <GoogleBetaNoticeDialog
+          open={!!googleNoticeState}
+          mode={googleNoticeState?.mode ?? "connect"}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setGoogleNoticeState(null);
+          }}
+          onContinue={() => {
+            const replaceId = googleNoticeState?.replaceId;
+            setGoogleNoticeState(null);
+            redirectToProvider("google", replaceId);
+          }}
+        />
+      )}
     </Card>
   );
 }
