@@ -43,6 +43,7 @@ var paramValidators = map[string]connectors.ParamValidatorFunc{
 	"slack.rename_channel":        makeParamValidator[renameChannelParams](),
 	"slack.unpin_message":         makeParamValidator[unpinMessageParams](),
 	"slack.list_unread":           makeParamValidator[listUnreadParams](),
+	"slack.client_counts":         makeParamValidator[clientCountsParams](),
 	"slack.mark_read":             makeParamValidator[markReadParams](),
 }
 
