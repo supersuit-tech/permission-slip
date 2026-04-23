@@ -401,12 +401,15 @@ make build    # TypeScript compiles, Go builds successfully
    - How to test the changes (steps, commands, or screenshots)
    - Any related issue numbers (use `Closes #123` to auto-close issues)
 
-3. **CI must pass.** The GitHub Actions pipeline runs:
+3. **CI runs on every PR push** (and on pushes to `main`). The GitHub Actions pipeline includes:
    - Backend tests (Go + real Postgres)
    - Frontend tests (Vitest)
    - OpenAPI spec bundle freshness check
    - Production build
+   - Mobile CI (on PRs that touch mobile)
    - Dependency vulnerability scans
+
+   These checks are **not required to pass before merge** in GitHub, but you should still treat a green CI run as the bar for shipping quality changes and fix failures before merging when practical.
 
 4. **Keep PRs focused.** One logical change per PR. If you find something unrelated to fix, open a separate PR.
 
