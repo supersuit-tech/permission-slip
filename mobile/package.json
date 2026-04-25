@@ -34,7 +34,7 @@
     "expo-linking": "^55.0.7",
     "expo-local-authentication": "^55.0.8",
     "expo-notifications": "^55.0.10",
-    "expo-updates": "^55.0.12",
+    "expo-updates": "^55.0.21",
     "expo-secure-store": "^55.0.8",
     "expo-status-bar": "~55.0.4",
     "openapi-fetch": "^0.17.0",
