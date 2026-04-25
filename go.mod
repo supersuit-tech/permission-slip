@@ -12,7 +12,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/credentials v1.19.15
 	github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue v1.20.23
 	github.com/aws/aws-sdk-go-v2/service/dynamodb v1.53.0
-	github.com/aws/aws-sdk-go-v2/service/sns v1.39.14
+	github.com/aws/aws-sdk-go-v2/service/sns v1.39.16
 	github.com/aws/smithy-go v1.25.0
 	github.com/coinbase/cdp-sdk/go v0.0.0-20260312193422-ec2866ff0423
 	github.com/ethereum/go-ethereum v1.17.1
