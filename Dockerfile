@@ -46,7 +46,7 @@ RUN npm run build
 # ── Stage 2: Build Go binary ────────────────────────────────────────────────
 # Pin to the exact patch version from go.mod's toolchain directive to avoid
 # automatic toolchain downloads during build (which can fail in restricted envs).
-FROM golang:1.26.1-alpine AS backend
+FROM golang:1.26.2-alpine AS backend
 
 RUN apk add --no-cache git
 
