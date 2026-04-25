@@ -17,7 +17,11 @@ import * as Haptics from "expo-haptics";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
-import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
+import {
+  useAgents,
+  getAgentDisplayName,
+  type AgentSummary,
+} from "../../hooks/useAgents";
 import { useApproveApproval } from "../../hooks/useApproveApproval";
 import { useDenyApproval } from "../../hooks/useDenyApproval";
 import { colors } from "../../theme/colors";
@@ -65,7 +69,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   } = useDenyApproval();
 
   const agent = useMemo(
-    () => agents.find((a) => a.agent_id === approval.agent_id),
+    () => agents.find((a: AgentSummary) => a.agent_id === approval.agent_id),
     [agents, approval.agent_id],
   );
   const agentName = agent
