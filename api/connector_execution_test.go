@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -612,8 +613,9 @@ func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentSuccessDo
 		)
 	}()
 
+	var startBump sync.Once
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		close(bumpCh)
+		startBump.Do(func() { close(bumpCh) })
 		<-bumpDone
 		if bumpErr != nil {
 			http.Error(w, bumpErr.Error(), http.StatusInternalServerError)
@@ -715,8 +717,9 @@ func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentNeedsReau
 		)
 	}()
 
+	var startBumpFail sync.Once
 	tokenSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		close(bumpCh)
+		startBumpFail.Do(func() { close(bumpCh) })
 		<-bumpDone
 		if bumpErr != nil {
 			http.Error(w, bumpErr.Error(), http.StatusInternalServerError)

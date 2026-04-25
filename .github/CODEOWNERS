@@ -1,6 +1,6 @@
 # Require @chiedo's approval for infrastructure, dependency, and CI files
-Dockerfile @chiedo
-go.mod @chiedo
-go.sum @chiedo
-Makefile @chiedo
-.github/workflows/ @chiedo
+Dockerfile @chiedo @chiedoclaude
+go.mod @chiedo @chiedoclaude
+go.sum @chiedo @chiedoclaude
+Makefile @chiedo @chiedoclaude
+.github/workflows/ @chiedo @chiedoclaude
