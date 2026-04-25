@@ -10,7 +10,8 @@ import (
 )
 
 func TestPanicRecoverMiddleware_ReturnsStructured500(t *testing.T) {
-	t.Parallel()
+	// Do not use t.Parallel: these tests swap the package-level panicCaptureError
+	// and would race with each other.
 
 	inner := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		panic("super-secret-panic-detail-do-not-leak")
@@ -55,7 +56,7 @@ func TestPanicRecoverMiddleware_ReturnsStructured500(t *testing.T) {
 }
 
 func TestPanicRecoverMiddleware_NoSecondWriteAfterImplicit200(t *testing.T) {
-	t.Parallel()
+	// See TestPanicRecoverMiddleware_ReturnsStructured500 — package-level hook.
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("ok"))
@@ -86,7 +87,7 @@ func TestPanicRecoverMiddleware_NoSecondWriteAfterImplicit200(t *testing.T) {
 }
 
 func TestPanicRecoverMiddleware_NoSecondWriteAfterHeaders(t *testing.T) {
-	t.Parallel()
+	// See TestPanicRecoverMiddleware_ReturnsStructured500 — package-level hook.
 
 	inner := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
