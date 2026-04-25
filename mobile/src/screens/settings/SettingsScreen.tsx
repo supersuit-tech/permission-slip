@@ -19,11 +19,15 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAuth } from "../../auth/AuthContext";
-import { useNotificationPreferences } from "../../hooks/useNotificationPreferences";
+import {
+  useNotificationPreferences,
+  type NotificationPreference,
+} from "../../hooks/useNotificationPreferences";
 import { useUpdateNotificationPreferences } from "../../hooks/useUpdateNotificationPreferences";
 import {
   NOTIFICATION_TYPE_STANDING_EXECUTION,
   useNotificationTypePreferences,
+  type NotificationTypePreference,
 } from "../../hooks/useNotificationTypePreferences";
 import { useUpdateNotificationTypePreferences } from "../../hooks/useUpdateNotificationTypePreferences";
 import Constants from "expo-constants";
@@ -74,11 +78,14 @@ export default function SettingsScreen(_props: Props) {
     [insets.bottom],
   );
 
-  const mobilePushPref = preferences.find((p) => p.channel === "mobile-push");
+  const mobilePushPref = preferences.find(
+    (p: NotificationPreference) => p.channel === "mobile-push",
+  );
   const mobilePushEnabled = mobilePushPref?.enabled ?? true;
 
   const standingPref = typePreferences.find(
-    (p) => p.notification_type === NOTIFICATION_TYPE_STANDING_EXECUTION,
+    (p: NotificationTypePreference) =>
+      p.notification_type === NOTIFICATION_TYPE_STANDING_EXECUTION,
   );
   const standingExecutionEnabled = standingPref?.enabled ?? true;
 
