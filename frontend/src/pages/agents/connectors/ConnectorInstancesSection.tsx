@@ -217,6 +217,10 @@ export function ConnectorInstancesSection({
     if (!bindingByInstance) return [];
     const out: string[] = [];
     for (const inst of instances) {
+      // Never auto-delete the default instance: it can briefly have no binding
+      // (e.g. race with refetch) or legitimately be unassigned while still the
+      // default row — the API rejects DELETE on default (Sentry: PERMISSION-SLIP-REACT-2).
+      if (inst.is_default) continue;
       const b = bindingByInstance.get(inst.connector_instance_id);
       if (!bindingRowKey(b ?? undefined)) out.push(inst.connector_instance_id);
     }
