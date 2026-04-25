@@ -462,7 +462,11 @@ function StaticOnlyContent({
             ? "credentials"
             : cred.service === "coinbase_agentkit"
               ? "CDP credentials"
-              : "API key"}
+              : ["postgres", "mysql", "snowflake"].includes(cred.service)
+                ? "connection string"
+                : cred.service === "redis"
+                  ? "Redis URL"
+                  : "API key"}
         </Button>
       ))}
     </div>
