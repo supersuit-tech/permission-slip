@@ -356,6 +356,97 @@ describe("ConnectorInstancesSection", () => {
     ).toBeInTheDocument();
   });
 
+  it("does not auto-delete the default instance when its credential binding is empty", async () => {
+    mockStandardGets(false);
+    const emptyBinding = new Map<string, InstanceCredentialBinding | null>();
+    emptyBinding.set(defaultInstance.connector_instance_id, {
+      agent_id: 42,
+      connector_id: "slack",
+      credential_id: null,
+      oauth_connection_id: null,
+    });
+    mockUseConnectorInstanceCredentialBindings.mockReturnValue({
+      data: emptyBinding,
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      status: "success" as const,
+    });
+    renderWithProviders(
+      <ConnectorInstancesSection
+        agentId={42}
+        connectorId="slack"
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2",
+            oauth_provider: "slack",
+          },
+        ]}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/Slack OAuth — Acme/)).toBeInTheDocument();
+    });
+    await waitFor(
+      () => {
+        const instDeletes = mockDelete.mock.calls.filter(
+          (c) =>
+            c[0] ===
+            "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}",
+        );
+        expect(instDeletes.length).toBe(0);
+      },
+      { timeout: 1500 },
+    );
+  });
+
+  it("auto-deletes a non-default instance with no credential binding (orphan cleanup)", async () => {
+    mockStandardGets(true);
+    const m = new Map<string, InstanceCredentialBinding | null>();
+    m.set(defaultInstance.connector_instance_id, oauthBinding("oconn_1"));
+    m.set(secondInstance.connector_instance_id, {
+      agent_id: 42,
+      connector_id: "slack",
+      credential_id: null,
+      oauth_connection_id: null,
+    });
+    mockUseConnectorInstanceCredentialBindings.mockReturnValue({
+      data: m,
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      status: "success" as const,
+    });
+    renderWithProviders(
+      <ConnectorInstancesSection
+        agentId={42}
+        connectorId="slack"
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2",
+            oauth_provider: "slack",
+          },
+        ]}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/Slack OAuth — Sales/)).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const instDeletes = mockDelete.mock.calls.filter(
+        (c) =>
+          c[0] ===
+          "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}",
+      );
+      expect(instDeletes.length).toBeGreaterThan(0);
+      expect(instDeletes[0]?.[1]?.params?.path?.instance_id).toBe(
+        secondInstance.connector_instance_id,
+      );
+    });
+  });
+
   it("re-authorize button navigates to the OAuth authorize URL with replace param", async () => {
     mockStandardGets(true, { secondNeedsReauth: true });
     mockUseConnectorInstanceCredentialBindings.mockReturnValue(
