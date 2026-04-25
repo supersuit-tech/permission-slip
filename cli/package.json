@@ -22,7 +22,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "commander": "^12.1.0"
+    "commander": "^14.0.3"
   },
   "devDependencies": {
     "@types/jest": "^29.5.14",
