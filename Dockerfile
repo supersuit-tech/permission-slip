@@ -5,7 +5,7 @@
 # Run:   docker run -p 8080:8080 -e DATABASE_URL=... -e SUPABASE_URL=... permission-slip
 
 # ── Stage 1: Build frontend ──────────────────────────────────────────────────
-FROM node:22-alpine AS frontend
+FROM node:25-alpine AS frontend
 
 WORKDIR /app/frontend
 
@@ -46,7 +46,7 @@ RUN npm run build
 # ── Stage 2: Build Go binary ────────────────────────────────────────────────
 # Pin to the exact patch version from go.mod's toolchain directive to avoid
 # automatic toolchain downloads during build (which can fail in restricted envs).
-FROM golang:1.26.1-alpine AS backend
+FROM golang:1.26.2-alpine AS backend
 
 RUN apk add --no-cache git
 
@@ -66,7 +66,7 @@ COPY --from=frontend /app/frontend/dist ./frontend/dist
 RUN CGO_ENABLED=0 GOOS=linux go build -o /server .
 
 # ── Stage 3: Minimal runtime ────────────────────────────────────────────────
-FROM alpine:3.21
+FROM alpine:3.23
 
 RUN apk add --no-cache ca-certificates tzdata
 
