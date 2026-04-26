@@ -5,7 +5,13 @@
  *
  * Mailpit is proxied at /mailpit on the same origin (configured in both
  * vite.config.ts and dev-proxy.cjs → localhost:54324).
+ *
+ * OTP digit count comes from `@/lib/otpDigitLengths` (same source as
+ * OtpStep / OtpCodeInput) so the Mailpit regex stays in sync with
+ * `shared/validation.json` at build time.
  */
+
+import { EMAIL_OTP_DIGIT_LENGTH } from "@/lib/otpDigitLengths";
 
 /** Subset of the Mailpit v1 message-list response we rely on. */
 interface MailpitMessageSummary {
@@ -48,10 +54,9 @@ export async function fetchOtpFromMailpit(
 
     const fullMsg: MailpitMessage = await msgRes.json();
 
-    // Extract OTP code from the email body using the configured length.
-    const { default: validation } = await import("@/lib/validation");
-    const len = validation.emailOtpCode.length;
-    const match = fullMsg.Text?.match(new RegExp(`\\b(\\d{${len}})\\b`));
+    const match = fullMsg.Text?.match(
+      new RegExp(`\\b(\\d{${EMAIL_OTP_DIGIT_LENGTH}})\\b`),
+    );
     return match?.[1] ?? null;
   } catch {
     return null;

@@ -8,7 +8,7 @@ import DevOnly from "../components/DevOnly";
 import { Button } from "@/components/ui/button";
 import { FormError } from "@/components/FormError";
 import { OtpCodeInput } from "@/components/OtpCodeInput";
-import validation from "@/lib/validation";
+import { EMAIL_OTP_DIGIT_LENGTH } from "@/lib/otpDigitLengths";
 
 interface OtpStepProps {
   email: string;
@@ -29,7 +29,7 @@ export default function OtpStep({
   const [otpCode, setOtpCode] = useState("");
   const { error, isSubmitting, handleSubmit } = useFormSubmit();
   const resend = useResend({ onResend });
-  const emailOtpLen = validation.emailOtpCode.length;
+  const emailOtpLen = EMAIL_OTP_DIGIT_LENGTH;
 
   const handleAutoFill = async () => {
     // Dynamic import keeps dev-only Mailpit code out of the production bundle

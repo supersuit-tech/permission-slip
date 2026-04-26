@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import validation from "@/lib/validation";
+import { EMAIL_OTP_DIGIT_LENGTH, TOTP_DIGIT_LENGTH } from "@/lib/otpDigitLengths";
 
 interface OtpCodeInputProps {
   /** HTML id for the input element (also used for label association). */
@@ -37,9 +37,7 @@ export function OtpCodeInput({
   required,
 }: OtpCodeInputProps) {
   const maxLength =
-    variant === "email"
-      ? validation.emailOtpCode.length
-      : validation.totpCode.length;
+    variant === "email" ? EMAIL_OTP_DIGIT_LENGTH : TOTP_DIGIT_LENGTH;
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
