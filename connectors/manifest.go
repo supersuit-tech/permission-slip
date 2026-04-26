@@ -62,6 +62,10 @@ type ManifestCredential struct {
 	InstructionsURL string   `json:"instructions_url,omitempty"`
 	OAuthProvider   string   `json:"oauth_provider,omitempty"`
 	OAuthScopes     []string `json:"oauth_scopes,omitempty"`
+	// AuthOptionGroup marks credentials that are mutually exclusive alternatives.
+	// All credentials sharing the same non-empty group name are treated as "pick
+	// one" options. Leave empty for credentials that are individually required.
+	AuthOptionGroup string `json:"auth_option_group,omitempty"`
 }
 
 // ManifestOAuthProvider describes an OAuth 2.0 provider declared by an external
@@ -342,7 +346,17 @@ func (m *ConnectorManifest) Validate() error {
 	// declare the same service with different auth types (e.g. oauth2 + api_key).
 	type serviceAuth struct{ service, authType string }
 	seen := make(map[serviceAuth]bool, len(m.RequiredCredentials))
+	// Pre-count group memberships to validate that each group has ≥2 members.
+	groupCount := make(map[string]int)
+	for _, c := range m.RequiredCredentials {
+		if c.AuthOptionGroup != "" {
+			groupCount[c.AuthOptionGroup]++
+		}
+	}
 	for i, c := range m.RequiredCredentials {
+		if c.AuthOptionGroup != "" && groupCount[c.AuthOptionGroup] < 2 {
+			return fmt.Errorf("manifest validation: required_credentials[%d].auth_option_group %q must contain at least two credentials", i, c.AuthOptionGroup)
+		}
 		if c.Service == "" {
 			return fmt.Errorf("manifest validation: required_credentials[%d].service is required", i)
 		}
@@ -674,6 +688,7 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 			InstructionsURL: c.InstructionsURL,
 			OAuthProvider:   c.OAuthProvider,
 			OAuthScopes:     c.OAuthScopes,
+			AuthOptionGroup: c.AuthOptionGroup,
 		})
 	}
 	for _, tpl := range m.Templates {

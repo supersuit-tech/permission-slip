@@ -437,6 +437,17 @@ RequiredCredential:
       example:
         - "https://www.googleapis.com/auth/gmail.send"
 
+    auth_option_group:
+      type: string
+      maxLength: 255
+      description: |
+        Groups credentials that are mutually exclusive alternatives. All credentials
+        sharing the same non-null group name are "pick one" options — the user satisfies
+        the connector's requirement by providing any one of them. Credentials without
+        this field are individually required. Only present when the connector declares
+        alternative auth paths (e.g. OAuth or PAT).
+      example: "github_auth"
+
   example:
     service: "github"
     auth_type: "api_key"

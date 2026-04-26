@@ -1337,15 +1337,17 @@ func (c *GitHubConnector) Manifest() *connectors.ConnectorManifest {
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
-				Service:       "github",
-				AuthType:      "oauth2",
-				OAuthProvider: "github",
-				OAuthScopes:   []string{"repo"},
+				Service:         "github",
+				AuthType:        "oauth2",
+				OAuthProvider:   "github",
+				OAuthScopes:     []string{"repo"},
+				AuthOptionGroup: "github_auth",
 			},
 			{
 				Service:         "github_pat",
 				AuthType:        "api_key",
 				InstructionsURL: "https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens",
+				AuthOptionGroup: "github_auth",
 			},
 		},
 		Templates: []connectors.ManifestTemplate{

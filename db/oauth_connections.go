@@ -298,14 +298,14 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
 	err := db.QueryRow(ctx, `
-		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes
+		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes, crc.auth_option_group
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1
 		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END, crc.service
 		LIMIT 1`,
 		actionType,
-	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes)
+	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &rc.AuthOptionGroup)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -323,7 +323,7 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 // fall back to static credentials when the user hasn't connected via OAuth.
 func GetRequiredCredentialsByActionType(ctx context.Context, db DBTX, actionType string) ([]RequiredCredential, error) {
 	rows, err := db.Query(ctx, `
-		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes
+		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes, crc.auth_option_group
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1
@@ -338,7 +338,7 @@ func GetRequiredCredentialsByActionType(ctx context.Context, db DBTX, actionType
 	var creds []RequiredCredential
 	for rows.Next() {
 		var rc RequiredCredential
-		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes); err != nil {
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &rc.AuthOptionGroup); err != nil {
 			return nil, err
 		}
 		creds = append(creds, rc)
