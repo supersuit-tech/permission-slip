@@ -4,8 +4,8 @@
 package redis
 
 import (
-	_ "embed"
 	"context"
+	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -186,7 +186,18 @@ func (c *RedisConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "redis", AuthType: "custom", InstructionsURL: "https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/"},
+			{
+				Service:         "redis",
+				AuthType:        "custom",
+				InstructionsURL: "https://redis.io/docs/latest/operate/oss_and_stack/management/security/acl/",
+				Fields: []connectors.ManifestCredentialField{
+					{
+						Key:         "url",
+						Label:       "Redis URL",
+						Placeholder: "redis://user:password@host:port/0",
+					},
+				},
+			},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{

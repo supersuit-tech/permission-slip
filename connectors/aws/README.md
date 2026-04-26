@@ -12,6 +12,7 @@ The AWS connector integrates Permission Slip with the [AWS REST APIs](https://do
 |-----|----------|-------------|
 | `access_key_id` | Yes | AWS access key ID (starts with `AKIA` for long-term keys or `ASIA` for temporary credentials) |
 | `secret_access_key` | Yes | AWS secret access key paired with the access key ID |
+| `region` | Yes | Default AWS region (e.g. `us-east-1`) used when an action omits an explicit region |
 | `session_token` | No | Session token for temporary credentials (from STS AssumeRole, etc.) |
 
 The credential `auth_type` in the database is `custom`. Credentials are stored encrypted in Supabase Vault and decrypted only at execution time.

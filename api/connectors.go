@@ -37,12 +37,22 @@ type connectorActionResponse struct {
 	Preview               any     `json:"preview,omitempty"`
 }
 
+type credentialFieldResponse struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Placeholder string `json:"placeholder,omitempty"`
+	Secret      bool   `json:"secret"`
+	Required    bool   `json:"required"`
+	HelpText    string `json:"help_text,omitempty"`
+}
+
 type requiredCredentialResponse struct {
-	Service         string   `json:"service"`
-	AuthType        string   `json:"auth_type"`
-	InstructionsURL *string  `json:"instructions_url,omitempty"`
-	OAuthProvider   *string  `json:"oauth_provider,omitempty"`
-	OAuthScopes     []string `json:"oauth_scopes,omitempty"`
+	Service         string                    `json:"service"`
+	AuthType        string                    `json:"auth_type"`
+	InstructionsURL *string                   `json:"instructions_url,omitempty"`
+	OAuthProvider   *string                   `json:"oauth_provider,omitempty"`
+	OAuthScopes     []string                  `json:"oauth_scopes,omitempty"`
+	Fields          []credentialFieldResponse `json:"fields,omitempty"`
 }
 
 type connectorDetailResponse struct {
@@ -154,13 +164,20 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 
 	creds := make([]requiredCredentialResponse, len(c.RequiredCredentials))
 	for i, rc := range c.RequiredCredentials {
-		creds[i] = requiredCredentialResponse{
+		resp := requiredCredentialResponse{
 			Service:         rc.Service,
 			AuthType:        rc.AuthType,
 			InstructionsURL: rc.InstructionsURL,
 			OAuthProvider:   rc.OAuthProvider,
 			OAuthScopes:     rc.OAuthScopes,
 		}
+		for _, f := range rc.CredentialFields {
+			resp.Fields = append(resp.Fields, credentialFieldResponse{
+				Key: f.Key, Label: f.Label, Placeholder: f.Placeholder,
+				Secret: f.Secret, Required: f.Required, HelpText: f.HelpText,
+			})
+		}
+		creds[i] = resp
 	}
 
 	return connectorDetailResponse{

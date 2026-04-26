@@ -64,6 +64,11 @@ func TestAWSConnector_ValidateCredentials(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name:    "missing region",
+			creds:   connectors.NewCredentials(map[string]string{"access_key_id": "AKID", "secret_access_key": "secret"}),
+			wantErr: true,
+		},
+		{
 			name:    "empty access_key_id",
 			creds:   connectors.NewCredentials(map[string]string{"access_key_id": "", "secret_access_key": "secret"}),
 			wantErr: true,

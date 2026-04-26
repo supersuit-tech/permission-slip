@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useStoreCredential } from "@/hooks/useStoreCredential";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import validation from "@/lib/validation";
+import { resolveStaticCredentialFields } from "./credentialFields";
 
 interface AddCredentialDialogProps {
   open: boolean;
@@ -44,23 +45,43 @@ export function AddCredentialDialog({
 }: AddCredentialDialogProps) {
   const { storeCredential, isLoading } = useStoreCredential();
   const [label, setLabel] = useState("");
-  const [apiKey, setApiKey] = useState("");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [cdpApiKeyID, setCdpApiKeyID] = useState("");
-  const [cdpApiKeySecret, setCdpApiKeySecret] = useState("");
-  const [cdpWalletSecret, setCdpWalletSecret] = useState("");
+  const [fieldValues, setFieldValues] = useState<Record<string, string>>({});
 
-  const isCoinbaseAgentKit = credential.service === "coinbase_agentkit";
+  const staticFields = useMemo(
+    () =>
+      resolveStaticCredentialFields(credential, {
+        credentialKey,
+        fieldLabel,
+        fieldPlaceholder,
+      }),
+    [credential, credentialKey, fieldLabel, fieldPlaceholder],
+  );
+
+  const staticFieldSig = useMemo(
+    () => staticFields.map((f) => f.key).join("\x1e"),
+    [staticFields],
+  );
+
+  useEffect(() => {
+    if (!open) return;
+    const next: Record<string, string> = {};
+    for (const f of staticFields) {
+      next[f.key] = "";
+    }
+    setFieldValues(next);
+  }, [open, staticFieldSig, staticFields]);
 
   function resetForm() {
     setLabel("");
-    setApiKey("");
     setUsername("");
     setPassword("");
-    setCdpApiKeyID("");
-    setCdpApiKeySecret("");
-    setCdpWalletSecret("");
+    const cleared: Record<string, string> = {};
+    for (const f of staticFields) {
+      cleared[f.key] = "";
+    }
+    setFieldValues(cleared);
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -94,57 +115,9 @@ export function AddCredentialDialog({
     }
   }
 
-  // Service-specific credential field overrides. Connectors with auth_type
-  // "custom" don't fit the default "API Key" mold — until we extend the
-  // connector manifest with per-field schemas, hardcode the known cases here.
-  const SERVICE_FIELD_OVERRIDES: Record<
-    string,
-    { key: string; label: string; placeholder: string }
-  > = {
-    postgres: {
-      key: "connection_string",
-      label: "Connection String",
-      placeholder: "postgresql://user:password@host:port/dbname",
-    },
-    mysql: {
-      key: "connection_string",
-      label: "Connection String",
-      placeholder: "mysql://user:password@host:port/dbname",
-    },
-    snowflake: {
-      key: "connection_string",
-      label: "Connection String",
-      placeholder: "user:password@account/database/schema",
-    },
-    redis: {
-      key: "url",
-      label: "Redis URL",
-      placeholder: "redis://user:password@host:port/0",
-    },
-  };
-  const override = SERVICE_FIELD_OVERRIDES[credential.service];
-  const resolvedKey = credentialKey ?? override?.key ?? "api_key";
-  const resolvedFieldLabel = fieldLabel ?? override?.label ?? "API Key";
-  const resolvedPlaceholder =
-    fieldPlaceholder ?? override?.placeholder ?? "Enter API key or token";
   const resolvedTitle = title ?? "Add Credential";
 
   function buildCredentials(): Record<string, string> | null {
-    if (isCoinbaseAgentKit) {
-      if (
-        !cdpApiKeyID.trim() ||
-        !cdpApiKeySecret.trim() ||
-        !cdpWalletSecret.trim()
-      ) {
-        toast.error("API Key ID, API Key Secret, and Wallet Secret are required");
-        return null;
-      }
-      return {
-        api_key_id: cdpApiKeyID.trim(),
-        api_key_secret: cdpApiKeySecret.trim(),
-        wallet_secret: cdpWalletSecret.trim(),
-      };
-    }
     if (credential.auth_type === "basic") {
       if (!username.trim() || !password.trim()) {
         toast.error("Username and password are required");
@@ -152,11 +125,23 @@ export function AddCredentialDialog({
       }
       return { username: username.trim(), password: password.trim() };
     }
-    if (!apiKey.trim()) {
-      toast.error(`${resolvedFieldLabel} is required`);
+    const out: Record<string, string> = {};
+    for (const f of staticFields) {
+      const v = (fieldValues[f.key] ?? "").trim();
+      if (f.required && !v) {
+        toast.error(`${f.label} is required`);
+        return null;
+      }
+      if (!f.required && !v) {
+        continue;
+      }
+      out[f.key] = v;
+    }
+    if (Object.keys(out).length === 0) {
+      toast.error("At least one credential value is required");
       return null;
     }
-    return { [resolvedKey]: apiKey.trim() };
+    return out;
   }
 
   const isBasic = credential.auth_type === "basic";
@@ -184,61 +169,7 @@ export function AddCredentialDialog({
                 disabled={isLoading}
               />
             </div>
-            {isCoinbaseAgentKit ? (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="cdp-api-key-id">API Key ID</Label>
-                  <Input
-                    id="cdp-api-key-id"
-                    placeholder="From CDP Portal → API Keys"
-                    value={cdpApiKeyID}
-                    onChange={(e) => setCdpApiKeyID(e.target.value)}
-                    disabled={isLoading}
-                    required
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cdp-api-key-secret">API Key Secret</Label>
-                  <Input
-                    id="cdp-api-key-secret"
-                    type="password"
-                    placeholder="PEM EC private key or Ed25519 secret from portal"
-                    value={cdpApiKeySecret}
-                    onChange={(e) => setCdpApiKeySecret(e.target.value)}
-                    disabled={isLoading}
-                    required
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="cdp-wallet-secret">Wallet Secret</Label>
-                  <Input
-                    id="cdp-wallet-secret"
-                    type="password"
-                    placeholder="Base64 PKCS#8 wallet secret from Wallet API product"
-                    value={cdpWalletSecret}
-                    onChange={(e) => setCdpWalletSecret(e.target.value)}
-                    disabled={isLoading}
-                    required
-                    autoComplete="off"
-                  />
-                </div>
-                <p className="text-muted-foreground text-xs">
-                  Create keys at{" "}
-                  <a
-                    href="https://portal.cdp.coinbase.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="underline"
-                  >
-                    portal.cdp.coinbase.com
-                  </a>
-                  . The wallet secret is required for signing and sending
-                  transactions.
-                </p>
-              </>
-            ) : isBasic ? (
+            {isBasic ? (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="cred-username">Username</Label>
@@ -267,19 +198,29 @@ export function AddCredentialDialog({
                 </div>
               </>
             ) : (
-              <div className="space-y-2">
-                <Label htmlFor="cred-api-key">{resolvedFieldLabel}</Label>
-                <Input
-                  id="cred-api-key"
-                  type="password"
-                  placeholder={resolvedPlaceholder}
-                  value={apiKey}
-                  onChange={(e) => setApiKey(e.target.value)}
-                  disabled={isLoading}
-                  required
-                  autoComplete="off"
-                />
-              </div>
+              staticFields.map((f) => (
+                <div key={f.key} className="space-y-2">
+                  <Label htmlFor={`cred-field-${f.key}`}>{f.label}</Label>
+                  <Input
+                    id={`cred-field-${f.key}`}
+                    type={f.secret ? "password" : "text"}
+                    placeholder={f.placeholder || undefined}
+                    value={fieldValues[f.key] ?? ""}
+                    onChange={(e) =>
+                      setFieldValues((prev) => ({
+                        ...prev,
+                        [f.key]: e.target.value,
+                      }))
+                    }
+                    disabled={isLoading}
+                    required={f.required}
+                    autoComplete="off"
+                  />
+                  {f.helpText ? (
+                    <p className="text-muted-foreground text-xs">{f.helpText}</p>
+                  ) : null}
+                </div>
+              ))
             )}
           </div>
           <DialogFooter>
