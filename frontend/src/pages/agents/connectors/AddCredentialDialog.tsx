@@ -94,9 +94,39 @@ export function AddCredentialDialog({
     }
   }
 
-  const resolvedKey = credentialKey ?? "api_key";
-  const resolvedFieldLabel = fieldLabel ?? "API Key";
-  const resolvedPlaceholder = fieldPlaceholder ?? "Enter API key or token";
+  // Service-specific credential field overrides. Connectors with auth_type
+  // "custom" don't fit the default "API Key" mold — until we extend the
+  // connector manifest with per-field schemas, hardcode the known cases here.
+  const SERVICE_FIELD_OVERRIDES: Record<
+    string,
+    { key: string; label: string; placeholder: string }
+  > = {
+    postgres: {
+      key: "connection_string",
+      label: "Connection String",
+      placeholder: "postgresql://user:password@host:port/dbname",
+    },
+    mysql: {
+      key: "connection_string",
+      label: "Connection String",
+      placeholder: "mysql://user:password@host:port/dbname",
+    },
+    snowflake: {
+      key: "connection_string",
+      label: "Connection String",
+      placeholder: "user:password@account/database/schema",
+    },
+    redis: {
+      key: "url",
+      label: "Redis URL",
+      placeholder: "redis://user:password@host:port/0",
+    },
+  };
+  const override = SERVICE_FIELD_OVERRIDES[credential.service];
+  const resolvedKey = credentialKey ?? override?.key ?? "api_key";
+  const resolvedFieldLabel = fieldLabel ?? override?.label ?? "API Key";
+  const resolvedPlaceholder =
+    fieldPlaceholder ?? override?.placeholder ?? "Enter API key or token";
   const resolvedTitle = title ?? "Add Credential";
 
   function buildCredentials(): Record<string, string> | null {

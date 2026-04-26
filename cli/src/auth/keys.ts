@@ -50,6 +50,11 @@ export function readPublicKey(): string {
 
 /**
  * Loads the private key from disk as a Node KeyObject.
+ *
+ * Supports both PKCS8 PEM (`-----BEGIN PRIVATE KEY-----`, what Node natively
+ * understands) and the OpenSSH native format (`-----BEGIN OPENSSH PRIVATE KEY-----`,
+ * what `ssh-keygen` produces by default). For OpenSSH keys, the 32-byte ed25519
+ * seed is extracted manually and converted to a JWK before construction.
  */
 export function loadPrivateKey(): crypto.KeyObject {
   if (!fs.existsSync(PRIVATE_KEY_FILE)) {
@@ -57,8 +62,82 @@ export function loadPrivateKey(): crypto.KeyObject {
       `Private key not found at ${PRIVATE_KEY_FILE}. Run 'permission-slip register' to generate one.`,
     );
   }
-  const pem = fs.readFileSync(PRIVATE_KEY_FILE);
-  return crypto.createPrivateKey({ key: pem, format: "pem" });
+  const raw = fs.readFileSync(PRIVATE_KEY_FILE, "utf-8");
+  if (raw.includes("BEGIN OPENSSH PRIVATE KEY")) {
+    return loadOpenSSHPrivateKey(raw);
+  }
+  return crypto.createPrivateKey({ key: raw, format: "pem" });
+}
+
+/**
+ * Parses an unencrypted OpenSSH-format ed25519 private key and returns it as a
+ * Node KeyObject. Format reference: PROTOCOL.key in the OpenSSH source.
+ */
+function loadOpenSSHPrivateKey(pem: string): crypto.KeyObject {
+  const b64 = pem
+    .replace(/-----BEGIN OPENSSH PRIVATE KEY-----/, "")
+    .replace(/-----END OPENSSH PRIVATE KEY-----/, "")
+    .replace(/\s+/g, "");
+  const buf = Buffer.from(b64, "base64");
+
+  // Magic: "openssh-key-v1\0"
+  const magic = "openssh-key-v1\0";
+  if (buf.slice(0, magic.length).toString("binary") !== magic) {
+    throw new Error("Not a valid OpenSSH private key (bad magic)");
+  }
+  let off = magic.length;
+
+  const readString = (): Buffer => {
+    const len = buf.readUInt32BE(off);
+    off += 4;
+    const out = buf.slice(off, off + len);
+    off += len;
+    return out;
+  };
+
+  const cipher = readString().toString();
+  if (cipher !== "none") {
+    throw new Error(
+      `Encrypted OpenSSH keys are not supported (cipher: ${cipher}). Decrypt the key with 'ssh-keygen -p -P <pw> -N "" -f <key>' first.`,
+    );
+  }
+  readString(); // kdfname
+  readString(); // kdfoptions
+  const numKeys = buf.readUInt32BE(off);
+  off += 4;
+  if (numKeys !== 1) {
+    throw new Error(`Expected exactly 1 key in OpenSSH file, got ${numKeys}`);
+  }
+  readString(); // public key blob (we don't need it; derive from private)
+  const privateBlob = readString();
+
+  // Parse the private key blob.
+  let pOff = 8; // skip check1+check2
+  const readPrivString = (): Buffer => {
+    const len = privateBlob.readUInt32BE(pOff);
+    pOff += 4;
+    const out = privateBlob.slice(pOff, pOff + len);
+    pOff += len;
+    return out;
+  };
+  const keyType = readPrivString().toString();
+  if (keyType !== "ssh-ed25519") {
+    throw new Error(`Unsupported key type: ${keyType} (only ssh-ed25519)`);
+  }
+  readPrivString(); // public key (32 bytes)
+  const privKey = readPrivString(); // 64 bytes: 32-byte seed + 32-byte public
+  if (privKey.length !== 64) {
+    throw new Error(`Unexpected ed25519 private key length: ${privKey.length}`);
+  }
+  const seed = privKey.slice(0, 32);
+  const pub = privKey.slice(32, 64);
+
+  const b64url = (b: Buffer) =>
+    b.toString("base64").replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  return crypto.createPrivateKey({
+    key: { kty: "OKP", crv: "Ed25519", d: b64url(seed), x: b64url(pub) },
+    format: "jwk",
+  });
 }
 
 /**

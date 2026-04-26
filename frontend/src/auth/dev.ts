@@ -48,8 +48,10 @@ export async function fetchOtpFromMailpit(
 
     const fullMsg: MailpitMessage = await msgRes.json();
 
-    // Extract 6-digit OTP code from the email body
-    const match = fullMsg.Text?.match(/\b(\d{6})\b/);
+    // Extract OTP code from the email body using the configured length.
+    const { default: validation } = await import("@/lib/validation");
+    const len = validation.emailOtpCode.length;
+    const match = fullMsg.Text?.match(new RegExp(`\\b(\\d{${len}})\\b`));
     return match?.[1] ?? null;
   } catch {
     return null;

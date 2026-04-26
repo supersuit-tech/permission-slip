@@ -206,7 +206,7 @@ secure_password_change = false
 # Set low for local dev to avoid rate-limit friction. Production uses hosted Supabase defaults.
 max_frequency = "1s"
 # Number of characters used in the email OTP.
-otp_length = 6
+otp_length = 8
 # Number of seconds before the email OTP expires (defaults to 1 hour).
 otp_expiry = 3600
 

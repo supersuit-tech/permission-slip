@@ -39,6 +39,8 @@ export default defineConfig({
   server: {
     fs: {
       allow: [
+        // Frontend project root (Vite's default — must be explicit when fs.allow is set).
+        path.resolve(__dirname),
         // Allow Vite dev server to read config/ from repo root.
         path.resolve(__dirname, "../config"),
       ],
