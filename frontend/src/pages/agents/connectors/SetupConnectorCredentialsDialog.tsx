@@ -34,6 +34,7 @@ import { isSaas } from "@/lib/saas";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
 import { AddCredentialDialog } from "./AddCredentialDialog";
+import { staticCredentialButtonLabel } from "./credentialFields";
 
 interface SetupConnectorCredentialsDialogProps {
   open: boolean;
@@ -457,16 +458,7 @@ function StaticOnlyContent({
           onClick={() => onConnect(cred)}
         >
           <KeyRound className="size-4" />
-          Add{" "}
-          {cred.auth_type === "basic"
-            ? "credentials"
-            : cred.service === "coinbase_agentkit"
-              ? "CDP credentials"
-              : ["postgres", "mysql", "snowflake"].includes(cred.service)
-                ? "connection string"
-                : cred.service === "redis"
-                  ? "Redis URL"
-                  : "API key"}
+          Add {staticCredentialButtonLabel(cred)}
         </Button>
       ))}
     </div>

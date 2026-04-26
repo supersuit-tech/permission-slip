@@ -10,9 +10,9 @@
 package postgres
 
 import (
-	_ "embed"
 	"context"
 	"database/sql"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -202,6 +202,13 @@ func (c *PostgresConnector) Manifest() *connectors.ConnectorManifest {
 				Service:         "postgres",
 				AuthType:        "custom",
 				InstructionsURL: "https://www.postgresql.org/docs/current/libpq-connect.html#LIBPQ-CONNSTRING",
+				Fields: []connectors.ManifestCredentialField{
+					{
+						Key:         "connection_string",
+						Label:       "Connection String",
+						Placeholder: "postgresql://user:password@host:port/dbname",
+					},
+				},
 			},
 		},
 		Templates: []connectors.ManifestTemplate{

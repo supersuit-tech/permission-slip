@@ -3,6 +3,7 @@ package api
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -115,15 +116,6 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Serialize the credentials object — never log the raw value.
-		credJSON, err := json.Marshal(req.Credentials)
-		if err != nil {
-			log.Printf("[%s] StoreCredential: marshal credentials: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
-			return
-		}
-
 		// Begin a transaction so limit check + vault insert + credential row
 		// insert are atomic. The advisory lock prevents TOCTOU races where
 		// concurrent requests could both pass the limit check.
@@ -145,6 +137,26 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 			return
 		}
 		if checkCredentialLimit(r.Context(), w, r, tx, profile.ID) {
+			return
+		}
+
+		candidates, err := db.GetRequiredCredentialsByService(r.Context(), tx, req.Service)
+		if err != nil {
+			log.Printf("[%s] StoreCredential: list required credentials: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
+			return
+		}
+		credStrings, pickErr := resolveAndValidateCredentialPayload(req.Service, candidates, req.Credentials)
+		if pickErr != nil {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, pickErr.Error()))
+			return
+		}
+		credJSON, err = json.Marshal(credStrings)
+		if err != nil {
+			log.Printf("[%s] StoreCredential: marshal credentials: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to store credential"))
 			return
 		}
 
@@ -273,3 +285,61 @@ func toCredentialSummary(c db.Credential) credentialSummary {
 	}
 }
 
+// resolveAndValidateCredentialPayload picks the matching connector credential row
+// for a service and validates keys/values. Returns string map for vault storage.
+func resolveAndValidateCredentialPayload(service string, candidates []db.RequiredCredential, submitted map[string]any) (map[string]string, error) {
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("unknown service %q — no connector declares this credential", service)
+	}
+	var matches []db.RequiredCredential
+	for _, c := range candidates {
+		if c.AuthType == "oauth2" {
+			continue
+		}
+		matches = append(matches, c)
+	}
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("service %q only supports OAuth — use the OAuth flow instead of storing static credentials", service)
+	}
+	if len(matches) == 1 {
+		if err := db.ValidateStaticCredentialKeys(matches[0], submitted); err != nil {
+			return nil, err
+		}
+		return credentialMapStrings(submitted)
+	}
+	// Multiple connectors share this service name — disambiguate by field schema.
+	var picked *db.RequiredCredential
+	for i := range matches {
+		if err := db.ValidateStaticCredentialKeys(matches[i], submitted); err != nil {
+			continue
+		}
+		if picked != nil && !sameCredentialSchema(*picked, matches[i]) {
+			return nil, fmt.Errorf("ambiguous credential schema for service %q — contact support", service)
+		}
+		cp := matches[i]
+		picked = &cp
+	}
+	if picked == nil {
+		return nil, fmt.Errorf("credentials do not match any registered connector for service %q", service)
+	}
+	return credentialMapStrings(submitted)
+}
+
+func sameCredentialSchema(a, b db.RequiredCredential) bool {
+	if a.AuthType != b.AuthType {
+		return false
+	}
+	return db.CredentialFieldSpecsMatch(a.CredentialFields, b.CredentialFields)
+}
+
+func credentialMapStrings(m map[string]any) (map[string]string, error) {
+	out := make(map[string]string, len(m))
+	for k, v := range m {
+		s, ok := v.(string)
+		if !ok {
+			return nil, fmt.Errorf("credential key %q must be a string", k)
+		}
+		out[k] = s
+	}
+	return out, nil
+}

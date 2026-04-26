@@ -105,6 +105,10 @@ func TestParseManifest_ValidationErrors(t *testing.T) {
 		{"missing auth_type", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s"}]}`},
 		{"invalid auth_type", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"magic"}]}`},
 		{"oauth2 missing oauth_provider", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"oauth2"}]}`},
+		{"fields on oauth2", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"oauth_providers":[{"id":"p","authorize_url":"https://a.example/oauth","token_url":"https://a.example/token"}],"required_credentials":[{"service":"s","auth_type":"oauth2","oauth_provider":"p","fields":[{"key":"k","label":"L"}]}]}`},
+		{"fields duplicate key", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"custom","fields":[{"key":"a","label":"A"},{"key":"a","label":"B"}]}]}`},
+		{"fields empty key", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"api_key","fields":[{"key":"","label":"L"}]}]}`},
+		{"fields empty label", `{"id":"x","name":"X","actions":[{"action_type":"x.a","name":"A"}],"required_credentials":[{"service":"s","auth_type":"api_key","fields":[{"key":"k","label":""}]}]}`},
 		{"invalid JSON", `{not json`},
 	}
 

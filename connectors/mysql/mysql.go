@@ -14,9 +14,9 @@
 package mysql
 
 import (
-	_ "embed"
 	"context"
 	"database/sql"
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"time"
@@ -70,6 +70,7 @@ func (c *MySQLConnector) ID() string { return "mysql" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -207,7 +208,18 @@ func (c *MySQLConnector) Manifest() *connectors.ConnectorManifest {
 			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
-			{Service: "mysql", AuthType: "custom", InstructionsURL: "https://github.com/go-sql-driver/mysql#dsn-data-source-name"},
+			{
+				Service:         "mysql",
+				AuthType:        "custom",
+				InstructionsURL: "https://github.com/go-sql-driver/mysql#dsn-data-source-name",
+				Fields: []connectors.ManifestCredentialField{
+					{
+						Key:         "connection_string",
+						Label:       "Connection String",
+						Placeholder: "mysql://user:password@host:port/dbname",
+					},
+				},
+			},
 		},
 		Templates: []connectors.ManifestTemplate{
 			{

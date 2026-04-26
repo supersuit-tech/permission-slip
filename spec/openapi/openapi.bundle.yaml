@@ -8478,6 +8478,13 @@ components:
             OAuth scopes required by this connector. Only present when `auth_type` is `oauth2`.
           example:
             - https://www.googleapis.com/auth/gmail.send
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/CredentialFieldSpec'
+          description: |
+            Per-field schema for static credentials (`api_key` or `custom`). When omitted or empty,
+            `api_key` auth behaves as a single field with key `api_key` and label "API Key".
       example:
         service: github
         auth_type: api_key
@@ -12119,6 +12126,32 @@ components:
             timestamp: '1770816000'
             expected_window: 300 seconds
           trace_id: trace_xyz789
+    CredentialFieldSpec:
+      type: object
+      required:
+        - key
+        - label
+        - secret
+        - required
+      properties:
+        key:
+          type: string
+          description: Storage key sent to the credential vault with POST /v1/credentials.
+        label:
+          type: string
+          description: Human-readable label for the input.
+        placeholder:
+          type: string
+          description: Optional input placeholder.
+        secret:
+          type: boolean
+          description: When true, render as a password field; when false, as plain text.
+        required:
+          type: boolean
+          description: When true, the field must be present and non-empty.
+        help_text:
+          type: string
+          description: Optional helper text shown under the input.
     ApproverInfo:
       type: object
       description: |
