@@ -239,7 +239,7 @@ func TestStoreCredential_MissingService(t *testing.T) {
 	}
 }
 
-func TestStoreCredential_UnknownService(t *testing.T) {
+func TestStoreCredential_UnknownService_LegacyPermissive(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -248,13 +248,14 @@ func TestStoreCredential_UnknownService(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
 
+	// No connector_required_credentials row: store still succeeds (settings / arbitrary services).
 	body := `{"service": "not_registered_anywhere", "credentials": {"api_key": "x"}}`
 	r := authenticatedJSONRequest(t, http.MethodPost, "/credentials", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

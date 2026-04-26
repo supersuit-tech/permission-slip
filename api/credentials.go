@@ -287,10 +287,11 @@ func toCredentialSummary(c db.Credential) credentialSummary {
 
 // resolveAndValidateCredentialPayload picks the matching connector credential row
 // for a service and validates keys/values. Returns string map for vault storage.
+//
+// When no connector row exists for the service, or only OAuth rows exist, there is
+// no static field schema to enforce — accept any string-valued map (legacy behavior
+// for settings UI, ad-hoc services, and bot-token style credentials).
 func resolveAndValidateCredentialPayload(service string, candidates []db.RequiredCredential, submitted map[string]any) (map[string]string, error) {
-	if len(candidates) == 0 {
-		return nil, fmt.Errorf("unknown service %q — no connector declares this credential", service)
-	}
 	var matches []db.RequiredCredential
 	for _, c := range candidates {
 		if c.AuthType == "oauth2" {
@@ -299,7 +300,7 @@ func resolveAndValidateCredentialPayload(service string, candidates []db.Require
 		matches = append(matches, c)
 	}
 	if len(matches) == 0 {
-		return nil, fmt.Errorf("service %q only supports OAuth — use the OAuth flow instead of storing static credentials", service)
+		return credentialMapStrings(submitted)
 	}
 	if len(matches) == 1 {
 		if err := db.ValidateStaticCredentialKeys(matches[0], submitted); err != nil {
