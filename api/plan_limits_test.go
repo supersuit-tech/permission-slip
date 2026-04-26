@@ -179,6 +179,10 @@ func TestStoreCredential_FreePlan_AtLimit_Returns403(t *testing.T) {
 		testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, fmt.Sprintf("service%d", i))
 	}
 
+	// POST /credentials validates against connector manifests when present; register
+	// the service used below so limit checks hit the vault path instead of 400.
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "planlim_nsvc", "newservice", "api_key", nil)
+
 	mockVault := vault.NewMockVaultStore()
 	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -219,6 +223,8 @@ func TestStoreCredential_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 		testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, fmt.Sprintf("service%d", i))
 	}
 
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "planlim_nsvc2", "newservice", "api_key", nil)
+
 	mockVault := vault.NewMockVaultStore()
 	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -244,6 +250,8 @@ func TestStoreCredential_PaidPlan_NoLimit(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid, fmt.Sprintf("service%d", i))
 	}
+
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "planlim_nsvc3", "newservice", "api_key", nil)
 
 	mockVault := vault.NewMockVaultStore()
 	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}

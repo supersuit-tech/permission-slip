@@ -31,6 +31,12 @@ func (c *CoinbaseAgentKitConnector) Manifest() *connectors.ConnectorManifest {
 				Service:         "coinbase_agentkit",
 				AuthType:        "api_key",
 				InstructionsURL: "https://portal.cdp.coinbase.com/access/api",
+				Fields: []connectors.ManifestCredentialField{
+					{Key: "api_key_id", Label: "API Key ID", Placeholder: "From CDP Portal → API Keys", Secret: ptrFalse()},
+					{Key: "api_key_secret", Label: "API Key Secret", Placeholder: "PEM EC private key or Ed25519 secret from portal"},
+					{Key: "wallet_secret", Label: "Wallet Secret", Placeholder: "Base64 PKCS#8 wallet secret from Wallet API product",
+						HelpText: "Create keys at https://portal.cdp.coinbase.com/ . The wallet secret is required for signing and sending transactions."},
+				},
 			},
 		},
 		Templates: []connectors.ManifestTemplate{
@@ -61,11 +67,11 @@ func (c *CoinbaseAgentKitConnector) Manifest() *connectors.ConnectorManifest {
 
 func createEvmAccountManifest() connectors.ManifestAction {
 	return connectors.ManifestAction{
-		ActionType:        "coinbase_agentkit.create_evm_account",
-		Name:              "Create EVM account",
-		Description:       "Create a new CDP-managed EVM wallet (MPC-secured). Optionally assign a unique name (2–36 alphanumeric characters and hyphens) for later lookup.",
-		RiskLevel:         "low",
-		DisplayTemplate:   "Create CDP EVM wallet {{name}}",
+		ActionType:      "coinbase_agentkit.create_evm_account",
+		Name:            "Create EVM account",
+		Description:     "Create a new CDP-managed EVM wallet (MPC-secured). Optionally assign a unique name (2–36 alphanumeric characters and hyphens) for later lookup.",
+		RiskLevel:       "low",
+		DisplayTemplate: "Create CDP EVM wallet {{name}}",
 		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 			"type": "object",
 			"additionalProperties": false,
@@ -85,11 +91,11 @@ func createEvmAccountManifest() connectors.ManifestAction {
 
 func listEvmAccountsManifest() connectors.ManifestAction {
 	return connectors.ManifestAction{
-		ActionType:        "coinbase_agentkit.list_evm_accounts",
-		Name:              "List EVM accounts",
-		Description:       "List CDP EVM accounts in the project with optional pagination.",
-		RiskLevel:         "low",
-		DisplayTemplate:   "List CDP EVM accounts",
+		ActionType:      "coinbase_agentkit.list_evm_accounts",
+		Name:            "List EVM accounts",
+		Description:     "List CDP EVM accounts in the project with optional pagination.",
+		RiskLevel:       "low",
+		DisplayTemplate: "List CDP EVM accounts",
 		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 			"type": "object",
 			"additionalProperties": false,
@@ -155,11 +161,11 @@ func sendCryptoManifest() connectors.ManifestAction {
 
 func requestTestnetFundsManifest() connectors.ManifestAction {
 	return connectors.ManifestAction{
-		ActionType:        "coinbase_agentkit.request_testnet_funds",
-		Name:              "Request testnet funds (faucet)",
-		Description:       "Request test tokens from the CDP faucet for development (subject to CDP limits).",
-		RiskLevel:         "medium",
-		DisplayTemplate:   "Faucet {{token}} on {{network}} → {{address}}",
+		ActionType:      "coinbase_agentkit.request_testnet_funds",
+		Name:            "Request testnet funds (faucet)",
+		Description:     "Request test tokens from the CDP faucet for development (subject to CDP limits).",
+		RiskLevel:       "medium",
+		DisplayTemplate: "Faucet {{token}} on {{network}} → {{address}}",
 		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 			"type": "object",
 			"required": ["address", "network", "token"],
@@ -184,11 +190,11 @@ func requestTestnetFundsManifest() connectors.ManifestAction {
 
 func listTokenBalancesManifest() connectors.ManifestAction {
 	return connectors.ManifestAction{
-		ActionType:        "coinbase_agentkit.list_token_balances",
-		Name:              "List token balances",
-		Description:       "List token balances for an address on Base, Base Sepolia, or Ethereum mainnet (CDP data API).",
-		RiskLevel:         "low",
-		DisplayTemplate:   "Token balances for {{address}} on {{network}}",
+		ActionType:      "coinbase_agentkit.list_token_balances",
+		Name:            "List token balances",
+		Description:     "List token balances for an address on Base, Base Sepolia, or Ethereum mainnet (CDP data API).",
+		RiskLevel:       "low",
+		DisplayTemplate: "Token balances for {{address}} on {{network}}",
 		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 			"type": "object",
 			"required": ["address", "network"],
@@ -216,11 +222,11 @@ func listTokenBalancesManifest() connectors.ManifestAction {
 
 func getSwapPriceManifest() connectors.ManifestAction {
 	return connectors.ManifestAction{
-		ActionType:        "coinbase_agentkit.get_swap_price",
-		Name:              "Get swap price quote",
-		Description:       "Read-only price quote for a token swap via CDP (no transaction). from_amount is in atomic units of from_token. Use 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE for native per EIP-7528.",
-		RiskLevel:         "low",
-		DisplayTemplate:   "Swap quote on {{network}}: {{from_amount}} ({{from_token}} → {{to_token}})",
+		ActionType:      "coinbase_agentkit.get_swap_price",
+		Name:            "Get swap price quote",
+		Description:     "Read-only price quote for a token swap via CDP (no transaction). from_amount is in atomic units of from_token. Use 0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE for native per EIP-7528.",
+		RiskLevel:       "low",
+		DisplayTemplate: "Swap quote on {{network}}: {{from_amount}} ({{from_token}} → {{to_token}})",
 		ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 			"type": "object",
 			"required": ["network", "from_token", "to_token", "from_amount", "taker"],
@@ -292,4 +298,9 @@ func swapTokensManifest() connectors.ManifestAction {
 			}
 		}`)),
 	}
+}
+
+func ptrFalse() *bool {
+	b := false
+	return &b
 }

@@ -55,13 +55,26 @@ type ActionPreview struct {
 	Fields map[string]string `json:"fields"`
 }
 
+// ManifestCredentialField describes one key/value field stored for a static
+// credential (auth_type api_key or custom). Omitted or empty Fields on the
+// parent credential implies a single default field (api_key → "API Key").
+type ManifestCredentialField struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Placeholder string `json:"placeholder,omitempty"`
+	Secret      *bool  `json:"secret,omitempty"`   // default true
+	Required    *bool  `json:"required,omitempty"` // default true
+	HelpText    string `json:"help_text,omitempty"`
+}
+
 // ManifestCredential describes a credential requirement for an external connector.
 type ManifestCredential struct {
-	Service         string   `json:"service"`
-	AuthType        string   `json:"auth_type"`
-	InstructionsURL string   `json:"instructions_url,omitempty"`
-	OAuthProvider   string   `json:"oauth_provider,omitempty"`
-	OAuthScopes     []string `json:"oauth_scopes,omitempty"`
+	Service         string                    `json:"service"`
+	AuthType        string                    `json:"auth_type"`
+	InstructionsURL string                    `json:"instructions_url,omitempty"`
+	OAuthProvider   string                    `json:"oauth_provider,omitempty"`
+	OAuthScopes     []string                  `json:"oauth_scopes,omitempty"`
+	Fields          []ManifestCredentialField `json:"fields,omitempty"`
 	// AuthOptionGroup marks credentials that are mutually exclusive alternatives.
 	// All credentials sharing the same non-empty group name are treated as "pick
 	// one" options. Leave empty for credentials that are individually required.
@@ -393,6 +406,24 @@ func (m *ConnectorManifest) Validate() error {
 				return err
 			}
 		}
+		if len(c.Fields) > 0 {
+			if c.AuthType != "api_key" && c.AuthType != "custom" {
+				return fmt.Errorf("manifest validation: required_credentials[%d].fields is only allowed when auth_type is api_key or custom", i)
+			}
+			seenKeys := make(map[string]bool, len(c.Fields))
+			for j, f := range c.Fields {
+				if f.Key == "" {
+					return fmt.Errorf("manifest validation: required_credentials[%d].fields[%d].key is required", i, j)
+				}
+				if seenKeys[f.Key] {
+					return fmt.Errorf("manifest validation: required_credentials[%d].fields has duplicate key %q", i, f.Key)
+				}
+				seenKeys[f.Key] = true
+				if f.Label == "" {
+					return fmt.Errorf("manifest validation: required_credentials[%d].fields[%d].label is required", i, j)
+				}
+			}
+		}
 	}
 
 	// Collect all known OAuth provider IDs: built-in + declared in this manifest.
@@ -682,12 +713,44 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 		})
 	}
 	for _, c := range m.RequiredCredentials {
+		var fieldsJSON []byte
+		if len(c.Fields) > 0 {
+			type fieldRow struct {
+				Key         string `json:"key"`
+				Label       string `json:"label"`
+				Placeholder string `json:"placeholder,omitempty"`
+				Secret      bool   `json:"secret"`
+				Required    bool   `json:"required"`
+				HelpText    string `json:"help_text,omitempty"`
+			}
+			rows := make([]fieldRow, 0, len(c.Fields))
+			for _, f := range c.Fields {
+				sec := true
+				if f.Secret != nil {
+					sec = *f.Secret
+				}
+				req := true
+				if f.Required != nil {
+					req = *f.Required
+				}
+				rows = append(rows, fieldRow{
+					Key: f.Key, Label: f.Label, Placeholder: f.Placeholder,
+					Secret: sec, Required: req, HelpText: f.HelpText,
+				})
+			}
+			var err error
+			fieldsJSON, err = json.Marshal(rows)
+			if err != nil {
+				log.Printf("warning: failed to marshal credential fields for %s/%s: %v", c.Service, c.AuthType, err)
+			}
+		}
 		out.Credentials = append(out.Credentials, db.ExternalConnectorCredential{
 			Service:         c.Service,
 			AuthType:        c.AuthType,
 			InstructionsURL: c.InstructionsURL,
 			OAuthProvider:   c.OAuthProvider,
 			OAuthScopes:     c.OAuthScopes,
+			FieldsJSON:      fieldsJSON,
 			AuthOptionGroup: c.AuthOptionGroup,
 		})
 	}

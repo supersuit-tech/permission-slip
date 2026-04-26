@@ -5,11 +5,11 @@
 package aws
 
 import (
-	_ "embed"
 	"bytes"
 	"context"
 	"crypto/hmac"
 	"crypto/sha256"
+	_ "embed"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -54,6 +54,7 @@ func (c *AWSConnector) ID() string { return "aws" }
 
 // Manifest returns the connector's metadata manifest. Used by the server to
 // auto-seed DB rows on startup, replacing manual seed.go files.
+//
 //go:embed logo.svg
 var logoSVG string
 
@@ -295,6 +296,12 @@ func (c *AWSConnector) Manifest() *connectors.ConnectorManifest {
 				Service:         "aws",
 				AuthType:        "custom",
 				InstructionsURL: "https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_access-keys.html",
+				Fields: []connectors.ManifestCredentialField{
+					{Key: "access_key_id", Label: "Access Key ID", Placeholder: "AKIA...", Secret: ptrBool(false), Required: ptrBool(true)},
+					{Key: "secret_access_key", Label: "Secret Access Key", Placeholder: "Your secret key", Secret: ptrBool(true), Required: ptrBool(true)},
+					{Key: "region", Label: "Default region", Placeholder: "e.g. us-east-1", Secret: ptrBool(false), Required: ptrBool(true),
+						HelpText: "Used as the default when an action does not specify a region."},
+				},
 			},
 		},
 		Templates: []connectors.ManifestTemplate{
@@ -347,19 +354,19 @@ func (c *AWSConnector) Manifest() *connectors.ConnectorManifest {
 // Actions returns the registered action handlers keyed by action_type.
 func (c *AWSConnector) Actions() map[string]connectors.Action {
 	return map[string]connectors.Action{
-		"aws.describe_instances":   &describeInstancesAction{conn: c},
-		"aws.start_instance":       &startInstanceAction{conn: c},
-		"aws.stop_instance":        &stopInstanceAction{conn: c},
-		"aws.restart_instance":     &restartInstanceAction{conn: c},
-		"aws.get_metrics":          &getMetricsAction{conn: c},
-		"aws.list_s3_objects":      &listS3ObjectsAction{conn: c},
-		"aws.create_presigned_url": &createPresignedURLAction{conn: c},
+		"aws.describe_instances":     &describeInstancesAction{conn: c},
+		"aws.start_instance":         &startInstanceAction{conn: c},
+		"aws.stop_instance":          &stopInstanceAction{conn: c},
+		"aws.restart_instance":       &restartInstanceAction{conn: c},
+		"aws.get_metrics":            &getMetricsAction{conn: c},
+		"aws.list_s3_objects":        &listS3ObjectsAction{conn: c},
+		"aws.create_presigned_url":   &createPresignedURLAction{conn: c},
 		"aws.describe_rds_instances": &describeRDSInstancesAction{conn: c},
 	}
 }
 
 // ValidateCredentials checks that the provided credentials contain the
-// required AWS access key ID and secret access key.
+// required AWS access key ID, secret access key, and default region.
 func (c *AWSConnector) ValidateCredentials(_ context.Context, creds connectors.Credentials) error {
 	accessKey, ok := creds.Get("access_key_id")
 	if !ok || accessKey == "" {
@@ -368,6 +375,13 @@ func (c *AWSConnector) ValidateCredentials(_ context.Context, creds connectors.C
 	secretKey, ok := creds.Get("secret_access_key")
 	if !ok || secretKey == "" {
 		return &connectors.ValidationError{Message: "missing required credential: secret_access_key"}
+	}
+	region, ok := creds.Get("region")
+	if !ok || strings.TrimSpace(region) == "" {
+		return &connectors.ValidationError{Message: "missing required credential: region"}
+	}
+	if err := validateRegion(region); err != nil {
+		return err
 	}
 	return nil
 }
@@ -513,6 +527,8 @@ func deriveSigningKey(secret, datestamp, region, service string) []byte {
 	kService := hmacSHA256(kRegion, []byte(service))
 	return hmacSHA256(kService, []byte("aws4_request"))
 }
+
+func ptrBool(b bool) *bool { return &b }
 
 func buildCanonicalHeaders(req *http.Request) (canonicalHeaders, signedHeaders string) {
 	headers := make(map[string]string)

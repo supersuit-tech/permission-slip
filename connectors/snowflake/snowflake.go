@@ -81,6 +81,13 @@ func (c *SnowflakeConnector) Manifest() *connectors.ConnectorManifest {
 				Service:         "snowflake",
 				AuthType:        "custom",
 				InstructionsURL: "https://docs.snowflake.com/en/developer-guide/go/go-driver",
+				Fields: []connectors.ManifestCredentialField{
+					{
+						Key:         "connection_string",
+						Label:       "Connection String",
+						Placeholder: "user:password@account/database/schema",
+					},
+				},
 			},
 		},
 		Templates: []connectors.ManifestTemplate{

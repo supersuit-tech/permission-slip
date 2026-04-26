@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/db"
@@ -24,7 +25,7 @@ func TestConnectorsSchema(t *testing.T) {
 	t.Run("connector_required_credentials", func(t *testing.T) {
 		testhelper.RequireColumns(t, tx, "connector_required_credentials", []string{
 			"connector_id", "service", "auth_type", "instructions_url",
-			"oauth_provider", "oauth_scopes",
+			"oauth_provider", "oauth_scopes", "credential_fields",
 		})
 	})
 	t.Run("oauth_connections", func(t *testing.T) {
@@ -637,6 +638,53 @@ func TestUpsertConnectorFromManifest_NoTemplates(t *testing.T) {
 	}
 	if len(templates) != 0 {
 		t.Errorf("expected 0 templates after removal, got %d", len(templates))
+	}
+}
+
+func TestUpsertConnectorFromManifest_CredentialFieldsRoundTrip(t *testing.T) {
+	t.Parallel()
+	ctx := context.Background()
+	tx := testhelper.SetupTestDB(t)
+
+	fields := []db.CredentialFieldSpec{
+		{Key: "a", Label: "A", Placeholder: "pa", Secret: true, Required: true},
+		{Key: "b", Label: "B", Secret: false, Required: false},
+	}
+	fieldsJSON, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	m := db.ExternalConnectorManifest{
+		ID:   "ext-fields",
+		Name: "Fields Test",
+		Actions: []db.ExternalConnectorAction{
+			{ActionType: "ext-fields.ping", Name: "Ping"},
+		},
+		Credentials: []db.ExternalConnectorCredential{
+			{Service: "ext-fields", AuthType: "custom", FieldsJSON: fieldsJSON},
+		},
+	}
+	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	detail, err := db.GetConnectorByID(ctx, tx, "ext-fields")
+	if err != nil {
+		t.Fatalf("GetConnectorByID: %v", err)
+	}
+	if detail == nil || len(detail.RequiredCredentials) != 1 {
+		t.Fatalf("detail: %+v", detail)
+	}
+	got := detail.RequiredCredentials[0].CredentialFields
+	if len(got) != 2 {
+		t.Fatalf("len(fields) = %d, want 2", len(got))
+	}
+	if got[0].Key != "a" || !got[0].Secret || got[0].Placeholder != "pa" {
+		t.Errorf("field[0] = %+v", got[0])
+	}
+	if got[1].Key != "b" || got[1].Secret || got[1].Required {
+		t.Errorf("field[1] = %+v", got[1])
 	}
 }
 

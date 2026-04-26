@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -43,14 +44,25 @@ type ConnectorAction struct {
 	Preview               []byte // raw JSONB — structured preview layout config
 }
 
+// CredentialFieldSpec is one field in a static (api_key/custom) credential schema.
+type CredentialFieldSpec struct {
+	Key         string `json:"key"`
+	Label       string `json:"label"`
+	Placeholder string `json:"placeholder,omitempty"`
+	Secret      bool   `json:"secret"`
+	Required    bool   `json:"required"`
+	HelpText    string `json:"help_text,omitempty"`
+}
+
 // RequiredCredential represents a row from the connector_required_credentials table.
 type RequiredCredential struct {
-	Service         string
-	AuthType        string
-	InstructionsURL *string
-	OAuthProvider   *string
-	OAuthScopes     []string
-	AuthOptionGroup *string
+	Service          string
+	AuthType         string
+	InstructionsURL  *string
+	OAuthProvider    *string
+	OAuthScopes      []string
+	CredentialFields []CredentialFieldSpec // from credential_fields JSONB; empty means UI default single api_key field
+	AuthOptionGroup  *string
 }
 
 // ListConnectors returns all connectors with their action types and required credential services.
@@ -122,7 +134,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch required credentials.
 	credRows, err := db.Query(ctx,
-		`SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, auth_option_group
+		`SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'::jsonb), auth_option_group
 		 FROM connector_required_credentials
 		 WHERE connector_id = $1
 		 ORDER BY service`,
@@ -135,12 +147,50 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	for credRows.Next() {
 		var rc RequiredCredential
-		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &rc.AuthOptionGroup); err != nil {
+		var fieldsRaw []byte
+		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
 			return nil, err
+		}
+		if len(fieldsRaw) > 0 && string(fieldsRaw) != "[]" && string(fieldsRaw) != "null" {
+			if err := json.Unmarshal(fieldsRaw, &rc.CredentialFields); err != nil {
+				return nil, fmt.Errorf("unmarshal credential_fields for %s/%s: %w", rc.Service, rc.AuthType, err)
+			}
 		}
 		cd.RequiredCredentials = append(cd.RequiredCredentials, rc)
 	}
 	return &cd, credRows.Err()
+}
+
+// GetRequiredCredentialsByService returns all connector_required_credentials rows
+// matching the given service name (may be multiple connectors if they share a
+// service string — callers should handle ambiguity).
+func GetRequiredCredentialsByService(ctx context.Context, db DBTX, service string) ([]RequiredCredential, error) {
+	rows, err := db.Query(ctx, `
+		SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'::jsonb), auth_option_group
+		FROM connector_required_credentials
+		WHERE service = $1`,
+		service,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []RequiredCredential
+	for rows.Next() {
+		var rc RequiredCredential
+		var fieldsRaw []byte
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
+			return nil, err
+		}
+		if len(fieldsRaw) > 0 && string(fieldsRaw) != "[]" && string(fieldsRaw) != "null" {
+			if err := json.Unmarshal(fieldsRaw, &rc.CredentialFields); err != nil {
+				return nil, fmt.Errorf("unmarshal credential_fields for service %q: %w", service, err)
+			}
+		}
+		out = append(out, rc)
+	}
+	return out, rows.Err()
 }
 
 // GetRequiredServicesByActionType returns the list of static credential services
@@ -279,6 +329,7 @@ type ExternalConnectorCredential struct {
 	InstructionsURL string
 	OAuthProvider   string
 	OAuthScopes     []string
+	FieldsJSON      []byte // JSON array of CredentialFieldSpec; nil/empty → store as []
 	AuthOptionGroup string
 }
 
@@ -367,15 +418,20 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	credKeys := make([]serviceAuthKey, 0, len(m.Credentials))
 	for _, c := range m.Credentials {
 		credKeys = append(credKeys, serviceAuthKey{c.Service, c.AuthType})
+		fieldsVal := c.FieldsJSON
+		if len(fieldsVal) == 0 {
+			fieldsVal = []byte("[]")
+		}
 		_, err := tx.Exec(ctx, `
-			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url, oauth_provider, oauth_scopes, auth_option_group)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url, oauth_provider, oauth_scopes, credential_fields, auth_option_group)
+			VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
 			ON CONFLICT (connector_id, service, auth_type) DO UPDATE SET
 				instructions_url = EXCLUDED.instructions_url,
 				oauth_provider = EXCLUDED.oauth_provider,
 				oauth_scopes = EXCLUDED.oauth_scopes,
+				credential_fields = EXCLUDED.credential_fields,
 				auth_option_group = EXCLUDED.auth_option_group`,
-			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL), nilIfEmpty(c.OAuthProvider), c.OAuthScopes, nilIfEmpty(c.AuthOptionGroup))
+			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL), nilIfEmpty(c.OAuthProvider), c.OAuthScopes, fieldsVal, nilIfEmpty(c.AuthOptionGroup))
 		if err != nil {
 			return err
 		}

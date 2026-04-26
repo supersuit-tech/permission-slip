@@ -68,3 +68,22 @@ func InsertConnectorRequiredCredential(t *testing.T, d db.DBTX, connectorID, ser
 		`INSERT INTO connector_required_credentials (connector_id, service, auth_type) VALUES ($1, $2, $3)`,
 		connectorID, service, authType)
 }
+
+// InsertConnectorWithStaticCredential registers a minimal connector (one ping action)
+// and a required static credential row for POST /v1/credentials validation tests.
+// When fieldsJSON is non-nil, it is stored as credential_fields (JSONB); otherwise
+// the column defaults to [].
+func InsertConnectorWithStaticCredential(t *testing.T, d db.DBTX, connectorID, service, authType string, fieldsJSON []byte) {
+	t.Helper()
+	InsertConnector(t, d, connectorID)
+	InsertConnectorAction(t, d, connectorID, connectorID+".ping", "Ping")
+	if len(fieldsJSON) == 0 {
+		mustExec(t, d,
+			`INSERT INTO connector_required_credentials (connector_id, service, auth_type) VALUES ($1, $2, $3)`,
+			connectorID, service, authType)
+		return
+	}
+	mustExec(t, d,
+		`INSERT INTO connector_required_credentials (connector_id, service, auth_type, credential_fields) VALUES ($1, $2, $3, $4::jsonb)`,
+		connectorID, service, authType, fieldsJSON)
+}
