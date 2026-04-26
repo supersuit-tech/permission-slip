@@ -152,7 +152,7 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, pickErr.Error()))
 			return
 		}
-		credJSON, err = json.Marshal(credStrings)
+		credJSON, err := json.Marshal(credStrings)
 		if err != nil {
 			log.Printf("[%s] StoreCredential: marshal credentials: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
