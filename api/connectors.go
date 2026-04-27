@@ -53,6 +53,7 @@ type requiredCredentialResponse struct {
 	OAuthProvider   *string                   `json:"oauth_provider,omitempty"`
 	OAuthScopes     []string                  `json:"oauth_scopes,omitempty"`
 	Fields          []credentialFieldResponse `json:"fields,omitempty"`
+	AuthOptionGroup *string                   `json:"auth_option_group,omitempty"`
 }
 
 type connectorDetailResponse struct {
@@ -170,6 +171,7 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 			InstructionsURL: rc.InstructionsURL,
 			OAuthProvider:   rc.OAuthProvider,
 			OAuthScopes:     rc.OAuthScopes,
+			AuthOptionGroup: rc.AuthOptionGroup,
 		}
 		for _, f := range rc.CredentialFields {
 			resp.Fields = append(resp.Fields, credentialFieldResponse{

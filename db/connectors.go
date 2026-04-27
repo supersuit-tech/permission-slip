@@ -62,6 +62,7 @@ type RequiredCredential struct {
 	OAuthProvider    *string
 	OAuthScopes      []string
 	CredentialFields []CredentialFieldSpec // from credential_fields JSONB; empty means UI default single api_key field
+	AuthOptionGroup  *string
 }
 
 // ListConnectors returns all connectors with their action types and required credential services.
@@ -133,7 +134,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch required credentials.
 	credRows, err := db.Query(ctx,
-		`SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'::jsonb)
+		`SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'::jsonb), auth_option_group
 		 FROM connector_required_credentials
 		 WHERE connector_id = $1
 		 ORDER BY service`,
@@ -147,7 +148,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 	for credRows.Next() {
 		var rc RequiredCredential
 		var fieldsRaw []byte
-		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw); err != nil {
+		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
 			return nil, err
 		}
 		if len(fieldsRaw) > 0 && string(fieldsRaw) != "[]" && string(fieldsRaw) != "null" {
@@ -165,7 +166,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 // service string — callers should handle ambiguity).
 func GetRequiredCredentialsByService(ctx context.Context, db DBTX, service string) ([]RequiredCredential, error) {
 	rows, err := db.Query(ctx, `
-		SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'::jsonb)
+		SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'::jsonb), auth_option_group
 		FROM connector_required_credentials
 		WHERE service = $1`,
 		service,
@@ -179,7 +180,7 @@ func GetRequiredCredentialsByService(ctx context.Context, db DBTX, service strin
 	for rows.Next() {
 		var rc RequiredCredential
 		var fieldsRaw []byte
-		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw); err != nil {
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
 			return nil, err
 		}
 		if len(fieldsRaw) > 0 && string(fieldsRaw) != "[]" && string(fieldsRaw) != "null" {
@@ -329,6 +330,7 @@ type ExternalConnectorCredential struct {
 	OAuthProvider   string
 	OAuthScopes     []string
 	FieldsJSON      []byte // JSON array of CredentialFieldSpec; nil/empty → store as []
+	AuthOptionGroup string
 }
 
 // ExternalConnectorTemplate describes a configuration template from a connector manifest.
@@ -421,14 +423,15 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 			fieldsVal = []byte("[]")
 		}
 		_, err := tx.Exec(ctx, `
-			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url, oauth_provider, oauth_scopes, credential_fields)
-			VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url, oauth_provider, oauth_scopes, credential_fields, auth_option_group)
+			VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
 			ON CONFLICT (connector_id, service, auth_type) DO UPDATE SET
 				instructions_url = EXCLUDED.instructions_url,
 				oauth_provider = EXCLUDED.oauth_provider,
 				oauth_scopes = EXCLUDED.oauth_scopes,
-				credential_fields = EXCLUDED.credential_fields`,
-			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL), nilIfEmpty(c.OAuthProvider), c.OAuthScopes, fieldsVal)
+				credential_fields = EXCLUDED.credential_fields,
+				auth_option_group = EXCLUDED.auth_option_group`,
+			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL), nilIfEmpty(c.OAuthProvider), c.OAuthScopes, fieldsVal, nilIfEmpty(c.AuthOptionGroup))
 		if err != nil {
 			return err
 		}
