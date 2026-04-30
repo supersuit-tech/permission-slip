@@ -39,7 +39,7 @@
     "expo-status-bar": "~55.0.5",
     "openapi-fetch": "^0.17.0",
     "react": "19.2.0",
-    "react-native": "0.83.2",
+    "react-native": "0.85.2",
     "react-native-safe-area-context": "^5.7.0",
     "react-native-screens": "^4.24.0",
     "react-native-url-polyfill": "^3.0.0"
