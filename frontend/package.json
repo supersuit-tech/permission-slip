@@ -48,7 +48,7 @@
   "devDependencies": {
     "@sentry/vite-plugin": "^3.6.1",
     "@storybook/addon-docs": "^10.3.6",
-    "@storybook/addon-themes": "^10.3.5",
+    "@storybook/addon-themes": "^10.3.6",
     "@storybook/react": "^10.3.5",
     "@storybook/react-vite": "^10.3.5",
     "@tailwindcss/vite": "^4.1.18",
