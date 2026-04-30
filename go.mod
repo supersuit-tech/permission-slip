@@ -27,7 +27,7 @@ require (
 	github.com/redis/go-redis/v9 v9.18.0
 	github.com/snowflakedb/gosnowflake v1.13.3
 	github.com/stripe/stripe-go/v82 v82.5.1
-	go.mongodb.org/mongo-driver/v2 v2.5.0
+	go.mongodb.org/mongo-driver/v2 v2.6.0
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.274.0
 	google.golang.org/grpc v1.80.0
