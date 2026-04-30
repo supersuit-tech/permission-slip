@@ -29,7 +29,7 @@
     "@tanstack/react-query": "^5.90.21",
     "expo": "~55.0.17",
     "expo-clipboard": "^55.0.8",
-    "expo-device": "^55.0.9",
+    "expo-device": "^55.0.15",
     "expo-haptics": "^55.0.8",
     "expo-linking": "^55.0.7",
     "expo-local-authentication": "^55.0.13",
