@@ -25,7 +25,7 @@ require (
 	github.com/joho/godotenv v1.5.1
 	github.com/pressly/goose/v3 v3.27.1
 	github.com/redis/go-redis/v9 v9.18.0
-	github.com/snowflakedb/gosnowflake v1.13.3
+	github.com/snowflakedb/gosnowflake v1.19.1
 	github.com/stripe/stripe-go/v82 v82.5.1
 	go.mongodb.org/mongo-driver/v2 v2.6.0
 	golang.org/x/oauth2 v0.36.0
@@ -47,12 +47,13 @@ require (
 	github.com/Azure/azure-sdk-for-go/sdk/internal v1.3.0 // indirect
 	github.com/Azure/azure-sdk-for-go/sdk/storage/azblob v1.2.0 // indirect
 	github.com/BurntSushi/toml v1.4.0 // indirect
-	github.com/JohnCGriffin/overflow v0.0.0-20211019200055-46fa312c352c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect
 	github.com/ProjectZKM/Ziren/crates/go-runtime/zkvm_runtime v0.0.0-20251001021608-1fe7b43fc4d6 // indirect
 	github.com/StackExchange/wmi v1.2.1 // indirect
-	github.com/apache/arrow-go/v18 v18.0.0 // indirect
+	github.com/andybalholm/brotli v1.2.1 // indirect
+	github.com/apache/arrow-go/v18 v18.4.0 // indirect
 	github.com/apache/arrow/go/v15 v15.0.2 // indirect
+	github.com/apache/thrift v0.22.0 // indirect
 	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.8 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.18.22 // indirect
@@ -89,9 +90,10 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/goccy/go-json v0.10.4 // indirect
+	github.com/goccy/go-json v0.10.5 // indirect
 	github.com/godbus/dbus v0.0.0-20190726142602-4481cbc300e2 // indirect
-	github.com/google/flatbuffers v24.12.23+incompatible // indirect
+	github.com/golang/snappy v1.0.0 // indirect
+	github.com/google/flatbuffers v25.2.10+incompatible // indirect
 	github.com/google/s2a-go v0.1.9 // indirect
 	github.com/googleapis/enterprise-certificate-proxy v0.3.14 // indirect
 	github.com/googleapis/gax-go/v2 v2.21.0 // indirect
@@ -101,10 +103,13 @@ require (
 	github.com/jackc/pgpassfile v1.0.0 // indirect
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
+	github.com/klauspost/asmfmt v1.3.2 // indirect
 	github.com/klauspost/compress v1.18.5 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
+	github.com/klauspost/cpuid/v2 v2.2.11 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
+	github.com/minio/asm2plan9s v0.0.0-20200509001527-cdd76441f9d8 // indirect
+	github.com/minio/c2goasm v0.0.0-20190812172519-36a3d3bbc4f3 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.26 // indirect
