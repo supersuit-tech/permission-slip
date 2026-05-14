@@ -15,7 +15,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sns v1.39.17
 	github.com/aws/smithy-go v1.25.1
 	github.com/coinbase/cdp-sdk/go v0.0.0-20260312193422-ec2866ff0423
-	github.com/ethereum/go-ethereum v1.17.1
+	github.com/ethereum/go-ethereum v1.17.3
 	github.com/getsentry/sentry-go v0.46.2
 	github.com/go-playground/validator/v10 v10.30.2
 	github.com/go-sql-driver/mysql v1.10.0
@@ -76,7 +76,7 @@ require (
 	github.com/bits-and-blooms/bitset v1.20.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/consensys/gnark-crypto v0.18.1 // indirect
-	github.com/crate-crypto/go-eth-kzg v1.4.0 // indirect
+	github.com/crate-crypto/go-eth-kzg v1.5.0 // indirect
 	github.com/danieljoos/wincred v1.2.2 // indirect
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
