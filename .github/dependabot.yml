@@ -14,6 +14,11 @@ updates:
     directory: "/mobile"
     schedule:
       interval: "weekly"
+    ignore:
+      # react-native's version is dictated by the Expo SDK we're on.
+      # Bump it via an Expo SDK upgrade, not directly.
+      - dependency-name: "react-native"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: "npm"
     directory: "/cli"
