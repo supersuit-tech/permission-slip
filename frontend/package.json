@@ -43,7 +43,7 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.15.0",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.4.1"
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@sentry/vite-plugin": "^3.6.1",
