@@ -39,26 +39,18 @@ This target:
 1. Checks that Supabase is running (health check on port 54321) — **errors if not**
 2. Runs all Go tests with the `integration` build tag against `postgresql://postgres:postgres@127.0.0.1:54322/postgres`
 
-You can also run a specific test:
+You can also run a specific integration test in `api`:
+
 ```bash
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
-  go test -tags integration -v -run TestIntegration_VaultCreateSecret ./api/
+  go test -tags integration -v -run TestIntegration_ ./api/
 ```
 
 ## What's covered
 
-### Vault tests (`api/vault_integration_test.go`)
+### Credential vault (SQLite unit tests)
 
-| Test | What it verifies |
-|------|-----------------|
-| `VaultCreateSecret_ReturnsValidUUID` | `vault.create_secret()` returns a valid UUID |
-| `VaultDecryptedSecretsView` | `vault.decrypted_secrets` view returns original plaintext |
-| `VaultDeleteSecret` | `DELETE FROM vault.secrets` removes the row |
-| `VaultStoreAndReadRoundTrip` | Store credential via API, read vault secret, verify JSON match |
-| `VaultStoreAndDeleteRoundTrip` | Store credential, delete via API, verify vault secret gone |
-| `VaultTransactionAtomicity` | Vault insert rolled back with transaction rollback |
-| `GetDecryptedCredentials` | Full decrypt pipeline with real Supabase Vault |
-| `VaultSecretEncrypted` | Raw `vault.secrets` column contains ciphertext, not plaintext |
+Connector OAuth tokens and static credentials are encrypted with **AES-256-GCM** in the `vault_secrets` table. Package **`vault`** includes `TestSQLiteVault_*` tests (round-trip, tampered ciphertext, wrong key) using a temporary SQLite database — these run in normal `go test ./...` / CI.
 
 ### Auth tests (`api/auth_integration_test.go`)
 
@@ -80,15 +72,14 @@ DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
    ```
 3. **Name tests with the `TestIntegration_` prefix** for consistency
 4. **Clean up test data** using `t.Cleanup()` — integration tests run against a shared database, not isolated transactions
-5. **Use `setupIntegrationPool(t)`** to get a connection to the Supabase Postgres instance
-6. **Use `setupIntegrationUser(t, pool)`** to create a test user with proper auth.users + profiles rows
+5. **Use `db.Connect` + `db.Migrate`** for SQLite-backed integration scenarios, or the Supabase helpers below when testing the legacy Docker stack
 
 ## Why separate from CI?
 
-- CI runs against plain Postgres (fast, no Docker dependency)
-- The Supabase stack requires Docker containers for Postgres + GoTrue + Vault + Mailpit
-- Integration tests verify real encryption, real JWT signing, and real auth flows that mocks cannot cover
-- Keeping them separate means CI stays fast and reliable while developers can verify integrations locally
+- CI runs `go test ./...` including `vault` package tests for AES-256-GCM round-trip, tamper detection, and wrong-key rejection against a temporary SQLite file
+- Optional `//go:build integration` tests may still target the Supabase Docker stack for JWT/auth flows (`api/auth_integration_test.go`)
+- The Supabase stack requires Docker containers for Postgres + GoTrue + Mailpit
+- Keeping heavy integration separate means CI stays fast while developers can verify integrations locally
 
 ## Ports reference
 

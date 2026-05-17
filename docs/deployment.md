@@ -105,8 +105,27 @@ curl https://your-app.fly.dev/api/health
 | `VAPID_PUBLIC_KEY` | Optional | VAPID public key for Web Push (auto-generated if unset) |
 | `VAPID_PRIVATE_KEY` | Optional | VAPID private key for Web Push (auto-generated if unset) |
 | `VAPID_SUBJECT` | Optional | `mailto:` URL for VAPID (e.g., `mailto:admin@mycompany.com`) |
+| `SECRET_ENCRYPTION_KEY` | Yes (with `DATABASE_PATH`) | Base64-encoded **32-byte** AES-256 key for the SQLite credential vault (`vault_secrets`). Generate with `openssl rand -base64 32`. **Back up this key** — loss is unrecoverable; leakage decrypts all stored OAuth tokens and credentials. |
 
-**Note:** `VAULT_SECRET_KEY` is configured on the Supabase side (in `supabase/config.toml`), not as a Fly secret. Your hosted Supabase project manages its own vault encryption key.
+### Credential vault operations
+
+When the app uses **`DATABASE_PATH`** (embedded SQLite), secrets are encrypted in the `vault_secrets` table with **AES-256-GCM** and a random 12-byte nonce per row. The master key is **`SECRET_ENCRYPTION_KEY`** (standard base64 decoding to exactly 32 bytes).
+
+**Generate a key**
+
+```bash
+openssl rand -base64 32
+```
+
+Set the value as a Fly secret (or in your process environment):
+
+```bash
+fly secrets set SECRET_ENCRYPTION_KEY="$(openssl rand -base64 32)"
+```
+
+**Key rotation (v1):** There is no automated rewrap job. To rotate, you would decrypt each `vault_secrets` row with the old key and re-encrypt with a new key during a maintenance window, then update `SECRET_ENCRYPTION_KEY` and redeploy. Document the procedure in your runbook; test on a copy of the database first.
+
+**Backups:** The SQLite file contains **ciphertext only** — safe against casual inspection — but anyone with **both** the database file and `SECRET_ENCRYPTION_KEY` can recover plaintext tokens. Store backups and the master key under separate access controls. If you replicate backups off-site, treat them as sensitive as production credentials.
 
 ### Error tracking (Sentry)
 

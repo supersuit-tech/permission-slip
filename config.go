@@ -3,6 +3,8 @@ package main
 import (
 	"os"
 	"strings"
+
+	"github.com/supersuit-tech/permission-slip/vault"
 )
 
 // configError represents a missing or invalid configuration value.
@@ -44,6 +46,32 @@ func validateConfig() (errs []configError, warnings []configError) {
 			warnings = append(warnings, ce)
 		} else {
 			errs = append(errs, ce)
+		}
+	}
+
+	// SQLite vault — encrypts connector OAuth tokens and static credentials.
+	if strings.TrimSpace(os.Getenv("DATABASE_PATH")) != "" {
+		keyRaw := strings.TrimSpace(os.Getenv("SECRET_ENCRYPTION_KEY"))
+		if keyRaw == "" {
+			ce := configError{
+				envVar:  "SECRET_ENCRYPTION_KEY",
+				message: "required when DATABASE_PATH is set (AES-256-GCM master key for vault_secrets); generate with: openssl rand -base64 32",
+			}
+			if devMode {
+				warnings = append(warnings, ce)
+			} else {
+				errs = append(errs, ce)
+			}
+		} else if _, err := vault.ParseSecretEncryptionKey(keyRaw); err != nil {
+			ce := configError{
+				envVar:  "SECRET_ENCRYPTION_KEY",
+				message: err.Error(),
+			}
+			if devMode {
+				warnings = append(warnings, ce)
+			} else {
+				errs = append(errs, ce)
+			}
 		}
 	}
 

@@ -1,7 +1,7 @@
 // Package vault defines the VaultStore interface for encrypting, storing,
-// and retrieving credential secrets. In production this is backed by Supabase
-// Vault (server-side AES-256-GCM encryption); in tests it is replaced by an
-// in-memory mock.
+// and retrieving credential secrets. With the SQLite stack ([db.Pool] on
+// DATABASE_PATH), production uses [SQLiteVault] (AES-256-GCM with
+// SECRET_ENCRYPTION_KEY). Tests typically use an in-memory [MockVaultStore].
 package vault
 
 import (

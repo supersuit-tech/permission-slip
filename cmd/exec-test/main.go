@@ -315,7 +315,10 @@ func resolveOAuthFromDB(ctx context.Context, pool db.DBTX, userID, oauthConnID s
 	}
 
 	// Read access token from vault.
-	v := vault.NewSupabaseVaultStore()
+	v, err := vault.NewSQLiteVaultFromEnv()
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("open vault: %w", err)
+	}
 	accessTokenBytes, err := v.ReadSecret(ctx, pool, conn.AccessTokenVaultID)
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("read access token from vault: %w", err)
@@ -345,7 +348,10 @@ func refreshOAuthToken(ctx context.Context, pool db.DBTX, conn *db.OAuthConnecti
 		return fmt.Errorf("OAuth provider %q not registered", conn.Provider)
 	}
 
-	v := vault.NewSupabaseVaultStore()
+	v, err := vault.NewSQLiteVaultFromEnv()
+	if err != nil {
+		return fmt.Errorf("open vault: %w", err)
+	}
 	if conn.RefreshTokenVaultID == nil {
 		return fmt.Errorf("no refresh token available — user must re-authorize")
 	}
@@ -428,7 +434,10 @@ func resolveStaticFromDB(ctx context.Context, pool db.DBTX, userID, credentialID
 		return connectors.Credentials{}, fmt.Errorf("look up vault secret: %w", err)
 	}
 
-	v := vault.NewSupabaseVaultStore()
+	v, err := vault.NewSQLiteVaultFromEnv()
+	if err != nil {
+		return connectors.Credentials{}, fmt.Errorf("open vault: %w", err)
+	}
 	raw, err := v.ReadSecret(ctx, pool, vaultSecretID)
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("decrypt credential: %w", err)
