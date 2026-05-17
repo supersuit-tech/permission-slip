@@ -28,7 +28,17 @@ jobs:
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
       - name: Run backend tests
-        run: go test ./...
+        id: gotest
+        run: |
+          set -o pipefail
+          go test ./... 2>&1 | tee /tmp/backend-tests.log
+
+      - name: Upload backend test log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-tests-log
+          path: /tmp/backend-tests.log
 
   frontend:
     name: Frontend Tests
@@ -99,7 +109,17 @@ jobs:
           fi
 
       - name: Build server (frontend + Go)
-        run: make build-ci
+        id: gobuild
+        run: |
+          set -o pipefail
+          make build-ci 2>&1 | tee /tmp/build.log
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: /tmp/build.log
 
   notify-failure:
     name: Notify on Failure
