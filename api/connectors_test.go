@@ -22,7 +22,6 @@ func decodeConnectorList(t *testing.T, body []byte) connectorListResponse {
 }
 
 func TestListConnectors_Empty(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
@@ -44,7 +43,6 @@ func TestListConnectors_Empty(t *testing.T) {
 }
 
 func TestListConnectors_ReturnsAll(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
 	conn1 := testhelper.GenerateID(t, "conn_")
@@ -72,7 +70,6 @@ func TestListConnectors_ReturnsAll(t *testing.T) {
 }
 
 func TestListConnectors_NoAuthRequired(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
@@ -100,7 +97,6 @@ func decodeConnectorDetail(t *testing.T, body []byte) connectorDetailResponse {
 }
 
 func TestGetConnector_Found(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
 	connID := testhelper.GenerateID(t, "conn_")
@@ -141,7 +137,6 @@ func TestGetConnector_Found(t *testing.T) {
 }
 
 func TestGetConnector_NotFound(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
@@ -157,7 +152,6 @@ func TestGetConnector_NotFound(t *testing.T) {
 }
 
 func TestGetConnector_NoAuthRequired(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
 	connID := testhelper.GenerateID(t, "conn_")
