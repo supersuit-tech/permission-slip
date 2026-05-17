@@ -51,7 +51,7 @@
 "jest-expo": "^55.0.9",
     "openapi-typescript": "^7.13.0",
     "react-test-renderer": "^19.2.0",
-    "typescript": "~5.9.2"
+    "typescript": "~6.0.3"
   },
 "private": true
 }
