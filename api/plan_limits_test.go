@@ -73,7 +73,7 @@ func TestCreateStandingApproval_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	// Register the agent so standing approvals can reference it.
-	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = now() WHERE agent_id = $1`, agentID)
+	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`, agentID)
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// Insert 4 standing approvals (under the limit of 5).
@@ -107,7 +107,7 @@ func TestCreateStandingApproval_PaidPlan_NoLimit(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = now() WHERE agent_id = $1`, agentID)
+	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`, agentID)
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
 	// Insert 10 standing approvals (would exceed free limit of 5).
@@ -141,7 +141,7 @@ func TestCreateStandingApproval_NoSubscription_NoLimit(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = now() WHERE agent_id = $1`, agentID)
+	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`, agentID)
 	// Intentionally no subscription — should bypass limits.
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
@@ -459,7 +459,7 @@ func TestCreateStandingApproval_RevokedDoNotCountTowardLimit(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
-	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = now() WHERE agent_id = $1`, agentID)
+	testhelper.MustExec(t, tx, `UPDATE agents SET status = 'registered', registered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`, agentID)
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// 4 active + 5 revoked = only 4 count toward limit (under 5).

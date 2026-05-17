@@ -15,7 +15,7 @@ func RecordStripeEvent(ctx context.Context, db DBTX, eventID, eventType string) 
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // IsStripeEventProcessed checks if a Stripe webhook event has already been processed.
@@ -36,10 +36,10 @@ func IsStripeEventProcessed(ctx context.Context, db DBTX, eventID string) (bool,
 func PurgeOldStripeEvents(ctx context.Context, db DBTX) (int64, error) {
 	tag, err := db.Exec(ctx,
 		`DELETE FROM stripe_webhook_events
-		 WHERE processed_at < now() - interval '72 hours'`)
+		 WHERE processed_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-72 hours')`)
 	if err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), nil
+	return RowsAffected(tag), nil
 }
 

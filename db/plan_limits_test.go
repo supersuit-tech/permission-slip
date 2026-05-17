@@ -62,7 +62,7 @@ func TestCountRegisteredAgentsByUser_ExcludesExpiredPending(t *testing.T) {
 	// 1 expired pending agent (expires_at in the past)
 	testhelper.MustExec(t, tx,
 		`INSERT INTO agents (public_key, approver_id, status, expires_at)
-		 VALUES ('pk', $1, 'pending', now() - interval '1 hour')`, uid)
+		 VALUES ('pk', $1, 'pending', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours'))`, uid)
 
 	count, err := db.CountRegisteredAgentsByUser(ctx, tx, uid)
 	if err != nil {

@@ -12,6 +12,8 @@ func TestCreateProfile_Success(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
+	testhelper.MustExec(t, tx, `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'x')`,
+		uid, uid+"@example.com")
 
 	profile, err := db.CreateProfile(context.Background(), tx, uid, "newuser", "newuser@example.com", false)
 	if err != nil {
@@ -40,6 +42,9 @@ func TestCreateProfile_UsernameTaken(t *testing.T) {
 	uid1 := testhelper.GenerateUID(t)
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid1, "taken")
+	// uid2 needs a users row but no profile yet so CreateProfile can attempt insert.
+	testhelper.MustExec(t, tx, `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'x')`,
+		uid2, uid2+"@example.com")
 
 	_, err := db.CreateProfile(context.Background(), tx, uid2, "taken", "taken@example.com", false)
 	if err == nil {
@@ -55,13 +60,15 @@ func TestCreateProfile_UsernameTaken(t *testing.T) {
 	}
 }
 
-func TestCreateProfile_Idempotent_AuthUsers(t *testing.T) {
+// TestCreateProfile_NewUser verifies that CreateProfile works when the users
+// row already exists (the normal flow: auth signup creates users row, then
+// the onboarding endpoint calls CreateProfile).
+func TestCreateProfile_NewUser(t *testing.T) {
 	t.Parallel()
-	// Calling CreateProfile when auth.users row already exists should not fail.
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
-	// Pre-insert the auth.users row (as Supabase would have done)
-	testhelper.MustExec(t, tx, `INSERT INTO auth.users (id) VALUES ($1)`, uid)
+	testhelper.MustExec(t, tx, `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'x')`,
+		uid, "preseeded@example.com")
 
 	profile, err := db.CreateProfile(context.Background(), tx, uid, "preseeded", "preseeded@example.com", false)
 	if err != nil {
@@ -76,6 +83,8 @@ func TestCreateProfile_MarketingOptIn(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
+	testhelper.MustExec(t, tx, `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'x')`,
+		uid, uid+"@example.com")
 
 	profile, err := db.CreateProfile(context.Background(), tx, uid, "marketer", "marketer@example.com", true)
 	if err != nil {
@@ -99,6 +108,8 @@ func TestCreateProfile_SMSDisabledByDefault(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
+	testhelper.MustExec(t, tx, `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'x')`,
+		uid, uid+"@example.com")
 
 	_, err := db.CreateProfile(context.Background(), tx, uid, "smsuser", "smsuser@example.com", false)
 	if err != nil {
@@ -118,6 +129,8 @@ func TestCreateProfile_EmptyEmail(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
+	testhelper.MustExec(t, tx, `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'x')`,
+		uid, uid+"@example.com")
 
 	profile, err := db.CreateProfile(context.Background(), tx, uid, "noemailer", "", false)
 	if err != nil {

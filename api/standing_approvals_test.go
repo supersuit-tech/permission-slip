@@ -1279,8 +1279,9 @@ func TestRevokeStandingApproval_Unauthenticated(t *testing.T) {
 // atomic UPDATE in RevokeStandingApproval works correctly when two requests
 // race: exactly one gets 200 (success) and the other gets 409 (already revoked).
 func TestRevokeStandingApproval_ConcurrentRevokes(t *testing.T) {
-	t.Parallel()
-	// Use the pool (not a transaction) so each goroutine gets its own connection.
+	// Not parallel: InsertStandingApproval commits a fixture connector on the
+	// shared test pool; other tests (e.g. GET /connectors) assume no stray rows.
+	// Uses the pool (not a rolled-back test transaction) so revoke handlers see committed state.
 	pool := testhelper.SetupPool(t)
 	uid := testhelper.GenerateUID(t)
 	saID := testhelper.GenerateID(t, "sa_")

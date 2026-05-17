@@ -36,7 +36,7 @@ func TestInviteExpirationBoundary_HTTP(t *testing.T) {
 
 	// Backdate expires_at to 1 second in the past.
 	testhelper.MustExec(t, tx,
-		`UPDATE registration_invites SET expires_at = now() - interval '1 second' WHERE id = $1`, riID)
+		`UPDATE registration_invites SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second') WHERE id = $1`, riID)
 
 	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
 	if err != nil {
@@ -81,7 +81,7 @@ func TestAgentRegistrationTTLBoundary_HTTP(t *testing.T) {
 
 	// Backdate the agent's expires_at to simulate TTL expiration.
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET expires_at = now() - interval '1 second' WHERE agent_id = $1`, reg.AgentID)
+		`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second') WHERE agent_id = $1`, reg.AgentID)
 
 	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
 
@@ -144,7 +144,7 @@ func TestLockoutVsExpirationPrecedence_HTTP(t *testing.T) {
 
 	// Now also expire the TTL.
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET expires_at = now() - interval '1 hour' WHERE agent_id = $1`, reg.AgentID)
+		`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hour') WHERE agent_id = $1`, reg.AgentID)
 
 	// With both lockout and expiration, expiration should take precedence in the
 	// diagnosis path (it's checked before lockout in diagnosePendingAgent).

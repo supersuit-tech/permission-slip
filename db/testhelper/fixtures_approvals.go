@@ -20,7 +20,7 @@ func InsertApprovalWithStatus(t *testing.T, d db.DBTX, approvalID string, agentI
 	t.Helper()
 	mustExec(t, d,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at)
-		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', $4, now() + interval '1 hour')`,
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', $4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'))`,
 		approvalID, agentID, approverID, status)
 }
 
@@ -29,10 +29,11 @@ func InsertApprovalWithStatus(t *testing.T, d db.DBTX, approvalID string, agentI
 // The agent and approver must already exist via InsertUser and InsertAgent.
 func InsertApprovalWithCreatedAt(t *testing.T, d db.DBTX, approvalID string, agentID int64, approverID string, createdAt time.Time) {
 	t.Helper()
+	expiresAt := createdAt.Add(time.Hour)
 	mustExec(t, d,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at, created_at)
-		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'pending', $4::timestamptz + interval '1 hour', $4)`,
-		approvalID, agentID, approverID, createdAt)
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'pending', $4, $5)`,
+		approvalID, agentID, approverID, db.TimestampForSQLite(expiresAt), db.TimestampForSQLite(createdAt))
 }
 
 // InsertApprovalWithExpiresAt creates a pending approval with an explicit expires_at.
@@ -43,7 +44,7 @@ func InsertApprovalWithExpiresAt(t *testing.T, d db.DBTX, approvalID string, age
 	mustExec(t, d,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at)
 		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'pending', $4)`,
-		approvalID, agentID, approverID, expiresAt)
+		approvalID, agentID, approverID, db.TimestampForSQLite(expiresAt))
 }
 
 // resolvedAtColumn maps an approval status to its resolution timestamp column.
@@ -71,7 +72,7 @@ func InsertResolvedApproval(t *testing.T, d db.DBTX, approvalID string, agentID 
 	tsColumn := resolvedAtColumn(t, status)
 	mustExec(t, d,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at, `+tsColumn+`)
-		 VALUES ($1, $2, $3, '{"type":"test.action","version":"1","parameters":{"to":"alice@example.com"}}', '{"description":"test action"}', $4, now() + interval '1 hour', now())`,
+		 VALUES ($1, $2, $3, '{"type":"test.action","version":"1","parameters":{"to":"alice@example.com"}}', '{"description":"test action"}', $4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
 		approvalID, agentID, approverID, status)
 }
 
@@ -80,10 +81,11 @@ func InsertResolvedApproval(t *testing.T, d db.DBTX, approvalID string, agentID 
 func InsertResolvedApprovalAt(t *testing.T, d db.DBTX, approvalID string, agentID int64, approverID, status string, resolvedAt time.Time) {
 	t.Helper()
 	tsColumn := resolvedAtColumn(t, status)
+	expiresAt := resolvedAt.Add(time.Hour)
 	mustExec(t, d,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at, `+tsColumn+`)
-		 VALUES ($1, $2, $3, '{"type":"test.action","version":"1","parameters":{"to":"alice@example.com"}}', '{"description":"test action"}', $4, $5::timestamptz + interval '1 hour', $5)`,
-		approvalID, agentID, approverID, status, resolvedAt)
+		 VALUES ($1, $2, $3, '{"type":"test.action","version":"1","parameters":{"to":"alice@example.com"}}', '{"description":"test action"}', $4, $5, $6)`,
+		approvalID, agentID, approverID, status, db.TimestampForSQLite(expiresAt), db.TimestampForSQLite(resolvedAt))
 }
 
 // InsertRequestID creates a request_id for the given agent and approver.

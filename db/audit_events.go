@@ -2,11 +2,10 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // AuditEventType represents the type of an audit event.
@@ -147,12 +146,12 @@ const resolvedOutcomeExpr = `CASE
 		WHEN ae.outcome = 'pending'
 		 AND a.status = 'pending'
 		 AND a.expires_at IS NOT NULL
-		 AND a.expires_at <= now()
+		 AND datetime(a.expires_at) <= datetime('now')
 		THEN 'expired'
 		WHEN ae.outcome = 'pending'
 		 AND ae.source_type = 'approval'
 		 AND appr.status = 'pending'
-		 AND appr.expires_at <= now()
+		 AND datetime(appr.expires_at) <= datetime('now')
 		THEN 'expired'
 		ELSE ae.outcome
 	END`
@@ -181,7 +180,7 @@ func ListAuditEvents(ctx context.Context, db DBTX, userID string, limit int, cur
 	where := []string{"ae.user_id = $1"}
 
 	if retentionDays > 0 {
-		where = append(where, "ae.created_at >= now() - make_interval(days => "+b.addArg(retentionDays)+")")
+		where = append(where, "ae.created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-' || "+b.addArg(retentionDays)+" || ' days')")
 	}
 
 	if cursor != nil {
@@ -274,14 +273,14 @@ func outcomeFilter(outcome string, b *queryBuilder) string {
 	case "expired":
 		// Agent registration expired OR approval request expired.
 		return `(ae.outcome = 'pending' AND (
-			(a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at <= now())
-			OR (ae.source_type = 'approval' AND appr.status = 'pending' AND appr.expires_at <= now())
+			(a.status = 'pending' AND a.expires_at IS NOT NULL AND datetime(a.expires_at) <= datetime('now'))
+			OR (ae.source_type = 'approval' AND appr.status = 'pending' AND datetime(appr.expires_at) <= datetime('now'))
 		))`
 	case "pending":
 		// Still active: neither agent registration nor approval has expired.
 		return `(ae.outcome = 'pending'
-			AND NOT (a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at <= now())
-			AND NOT (ae.source_type = 'approval' AND appr.status = 'pending' AND appr.expires_at <= now())
+			AND NOT (a.status = 'pending' AND a.expires_at IS NOT NULL AND datetime(a.expires_at) <= datetime('now'))
+			AND NOT (ae.source_type = 'approval' AND appr.status = 'pending' AND datetime(appr.expires_at) <= datetime('now'))
 		)`
 	default:
 		return "ae.outcome = " + b.addArg(outcome)
@@ -311,7 +310,7 @@ type AuditLogExportCursor struct {
 // via a compound (created_at, id) key.
 //
 // retentionDays controls the retention window: if > 0, the effective `since`
-// is clamped to at least now()-retentionDays, even if the caller passes an
+// is clamped to at least strftime('%Y-%m-%dT%H:%M:%fZ', 'now')-retentionDays, even if the caller passes an
 // earlier value. Pass 0 to disable retention filtering.
 //
 // Optional parameters:
@@ -328,8 +327,8 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 	fetchLimit := limit + 1
 
 	// Clamp `since` to the retention window when enforcement is active.
-	// Use UTC + fixed 24h days to match the SQL `make_interval(days => N)`
-	// semantics used in the list endpoint and purge jobs.
+	// Use UTC + fixed 24h days to match the SQLite strftime modifier semantics
+	// used in the list endpoint and purge jobs.
 	if retentionDays > 0 {
 		retentionFloor := time.Now().UTC().Add(-time.Duration(retentionDays) * 24 * time.Hour)
 		if since.Before(retentionFloor) {
@@ -398,17 +397,23 @@ func ExportAuditLogs(ctx context.Context, db DBTX, userID string, since time.Tim
 // scanAuditEvents reads all rows from the query result into a slice of AuditEvent.
 // Both ListAuditEvents and ExportAuditLogs use identical SELECT columns, so this
 // centralises the scan logic to avoid divergence.
-func scanAuditEvents(rows pgx.Rows) ([]AuditEvent, error) {
+func scanAuditEvents(rows *sql.Rows) ([]AuditEvent, error) {
 	defer rows.Close()
 
 	var events []AuditEvent
 	for rows.Next() {
 		var e AuditEvent
 		var eventType string
+		var ts sql.NullString
 		if err := rows.Scan(
-			&e.ID, &eventType, &e.Timestamp, &e.AgentID, &e.AgentMeta, &e.Action,
+			&e.ID, &eventType, &ts, &e.AgentID, &e.AgentMeta, &e.Action,
 			&e.Outcome, &e.SourceID, &e.SourceType, &e.ConnectorID, &e.ExecutionStatus, &e.ExecutionError,
 		); err != nil {
+			return nil, fmt.Errorf("scan audit event: %w", err)
+		}
+		var err error
+		e.Timestamp, err = sqliteTimeRequired(ts)
+		if err != nil {
 			return nil, fmt.Errorf("scan audit event: %w", err)
 		}
 		e.EventType = AuditEventType(eventType)

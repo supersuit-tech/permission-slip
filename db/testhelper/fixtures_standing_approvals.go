@@ -54,7 +54,7 @@ func InsertStandingApprovalWithStatus(t *testing.T, d db.DBTX, saID string, agen
 	configID := ensureStandingApprovalSourceConfig(t, d, agentID, userID, actionType)
 	mustExec(t, d,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, now(), now() + interval '30 days')`,
+		 VALUES ($1, $2, $3, $4, $5, $6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'))`,
 		saID, agentID, userID, actionType, status, configID)
 }
 
@@ -67,8 +67,12 @@ func InsertStandingApprovalWithCreatedAt(t *testing.T, d db.DBTX, saID string, a
 	expiresAt := createdAt.Add(30 * 24 * time.Hour)
 	mustExec(t, d,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at, created_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $6)`,
-		saID, agentID, userID, actionType, configID, createdAt, expiresAt)
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8)`,
+		saID, agentID, userID, actionType, configID,
+		db.TimestampForSQLite(createdAt),
+		db.TimestampForSQLite(expiresAt),
+		db.TimestampForSQLite(createdAt),
+	)
 }
 
 // InsertStandingApprovalWithActionType creates an active standing approval with a specific action_type.
@@ -78,7 +82,7 @@ func InsertStandingApprovalWithActionType(t *testing.T, d db.DBTX, saID string, 
 	configID := ensureStandingApprovalSourceConfig(t, d, agentID, userID, actionType)
 	mustExec(t, d,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, now(), now() + interval '30 days')`,
+		 VALUES ($1, $2, $3, $4, 'active', $5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'))`,
 		saID, agentID, userID, actionType, configID)
 }
 
@@ -127,10 +131,12 @@ func InsertStandingApprovalFull(t *testing.T, d db.DBTX, saID string, agentID in
 		id := ensureStandingApprovalSourceConfig(t, d, agentID, userID, opts.ActionType)
 		sourceID = &id
 	}
+	startsStr := opts.StartsAt.UTC().Format("2006-01-02T15:04:05.000000Z")
+	expiresStr := opts.ExpiresAt.UTC().Format("2006-01-02T15:04:05.000000Z")
 	mustExec(t, d,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, sourceID, opts.StartsAt, opts.ExpiresAt)
+		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, sourceID, startsStr, expiresStr)
 }
 
 // RequireStandingApprovalExecutionCount asserts the number of rows in

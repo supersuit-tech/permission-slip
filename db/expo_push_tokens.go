@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"time"
 )
 
@@ -17,6 +18,7 @@ type ExpoPushToken struct {
 // (user_id, token) pair already exists (device re-registered).
 func UpsertExpoPushToken(ctx context.Context, db DBTX, userID, token string) (*ExpoPushToken, error) {
 	var t ExpoPushToken
+	var createdAt sql.NullString
 	err := db.QueryRow(ctx,
 		`INSERT INTO expo_push_tokens (user_id, token)
 		 VALUES ($1, $2)
@@ -24,9 +26,14 @@ func UpsertExpoPushToken(ctx context.Context, db DBTX, userID, token string) (*E
 		 DO UPDATE SET token = EXCLUDED.token
 		 RETURNING id, user_id, token, created_at`,
 		userID, token,
-	).Scan(&t.ID, &t.UserID, &t.Token, &t.CreatedAt)
+	).Scan(&t.ID, &t.UserID, &t.Token, &createdAt)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	t.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &t, nil
 }
@@ -41,7 +48,7 @@ func DeleteExpoPushToken(ctx context.Context, db DBTX, userID string, tokenID in
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // DeleteExpoPushTokenForUser removes an Expo push token by its token string,
@@ -55,7 +62,7 @@ func DeleteExpoPushTokenForUser(ctx context.Context, db DBTX, userID, token stri
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // DeleteExpoPushTokenByToken removes an Expo push token by its token string.
@@ -82,8 +89,14 @@ func ListExpoPushTokensByUserID(ctx context.Context, db DBTX, userID string) ([]
 	var tokens []ExpoPushToken
 	for rows.Next() {
 		var t ExpoPushToken
-		if err := rows.Scan(&t.ID, &t.UserID, &t.Token, &t.CreatedAt); err != nil {
+		var createdAt sql.NullString
+		if err := rows.Scan(&t.ID, &t.UserID, &t.Token, &createdAt); err != nil {
 			return nil, err
+		}
+		var err2 error
+		t.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+		if err2 != nil {
+			return nil, err2
 		}
 		tokens = append(tokens, t)
 	}

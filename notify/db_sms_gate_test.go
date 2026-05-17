@@ -10,7 +10,6 @@ import (
 )
 
 func TestDBSMSGate_FreeTier_Blocked(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "free_user")
@@ -27,7 +26,6 @@ func TestDBSMSGate_FreeTier_Blocked(t *testing.T) {
 }
 
 func TestDBSMSGate_PaidTier_Allowed(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "paid_user")
@@ -44,7 +42,6 @@ func TestDBSMSGate_PaidTier_Allowed(t *testing.T) {
 }
 
 func TestDBSMSGate_NoSubscription_Blocked(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "no_sub_user")
@@ -61,7 +58,6 @@ func TestDBSMSGate_NoSubscription_Blocked(t *testing.T) {
 }
 
 func TestDBSMSGate_RecordSMSSent_IncrementsCount(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "sms_user")

@@ -1,14 +1,13 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Credential represents the metadata of a stored credential (secrets are never returned).
@@ -18,6 +17,21 @@ type Credential struct {
 	Service   string
 	Label     *string
 	CreatedAt time.Time
+}
+
+func scanCredential(row rowScanner) (*Credential, error) {
+	var c Credential
+	var createdAt sql.NullString
+	err := row.Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &createdAt)
+	if err != nil {
+		return nil, err
+	}
+	var err2 error
+	c.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	return &c, nil
 }
 
 // CreateCredentialParams holds the parameters for inserting a new credential row.
@@ -70,11 +84,11 @@ func ListCredentialsByUser(ctx context.Context, db DBTX, userID string) ([]Crede
 
 	var creds []Credential
 	for rows.Next() {
-		var c Credential
-		if err := rows.Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &c.CreatedAt); err != nil {
+		c, err := scanCredential(rows)
+		if err != nil {
 			return nil, err
 		}
-		creds = append(creds, c)
+		creds = append(creds, *c)
 	}
 	return creds, rows.Err()
 }
@@ -83,21 +97,19 @@ func ListCredentialsByUser(ctx context.Context, db DBTX, userID string) ([]Crede
 // Returns a *CredentialError with code CredentialErrDuplicate if the (user_id, service, label)
 // unique constraint is violated.
 func CreateCredential(ctx context.Context, db DBTX, p CreateCredentialParams) (*Credential, error) {
-	var c Credential
-	err := db.QueryRow(ctx, `
+	c, err := scanCredential(db.QueryRow(ctx, `
 		INSERT INTO credentials (id, user_id, service, label, vault_secret_id)
 		VALUES ($1, $2, $3, $4, $5)
 		RETURNING id, user_id, service, label, created_at`,
 		p.ID, p.UserID, p.Service, p.Label, p.VaultSecretID,
-	).Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &c.CreatedAt)
+	))
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
+		if IsUniqueViolation(err) {
 			return nil, &CredentialError{Code: CredentialErrDuplicate, Message: "Credentials already stored for this service with this label"}
 		}
 		return nil, err
 	}
-	return &c, nil
+	return c, nil
 }
 
 // DeleteCredentialResult holds the result of a credential deletion.
@@ -111,14 +123,19 @@ type DeleteCredentialResult struct {
 // Returns a *CredentialError with code CredentialErrNotFound if no matching row exists.
 func DeleteCredential(ctx context.Context, db DBTX, credID, userID string) (*DeleteCredentialResult, error) {
 	var result DeleteCredentialResult
+	var deletedAt sql.NullString
 	err := db.QueryRow(ctx, `
 		DELETE FROM credentials
 		WHERE id = $1 AND user_id = $2
-		RETURNING now(), vault_secret_id`, credID, userID,
-	).Scan(&result.DeletedAt, &result.VaultSecretID)
-	if errors.Is(err, pgx.ErrNoRows) {
+		RETURNING strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS deleted_at, vault_secret_id`, credID, userID,
+	).Scan(&deletedAt, &result.VaultSecretID)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
 	}
+	if err != nil {
+		return nil, err
+	}
+	result.DeletedAt, err = sqliteTimeRequired(deletedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -157,7 +174,7 @@ func GetVaultSecretID(ctx context.Context, db DBTX, userID, service string, labe
 			userID, service,
 		).Scan(&vaultSecretID)
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
 	}
 	if err != nil {
@@ -174,7 +191,7 @@ func GetVaultSecretIDByCredentialID(ctx context.Context, db DBTX, credentialID s
 		SELECT vault_secret_id FROM credentials WHERE id = $1`,
 		credentialID,
 	).Scan(&vaultSecretID)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
 	}
 	if err != nil {
@@ -216,16 +233,12 @@ func GetDecryptedCredentials(
 // GetCredentialByID returns the credential metadata for the given ID,
 // or nil if no credential exists with that ID.
 func GetCredentialByID(ctx context.Context, db DBTX, credID string) (*Credential, error) {
-	var c Credential
-	err := db.QueryRow(ctx, `
+	c, err := scanCredential(db.QueryRow(ctx, `
 		SELECT id, user_id, service, label, created_at
 		FROM credentials WHERE id = $1`, credID,
-	).Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &c.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	))
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	return &c, nil
+	return c, err
 }

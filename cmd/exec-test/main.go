@@ -83,7 +83,7 @@ func main() {
 	}
 	flag.Parse()
 
-	// Load .env for DATABASE_URL etc.
+	// Load .env for DATABASE_PATH etc.
 	_ = godotenv.Load()
 
 	// Build connector registry (same as production).
@@ -242,15 +242,15 @@ func resolveDirectCredentials(creds credFlag) (connectors.Credentials, error) {
 // agent's credential binding, decrypts from vault, and refreshes OAuth tokens
 // if needed — exactly the same code path as production.
 func resolveDatabaseCredentials(userID string, agentID int64, connectorID string, registry *connectors.Registry) (connectors.Credentials, error) {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		return connectors.Credentials{}, fmt.Errorf("DATABASE_URL is required for database credential resolution (set it in .env)")
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		return connectors.Credentials{}, fmt.Errorf("DATABASE_PATH is required for database credential resolution (set it in .env)")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	pool, err := db.Connect(ctx, dbURL)
+	pool, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("connect to database: %w", err)
 	}
@@ -373,7 +373,7 @@ func refreshOAuthToken(ctx context.Context, pool db.DBTX, conn *db.OAuthConnecti
 	if err != nil {
 		return fmt.Errorf("begin transaction: %w", err)
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck
 
 	// Delete old access token, store new one.
 	_ = v.DeleteSecret(ctx, tx, conn.AccessTokenVaultID)
@@ -403,7 +403,7 @@ func refreshOAuthToken(ctx context.Context, pool db.DBTX, conn *db.OAuthConnecti
 		return fmt.Errorf("update OAuth connection tokens: %w", err)
 	}
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit token refresh: %w", err)
 	}
 

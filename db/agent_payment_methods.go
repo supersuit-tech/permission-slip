@@ -1,11 +1,11 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // AgentPaymentMethod represents the binding between an agent and a payment method.
@@ -18,15 +18,21 @@ type AgentPaymentMethod struct {
 // GetAgentPaymentMethod returns the payment method assignment for an agent, or nil if none.
 func GetAgentPaymentMethod(ctx context.Context, db DBTX, agentID int64) (*AgentPaymentMethod, error) {
 	var apm AgentPaymentMethod
+	var createdAt sql.NullString
 	err := db.QueryRow(ctx,
 		`SELECT agent_id, payment_method_id, created_at
 		 FROM agent_payment_methods WHERE agent_id = $1`,
-		agentID).Scan(&apm.AgentID, &apm.PaymentMethodID, &apm.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+		agentID).Scan(&apm.AgentID, &apm.PaymentMethodID, &createdAt)
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	apm.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &apm, nil
 }
@@ -34,14 +40,20 @@ func GetAgentPaymentMethod(ctx context.Context, db DBTX, agentID int64) (*AgentP
 // AssignAgentPaymentMethod upserts the payment method for an agent.
 func AssignAgentPaymentMethod(ctx context.Context, db DBTX, agentID int64, paymentMethodID string) (*AgentPaymentMethod, error) {
 	var apm AgentPaymentMethod
+	var createdAt sql.NullString
 	err := db.QueryRow(ctx,
 		`INSERT INTO agent_payment_methods (agent_id, payment_method_id)
 		 VALUES ($1, $2)
 		 ON CONFLICT (agent_id) DO UPDATE SET payment_method_id = EXCLUDED.payment_method_id
 		 RETURNING agent_id, payment_method_id, created_at`,
-		agentID, paymentMethodID).Scan(&apm.AgentID, &apm.PaymentMethodID, &apm.CreatedAt)
+		agentID, paymentMethodID).Scan(&apm.AgentID, &apm.PaymentMethodID, &createdAt)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	apm.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &apm, nil
 }
@@ -55,7 +67,7 @@ func RemoveAgentPaymentMethod(ctx context.Context, db DBTX, agentID int64) (bool
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // CountAgentsByPaymentMethod returns the number of agents using a given payment method.

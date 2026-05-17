@@ -1,13 +1,13 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/jackc/pgx/v5"
 )
 
 // AgentConnectorInstance is a row in agent_connectors (one instance of a connector type for an agent).
@@ -33,18 +33,18 @@ type AgentConnectorInstance struct {
 const connectorInstanceDisplayNameSQL = `COALESCE(
     cr.label,
     CASE
-        WHEN NULLIF(oc.extra_data->>'display_name', '') IS NOT NULL
-             AND NULLIF(oc.extra_data->>'team_name', '') IS NOT NULL
-            THEN (oc.extra_data->>'display_name') || ' @ ' || (oc.extra_data->>'team_name')
-        WHEN NULLIF(oc.extra_data->>'email', '') IS NOT NULL
-             AND NULLIF(oc.extra_data->>'team_name', '') IS NOT NULL
-            THEN (oc.extra_data->>'email') || ' @ ' || (oc.extra_data->>'team_name')
-        WHEN NULLIF(oc.extra_data->>'display_name', '') IS NOT NULL
-            THEN oc.extra_data->>'display_name'
-        WHEN NULLIF(oc.extra_data->>'email', '') IS NOT NULL
-            THEN oc.extra_data->>'email'
-        WHEN NULLIF(oc.extra_data->>'team_name', '') IS NOT NULL
-            THEN oc.extra_data->>'team_name'
+        WHEN NULLIF(json_extract(oc.extra_data, '$.display_name'), '') IS NOT NULL
+             AND NULLIF(json_extract(oc.extra_data, '$.team_name'), '') IS NOT NULL
+            THEN json_extract(oc.extra_data, '$.display_name') || ' @ ' || json_extract(oc.extra_data, '$.team_name')
+        WHEN NULLIF(json_extract(oc.extra_data, '$.email'), '') IS NOT NULL
+             AND NULLIF(json_extract(oc.extra_data, '$.team_name'), '') IS NOT NULL
+            THEN json_extract(oc.extra_data, '$.email') || ' @ ' || json_extract(oc.extra_data, '$.team_name')
+        WHEN NULLIF(json_extract(oc.extra_data, '$.display_name'), '') IS NOT NULL
+            THEN json_extract(oc.extra_data, '$.display_name')
+        WHEN NULLIF(json_extract(oc.extra_data, '$.email'), '') IS NOT NULL
+            THEN json_extract(oc.extra_data, '$.email')
+        WHEN NULLIF(json_extract(oc.extra_data, '$.team_name'), '') IS NOT NULL
+            THEN json_extract(oc.extra_data, '$.team_name')
         ELSE ''
     END,
     ''
@@ -129,12 +129,12 @@ func CreateAgentConnectorInstance(ctx context.Context, db DBTX, p CreateAgentCon
 		return nil, &AgentConnectorError{Code: AgentConnectorErrConnectorNotEnabled}
 	}
 
-	var newID string
+	var newID = uuid.NewString()
 	err := db.QueryRow(ctx, `
-		INSERT INTO agent_connectors (agent_id, approver_id, connector_id, is_default)
-		VALUES ($1, $2, $3, false)
-		RETURNING connector_instance_id::text`,
-		p.AgentID, p.ApproverID, p.ConnectorID,
+		INSERT INTO agent_connectors (agent_id, approver_id, connector_id, connector_instance_id, is_default)
+		VALUES ($1, $2, $3, $4, 0)
+		RETURNING connector_instance_id`,
+		p.AgentID, p.ApproverID, p.ConnectorID, newID,
 	).Scan(&newID)
 	if err != nil {
 		return nil, err
@@ -142,14 +142,20 @@ func CreateAgentConnectorInstance(ctx context.Context, db DBTX, p CreateAgentCon
 	return GetAgentConnectorInstance(ctx, db, p.AgentID, p.ApproverID, p.ConnectorID, newID)
 }
 
-func scanAgentConnectorInstance(row pgx.Row) (*AgentConnectorInstance, error) {
+func scanAgentConnectorInstance(row rowScanner) (*AgentConnectorInstance, error) {
 	var inst AgentConnectorInstance
+	var enabledAt sql.NullString
 	err := row.Scan(
 		&inst.ConnectorInstanceID, &inst.AgentID, &inst.ConnectorID, &inst.ApproverID,
-		&inst.DisplayName, &inst.IsDefault, &inst.EnabledAt,
+		&inst.DisplayName, &inst.IsDefault, &enabledAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	inst.EnabledAt, err2 = sqliteTimeRequired(enabledAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &inst, nil
 }
@@ -180,11 +186,11 @@ func ListAgentConnectorInstances(ctx context.Context, db DBTX, agentID int64, ap
 // GetAgentConnectorInstance returns a single instance by ID, scoped to agent and approver.
 func GetAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID string) (*AgentConnectorInstance, error) {
 	row := db.QueryRow(ctx, agentConnectorInstanceSelect+`
-		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3 AND ac.connector_instance_id = $4::uuid`,
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3 AND ac.connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	inst, err := scanAgentConnectorInstance(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -200,7 +206,7 @@ func GetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int6
 		agentID, approverID, connectorID,
 	)
 	inst, err := scanAgentConnectorInstance(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -217,7 +223,7 @@ func GetDefaultAgentConnectorInstanceByAgent(ctx context.Context, db DBTX, agent
 		agentID, connectorID,
 	)
 	inst, err := scanAgentConnectorInstance(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -242,7 +248,7 @@ func SetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int6
 		SET is_default = false
 		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
 		  AND is_default
-		  AND connector_instance_id <> $4::uuid`,
+		  AND connector_instance_id <> $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	if err != nil {
@@ -252,13 +258,13 @@ func SetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int6
 	tag, err := tx.Exec(ctx, `
 		UPDATE agent_connectors
 		SET is_default = true
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	if err != nil {
 		return nil, err
 	}
-	if tag.RowsAffected() == 0 {
+	if RowsAffected(tag) == 0 {
 		if owned {
 			_ = RollbackTx(ctx, tx)
 		}
@@ -286,10 +292,10 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 	var isDefault bool
 	err = tx.QueryRow(ctx, `
 		SELECT is_default FROM agent_connectors
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	).Scan(&isDefault)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return &AgentConnectorInstanceError{Code: AgentConnectorInstanceErrNotFound}
 	}
 	if err != nil {
@@ -301,11 +307,11 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 
 	_, err = tx.Exec(ctx, `
 		UPDATE standing_approvals
-		SET status = 'revoked', revoked_at = now()
+		SET status = 'revoked', revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		WHERE agent_id = $1
 		  AND user_id = $2
 		  AND status = 'active'
-		  AND connector_instance_id = $3::uuid`,
+		  AND connector_instance_id = $3`,
 		agentID, approverID, connectorInstanceID,
 	)
 	if err != nil {
@@ -314,13 +320,13 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 
 	tag, err := tx.Exec(ctx, `
 		DELETE FROM agent_connectors
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	if err != nil {
 		return err
 	}
-	if tag.RowsAffected() == 0 {
+	if RowsAffected(tag) == 0 {
 		return &AgentConnectorInstanceError{Code: AgentConnectorInstanceErrNotFound}
 	}
 

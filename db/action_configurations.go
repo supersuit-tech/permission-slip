@@ -1,12 +1,11 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // ActionConfiguration represents a row from the action_configurations table.
@@ -31,15 +30,25 @@ const actionConfigColumns = `id, agent_id, user_id, connector_id, action_type,
 
 // scanActionConfig scans a single row into an ActionConfiguration.
 // The row must select actionConfigColumns.
-func scanActionConfig(row pgx.Row) (*ActionConfiguration, error) {
+func scanActionConfig(row rowScanner) (*ActionConfiguration, error) {
 	var ac ActionConfiguration
+	var createdAt, updatedAt sql.NullString
 	err := row.Scan(
 		&ac.ID, &ac.AgentID, &ac.UserID, &ac.ConnectorID, &ac.ActionType,
 		&ac.Parameters, &ac.Status, &ac.Name, &ac.Description,
-		&ac.CreatedAt, &ac.UpdatedAt,
+		&createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	ac.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	ac.UpdatedAt, err2 = sqliteTimeRequired(updatedAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &ac, nil
 }
@@ -96,11 +105,10 @@ func CreateActionConfig(ctx context.Context, db DBTX, p CreateActionConfigParams
 	)
 	ac, err := scanActionConfig(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &ActionConfigError{Code: ActionConfigErrAgentNotFound, Message: "agent not found or not owned by user"}
 		}
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeForeignKeyViolation {
+		if IsForeignKeyViolation(err) {
 			return nil, &ActionConfigError{Code: ActionConfigErrInvalidRef, Message: "invalid connector, action type, or credential reference"}
 		}
 		return nil, err
@@ -118,7 +126,7 @@ func GetActionConfigByID(ctx context.Context, db DBTX, configID, userID string) 
 		configID, userID,
 	)
 	ac, err := scanActionConfig(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -175,18 +183,17 @@ func UpdateActionConfig(ctx context.Context, db DBTX, p UpdateActionConfigParams
 		     status        = COALESCE($4, status),
 		     name          = COALESCE($5, name),
 		     description   = COALESCE($6, description),
-		     updated_at    = now()
+		     updated_at    = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE id = $1 AND user_id = $2
 		 RETURNING `+actionConfigColumns,
 		p.ID, p.UserID, p.Parameters, p.Status, p.Name, p.Description,
 	)
 	ac, err := scanActionConfig(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &ActionConfigError{Code: ActionConfigErrNotFound, Message: "action configuration not found"}
 		}
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeForeignKeyViolation {
+		if IsForeignKeyViolation(err) {
 			return nil, &ActionConfigError{Code: ActionConfigErrInvalidRef, Message: "invalid credential reference"}
 		}
 		return nil, err
@@ -212,7 +219,7 @@ func GetActiveActionConfigForAgent(ctx context.Context, db DBTX, configID string
 		configID, agentID,
 	)
 	ac, err := scanActionConfig(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -231,7 +238,7 @@ func DeleteActionConfig(ctx context.Context, db DBTX, configID, userID string) (
 		configID, userID,
 	)
 	ac, err := scanActionConfig(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

@@ -751,7 +751,7 @@ func TestAgentApprovalStatus_ApprovedWithExecution(t *testing.T) {
 	approvalID := "appr_status_exec"
 	testhelper.InsertApprovalWithStatus(t, tx, approvalID, agentID, uid, "approved")
 	_, err = tx.Exec(context.Background(),
-		`UPDATE approvals SET execution_status = 'success', execution_result = '{"data":"ok"}', executed_at = now() WHERE approval_id = $1`,
+		`UPDATE approvals SET execution_status = 'success', execution_result = '{"data":"ok"}', executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE approval_id = $1`,
 		approvalID,
 	)
 	if err != nil {

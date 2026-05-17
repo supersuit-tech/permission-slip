@@ -170,7 +170,7 @@ func TestVerifyAgentConfirmationCode_Expired(t *testing.T) {
 	}
 
 	// Backdate expires_at to the past.
-	testhelper.MustExec(t, tx, `UPDATE agents SET expires_at = now() - interval '1 hour' WHERE agent_id = $1`, agent.AgentID)
+	testhelper.MustExec(t, tx, `UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours') WHERE agent_id = $1`, agent.AgentID)
 
 	_, err = db.VerifyAgentConfirmationCode(context.Background(), tx, agent.AgentID, "EE5FF6GHJK")
 	if err != db.ErrRegistrationExpired {

@@ -189,7 +189,7 @@ func TestGetBillingPlan_QuotaGraceEffectiveLimits(t *testing.T) {
 	paid := db.PlanPayAsYouGo
 	testhelper.MustExec(t, tx,
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
-		uid, paid, future)
+		uid, paid, db.TimestampForSQLite(future))
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
@@ -734,10 +734,12 @@ func TestGetUsage_HistoricalPeriod(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// Insert usage for a past period (February 2026).
+	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
+	periodEnd := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
 	testhelper.MustExec(t, tx,
 		`INSERT INTO usage_periods (user_id, period_start, period_end, request_count, sms_count)
-		 VALUES ($1, '2026-02-01T00:00:00Z', '2026-03-01T00:00:00Z', 800, 2)`,
-		uid)
+		 VALUES ($1, $2, $3, 800, 2)`,
+		uid, periodStart, periodEnd)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
@@ -849,8 +851,8 @@ func TestDowngrade_EndQuotaGraceNow_ClearsPaidQuotas(t *testing.T) {
 
 	future := time.Now().Add(48 * time.Hour)
 	testhelper.MustExec(t, tx,
-		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = now() WHERE user_id = $1`,
-		uid, db.PlanPayAsYouGo, future)
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE user_id = $1`,
+		uid, db.PlanPayAsYouGo, db.TimestampForSQLite(future))
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
@@ -895,7 +897,7 @@ func TestDowngrade_EndQuotaGraceNow_PastEntitlementsReturnsAlreadyDowngraded(t *
 	past := time.Now().Add(-48 * time.Hour)
 	testhelper.MustExec(t, tx,
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
-		uid, db.PlanPayAsYouGo, past)
+		uid, db.PlanPayAsYouGo, db.TimestampForSQLite(past))
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
@@ -930,8 +932,8 @@ func TestDowngrade_EndQuotaGraceNow_DoubleCallReturns409(t *testing.T) {
 
 	future := time.Now().Add(48 * time.Hour)
 	testhelper.MustExec(t, tx,
-		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = now() WHERE user_id = $1`,
-		uid, db.PlanPayAsYouGo, future)
+		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE user_id = $1`,
+		uid, db.PlanPayAsYouGo, db.TimestampForSQLite(future))
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)

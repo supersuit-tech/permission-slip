@@ -227,7 +227,7 @@ func TestFindActiveStandingApprovalsForAgent_FiltersByInstance(t *testing.T) {
 	saID := testhelper.GenerateID(t, "sa_")
 	_, err = tx.Exec(ctx,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, connector_instance_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6::uuid, now(), now() + interval '30 days')`,
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'))`,
 		saID, agentID, uid, actionType, configID, inst2.ConnectorInstanceID,
 	)
 	if err != nil {
@@ -288,7 +288,7 @@ func TestDeleteAgentConnectorInstance_RevokesInstanceScopedStandingApproval(t *t
 	saID := testhelper.GenerateID(t, "sa_")
 	_, err = tx.Exec(ctx,
 		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, connector_instance_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6::uuid, now(), now() + interval '30 days')`,
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'))`,
 		saID, agentID, uid, actionType, configID, inst2.ConnectorInstanceID,
 	)
 	if err != nil {

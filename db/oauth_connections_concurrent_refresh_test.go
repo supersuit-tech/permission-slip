@@ -32,7 +32,7 @@ func TestReloadOAuthConnectionIfConcurrentRefreshSucceeded_DetectsNewerExpiry(t 
 
 	newExpiry := time.Now().Add(2 * time.Hour)
 	testhelper.MustExec(t, tx,
-		`UPDATE oauth_connections SET token_expiry = $1, updated_at = now() WHERE id = $2`,
+		`UPDATE oauth_connections SET token_expiry = $1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = $2`,
 		newExpiry, connID,
 	)
 
@@ -69,7 +69,7 @@ func TestGetOAuthConnectionByProvider_ReturnsMostRecent(t *testing.T) {
 		Scopes:              []string{"channels:write"},
 	})
 	testhelper.MustExec(t, tx,
-		`UPDATE oauth_connections SET created_at = now() - interval '2 days' WHERE id = $1`,
+		`UPDATE oauth_connections SET created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 days') WHERE id = $1`,
 		"oconn_old",
 	)
 
@@ -105,7 +105,7 @@ func TestReloadOAuthConnectionIfConcurrentRefreshSucceeded_NeedsReauthDoesNotSki
 	}
 
 	testhelper.MustExec(t, tx,
-		`UPDATE oauth_connections SET status = $1, updated_at = now() WHERE id = $2`,
+		`UPDATE oauth_connections SET status = $1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = $2`,
 		db.OAuthStatusNeedsReauth, connID,
 	)
 

@@ -72,7 +72,7 @@ func TestSubscriptionsCascadeDelete(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, "free")
 
 	testhelper.RequireCascadeDeletes(t, tx,
-		"DELETE FROM auth.users WHERE id = '"+uid+"'",
+		"DELETE FROM users WHERE id = '"+uid+"'",
 		[]string{"subscriptions"},
 		"user_id = '"+uid+"'",
 	)
@@ -263,7 +263,7 @@ func TestClearSubscriptionQuotaGrace_ReturnsNilWhenNoActiveGrace(t *testing.T) {
 	future := time.Now().Add(48 * time.Hour)
 	testhelper.MustExec(t, tx,
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
-		uid, db.PlanPayAsYouGo, future)
+		uid, db.PlanPayAsYouGo, db.TimestampForSQLite(future))
 
 	cleared, err := db.ClearSubscriptionQuotaGrace(ctx, tx, uid)
 	if err != nil {
@@ -288,7 +288,7 @@ func TestClearSubscriptionQuotaGrace_ReturnsNilWhenNoActiveGrace(t *testing.T) {
 	past := time.Now().Add(-48 * time.Hour)
 	testhelper.MustExec(t, tx,
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
-		uid, db.PlanPayAsYouGo, past)
+		uid, db.PlanPayAsYouGo, db.TimestampForSQLite(past))
 	expired, err := db.ClearSubscriptionQuotaGrace(ctx, tx, uid)
 	if err != nil {
 		t.Fatalf("ClearSubscriptionQuotaGrace with past until: %v", err)
@@ -313,7 +313,7 @@ func TestEffectiveQuotaPlan(t *testing.T) {
 	paid := db.PlanPayAsYouGo
 	testhelper.MustExec(t, tx,
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
-		uid, paid, future)
+		uid, paid, db.TimestampForSQLite(future))
 
 	sp, err := db.GetSubscriptionWithPlan(ctx, tx, uid)
 	if err != nil {
@@ -326,7 +326,7 @@ func TestEffectiveQuotaPlan(t *testing.T) {
 	past := time.Now().Add(-time.Hour)
 	testhelper.MustExec(t, tx,
 		`UPDATE subscriptions SET quota_entitlements_until = $2 WHERE user_id = $1`,
-		uid, past)
+		uid, db.TimestampForSQLite(past))
 
 	sp2, err := db.GetSubscriptionWithPlan(ctx, tx, uid)
 	if err != nil {
@@ -533,7 +533,7 @@ func TestEffectiveRetentionDays(t *testing.T) {
 
 		// Simulate grace period having expired (set downgraded_at to 10 days ago).
 		testhelper.MustExec(t, tx,
-			`UPDATE subscriptions SET downgraded_at = now() - interval '10 days' WHERE user_id = $1`,
+			`UPDATE subscriptions SET downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 days') WHERE user_id = $1`,
 			uid)
 
 		sp, err := db.GetSubscriptionWithPlan(ctx, tx, uid)

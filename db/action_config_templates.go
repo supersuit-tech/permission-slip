@@ -2,10 +2,9 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // ActionConfigTemplate represents a row from the action_config_templates table.
@@ -24,6 +23,24 @@ type ActionConfigTemplate struct {
 
 // MaxTemplateListSize is the maximum number of templates returned by list queries.
 const MaxTemplateListSize = 100
+
+func scanActionConfigTemplate(row rowScanner) (*ActionConfigTemplate, error) {
+	var t ActionConfigTemplate
+	var createdAt sql.NullString
+	err := row.Scan(
+		&t.ID, &t.ConnectorID, &t.ActionType, &t.Name,
+		&t.Description, &t.Parameters, &t.StandingApprovalSpec, &createdAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	var err2 error
+	t.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	return &t, nil
+}
 
 // ListTemplatesByConnector returns all action configuration templates for the
 // given connector, ordered by action_type then name. Results are capped at
@@ -44,12 +61,11 @@ func ListTemplatesByConnector(ctx context.Context, db DBTX, connectorID string) 
 
 	var templates []ActionConfigTemplate
 	for rows.Next() {
-		var t ActionConfigTemplate
-		if err := rows.Scan(&t.ID, &t.ConnectorID, &t.ActionType, &t.Name,
-			&t.Description, &t.Parameters, &t.StandingApprovalSpec, &t.CreatedAt); err != nil {
+		tpl, err := scanActionConfigTemplate(rows)
+		if err != nil {
 			return nil, err
 		}
-		templates = append(templates, t)
+		templates = append(templates, *tpl)
 	}
 	return templates, rows.Err()
 }
@@ -58,11 +74,14 @@ func ListTemplatesByConnector(ctx context.Context, db DBTX, connectorID string) 
 // The result order is not guaranteed to match the input order. Missing IDs are
 // silently omitted (the caller should compare counts to detect missing templates).
 func GetActionConfigTemplatesByIDs(ctx context.Context, db DBTX, ids []string) ([]ActionConfigTemplate, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
 	rows, err := db.Query(ctx,
 		`SELECT id, connector_id, action_type, name, description, parameters, standing_approval_spec, created_at
 		 FROM action_config_templates
-		 WHERE id = ANY($1)`,
-		ids,
+		 WHERE id IN (`+InPlaceholders(1, len(ids))+`)`,
+		StringsToArgs(ids)...,
 	)
 	if err != nil {
 		return nil, err
@@ -71,12 +90,11 @@ func GetActionConfigTemplatesByIDs(ctx context.Context, db DBTX, ids []string) (
 
 	var templates []ActionConfigTemplate
 	for rows.Next() {
-		var t ActionConfigTemplate
-		if err := rows.Scan(&t.ID, &t.ConnectorID, &t.ActionType, &t.Name,
-			&t.Description, &t.Parameters, &t.StandingApprovalSpec, &t.CreatedAt); err != nil {
+		tpl, err := scanActionConfigTemplate(rows)
+		if err != nil {
 			return nil, err
 		}
-		templates = append(templates, t)
+		templates = append(templates, *tpl)
 	}
 	return templates, rows.Err()
 }
@@ -84,19 +102,14 @@ func GetActionConfigTemplatesByIDs(ctx context.Context, db DBTX, ids []string) (
 // GetActionConfigTemplateByID returns the action configuration template with the
 // given ID, or nil if not found.
 func GetActionConfigTemplateByID(ctx context.Context, db DBTX, templateID string) (*ActionConfigTemplate, error) {
-	row := db.QueryRow(ctx,
+	tpl, err := scanActionConfigTemplate(db.QueryRow(ctx,
 		`SELECT id, connector_id, action_type, name, description, parameters, standing_approval_spec, created_at
 		 FROM action_config_templates
 		 WHERE id = $1`,
 		templateID,
-	)
-	var t ActionConfigTemplate
-	if err := row.Scan(&t.ID, &t.ConnectorID, &t.ActionType, &t.Name,
-		&t.Description, &t.Parameters, &t.StandingApprovalSpec, &t.CreatedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil
-		}
-		return nil, err
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
 	}
-	return &t, nil
+	return tpl, err
 }

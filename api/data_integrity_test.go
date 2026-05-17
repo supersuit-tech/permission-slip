@@ -67,12 +67,8 @@ func setupPoolUser(t *testing.T, d db.DBTX) string {
 	testhelper.InsertUser(t, d, uid, "u_"+uid[:8])
 	t.Cleanup(func() {
 		ctx := context.Background()
-		// FK-safe order: leaf tables first, root tables last.
-		d.Exec(ctx, `DELETE FROM audit_events WHERE user_id = $1`, uid)
-		d.Exec(ctx, `DELETE FROM agents WHERE approver_id = $1`, uid)
-		d.Exec(ctx, `DELETE FROM registration_invites WHERE user_id = $1`, uid)
-		d.Exec(ctx, `DELETE FROM profiles WHERE id = $1`, uid)
-		d.Exec(ctx, `DELETE FROM auth.users WHERE id = $1`, uid)
+		// Deleting from users cascades to profiles and all child tables.
+		d.Exec(ctx, `DELETE FROM users WHERE id = $1`, uid) //nolint:errcheck
 	})
 	return uid
 }
@@ -289,7 +285,7 @@ func TestResponseFields_RegisteredAgent(t *testing.T) {
 
 	// Set registered_at for the registered agent.
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET registered_at = now() WHERE agent_id = $1`, agentID)
+		`UPDATE agents SET registered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`, agentID)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -331,7 +327,7 @@ func TestResponseFields_DeactivatedAgent(t *testing.T) {
 
 	// Set deactivated_at for the deactivated agent.
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET deactivated_at = now() WHERE agent_id = $1`, agentID)
+		`UPDATE agents SET deactivated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`, agentID)
 
 	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
 	router := NewRouter(deps)

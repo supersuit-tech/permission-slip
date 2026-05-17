@@ -1,10 +1,10 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // ActionSchema holds the connector ID and parameters schema for an action type.
@@ -22,7 +22,7 @@ func GetActionParametersSchema(ctx context.Context, db DBTX, actionType string) 
 		`SELECT connector_id, parameters_schema FROM connector_actions WHERE action_type = $1`,
 		actionType,
 	).Scan(&result.ConnectorID, &result.Schema)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

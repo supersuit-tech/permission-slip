@@ -1,10 +1,10 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // Push subscription channel values.
@@ -27,22 +27,32 @@ type PushSubscription struct {
 	CreatedAt time.Time
 }
 
+func scanPushSubscription(row rowScanner) (*PushSubscription, error) {
+	var s PushSubscription
+	var createdAt sql.NullString
+	err := row.Scan(&s.ID, &s.UserID, &s.Channel, &s.Endpoint, &s.P256dh, &s.Auth, &s.ExpoToken, &createdAt)
+	if err != nil {
+		return nil, err
+	}
+	var err2 error
+	s.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	return &s, nil
+}
+
 // UpsertPushSubscription inserts a web-push subscription or updates it if the
 // (user_id, endpoint) pair already exists (browser re-subscribed).
 func UpsertPushSubscription(ctx context.Context, db DBTX, userID, endpoint, p256dh, auth string) (*PushSubscription, error) {
-	var sub PushSubscription
-	err := db.QueryRow(ctx,
+	return scanPushSubscription(db.QueryRow(ctx,
 		`INSERT INTO push_subscriptions (user_id, channel, endpoint, p256dh, auth)
 		 VALUES ($1, 'web-push', $2, $3, $4)
 		 ON CONFLICT (user_id, endpoint) WHERE endpoint IS NOT NULL
 		 DO UPDATE SET p256dh = EXCLUDED.p256dh, auth = EXCLUDED.auth
 		 RETURNING id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at`,
 		userID, endpoint, p256dh, auth,
-	).Scan(&sub.ID, &sub.UserID, &sub.Channel, &sub.Endpoint, &sub.P256dh, &sub.Auth, &sub.ExpoToken, &sub.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &sub, nil
+	))
 }
 
 // DeletePushSubscription removes a push subscription by ID, scoped to the user.
@@ -55,7 +65,7 @@ func DeletePushSubscription(ctx context.Context, db DBTX, userID string, subID i
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // DeletePushSubscriptionByEndpoint removes a push subscription by endpoint URL.
@@ -72,7 +82,7 @@ func DeletePushSubscriptionByEndpoint(ctx context.Context, db DBTX, endpoint str
 const pushSubscriptionColumns = "id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at"
 
 // scanPushSubscriptions reads rows into a slice of PushSubscription.
-func scanPushSubscriptions(rows pgx.Rows, err error) ([]PushSubscription, error) {
+func scanPushSubscriptions(rows *sql.Rows, err error) ([]PushSubscription, error) {
 	if err != nil {
 		return nil, err
 	}
@@ -80,11 +90,11 @@ func scanPushSubscriptions(rows pgx.Rows, err error) ([]PushSubscription, error)
 
 	var subs []PushSubscription
 	for rows.Next() {
-		var s PushSubscription
-		if err := rows.Scan(&s.ID, &s.UserID, &s.Channel, &s.Endpoint, &s.P256dh, &s.Auth, &s.ExpoToken, &s.CreatedAt); err != nil {
+		s, err := scanPushSubscription(rows)
+		if err != nil {
 			return nil, err
 		}
-		subs = append(subs, s)
+		subs = append(subs, *s)
 	}
 	return subs, rows.Err()
 }

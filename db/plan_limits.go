@@ -25,10 +25,7 @@ const (
 // Must be called within a transaction — the lock is released when the
 // transaction commits or rolls back.
 func AcquirePlanLimitLock(ctx context.Context, tx DBTX, namespace int, userID string) error {
-	_, err := tx.Exec(ctx,
-		`SELECT pg_advisory_xact_lock($1, hashtext($2))`,
-		namespace, userID)
-	if err != nil {
+	if err := execPostgreSQLAdvisoryXactLock(ctx, tx, namespace, userID); err != nil {
 		return fmt.Errorf("advisory lock (ns=%d): %w", namespace, err)
 	}
 	return nil

@@ -74,7 +74,7 @@ func insertRegisteredAgentWithKey(t *testing.T, tx db.DBTX, approverID string) (
 	}
 	var agentID int64
 	err = tx.QueryRow(context.Background(),
-		`INSERT INTO agents (public_key, approver_id, status, registered_at) VALUES ($1, $2, 'registered', now()) RETURNING agent_id`,
+		`INSERT INTO agents (public_key, approver_id, status, registered_at) VALUES ($1, $2, 'registered', strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) RETURNING agent_id`,
 		pubKeySSH, approverID).Scan(&agentID)
 	if err != nil {
 		t.Fatalf("insert agent with key: %v", err)

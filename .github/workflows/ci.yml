@@ -11,23 +11,11 @@ jobs:
     name: Backend Tests
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: permission_slip_test
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
+    # Tests use modernc.org/sqlite, which is embedded in the Go binary — no
+    # external database service needed. Each test that needs a DB opens an
+    # in-memory SQLite instance via db.OpenMemoryDB or db.Connect(ctx, ":memory:").
     env:
-      DATABASE_URL_TEST: postgres://postgres:postgres@localhost:5432/permission_slip_test?sslmode=disable
+      DATABASE_PATH: ":memory:"
 
     steps:
       - uses: actions/checkout@v6
@@ -40,7 +28,19 @@ jobs:
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
       - name: Run backend tests
-        run: go test ./...
+        run: |
+          set -o pipefail
+          if ! go test ./... 2>&1 | tee /tmp/backend-tests.log; then
+            RC=${PIPESTATUS[0]}
+            echo ""
+            echo "=== BACKEND TESTS FAILED — last 30 lines of output as annotations ==="
+            tail -n 30 /tmp/backend-tests.log | while IFS= read -r line; do
+              # Skip empty lines, strip ANSI, cap length
+              clean=$(echo "$line" | sed -E 's/\x1b\[[0-9;]*m//g' | tr -d '\r' | head -c 800)
+              [ -n "$clean" ] && echo "::error::$clean"
+            done
+            exit $RC
+          fi
 
   frontend:
     name: Frontend Tests
@@ -111,7 +111,18 @@ jobs:
           fi
 
       - name: Build server (frontend + Go)
-        run: make build-ci
+        run: |
+          set -o pipefail
+          if ! make build-ci 2>&1 | tee /tmp/build.log; then
+            RC=${PIPESTATUS[0]}
+            echo ""
+            echo "=== BUILD FAILED — last 30 lines of output as annotations ==="
+            tail -n 30 /tmp/build.log | while IFS= read -r line; do
+              clean=$(echo "$line" | sed -E 's/\x1b\[[0-9;]*m//g' | tr -d '\r' | head -c 800)
+              [ -n "$clean" ] && echo "::error::$clean"
+            done
+            exit $RC
+          fi
 
   notify-failure:
     name: Notify on Failure

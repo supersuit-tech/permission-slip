@@ -234,9 +234,9 @@ func (s *supabaseClient) deleteUser(id string) {
 }
 
 func main() {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("DATABASE_URL is required")
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		log.Fatal("DATABASE_PATH is required")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -246,37 +246,24 @@ func main() {
 
 	// Run migrations first so tables exist.
 	log.Println("Running migrations...")
-	if err := db.Migrate(ctx, dbURL); err != nil {
+	if err := db.Migrate(ctx, dbPath); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	pool, err := db.Connect(ctx, dbURL)
+	pool, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 	defer pool.Close()
 
-	// Phase 1a: truncate audit_events before deleting auth users. The
-	// audit_events FK on profiles uses ON DELETE RESTRICT, so rows there
-	// block the cascade from auth.users → profiles that the Auth Admin API
-	// triggers. This must happen outside the transaction so the Auth service
-	// sees committed state.
-	log.Println("Truncating audit_events (FK dep on profiles)...")
-	if _, err := pool.Exec(ctx, "TRUNCATE audit_events CASCADE"); err != nil {
-		log.Fatalf("Failed to truncate audit_events: %v", err)
-	}
-
-	// Phase 1b: delete all auth users via the Admin API (outside any DB
-	// transaction so the Auth service sees committed state immediately).
-	log.Println("Cleaning previous seed data (auth users)...")
-	cleanAuthUsers(supa)
-
-	// Phase 2: clean DB rows and insert new seed data inside a transaction.
+	// Phase 1: clean DB rows and insert new seed data inside a transaction.
+	// Deleting from users cascades to all child tables, so no pre-cleanup needed.
+	// cleanAuthUsers is a no-op in the SQLite-backed stack (no Auth service).
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		log.Fatalf("Failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck
 
 	log.Println("Cleaning previous seed data (DB rows)...")
 	cleanDB(ctx, tx)
@@ -284,7 +271,7 @@ func main() {
 	log.Println("Seeding data...")
 	seed(ctx, tx, supa)
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		log.Fatalf("Failed to commit transaction: %v", err)
 	}
 
@@ -351,12 +338,11 @@ func cleanAuthUsers(supa *supabaseClient) {
 }
 
 // cleanDB removes all DB rows inside the active transaction.
-// Deletes ALL profiles and auth.users (not just seed users) so manually-created
-// accounts are also cleaned up, matching what cleanAuthUsers does via the API.
+// Deletes all users (which cascades to profiles and all child tables) so that
+// manually-created accounts are also cleaned up.
 func cleanDB(ctx context.Context, tx db.DBTX) {
-	// audit_events is already truncated in Phase 1a (before auth user cleanup).
-	exec(ctx, tx, `DELETE FROM profiles`)
-	exec(ctx, tx, `DELETE FROM auth.users`)
+	// audit_events is already truncated in Phase 1a (before user cleanup).
+	exec(ctx, tx, `DELETE FROM users`)
 	exec(ctx, tx, `DELETE FROM connectors WHERE id = $1`, connectorGitHub)
 	exec(ctx, tx, `DELETE FROM connectors WHERE id = $1`, connectorGoogle)
 	exec(ctx, tx, `DELETE FROM connectors WHERE id = $1`, connectorSlack)
@@ -399,10 +385,16 @@ var userContacts = map[string]userContactInfo{
 	userHasPendingApproval: {email: "has-pending-approvals@example.com", phone: "+15551000006"},
 }
 
-// insertUser creates a real Supabase Auth user via the Admin API, then inserts
-// the corresponding profiles row via SQL (with optional contact fields).
-func insertUser(ctx context.Context, tx db.DBTX, supa *supabaseClient, id, email string) {
-	supa.createUser(id, email, "password123")
+// insertUser creates a users row (with a stub argon2id hash for "password123"),
+// then inserts the corresponding profiles row with optional contact fields.
+//
+// The stub password hash is safe for dev/seed data — use cmd/create-user in
+// prod to generate real hashes.
+func insertUser(ctx context.Context, tx db.DBTX, _ *supabaseClient, id, email string) {
+	// Argon2id hash of "password123" with default OWASP parameters.
+	// Generated offline; do not use in production accounts.
+	const stubHash = "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHQ$hGkbDjAJCQRcOg7SFlnVhk"
+	exec(ctx, tx, `INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)`, id, email, stubHash)
 	contact, hasContact := userContacts[id]
 	if hasContact && (contact.email != "" || contact.phone != "") {
 		var emailPtr, phonePtr *string
@@ -522,7 +514,7 @@ func seedAuditEvents(ctx context.Context, tx db.DBTX) {
 			a.approval_id,
 			'approval',
 			ag.metadata,
-			jsonb_build_object('type', a.action->>'type'),
+			json_object('type', json_extract(a.action, '$.type')),
 			COALESCE(a.approved_at, a.denied_at, a.cancelled_at)
 		FROM approvals a
 		JOIN agents ag ON ag.agent_id = a.agent_id
@@ -537,7 +529,7 @@ func seedAuditEvents(ctx context.Context, tx db.DBTX) {
 			ag.agent_id,
 			'agent.registered',
 			'registered',
-			'ar:' || ag.agent_id::text,
+			'ar:' || CAST(ag.agent_id AS TEXT),
 			'agent',
 			ag.metadata,
 			NULL,
@@ -554,7 +546,7 @@ func seedAuditEvents(ctx context.Context, tx db.DBTX) {
 			ag.agent_id,
 			'agent.registered',
 			'pending',
-			'ri:seed-' || ag.agent_id::text,
+			'ri:seed-' || CAST(ag.agent_id AS TEXT),
 			'registration_invite',
 			ag.metadata,
 			NULL,
@@ -570,7 +562,7 @@ func seedAuditEvents(ctx context.Context, tx db.DBTX) {
 			ag.agent_id,
 			'agent.deactivated',
 			'deactivated',
-			'ad:' || ag.agent_id::text,
+			'ad:' || CAST(ag.agent_id AS TEXT),
 			'agent',
 			ag.metadata,
 			NULL,
@@ -587,10 +579,10 @@ func seedAuditEvents(ctx context.Context, tx db.DBTX) {
 			sa.agent_id,
 			'standing_approval.executed',
 			'auto_executed',
-			'sae:' || sae.id::text,
+			'sae:' || sae.id,
 			'standing_approval',
 			ag.metadata,
-			jsonb_build_object('type', sa.action_type),
+			json_object('type', sa.action_type),
 			sae.executed_at
 		FROM standing_approval_executions sae
 		JOIN standing_approvals sa ON sa.standing_approval_id = sae.standing_approval_id

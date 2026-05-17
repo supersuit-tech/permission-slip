@@ -25,23 +25,16 @@ func TestMigrationsApplied(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	var uuidExists bool
+	var n int
 	err := tx.QueryRow(context.Background(),
-		"SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'uuid-ossp')").Scan(&uuidExists)
+		`SELECT COUNT(*) FROM sqlite_master
+		 WHERE type = 'table'
+		   AND name IN ('users', 'profiles', 'subscriptions', 'audit_events')`,
+	).Scan(&n)
 	if err != nil {
-		t.Fatalf("failed to check uuid-ossp extension: %v", err)
+		t.Fatalf("failed to verify core tables: %v", err)
 	}
-	if !uuidExists {
-		t.Fatal("uuid-ossp extension should be installed after migrations")
-	}
-
-	var pgcryptoExists bool
-	err = tx.QueryRow(context.Background(),
-		"SELECT EXISTS(SELECT 1 FROM pg_extension WHERE extname = 'pgcrypto')").Scan(&pgcryptoExists)
-	if err != nil {
-		t.Fatalf("failed to check pgcrypto extension: %v", err)
-	}
-	if !pgcryptoExists {
-		t.Fatal("pgcrypto extension should be installed after migrations")
+	if n != 4 {
+		t.Fatalf("expected consolidated SQLite schema to define 4 core tables, found %d", n)
 	}
 }

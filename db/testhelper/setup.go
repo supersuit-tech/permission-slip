@@ -8,79 +8,53 @@ import (
 	"testing"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
-const defaultTestDatabaseURL = "postgres://localhost:5432/permission_slip_test?sslmode=disable"
-
-// TestDatabaseURL returns the database URL for tests.
-// It reads from DATABASE_URL_TEST, falling back to a default local URL.
-func TestDatabaseURL() string {
-	if url := os.Getenv("DATABASE_URL_TEST"); url != "" {
-		return url
+// TestDatabasePath returns the SQLite path used for tests. Defaults to a
+// shared in-memory database so tests run fast and need no filesystem setup.
+// Override with DATABASE_PATH_TEST if you want a real file (useful for
+// debugging a failing test's state with the sqlite3 CLI).
+func TestDatabasePath() string {
+	if p := os.Getenv("DATABASE_PATH_TEST"); p != "" {
+		return p
 	}
-	return defaultTestDatabaseURL
+	return ":memory:"
 }
 
 var (
-	sharedPool     *pgxpool.Pool
+	sharedPool     *db.Pool
 	sharedPoolOnce sync.Once
 	sharedPoolErr  error
 )
 
 // getSharedPool returns a connection pool shared across all tests in a binary.
-// The pool is created once and reused; individual tests get isolated transactions.
-func getSharedPool(t *testing.T) *pgxpool.Pool {
+// Migrations run exactly once on first access.
+func getSharedPool(t *testing.T) *db.Pool {
 	t.Helper()
 
 	sharedPoolOnce.Do(func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		dbURL := TestDatabaseURL()
+		path := TestDatabasePath()
 
-		// Use a PostgreSQL advisory lock to prevent concurrent migration
-		// from multiple test binaries (go test ./... runs packages in parallel).
-		sharedPoolErr = migrateWithLock(ctx, dbURL)
-		if sharedPoolErr != nil {
+		var err error
+		sharedPool, err = db.Connect(ctx, path)
+		if err != nil {
+			sharedPoolErr = fmt.Errorf("connect test database: %w", err)
 			return
 		}
-
-		sharedPool, sharedPoolErr = db.Connect(ctx, dbURL)
+		if err := db.MigratePool(ctx, sharedPool); err != nil {
+			sharedPoolErr = fmt.Errorf("migrate test database: %w", err)
+			_ = sharedPool.Close()
+			sharedPool = nil
+			return
+		}
 	})
 	if sharedPoolErr != nil {
 		t.Fatalf("failed to initialize shared test pool: %v", sharedPoolErr)
 	}
-
 	return sharedPool
-}
-
-// migrateWithLock runs migrations while holding a PostgreSQL advisory lock.
-// This prevents race conditions when multiple test binaries (from go test ./...)
-// run migrations concurrently against the same database.
-func migrateWithLock(ctx context.Context, dbURL string) error {
-	pool, err := db.Connect(ctx, dbURL)
-	if err != nil {
-		return fmt.Errorf("connect for migration: %w", err)
-	}
-	defer pool.Close()
-
-	// Use a single dedicated connection so that lock and unlock run on the same session.
-	conn, err := pool.Acquire(ctx)
-	if err != nil {
-		return fmt.Errorf("acquire connection for advisory lock: %w", err)
-	}
-	defer conn.Release()
-
-	// Acquire an advisory lock (key chosen arbitrarily, must be consistent).
-	const lockID = 123456789
-	_, err = conn.Exec(ctx, "SELECT pg_advisory_lock($1)", lockID)
-	if err != nil {
-		return fmt.Errorf("advisory lock: %w", err)
-	}
-	defer conn.Exec(ctx, "SELECT pg_advisory_unlock($1)", lockID) //nolint:errcheck
-
-	return db.Migrate(ctx, dbURL)
 }
 
 // SetupTestDB returns a db.DBTX backed by a transaction that is automatically
@@ -88,8 +62,9 @@ func migrateWithLock(ctx context.Context, dbURL string) error {
 // each test's inserts/updates/deletes are invisible to other tests and leave
 // no residue in the database.
 //
-// The underlying connection pool is shared across all tests in a binary,
-// so SetupTestDB is cheap to call and safe for use with t.Parallel().
+// Note: with SQLite's single-writer model, tests using SetupTestDB should NOT
+// call t.Parallel() — concurrent write transactions on the shared in-memory
+// DB will serialize and the tests may flake on timing.
 func SetupTestDB(t *testing.T) db.DBTX {
 	t.Helper()
 
@@ -98,20 +73,15 @@ func SetupTestDB(t *testing.T) db.DBTX {
 	if err != nil {
 		t.Fatalf("failed to begin test transaction: %v", err)
 	}
-
 	t.Cleanup(func() {
-		// Rollback discards all changes made during the test.
-		tx.Rollback(context.Background()) //nolint:errcheck
+		_ = tx.Rollback()
 	})
-
 	return tx
 }
 
-// SetupPool creates a connection pool for testing and runs all migrations.
-// Deprecated: Use SetupTestDB for transaction-isolated tests. SetupPool is
-// retained for tests that need a raw pool (e.g., tests that manage their own
-// transactions or test pool-level behavior).
-func SetupPool(t *testing.T) *pgxpool.Pool {
+// SetupPool returns the shared *db.Pool for tests that need raw pool access
+// (e.g., tests that manage their own transactions or test pool-level behavior).
+func SetupPool(t *testing.T) *db.Pool {
 	t.Helper()
 	return getSharedPool(t)
 }

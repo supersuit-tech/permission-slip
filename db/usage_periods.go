@@ -2,13 +2,12 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"time"
-
-	"github.com/jackc/pgx/v5"
 )
 
 // UsagePeriod represents a row from the usage_periods table.
@@ -32,20 +31,34 @@ type UsagePeriod struct {
 
 const usagePeriodColumns = `id, user_id, period_start, period_end, request_count, sms_count, breakdown, created_at`
 
-func scanUsagePeriod(row pgx.Row) (*UsagePeriod, error) {
+func scanUsagePeriod(row rowScanner) (*UsagePeriod, error) {
 	var u UsagePeriod
+	var periodStart, periodEnd, createdAt sql.NullString
 	err := row.Scan(
 		&u.ID,
 		&u.UserID,
-		&u.PeriodStart,
-		&u.PeriodEnd,
+		&periodStart,
+		&periodEnd,
 		&u.RequestCount,
 		&u.SMSCount,
 		&u.Breakdown,
-		&u.CreatedAt,
+		&createdAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	u.PeriodStart, err2 = sqliteTimeRequired(periodStart)
+	if err2 != nil {
+		return nil, err2
+	}
+	u.PeriodEnd, err2 = sqliteTimeRequired(periodEnd)
+	if err2 != nil {
+		return nil, err2
+	}
+	u.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &u, nil
 }
@@ -61,7 +74,7 @@ func GetLatestUsage(ctx context.Context, db DBTX, userID string) (*UsagePeriod, 
 		 ORDER BY period_start DESC
 		 LIMIT 1`,
 		userID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return u, err
@@ -91,56 +104,51 @@ type UsageBreakdownKeys struct {
 	ActionType  string // may be empty if unknown
 }
 
-// breakdownUpdateSQL generates the nested jsonb_set expression used to
+// breakdownUpdateSQL generates the SQLite json_set expression used to
 // atomically increment by_agent, by_connector, and by_action_type counters
-// within the breakdown JSONB column. col is the column reference
+// within the breakdown JSON column. col is the column reference
 // (e.g. "usage_periods.breakdown" or just "breakdown"), and agentP,
 // connectorP, actionP are the positional parameter numbers for the
 // agent key, connector key, and action type key respectively.
+//
+// Keys may contain dots (e.g. "github.create_pr") so we use SQLite's
+// double-quoted path syntax: '$.by_agent."key"'.
 func breakdownUpdateSQL(col string, agentP, connectorP, actionP int) string {
 	return fmt.Sprintf(`
-		jsonb_set(
-			jsonb_set(
-				jsonb_set(
-					COALESCE(%[1]s, '{}'),
-					'{by_agent}',
-					jsonb_set(
-						COALESCE(%[1]s->'by_agent', '{}'),
-						ARRAY[$%[2]d::text],
-						to_jsonb(COALESCE((%[1]s->'by_agent'->>$%[2]d::text)::int, 0) + 1)
-					)
+		json_set(
+			json_set(
+				json_set(
+					COALESCE(%[1]s, '{"by_agent":{},"by_connector":{},"by_action_type":{}}'),
+					'$.by_agent."' || $%[2]d || '"',
+					COALESCE(json_extract(COALESCE(%[1]s, '{}'), '$.by_agent."' || $%[2]d || '"'), 0) + 1
 				),
-				'{by_connector}',
-				CASE WHEN $%[3]d::text = '' THEN COALESCE(%[1]s->'by_connector', '{}')
-				ELSE jsonb_set(
-					COALESCE(%[1]s->'by_connector', '{}'),
-					ARRAY[$%[3]d::text],
-					to_jsonb(COALESCE((%[1]s->'by_connector'->>$%[3]d::text)::int, 0) + 1)
-				) END
+				CASE WHEN $%[3]d = '' THEN '$.by_connector' ELSE '$.by_connector."' || $%[3]d || '"' END,
+				CASE WHEN $%[3]d = ''
+				     THEN COALESCE(json_extract(COALESCE(%[1]s, '{"by_connector":{}}'), '$.by_connector'), json('{}'))
+				     ELSE COALESCE(json_extract(COALESCE(%[1]s, '{}'), '$.by_connector."' || $%[3]d || '"'), 0) + 1
+				     END
 			),
-			'{by_action_type}',
-			CASE WHEN $%[4]d::text = '' THEN COALESCE(%[1]s->'by_action_type', '{}')
-			ELSE jsonb_set(
-				COALESCE(%[1]s->'by_action_type', '{}'),
-				ARRAY[$%[4]d::text],
-				to_jsonb(COALESCE((%[1]s->'by_action_type'->>$%[4]d::text)::int, 0) + 1)
-			) END
+			CASE WHEN $%[4]d = '' THEN '$.by_action_type' ELSE '$.by_action_type."' || $%[4]d || '"' END,
+			CASE WHEN $%[4]d = ''
+			     THEN COALESCE(json_extract(COALESCE(%[1]s, '{"by_action_type":{}}'), '$.by_action_type'), json('{}'))
+			     ELSE COALESCE(json_extract(COALESCE(%[1]s, '{}'), '$.by_action_type."' || $%[4]d || '"'), 0) + 1
+			     END
 		)`, col, agentP, connectorP, actionP)
 }
 
 // IncrementRequestCountWithBreakdown atomically increments the request count
-// and updates the JSONB breakdown for the given user and billing period.
+// and updates the breakdown JSON for the given user and billing period.
 // The breakdown tracks counts by agent, connector, and action type using
-// atomic jsonb_set operations.
+// atomic json_set operations.
 func IncrementRequestCountWithBreakdown(ctx context.Context, db DBTX, userID string, periodStart, periodEnd time.Time, keys UsageBreakdownKeys) (*UsagePeriod, error) {
 	agentKey := strconv.FormatInt(keys.AgentID, 10)
 
 	query := fmt.Sprintf(
 		`INSERT INTO usage_periods (user_id, period_start, period_end, request_count, breakdown)
-		 VALUES ($1, $2, $3, 1, jsonb_build_object(
-			'by_agent', jsonb_build_object($4::text, 1),
-			'by_connector', CASE WHEN $5::text = '' THEN '{}'::jsonb ELSE jsonb_build_object($5::text, 1) END,
-			'by_action_type', CASE WHEN $6::text = '' THEN '{}'::jsonb ELSE jsonb_build_object($6::text, 1) END
+		 VALUES ($1, $2, $3, 1, json_object(
+			'by_agent', json_object($4, 1),
+			'by_connector', CASE WHEN $5 = '' THEN json('{}') ELSE json_object($5, 1) END,
+			'by_action_type', CASE WHEN $6 = '' THEN json('{}') ELSE json_object($6, 1) END
 		 ))
 		 ON CONFLICT (user_id, period_start)
 		 DO UPDATE SET request_count = usage_periods.request_count + 1,
@@ -178,7 +186,7 @@ func GetUsageByPeriod(ctx context.Context, db DBTX, userID string, periodStart t
 		 FROM usage_periods
 		 WHERE user_id = $1 AND period_start = $2`,
 		userID, periodStart))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return u, err
@@ -240,7 +248,7 @@ func ReserveRequestQuota(ctx context.Context, d DBTX, userID string, periodStart
 		 WHERE usage_periods.request_count < $4
 		 RETURNING id`,
 		userID, periodStart, periodEnd, limit).Scan(&id)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil // quota exhausted
 	}
 	if err != nil {
@@ -283,4 +291,3 @@ func BillingPeriodBounds(t time.Time) (start, end time.Time) {
 	end = start.AddDate(0, 1, 0)
 	return start, end
 }
-

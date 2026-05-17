@@ -35,7 +35,7 @@ func setEnvForTest(t *testing.T, vars map[string]string) {
 func TestValidateConfig_DevelopmentModeSkipsErrors(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                "development",
-		"DATABASE_URL":        "",
+		"DATABASE_PATH": "",
 		"SUPABASE_URL":        "",
 		"SUPABASE_JWT_SECRET": "",
 		"SUPABASE_JWKS_URL":   "",
@@ -56,7 +56,7 @@ func TestValidateConfig_DevelopmentModeSkipsErrors(t *testing.T) {
 func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                      "development",
-		"DATABASE_URL":              "",
+		"DATABASE_PATH": "",
 		"SUPABASE_URL":              "",
 		"SUPABASE_JWT_SECRET":       "",
 		"SUPABASE_JWKS_URL":         "",
@@ -87,7 +87,7 @@ func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 func TestValidateConfig_MissingDatabaseURL(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                "",
-		"DATABASE_URL":        "",
+		"DATABASE_PATH": "",
 		"SUPABASE_URL":        "http://localhost:54321",
 		"SUPABASE_JWT_SECRET": "",
 		"VAPID_PUBLIC_KEY":    "",
@@ -99,20 +99,20 @@ func TestValidateConfig_MissingDatabaseURL(t *testing.T) {
 
 	found := false
 	for _, e := range errs {
-		if e.envVar == "DATABASE_URL" {
+		if e.envVar == "DATABASE_PATH" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected error for missing DATABASE_URL")
+		t.Error("expected error for missing DATABASE_PATH")
 	}
 }
 
 func TestValidateConfig_MissingJWTConfig(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                "",
-		"DATABASE_URL":        "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":        "",
 		"SUPABASE_JWT_SECRET": "",
 		"SUPABASE_JWKS_URL":   "",
@@ -138,7 +138,7 @@ func TestValidateConfig_MissingJWTConfig(t *testing.T) {
 func TestValidateConfig_SupabaseURLSuffices(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                "",
-		"DATABASE_URL":        "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":        "http://localhost:54321",
 		"SUPABASE_JWT_SECRET": "",
 		"SUPABASE_JWKS_URL":   "",
@@ -159,7 +159,7 @@ func TestValidateConfig_SupabaseURLSuffices(t *testing.T) {
 func TestValidateConfig_JWTSecretSuffices(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                "",
-		"DATABASE_URL":        "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":        "",
 		"SUPABASE_JWT_SECRET": "my-secret-that-is-32-chars-long!",
 		"SUPABASE_JWKS_URL":   "",
@@ -182,7 +182,7 @@ func TestValidateConfig_OptionalWarnings(t *testing.T) {
 	// is always optional.
 	setEnvForTest(t, map[string]string{
 		"MODE":              "development",
-		"DATABASE_URL":      "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":      "http://localhost:54321",
 		"INVITE_HMAC_KEY":   "",
 		"BASE_URL":          "",
@@ -212,7 +212,7 @@ func TestValidateConfig_OptionalWarnings(t *testing.T) {
 func TestValidateConfig_AllValid(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                      "",
-		"DATABASE_URL":              "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":              "http://localhost:54321",
 		"SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
 		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
@@ -245,7 +245,7 @@ func TestValidateConfig_NoVAPIDKeysInProduction_WebPushDisabled(t *testing.T) {
 	// When no VAPID vars are set at all, Web Push is simply disabled — no errors.
 	setEnvForTest(t, map[string]string{
 		"MODE":              "",
-		"DATABASE_URL":      "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":      "http://localhost:54321",
 		"INVITE_HMAC_KEY":   "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":          "https://example.com",
@@ -266,7 +266,7 @@ func TestValidateConfig_PartialVAPIDInProduction_SubjectOnly(t *testing.T) {
 	// If only VAPID_SUBJECT is set, the keys are missing — error.
 	setEnvForTest(t, map[string]string{
 		"MODE":              "",
-		"DATABASE_URL":      "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":      "http://localhost:54321",
 		"VAPID_PUBLIC_KEY":  "",
 		"VAPID_PRIVATE_KEY": "",
@@ -318,7 +318,7 @@ func TestValidateConfig_VAPIDKeysNotRequiredInDevMode(t *testing.T) {
 func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPrivate(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":              "",
-		"DATABASE_URL":      "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":      "http://localhost:54321",
 		"VAPID_PUBLIC_KEY":  "BExamplePublicKey",
 		"VAPID_PRIVATE_KEY": "", // missing private key
@@ -342,7 +342,7 @@ func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPrivate(t *testing.T
 func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPublic(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":              "",
-		"DATABASE_URL":      "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":      "http://localhost:54321",
 		"VAPID_PUBLIC_KEY":  "",
 		"VAPID_PRIVATE_KEY": "examplePrivateKey", // missing public key
@@ -366,7 +366,7 @@ func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPublic(t *testing.T)
 func TestValidateConfig_VAPIDSubjectMustBeContactURI(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":              "",
-		"DATABASE_URL":      "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":      "http://localhost:54321",
 		"VAPID_PUBLIC_KEY":  "BExamplePublicKey",
 		"VAPID_PRIVATE_KEY": "examplePrivateKey",
@@ -390,7 +390,7 @@ func TestValidateConfig_VAPIDSubjectMustBeContactURI(t *testing.T) {
 func TestValidateConfig_BillingEnabled_RequiresStripeKeysInProd(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                  "",
-		"DATABASE_URL":          "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":          "http://localhost:54321",
 		"BILLING_ENABLED":       "true",
 		"STRIPE_SECRET_KEY":     "",
@@ -423,7 +423,7 @@ func TestValidateConfig_BillingEnabled_RequiresStripeKeysInProd(t *testing.T) {
 func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                      "",
-		"DATABASE_URL":              "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":              "http://localhost:54321",
 		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
 		"BILLING_ENABLED":           "true",
@@ -460,7 +460,7 @@ func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 func TestValidateConfig_CouponSecretTooShort_ProdError(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                  "",
-		"DATABASE_URL":          "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":          "http://localhost:54321",
 		"BILLING_ENABLED":       "true",
 		"COUPON_SECRET":         "short",
@@ -488,7 +488,7 @@ func TestValidateConfig_CouponSecretTooShort_ProdError(t *testing.T) {
 func TestValidateConfig_CouponSecretTooShort_DevWarning(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                "development",
-		"DATABASE_URL":        "",
+		"DATABASE_PATH": "",
 		"SUPABASE_URL":        "",
 		"SUPABASE_JWT_SECRET": "",
 		"BILLING_ENABLED":     "true",
@@ -513,7 +513,7 @@ func TestValidateConfig_CouponSecretTooShort_DevWarning(t *testing.T) {
 func TestValidateConfig_VAPIDSubjectAcceptsHTTPS(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":              "",
-		"DATABASE_URL":      "postgres://localhost/test",
+		"DATABASE_PATH": "/tmp/test.db",
 		"SUPABASE_URL":      "http://localhost:54321",
 		"VAPID_PUBLIC_KEY":  "BExamplePublicKey",
 		"VAPID_PRIVATE_KEY": "examplePrivateKey",

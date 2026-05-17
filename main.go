@@ -199,27 +199,20 @@ func main() {
 		done <-chan struct{}
 	}
 
-	// Connect to Postgres if DATABASE_URL is set
-	if dbURL := os.Getenv("DATABASE_URL"); dbURL != "" {
+	// Connect to SQLite if DATABASE_PATH is set.
+	if dbPath := os.Getenv("DATABASE_PATH"); dbPath != "" {
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		// Run pending migrations
+		// Run pending migrations before opening the runtime pool.
 		log.Println("Running database migrations...")
-		if err := db.Migrate(ctx, dbURL); err != nil {
+		if err := db.Migrate(ctx, dbPath); err != nil {
 			sentry.CaptureException(err)
 			sentry.Flush(2 * time.Second)
 			log.Fatalf("Failed to run migrations: %v", err)
 		}
 
-		// Use least-privilege app role for runtime queries, falling back to
-		// the superuser DATABASE_URL for backward compatibility.
-		appURL := os.Getenv("DATABASE_URL_APP")
-		if appURL == "" {
-			appURL = dbURL
-		}
-
-		pool, err := db.Connect(ctx, appURL)
+		pool, err := db.Connect(ctx, dbPath)
 		if err != nil {
 			sentry.CaptureException(err)
 			sentry.Flush(2 * time.Second)
@@ -245,13 +238,11 @@ func main() {
 			log.Printf("Subscriptions: backfilled %d user(s) without subscriptions", backfilled)
 		}
 
-		// Initialize credential vault.
-		// In production/dev with Supabase, use the real vault extension.
-		// The vault extension must be enabled in the database.
+		// Initialize credential vault (Phase 4 will swap this for vault/sqlite.go).
 		deps.Vault = vault.NewSupabaseVaultStore()
 		log.Println("Credential vault: using Supabase Vault (encrypted storage)")
 	} else {
-		log.Println("DATABASE_URL not set, running without database")
+		log.Println("DATABASE_PATH not set, running without database")
 	}
 
 	// Initialize notification dispatcher.
@@ -401,8 +392,12 @@ func main() {
 
 	mux := http.NewServeMux()
 
-	// API routes
-	mux.HandleFunc("GET /api/health", handleHealth(deps.DB))
+	// API routes — health check uses the Pool directly (needs Ping, not DBTX).
+	var healthPinger dbPinger
+	if p, ok := deps.DB.(dbPinger); ok {
+		healthPinger = p
+	}
+	mux.HandleFunc("GET /api/health", handleHealth(healthPinger))
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", api.NewRouter(&deps)))
 
 	// Stripe webhook endpoint lives outside /api/v1/ — it must bypass auth

@@ -64,7 +64,7 @@ func TestUsagePeriodsCascadeDelete(t *testing.T) {
 	}
 
 	testhelper.RequireCascadeDeletes(t, tx,
-		"DELETE FROM auth.users WHERE id = '"+uid+"'",
+		"DELETE FROM users WHERE id = '"+uid+"'",
 		[]string{"usage_periods"},
 		"user_id = '"+uid+"'",
 	)
@@ -297,17 +297,16 @@ func TestIncrementRequestCountConcurrent(t *testing.T) {
 	// Create user directly via pool (not in a test transaction).
 	uid := testhelper.GenerateUID(t)
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO auth.users (id) VALUES ($1)`, uid); err != nil {
-		t.Fatalf("insert auth.users: %v", err)
+		`INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'test-stub-hash')`,
+		uid, uid+"@test.local"); err != nil {
+		t.Fatalf("insert users: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
 		`INSERT INTO profiles (id, username) VALUES ($1, $2)`, uid, "conc_"+uid[:8]); err != nil {
 		t.Fatalf("insert profiles: %v", err)
 	}
 	t.Cleanup(func() {
-		pool.Exec(context.Background(), `DELETE FROM usage_periods WHERE user_id = $1`, uid)  //nolint:errcheck
-		pool.Exec(context.Background(), `DELETE FROM profiles WHERE id = $1`, uid)             //nolint:errcheck
-		pool.Exec(context.Background(), `DELETE FROM auth.users WHERE id = $1`, uid)           //nolint:errcheck
+		pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, uid) //nolint:errcheck
 	})
 
 	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -414,18 +413,16 @@ func TestReserveRequestQuotaConcurrent(t *testing.T) {
 
 	uid := testhelper.GenerateUID(t)
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO auth.users (id) VALUES ($1)`, uid); err != nil {
-		t.Fatalf("insert auth.users: %v", err)
+		`INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'test-stub-hash')`,
+		uid, uid+"@test.local"); err != nil {
+		t.Fatalf("insert users: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
 		`INSERT INTO profiles (id, username) VALUES ($1, $2)`, uid, "rq_"+uid[:8]); err != nil {
 		t.Fatalf("insert profiles: %v", err)
 	}
 	t.Cleanup(func() {
-		bg := context.Background()
-		pool.Exec(bg, `DELETE FROM usage_periods WHERE user_id = $1`, uid) //nolint:errcheck
-		pool.Exec(bg, `DELETE FROM profiles WHERE id = $1`, uid)           //nolint:errcheck
-		pool.Exec(bg, `DELETE FROM auth.users WHERE id = $1`, uid)         //nolint:errcheck
+		pool.Exec(context.Background(), `DELETE FROM users WHERE id = $1`, uid) //nolint:errcheck
 	})
 
 	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
