@@ -234,9 +234,9 @@ func (s *supabaseClient) deleteUser(id string) {
 }
 
 func main() {
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("DATABASE_URL is required")
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		log.Fatal("DATABASE_PATH is required")
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
@@ -246,11 +246,11 @@ func main() {
 
 	// Run migrations first so tables exist.
 	log.Println("Running migrations...")
-	if err := db.Migrate(ctx, dbURL); err != nil {
+	if err := db.Migrate(ctx, dbPath); err != nil {
 		log.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	pool, err := db.Connect(ctx, dbURL)
+	pool, err := db.Connect(ctx, dbPath)
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
@@ -263,7 +263,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to begin transaction: %v", err)
 	}
-	defer tx.Rollback(ctx) //nolint:errcheck
+	defer tx.Rollback() //nolint:errcheck
 
 	log.Println("Cleaning previous seed data (DB rows)...")
 	cleanDB(ctx, tx)
@@ -271,7 +271,7 @@ func main() {
 	log.Println("Seeding data...")
 	seed(ctx, tx, supa)
 
-	if err := tx.Commit(ctx); err != nil {
+	if err := tx.Commit(); err != nil {
 		log.Fatalf("Failed to commit transaction: %v", err)
 	}
 
