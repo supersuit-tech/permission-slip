@@ -1281,7 +1281,7 @@ func TestRevokeStandingApproval_Unauthenticated(t *testing.T) {
 func TestRevokeStandingApproval_ConcurrentRevokes(t *testing.T) {
 	// Not parallel: InsertStandingApproval commits a fixture connector on the
 	// shared test pool; other tests (e.g. GET /connectors) assume no stray rows.
-	// Use the pool (not a transaction) so each goroutine gets its own connection.
+	// Uses the pool (not a rolled-back test transaction) so revoke handlers see committed state.
 	pool := testhelper.SetupPool(t)
 	uid := testhelper.GenerateUID(t)
 	saID := testhelper.GenerateID(t, "sa_")
