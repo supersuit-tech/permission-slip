@@ -16,6 +16,9 @@ jest.mock("../../lib/authApi");
 import * as authStorage from "../../lib/authStorage";
 import * as authApi from "../../lib/authApi";
 
+const mockAuthStorage = jest.mocked(authStorage);
+const mockAuthApi = jest.mocked(authApi);
+
 // --- Mocks ---
 
 const mockGet = jest.fn();
@@ -26,8 +29,8 @@ jest.mock("../../api/client", () => ({
 }));
 
 function bootstrapAuthenticated(session: ReturnType<typeof mockSession>) {
-  authStorage.getStoredRefreshToken.mockResolvedValue("mock-refresh");
-  authApi.postAuth.mockImplementation(async (path: string) => {
+  mockAuthStorage.getStoredRefreshToken.mockResolvedValue("mock-refresh");
+  mockAuthApi.postAuth.mockImplementation(async (path: string) => {
     if (path === "refresh") {
       return {
         data: {
@@ -82,8 +85,8 @@ let currentQueryClient: QueryClient | null = null;
 describe("useApprovals", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    authStorage.getStoredRefreshToken.mockResolvedValue(null);
-    authApi.postAuth.mockResolvedValue({ data: null, error: null });
+    mockAuthStorage.getStoredRefreshToken.mockResolvedValue(null);
+    mockAuthApi.postAuth.mockResolvedValue({ data: null, error: null });
   });
 
   afterEach(async () => {

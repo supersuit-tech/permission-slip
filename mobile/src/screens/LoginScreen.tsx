@@ -193,7 +193,7 @@ const localStyles = StyleSheet.create({
   segmentText: {
     fontSize: 14,
     fontWeight: "600",
-    color: colors.gray600,
+    color: colors.gray500,
   },
   segmentTextActive: {
     color: colors.white,

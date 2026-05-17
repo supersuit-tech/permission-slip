@@ -12,6 +12,9 @@ jest.mock("../../lib/authApi");
 import * as authStorage from "../../lib/authStorage";
 import * as authApi from "../../lib/authApi";
 
+const mockAuthStorage = jest.mocked(authStorage);
+const mockAuthApi = jest.mocked(authApi);
+
 interface AuthCapture {
   authStatus: string;
   email: string | undefined;
@@ -43,8 +46,8 @@ function createAuthCapture() {
 }
 
 function bootstrapAuthenticated(session: ReturnType<typeof mockSession>) {
-  authStorage.getStoredRefreshToken.mockResolvedValue("mock-refresh");
-  authApi.postAuth.mockImplementation(async (path: string) => {
+  mockAuthStorage.getStoredRefreshToken.mockResolvedValue("mock-refresh");
+  mockAuthApi.postAuth.mockImplementation(async (path: string) => {
     if (path === "refresh") {
       return {
         data: {
@@ -62,10 +65,10 @@ function bootstrapAuthenticated(session: ReturnType<typeof mockSession>) {
 describe("AuthProvider", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    authStorage.getStoredRefreshToken.mockResolvedValue(null);
-    authStorage.setStoredRefreshToken.mockResolvedValue(undefined);
-    authStorage.clearStoredRefreshToken.mockResolvedValue(undefined);
-    authApi.postAuth.mockResolvedValue({ data: null, error: null });
+    mockAuthStorage.getStoredRefreshToken.mockResolvedValue(null);
+    mockAuthStorage.setStoredRefreshToken.mockResolvedValue(undefined);
+    mockAuthStorage.clearStoredRefreshToken.mockResolvedValue(undefined);
+    mockAuthApi.postAuth.mockResolvedValue({ data: null, error: null });
   });
 
   it("transitions to unauthenticated when no refresh token", async () => {
@@ -104,7 +107,7 @@ describe("AuthProvider", () => {
 
   it("signInWithPassword calls login endpoint", async () => {
     const session = mockSession();
-    authApi.postAuth.mockImplementation(async (path: string, body: Record<string, string>) => {
+    mockAuthApi.postAuth.mockImplementation(async (path: string, body: Record<string, string>) => {
       if (path === "login") {
         expect(body.email).toBe("a@b.co");
         expect(body.password).toBe("secret12345");
@@ -135,7 +138,7 @@ describe("AuthProvider", () => {
       expect(r.error).toBeNull();
     });
 
-    expect(authApi.postAuth).toHaveBeenCalledWith("login", {
+    expect(mockAuthApi.postAuth).toHaveBeenCalledWith("login", {
       email: "a@b.co",
       password: "secret12345",
     });
@@ -144,13 +147,13 @@ describe("AuthProvider", () => {
 
   it("signOut clears session and calls logout", async () => {
     let storedRt = "mock-refresh";
-    authStorage.getStoredRefreshToken.mockImplementation(() => Promise.resolve(storedRt));
-    authStorage.setStoredRefreshToken.mockImplementation(async (t: string) => {
+    mockAuthStorage.getStoredRefreshToken.mockImplementation(() => Promise.resolve(storedRt));
+    mockAuthStorage.setStoredRefreshToken.mockImplementation(async (t: string) => {
       storedRt = t;
     });
 
     const session = mockSession();
-    authApi.postAuth.mockImplementation(async (path: string) => {
+    mockAuthApi.postAuth.mockImplementation(async (path: string) => {
       if (path === "refresh") {
         return {
           data: {
@@ -176,7 +179,7 @@ describe("AuthProvider", () => {
 
     expect(capture.authStatus).toBe("authenticated");
 
-    authApi.postAuth.mockImplementation(async (path: string) => {
+    mockAuthApi.postAuth.mockImplementation(async (path: string) => {
       if (path === "logout") {
         return { data: null, error: null };
       }
@@ -197,7 +200,7 @@ describe("AuthProvider", () => {
       await capture.signOut!();
     });
 
-    expect(authApi.postAuth).toHaveBeenCalledWith("logout", {
+    expect(mockAuthApi.postAuth).toHaveBeenCalledWith("logout", {
       refresh_token: "post-refresh-rt",
     });
     expect(capture.authStatus).toBe("unauthenticated");
