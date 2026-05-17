@@ -33,12 +33,14 @@ jobs:
           if ! go test ./... 2>&1 | tee /tmp/backend-tests.log; then
             RC=${PIPESTATUS[0]}
             echo ""
-            echo "=== BACKEND TESTS FAILED — emitting last 80 lines as annotations ==="
-            tail -n 80 /tmp/backend-tests.log | while IFS= read -r line; do
-              # Sanitize for ::error:: format
-              clean=$(echo "$line" | tr -d '\r' | head -c 800)
-              [ -n "$clean" ] && echo "::error::$clean"
-            done
+            echo "=== BACKEND TESTS FAILED — emitting error-flavoured lines as annotations ==="
+            # Keep only Go-error-looking lines (file.go:lineNo: …, FAIL, panic) — bounded to 10.
+            grep -nE '\.go:[0-9]+:|^FAIL|^--- FAIL|panic:|cannot find|undefined:|undeclared name|imported and not used|build constraints' /tmp/backend-tests.log \
+              | head -n 10 \
+              | while IFS= read -r line; do
+                  clean=$(echo "$line" | tr -d '\r' | head -c 800)
+                  [ -n "$clean" ] && echo "::error::$clean"
+                done
             exit $RC
           fi
 
@@ -116,11 +118,13 @@ jobs:
           if ! make build-ci 2>&1 | tee /tmp/build.log; then
             RC=${PIPESTATUS[0]}
             echo ""
-            echo "=== BUILD FAILED — emitting last 80 lines as annotations ==="
-            tail -n 80 /tmp/build.log | while IFS= read -r line; do
-              clean=$(echo "$line" | tr -d '\r' | head -c 800)
-              [ -n "$clean" ] && echo "::error::$clean"
-            done
+            echo "=== BUILD FAILED — emitting error-flavoured lines as annotations ==="
+            grep -nE '\.go:[0-9]+:|cannot find|undefined:|undeclared name|imported and not used|too many arguments|too few arguments|wrong type|build constraints|error TS[0-9]+' /tmp/build.log \
+              | head -n 10 \
+              | while IFS= read -r line; do
+                  clean=$(echo "$line" | tr -d '\r' | head -c 800)
+                  [ -n "$clean" ] && echo "::error::$clean"
+                done
             exit $RC
           fi
 
