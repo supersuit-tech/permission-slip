@@ -1,12 +1,12 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // DefaultApprovalTTL is the default time-to-live for a new approval request.
@@ -80,7 +80,7 @@ func GetApprovalByIDAndAgent(ctx context.Context, db DBTX, approvalID string, ag
 		approvalID, agentID,
 	)
 	a, err := scanApproval(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -95,9 +95,9 @@ func GetApprovalByIDAndAgent(ctx context.Context, db DBTX, approvalID string, ag
 func CancelApproval(ctx context.Context, db DBTX, approvalID string, agentID int64) (*Approval, error) {
 	row := db.QueryRow(ctx,
 		`UPDATE approvals
-		 SET status = 'cancelled', cancelled_at = now()
+		 SET status = 'cancelled', cancelled_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE approval_id = $1 AND agent_id = $2
-		   AND status = 'pending' AND expires_at > now()
+		   AND status = 'pending' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 RETURNING `+approvalColumns,
 		approvalID, agentID,
 	)
@@ -105,7 +105,7 @@ func CancelApproval(ctx context.Context, db DBTX, approvalID string, agentID int
 	if err == nil {
 		return appr, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 

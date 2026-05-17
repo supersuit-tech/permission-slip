@@ -72,7 +72,7 @@ func TestSubscriptionsCascadeDelete(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, "free")
 
 	testhelper.RequireCascadeDeletes(t, tx,
-		"DELETE FROM auth.users WHERE id = '"+uid+"'",
+		"DELETE FROM users WHERE id = '"+uid+"'",
 		[]string{"subscriptions"},
 		"user_id = '"+uid+"'",
 	)
@@ -533,7 +533,7 @@ func TestEffectiveRetentionDays(t *testing.T) {
 
 		// Simulate grace period having expired (set downgraded_at to 10 days ago).
 		testhelper.MustExec(t, tx,
-			`UPDATE subscriptions SET downgraded_at = now() - interval '10 days' WHERE user_id = $1`,
+			`UPDATE subscriptions SET downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 days') WHERE user_id = $1`,
 			uid)
 
 		sp, err := db.GetSubscriptionWithPlan(ctx, tx, uid)

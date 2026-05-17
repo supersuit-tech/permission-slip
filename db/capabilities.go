@@ -110,7 +110,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		                           AND oc.user_id = ac.approver_id
 		                           AND oc.provider = crc.oauth_provider
 		                           AND oc.status = 'active'
-		                           AND crc.oauth_scopes <@ oc.scopes
+		                           AND (SELECT COUNT(*) = 0 FROM json_each(crc.oauth_scopes) s WHERE NOT EXISTS (SELECT 1 FROM json_each(oc.scopes) os WHERE os.value = s.value))
 		                     ))
 		                 )
 		           )
@@ -149,7 +149,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// Display name uses the shared connectorInstanceDisplayNameSQL fragment so the CLI
 	// capabilities output matches the UI's Settings → Credentials page.
 	instRows, err := db.Query(ctx, `
-		SELECT ac.connector_id, ac.connector_instance_id::text,
+		SELECT ac.connector_id, ac.connector_instance_id,
 		       `+connectorInstanceDisplayNameSQL+`,
 		       NOT EXISTS (
 		           SELECT 1 FROM connector_required_credentials crc
@@ -175,7 +175,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		                       AND oc.user_id = ac.approver_id
 		                       AND oc.provider = crc.oauth_provider
 		                       AND oc.status = 'active'
-		                       AND crc.oauth_scopes <@ oc.scopes
+		                       AND (SELECT COUNT(*) = 0 FROM json_each(crc.oauth_scopes) s WHERE NOT EXISTS (SELECT 1 FROM json_each(oc.scopes) os WHERE os.value = s.value))
 		                 ))
 		             )
 		       ) AS credentials_ready
@@ -208,13 +208,13 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	}
 
 	// 2. Actions for enabled connectors.
-	actionRows, err := db.Query(ctx, `
-		SELECT ca.connector_id, ca.action_type, ca.name, ca.description,
+	actionRows, err := db.Query(ctx,
+		`SELECT ca.connector_id, ca.action_type, ca.name, ca.description,
 		       ca.risk_level, ca.parameters_schema
 		FROM connector_actions ca
-		WHERE ca.connector_id = ANY($1)
+		WHERE ca.connector_id IN (`+InPlaceholders(1, len(connectorIDs))+`)
 		ORDER BY ca.connector_id, ca.action_type`,
-		connectorIDs,
+		StringsToArgs(connectorIDs)...,
 	)
 	if err != nil {
 		return nil, err
@@ -235,13 +235,13 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// 3. Active, non-expired standing approvals for this agent.
 	saRows, err := db.Query(ctx, `
 		SELECT sa.standing_approval_id, sa.action_type, sa.constraints,
-		       sa.expires_at, sa.connector_instance_id::text
+		       sa.expires_at, sa.connector_instance_id
 		FROM standing_approvals sa
 		WHERE sa.agent_id = $1
 		  AND sa.user_id = $2
 		  AND sa.status = 'active'
-		  AND (sa.expires_at IS NULL OR sa.expires_at > now())
-		  AND sa.starts_at <= now()
+		  AND (sa.expires_at IS NULL OR sa.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		  AND sa.starts_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		ORDER BY sa.action_type, sa.expires_at NULLS LAST`,
 		agentID, approverID,
 	)
@@ -271,16 +271,17 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// Each configuration defines a pre-approved set of parameters (with
 	// optional wildcards). The agent picks from these when requesting
 	// approval or executing actions.
-	acRows, err := db.Query(ctx, `
-		SELECT ac.id, ac.connector_id, ac.action_type, ac.name, ac.description,
+	acArgs := append([]any{agentID, approverID}, StringsToArgs(connectorIDs)...)
+	acRows, err := db.Query(ctx,
+		`SELECT ac.id, ac.connector_id, ac.action_type, ac.name, ac.description,
 		       ac.parameters
 		FROM action_configurations ac
 		WHERE ac.agent_id = $1
 		  AND ac.user_id = $2
 		  AND ac.status = 'active'
-		  AND ac.connector_id = ANY($3)
+		  AND ac.connector_id IN (`+InPlaceholders(3, len(connectorIDs))+`)
 		ORDER BY ac.connector_id, ac.action_type, ac.created_at`,
-		agentID, approverID, connectorIDs,
+		acArgs...,
 	)
 	if err != nil {
 		return nil, err

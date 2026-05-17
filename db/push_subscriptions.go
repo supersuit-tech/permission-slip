@@ -1,10 +1,10 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // Push subscription channel values.
@@ -55,7 +55,7 @@ func DeletePushSubscription(ctx context.Context, db DBTX, userID string, subID i
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // DeletePushSubscriptionByEndpoint removes a push subscription by endpoint URL.
@@ -72,7 +72,7 @@ func DeletePushSubscriptionByEndpoint(ctx context.Context, db DBTX, endpoint str
 const pushSubscriptionColumns = "id, user_id, channel, endpoint, p256dh, auth, expo_token, created_at"
 
 // scanPushSubscriptions reads rows into a slice of PushSubscription.
-func scanPushSubscriptions(rows pgx.Rows, err error) ([]PushSubscription, error) {
+func scanPushSubscriptions(rows *sql.Rows, err error) ([]PushSubscription, error) {
 	if err != nil {
 		return nil, err
 	}

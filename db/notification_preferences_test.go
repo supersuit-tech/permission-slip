@@ -27,7 +27,7 @@ func TestNotificationPreferencesCascadeDelete(t *testing.T) {
 	}
 
 	testhelper.RequireCascadeDeletes(t, tx,
-		"DELETE FROM auth.users WHERE id = '"+uid+"'",
+		"DELETE FROM users WHERE id = '"+uid+"'",
 		[]string{"notification_preferences"},
 		"user_id = '"+uid+"'",
 	)

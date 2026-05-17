@@ -1,11 +1,11 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // ActionConfigTemplate represents a row from the action_config_templates table.
@@ -58,11 +58,14 @@ func ListTemplatesByConnector(ctx context.Context, db DBTX, connectorID string) 
 // The result order is not guaranteed to match the input order. Missing IDs are
 // silently omitted (the caller should compare counts to detect missing templates).
 func GetActionConfigTemplatesByIDs(ctx context.Context, db DBTX, ids []string) ([]ActionConfigTemplate, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
 	rows, err := db.Query(ctx,
 		`SELECT id, connector_id, action_type, name, description, parameters, standing_approval_spec, created_at
 		 FROM action_config_templates
-		 WHERE id = ANY($1)`,
-		ids,
+		 WHERE id IN (`+InPlaceholders(1, len(ids))+`)`,
+		StringsToArgs(ids)...,
 	)
 	if err != nil {
 		return nil, err
@@ -93,7 +96,7 @@ func GetActionConfigTemplateByID(ctx context.Context, db DBTX, templateID string
 	var t ActionConfigTemplate
 	if err := row.Scan(&t.ID, &t.ConnectorID, &t.ActionType, &t.Name,
 		&t.Description, &t.Parameters, &t.StandingApprovalSpec, &t.CreatedAt); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

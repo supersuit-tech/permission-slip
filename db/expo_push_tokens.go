@@ -41,7 +41,7 @@ func DeleteExpoPushToken(ctx context.Context, db DBTX, userID string, tokenID in
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // DeleteExpoPushTokenForUser removes an Expo push token by its token string,
@@ -55,7 +55,7 @@ func DeleteExpoPushTokenForUser(ctx context.Context, db DBTX, userID, token stri
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // DeleteExpoPushTokenByToken removes an Expo push token by its token string.

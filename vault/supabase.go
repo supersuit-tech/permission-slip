@@ -2,10 +2,10 @@ package vault
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
@@ -44,7 +44,7 @@ func (s *SupabaseVaultStore) ReadSecret(ctx context.Context, tx db.DBTX, secretI
 		secretID,
 	).Scan(&decrypted)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, fmt.Errorf("vault secret %s not found", secretID)
 		}
 		return nil, fmt.Errorf("vault.read_secret: %w", err)

@@ -11,7 +11,7 @@ import (
 // ── Phase 2: Expiration & Isolation (DB-level) ─────────────────────────────
 
 // TestInviteExpirationBoundary creates an invite with a short TTL and verifies
-// that ConsumeInvite respects the expires_at > now() check. We backdate
+// that ConsumeInvite respects the expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') check. We backdate
 // expires_at to just past expiration and confirm the invite cannot be consumed.
 func TestInviteExpirationBoundary(t *testing.T) {
 	t.Parallel()
@@ -31,9 +31,9 @@ func TestInviteExpirationBoundary(t *testing.T) {
 
 	// Backdate expires_at to 1 second in the past — simulates "just expired".
 	testhelper.MustExec(t, tx,
-		`UPDATE registration_invites SET expires_at = now() - interval '1 second' WHERE id = $1`, riID)
+		`UPDATE registration_invites SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') - interval '1 second' WHERE id = $1`, riID)
 
-	// ConsumeInvite should return nil (no match) because expires_at <= now().
+	// ConsumeInvite should return nil (no match) because expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now').
 	invite, err := db.ConsumeInvite(ctx, tx, hash)
 	if err != nil {
 		t.Fatalf("consume invite: unexpected error: %v", err)
@@ -54,8 +54,8 @@ func TestInviteExpirationBoundary(t *testing.T) {
 		t.Errorf("expected status 'active' (not yet consumed), got %q", existing.Status)
 	}
 
-	// Also verify that an invite right at the boundary (expires_at = now()) is rejected.
-	// Set expires_at to exactly now() — the check is expires_at > now(), so equal should fail.
+	// Also verify that an invite right at the boundary (expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) is rejected.
+	// Set expires_at to exactly strftime('%Y-%m-%dT%H:%M:%fZ', 'now') — the check is expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), so equal should fail.
 	riID2 := testhelper.GenerateID(t, "ri_")
 	hash2 := testhelper.GenerateID(t, "hash_")
 	_, err = db.CreateRegistrationInvite(ctx, tx, riID2, uid, hash2, 900)
@@ -63,14 +63,14 @@ func TestInviteExpirationBoundary(t *testing.T) {
 		t.Fatalf("create invite 2: %v", err)
 	}
 	testhelper.MustExec(t, tx,
-		`UPDATE registration_invites SET expires_at = now() WHERE id = $1`, riID2)
+		`UPDATE registration_invites SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = $1`, riID2)
 
 	invite2, err := db.ConsumeInvite(ctx, tx, hash2)
 	if err != nil {
 		t.Fatalf("consume invite 2: unexpected error: %v", err)
 	}
 	if invite2 != nil {
-		t.Error("expected nil when expires_at = now() (boundary: > not >=), got non-nil")
+		t.Error("expected nil when expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') (boundary: > not >=), got non-nil")
 	}
 
 	// Finally, confirm that a non-expired invite CAN still be consumed.
@@ -121,7 +121,7 @@ func TestAgentRegistrationTTLBoundary(t *testing.T) {
 
 	// Backdate expires_at to 1 second in the past.
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET expires_at = now() - interval '1 second' WHERE agent_id = $1`, agent.AgentID)
+		`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') - interval '1 second' WHERE agent_id = $1`, agent.AgentID)
 
 	// Verification should fail with ErrRegistrationExpired.
 	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "AA1BB2CDEF")
@@ -129,13 +129,13 @@ func TestAgentRegistrationTTLBoundary(t *testing.T) {
 		t.Errorf("expected ErrRegistrationExpired, got %v", err)
 	}
 
-	// Also test boundary: expires_at = now() should fail (check is > not >=).
+	// Also test boundary: expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') should fail (check is > not >=).
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET expires_at = now(), verification_attempts = 0 WHERE agent_id = $1`, agent.AgentID)
+		`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), verification_attempts = 0 WHERE agent_id = $1`, agent.AgentID)
 
 	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "AA1BB2CDEF")
 	if err != db.ErrRegistrationExpired {
-		t.Errorf("at boundary (expires_at = now()): expected ErrRegistrationExpired, got %v", err)
+		t.Errorf("at boundary (expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')): expected ErrRegistrationExpired, got %v", err)
 	}
 
 	// Verify that a non-expired agent CAN still be verified.
@@ -189,12 +189,12 @@ func TestLockoutVsExpirationPrecedence(t *testing.T) {
 
 	// Now also expire the TTL.
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET expires_at = now() - interval '1 hour' WHERE agent_id = $1`, agent.AgentID)
+		`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours') WHERE agent_id = $1`, agent.AgentID)
 
 	// Both conditions are now true: locked out AND expired.
 	// The diagnosis function (diagnosePendingAgent) checks:
 	//   1. status != 'pending' → ErrAgentNotPending
-	//   2. expires_at < now() → ErrRegistrationExpired
+	//   2. expires_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now') → ErrRegistrationExpired
 	//   3. attempts >= 5 → ErrVerificationLocked
 	// Since the agent is still 'pending' and expired, ErrRegistrationExpired
 	// should take precedence over ErrVerificationLocked.

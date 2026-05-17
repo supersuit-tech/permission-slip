@@ -8,7 +8,7 @@ import (
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
-// InsertUserWithAgent creates a user (profile + auth.users) and an agent
+// InsertUserWithAgent creates a user (users + profiles rows) and an agent
 // owned by that user in 'pending' status. Returns the auto-generated agent_id.
 func InsertUserWithAgent(t *testing.T, d db.DBTX, uid, username string) int64 {
 	t.Helper()

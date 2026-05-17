@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/shared"
 )
@@ -174,7 +175,6 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 
 		// Apply each template. Use savepoints so individual failures don't
 		// abort the entire batch.
-		pgxTx, _ := tx.(pgx.Tx)
 		results := make([]bulkApplyResult, 0, len(uniqueIDs))
 
 		for _, id := range uniqueIDs {
@@ -185,7 +185,7 @@ func handleBulkApplyActionConfigTemplates(deps *Deps) http.HandlerFunc {
 					approvalMode = &m
 				}
 			}
-			res, err := applyOneTemplateInSavepoint(r.Context(), pgxTx, tx, profile, tpl, req.AgentID, approvalMode, &saRemaining)
+			res, err := applyOneTemplateInSavepoint(r.Context(), tx, profile, tpl, req.AgentID, approvalMode, &saRemaining)
 			if err != nil {
 				code := string(ErrInternalError)
 				if res != nil {
@@ -231,45 +231,36 @@ type applyOneResult struct {
 	errorCode        string
 }
 
-// applyOneTemplateInSavepoint applies a single template within a savepoint.
-// If pgxTx is non-nil, savepoints are used for isolation. Otherwise, the
-// operation runs directly on fallbackTx (e.g., in tests where DBTX is already a tx).
+// applyOneTemplateInSavepoint applies a single template within a SQL savepoint
+// so that a failure rolls back only this template's writes, not the whole batch.
 func applyOneTemplateInSavepoint(
 	ctx context.Context,
-	pgxTx pgx.Tx,
-	fallbackTx db.DBTX,
+	tx db.DBTX,
 	profile *db.Profile,
 	tpl *db.ActionConfigTemplate,
 	agentID int64,
 	approvalMode *string,
 	saRemaining *int,
 ) (*applyOneResult, error) {
-	var dtx db.DBTX
-	var sp pgx.Tx
+	b := make([]byte, 4)
+	if _, err := rand.Read(b); err != nil {
+		return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("internal error")
+	}
+	sp := "sp_" + hex.EncodeToString(b)
 
-	if pgxTx != nil {
-		var err error
-		sp, err = pgxTx.Begin(ctx)
-		if err != nil {
-			return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("internal error")
-		}
-		defer sp.Rollback(ctx) //nolint:errcheck
-		dtx = sp
-	} else {
-		dtx = fallbackTx
+	if _, err := tx.Exec(ctx, "SAVEPOINT "+sp); err != nil {
+		return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("internal error")
 	}
 
-	res, err := applyOneTemplateCore(ctx, dtx, profile, tpl, agentID, approvalMode, saRemaining)
+	res, err := applyOneTemplateCore(ctx, tx, profile, tpl, agentID, approvalMode, saRemaining)
 	if err != nil {
+		tx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+sp) //nolint:errcheck
 		return res, err
 	}
 
-	if sp != nil {
-		if err := sp.Commit(ctx); err != nil {
-			return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("internal error")
-		}
+	if _, err := tx.Exec(ctx, "RELEASE SAVEPOINT "+sp); err != nil {
+		return &applyOneResult{errorCode: string(ErrInternalError)}, fmt.Errorf("internal error")
 	}
-
 	return res, nil
 }
 

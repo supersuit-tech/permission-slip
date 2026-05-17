@@ -1,11 +1,11 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // AgentPaymentMethod represents the binding between an agent and a payment method.
@@ -22,7 +22,7 @@ func GetAgentPaymentMethod(ctx context.Context, db DBTX, agentID int64) (*AgentP
 		`SELECT agent_id, payment_method_id, created_at
 		 FROM agent_payment_methods WHERE agent_id = $1`,
 		agentID).Scan(&apm.AgentID, &apm.PaymentMethodID, &apm.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -55,7 +55,7 @@ func RemoveAgentPaymentMethod(ctx context.Context, db DBTX, agentID int64) (bool
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // CountAgentsByPaymentMethod returns the number of agents using a given payment method.

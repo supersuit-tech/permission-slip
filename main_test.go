@@ -9,9 +9,6 @@ import (
 	"net/http/httptest"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 const secondDuration = time.Second
@@ -47,7 +44,7 @@ func TestHandleHealth_NoDB(t *testing.T) {
 func TestHandleHealth_DBHealthy(t *testing.T) {
 	t.Parallel()
 
-	handler := handleHealth(&mockDBTX{healthy: true})
+	handler := handleHealth(&mockPinger{healthy: true})
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -71,7 +68,7 @@ func TestHandleHealth_DBHealthy(t *testing.T) {
 func TestHandleHealth_DBUnreachable(t *testing.T) {
 	t.Parallel()
 
-	handler := handleHealth(&mockDBTX{healthy: false})
+	handler := handleHealth(&mockPinger{healthy: false})
 	req := httptest.NewRequest(http.MethodGet, "/api/health", nil)
 	rec := httptest.NewRecorder()
 	handler.ServeHTTP(rec, req)
@@ -162,36 +159,14 @@ func TestGracefulShutdown_DrainsRequests(t *testing.T) {
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-// mockDBTX implements db.DBTX for health check testing.
-type mockDBTX struct {
+// mockPinger implements dbPinger for health check testing.
+type mockPinger struct {
 	healthy bool
 }
 
-func (m *mockDBTX) Exec(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
-	return pgconn.CommandTag{}, nil
-}
-
-func (m *mockDBTX) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
-	return nil, nil
-}
-
-func (m *mockDBTX) QueryRow(_ context.Context, _ string, _ ...any) pgx.Row {
-	return &mockRow{healthy: m.healthy}
-}
-
-// mockRow implements pgx.Row.
-type mockRow struct {
-	healthy bool
-}
-
-func (mr *mockRow) Scan(dest ...any) error {
-	if !mr.healthy {
+func (m *mockPinger) Ping(_ context.Context) error {
+	if !m.healthy {
 		return errors.New("connection refused")
-	}
-	if len(dest) > 0 {
-		if p, ok := dest[0].(*int); ok {
-			*p = 1
-		}
 	}
 	return nil
 }

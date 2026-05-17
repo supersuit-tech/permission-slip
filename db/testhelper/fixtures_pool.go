@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
@@ -14,7 +13,7 @@ import (
 //
 // All created rows are automatically cleaned up when the test completes.
 type PoolUser struct {
-	Pool    *pgxpool.Pool
+	Pool    *db.Pool
 	UserID  string
 	AgentID int64
 }
@@ -32,9 +31,13 @@ func SetupPoolUser(t *testing.T, prefix string, publicKey string) PoolUser {
 	ctx := context.Background()
 
 	uid := GenerateUID(t)
+	// users is our app-managed identity table (post-Supabase). Insert a stub
+	// password hash; tests don't authenticate via this row, they manufacture
+	// JWTs directly.
 	if _, err := pool.Exec(ctx,
-		`INSERT INTO auth.users (id) VALUES ($1)`, uid); err != nil {
-		t.Fatalf("SetupPoolUser: insert auth.users: %v", err)
+		`INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3)`,
+		uid, uid+"@test.local", "test-stub-hash"); err != nil {
+		t.Fatalf("SetupPoolUser: insert users: %v", err)
 	}
 	if _, err := pool.Exec(ctx,
 		`INSERT INTO profiles (id, username) VALUES ($1, $2)`, uid, prefix+"_"+uid[:8]); err != nil {
@@ -55,7 +58,7 @@ func SetupPoolUser(t *testing.T, prefix string, publicKey string) PoolUser {
 		pool.Exec(bg, `DELETE FROM subscriptions WHERE user_id = $1`, uid)
 		pool.Exec(bg, `DELETE FROM agents WHERE agent_id = $1`, agentID)
 		pool.Exec(bg, `DELETE FROM profiles WHERE id = $1`, uid)
-		pool.Exec(bg, `DELETE FROM auth.users WHERE id = $1`, uid)
+		pool.Exec(bg, `DELETE FROM users WHERE id = $1`, uid)
 	})
 
 	return PoolUser{Pool: pool, UserID: uid, AgentID: agentID}

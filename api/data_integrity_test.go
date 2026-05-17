@@ -67,12 +67,8 @@ func setupPoolUser(t *testing.T, d db.DBTX) string {
 	testhelper.InsertUser(t, d, uid, "u_"+uid[:8])
 	t.Cleanup(func() {
 		ctx := context.Background()
-		// FK-safe order: leaf tables first, root tables last.
-		d.Exec(ctx, `DELETE FROM audit_events WHERE user_id = $1`, uid)
-		d.Exec(ctx, `DELETE FROM agents WHERE approver_id = $1`, uid)
-		d.Exec(ctx, `DELETE FROM registration_invites WHERE user_id = $1`, uid)
-		d.Exec(ctx, `DELETE FROM profiles WHERE id = $1`, uid)
-		d.Exec(ctx, `DELETE FROM auth.users WHERE id = $1`, uid)
+		// Deleting from users cascades to profiles and all child tables.
+		d.Exec(ctx, `DELETE FROM users WHERE id = $1`, uid) //nolint:errcheck
 	})
 	return uid
 }

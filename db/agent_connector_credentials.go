@@ -1,12 +1,12 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // AgentConnectorCredential represents a row from the agent_connector_credentials
@@ -49,7 +49,7 @@ func GetAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, agentID
 		agentID, connectorID, connectorInstanceID,
 	).Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ConnectorInstanceID, &acc.ApproverID,
 		&acc.CredentialID, &acc.OAuthConnectionID, &acc.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -147,7 +147,7 @@ func DeleteAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, agen
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // ListAgentConnectorCredentialsForAgentConnector returns all credential bindings for every

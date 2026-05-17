@@ -6,8 +6,12 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/api"
-	"github.com/supersuit-tech/permission-slip/db"
 )
+
+// dbPinger is the minimal interface handleHealth needs: just a connectivity check.
+type dbPinger interface {
+	Ping(ctx context.Context) error
+}
 
 // handleHealth returns a handler that reports server health, including
 // database connectivity status when a database connection is configured.
@@ -16,7 +20,7 @@ import (
 //   - 200 {"status":"ok","database":"ok"} — healthy with DB
 //   - 200 {"status":"ok"} — healthy without DB
 //   - 503 {"status":"degraded","database":"unreachable"} — DB unreachable
-func handleHealth(d db.DBTX) http.HandlerFunc {
+func handleHealth(d dbPinger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		resp := map[string]string{"status": "ok"}
 
@@ -24,9 +28,7 @@ func handleHealth(d db.DBTX) http.HandlerFunc {
 			ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 			defer cancel()
 
-			var n int
-			err := d.QueryRow(ctx, "SELECT 1").Scan(&n)
-			if err != nil {
+			if err := d.Ping(ctx); err != nil {
 				resp["status"] = "degraded"
 				resp["database"] = "unreachable"
 				api.RespondJSON(w, http.StatusServiceUnavailable, resp)

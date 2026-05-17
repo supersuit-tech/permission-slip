@@ -21,9 +21,9 @@ func validateConfig() (errs []configError, warnings []configError) {
 	devMode := os.Getenv("MODE") == "development"
 
 	// Required for API mode — the server can't serve API requests without a database.
-	if !devMode && os.Getenv("DATABASE_URL") == "" {
+	if !devMode && os.Getenv("DATABASE_PATH") == "" {
 		errs = append(errs, configError{
-			envVar:  "DATABASE_URL",
+			envVar:  "DATABASE_PATH",
 			message: "required for database connectivity",
 		})
 	}

@@ -24,8 +24,8 @@ func MustExec(t *testing.T, d db.DBTX, sql string, args ...any) {
 	mustExec(t, d, sql, args...)
 }
 
-// WithSavepoint wraps fn in a PostgreSQL savepoint so that a failed SQL
-// statement (e.g. a CHECK-constraint violation) does not abort the enclosing
+// WithSavepoint wraps fn in a savepoint so that a failed SQL statement
+// (e.g. a CHECK-constraint violation) does not abort the enclosing
 // transaction. It returns whatever error fn returned.
 //
 // Use this in tests that deliberately trigger constraint errors:

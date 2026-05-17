@@ -93,7 +93,7 @@ func TestApprovalStatusCheckConstraint(t *testing.T) {
 		func(value string, i int) error {
 			_, err := tx.Exec(context.Background(),
 				`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at)
-				 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', $4, now() + interval '1 hour')`,
+				 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', $4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 				fmt.Sprintf("%s_%d", base, i), agentID, uid, value)
 			return err
 		})
@@ -305,7 +305,7 @@ func TestApprovalExecutionStatusCheckConstraint(t *testing.T) {
 		func(value string, i int) error {
 			_, err := tx.Exec(context.Background(),
 				`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, execution_status, executed_at, expires_at)
-				 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', $4, now(), now() + interval '1 hour')`,
+				 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', $4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 				fmt.Sprintf("%s_%d", base, i), agentID, uid, value)
 			return err
 		})
@@ -323,7 +323,7 @@ func TestApprovalExecutionColumnsConsistencyConstraint(t *testing.T) {
 	id1 := testhelper.GenerateID(t, "appr_")
 	_, err := tx.Exec(ctx,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at)
-		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'pending', now() + interval '1 hour')`,
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'pending', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 		id1, agentID, uid)
 	if err != nil {
 		t.Fatalf("all-NULL insert should succeed: %v", err)
@@ -333,7 +333,7 @@ func TestApprovalExecutionColumnsConsistencyConstraint(t *testing.T) {
 	id2 := testhelper.GenerateID(t, "appr_")
 	_, err = tx.Exec(ctx,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, execution_status, executed_at, expires_at)
-		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', 'success', now(), now() + interval '1 hour')`,
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', 'success', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 		id2, agentID, uid)
 	if err != nil {
 		t.Fatalf("status+timestamp insert should succeed: %v", err)
@@ -343,7 +343,7 @@ func TestApprovalExecutionColumnsConsistencyConstraint(t *testing.T) {
 	id3 := testhelper.GenerateID(t, "appr_")
 	_, err = tx.Exec(ctx,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, execution_status, expires_at)
-		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', 'success', now() + interval '1 hour')`,
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', 'success', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 		id3, agentID, uid)
 	if err == nil {
 		t.Error("execution_status without executed_at should violate constraint")
@@ -353,7 +353,7 @@ func TestApprovalExecutionColumnsConsistencyConstraint(t *testing.T) {
 	id4 := testhelper.GenerateID(t, "appr_")
 	_, err = tx.Exec(ctx,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, executed_at, expires_at)
-		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', now(), now() + interval '1 hour')`,
+		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'approved', strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 		id4, agentID, uid)
 	if err == nil {
 		t.Error("executed_at without execution_status should violate constraint")

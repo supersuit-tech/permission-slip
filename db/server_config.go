@@ -1,9 +1,9 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // GetServerConfig returns the value for the given key, or empty string if not found.
@@ -13,7 +13,7 @@ func GetServerConfig(ctx context.Context, db DBTX, key string) (string, error) {
 		"SELECT value FROM server_config WHERE key = $1",
 		key,
 	).Scan(&value)
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", nil
 	}
 	if err != nil {
@@ -28,7 +28,7 @@ func SetServerConfig(ctx context.Context, db DBTX, key, value string) error {
 		`INSERT INTO server_config (key, value)
 		 VALUES ($1, $2)
 		 ON CONFLICT (key)
-		 DO UPDATE SET value = EXCLUDED.value, updated_at = now()`,
+		 DO UPDATE SET value = EXCLUDED.value, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
 		key, value,
 	)
 	return err

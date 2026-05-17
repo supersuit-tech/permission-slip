@@ -1,13 +1,11 @@
 package api
 
 import (
-	"errors"
 	"fmt"
 	"log"
 	"net/http"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
@@ -127,8 +125,7 @@ func handleCreateRegistrationInvite(deps *Deps) http.HandlerFunc {
 				)
 			}
 			if err != nil {
-				var pgErr *pgconn.PgError
-				if errors.As(err, &pgErr) && pgErr.Code == db.PgCodeUniqueViolation {
+				if db.IsUniqueViolation(err) {
 					log.Printf("[%s] CreateRegistrationInvite: unique violation on attempt %d, retrying", TraceID(r.Context()), attempt+1)
 					continue
 				}

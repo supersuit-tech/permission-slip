@@ -1,12 +1,12 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 const (
@@ -34,7 +34,7 @@ func CountRecentInvitesByUser(ctx context.Context, db DBTX, userID string, windo
 	var count int
 	err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM registration_invites
-		 WHERE user_id = $1 AND created_at > now() - make_interval(secs => $2)`,
+		 WHERE user_id = $1 AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-' || $2 || ' seconds')`,
 		userID, int(window.Seconds()),
 	).Scan(&count)
 	return count, err
@@ -42,12 +42,12 @@ func CountRecentInvitesByUser(ctx context.Context, db DBTX, userID string, windo
 
 // CreateRegistrationInvite inserts a new registration invite and returns the created row.
 // ttlSeconds controls the invite lifetime; expires_at is computed by the database
-// as now() + ttlSeconds to avoid clock skew between the app and DB servers.
+// as strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + ttlSeconds to avoid clock skew between the app and DB servers.
 func CreateRegistrationInvite(ctx context.Context, db DBTX, id, userID, inviteCodeHash string, ttlSeconds int) (*RegistrationInvite, error) {
 	var ri RegistrationInvite
 	err := db.QueryRow(ctx,
 		`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-		 VALUES ($1, $2, $3, 'active', now() + make_interval(secs => $4))
+		 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || $4 || ' seconds'))
 		 RETURNING id, user_id, invite_code_hash, status, verification_attempts, expires_at, consumed_at, created_at`,
 		id, userID, inviteCodeHash, ttlSeconds,
 	).Scan(&ri.ID, &ri.UserID, &ri.InviteCodeHash, &ri.Status, &ri.VerificationAttempts, &ri.ExpiresAt, &ri.ConsumedAt, &ri.CreatedAt)
@@ -96,7 +96,7 @@ func CreateRegistrationInviteIfUnderLimit(
 	var count int
 	if err := txDB.QueryRow(ctx,
 		`SELECT COUNT(*) FROM registration_invites
-		 WHERE user_id = $1 AND created_at > now() - make_interval(secs => $2)`,
+		 WHERE user_id = $1 AND created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-' || $2 || ' seconds')`,
 		userID, rateWindowSeconds,
 	).Scan(&count); err != nil {
 		return nil, fmt.Errorf("count recent invites: %w", err)
@@ -113,7 +113,7 @@ func CreateRegistrationInviteIfUnderLimit(
 	var ri RegistrationInvite
 	if err := txDB.QueryRow(ctx,
 		`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-		 VALUES ($1, $2, $3, 'active', now() + make_interval(secs => $4))
+		 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || $4 || ' seconds'))
 		 RETURNING id, user_id, invite_code_hash, status, verification_attempts, expires_at, consumed_at, created_at`,
 		id, userID, inviteCodeHash, ttlSeconds,
 	).Scan(&ri.ID, &ri.UserID, &ri.InviteCodeHash, &ri.Status, &ri.VerificationAttempts, &ri.ExpiresAt, &ri.ConsumedAt, &ri.CreatedAt); err != nil {
@@ -133,22 +133,22 @@ func CreateRegistrationInviteIfUnderLimit(
 // not expired, consumed, or locked (>= 5 verification_attempts), and atomically
 // marks it as consumed. Returns the invite (including user_id) on success.
 //
-// The UPDATE ... WHERE uses status='active' AND expires_at > now() AND
+// The UPDATE ... WHERE uses status='active' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND
 // verification_attempts < 5 so that concurrent callers race on the row lock;
 // at most one succeeds.
 func ConsumeInvite(ctx context.Context, db DBTX, inviteCodeHash string) (*RegistrationInvite, error) {
 	var ri RegistrationInvite
 	err := db.QueryRow(ctx,
 		`UPDATE registration_invites
-		 SET status = 'consumed', consumed_at = now()
+		 SET status = 'consumed', consumed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE invite_code_hash = $1
 		   AND status = 'active'
-		   AND expires_at > now()
+		   AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		   AND verification_attempts < 5
 		 RETURNING id, user_id, invite_code_hash, status, verification_attempts, expires_at, consumed_at, created_at`,
 		inviteCodeHash,
 	).Scan(&ri.ID, &ri.UserID, &ri.InviteCodeHash, &ri.Status, &ri.VerificationAttempts, &ri.ExpiresAt, &ri.ConsumedAt, &ri.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -167,7 +167,7 @@ func LookupInviteByCodeHash(ctx context.Context, db DBTX, inviteCodeHash string)
 		 WHERE invite_code_hash = $1`,
 		inviteCodeHash,
 	).Scan(&ri.ID, &ri.UserID, &ri.InviteCodeHash, &ri.Status, &ri.VerificationAttempts, &ri.ExpiresAt, &ri.ConsumedAt, &ri.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

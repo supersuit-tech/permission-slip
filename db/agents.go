@@ -1,6 +1,7 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"crypto/subtle"
 	"errors"
@@ -8,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // Agent status values. These correspond to the CHECK constraint on agents.status.
@@ -48,7 +48,7 @@ const agentColumns = `agent_id, public_key, approver_id, status, metadata,
 	registration_ttl, expires_at, registered_at, deactivated_at, last_active_at, created_at`
 
 // scanAgent scans a single row into an Agent. The row must select agentColumns.
-func scanAgent(row pgx.Row) (*Agent, error) {
+func scanAgent(row *sql.Row) (*Agent, error) {
 	var a Agent
 	err := row.Scan(
 		&a.AgentID, &a.PublicKey, &a.ApproverID, &a.Status, &a.Metadata,
@@ -92,16 +92,16 @@ const agentListColumns = agentColumns + `,
 	(SELECT COUNT(*)
 	 FROM approvals
 	 WHERE approvals.agent_id = agents.agent_id
-	   AND approvals.created_at > now() - interval '30 days')
+	   AND approvals.created_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days'))
 	+
 	(SELECT COUNT(*)
 	 FROM standing_approval_executions sae
 	 JOIN standing_approvals sa ON sa.standing_approval_id = sae.standing_approval_id
 	 WHERE sa.agent_id = agents.agent_id
-	   AND sae.executed_at > now() - interval '30 days') AS request_count_30d`
+	   AND sae.executed_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')) AS request_count_30d`
 
 // scanAgentListItem scans a row selected with agentListColumns into an AgentListItem.
-func scanAgentListItem(row pgx.Row) (*AgentListItem, error) {
+func scanAgentListItem(row *sql.Row) (*AgentListItem, error) {
 	var item AgentListItem
 	err := row.Scan(
 		&item.AgentID, &item.PublicKey, &item.ApproverID, &item.Status, &item.Metadata,
@@ -121,7 +121,7 @@ func scanAgentListItem(row pgx.Row) (*AgentListItem, error) {
 // with agent_id as a tiebreaker. Pass a nil cursor to start from the beginning.
 // Limit is clamped to [1, 100] with a default of 50 when <= 0.
 //
-// Expired pending agents (status='pending' with expires_at <= now()) are
+// Expired pending agents (status='pending' with expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) are
 // excluded from results since they can never complete registration.
 //
 // Each returned AgentListItem includes a RequestCount30d computed from
@@ -137,11 +137,11 @@ func GetAgentsByApprover(ctx context.Context, db DBTX, approverID string, limit 
 	// Fetch one extra row to determine has_more.
 	fetchLimit := limit + 1
 
-	var rows pgx.Rows
+	var rows *sql.Rows
 	var err error
 	// Exclude expired pending agents: they can never complete registration
 	// and would otherwise waste pagination slots.
-	expiredFilter := `AND NOT (status = 'pending' AND expires_at IS NOT NULL AND expires_at <= now())`
+	expiredFilter := `AND NOT (status = 'pending' AND expires_at IS NOT NULL AND expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`
 
 	if cursor != nil {
 		rows, err = db.Query(ctx,
@@ -199,7 +199,7 @@ func GetAgentByID(ctx context.Context, db DBTX, agentID int64, approverID string
 		agentID, approverID,
 	)
 	a, err := scanAgent(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -214,13 +214,13 @@ func GetAgentByID(ctx context.Context, db DBTX, agentID int64, approverID string
 func UpdateAgentMetadata(ctx context.Context, db DBTX, agentID int64, approverID string, metadata []byte) (*Agent, error) {
 	row := db.QueryRow(ctx,
 		`UPDATE agents
-		 SET metadata = COALESCE(metadata, '{}'::jsonb) || $3
+		 SET metadata = COALESCE(metadata, '{}') || $3
 		 WHERE agent_id = $1 AND approver_id = $2
 		 RETURNING `+agentColumns,
 		agentID, approverID, metadata,
 	)
 	a, err := scanAgent(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -246,13 +246,13 @@ func AgentBelongsToUser(ctx context.Context, db DBTX, agentID int64, userID stri
 func RegisterAgent(ctx context.Context, db DBTX, agentID int64, approverID string) (*Agent, error) {
 	row := db.QueryRow(ctx,
 		`UPDATE agents
-		 SET status = 'registered', registered_at = now(), confirmation_code = NULL
+		 SET status = 'registered', registered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), confirmation_code = NULL
 		 WHERE agent_id = $1 AND approver_id = $2 AND status = 'pending'
 		 RETURNING `+agentColumns,
 		agentID, approverID,
 	)
 	a, err := scanAgent(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -269,12 +269,12 @@ func DeactivateAgent(ctx context.Context, db DBTX, agentID int64, approverID str
 	row := db.QueryRow(ctx,
 		`WITH deactivated AS (
 		     UPDATE agents
-		     SET status = 'deactivated', deactivated_at = now()
+		     SET status = 'deactivated', deactivated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		     WHERE agent_id = $1 AND approver_id = $2 AND status != 'deactivated'
 		     RETURNING `+agentColumns+`
 		 ), revoke_standing AS (
 		     UPDATE standing_approvals
-		     SET status = 'revoked', revoked_at = now()
+		     SET status = 'revoked', revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		     WHERE agent_id = (SELECT agent_id FROM deactivated) AND status = 'active'
 		 )
 		 SELECT `+agentColumns+`
@@ -282,7 +282,7 @@ func DeactivateAgent(ctx context.Context, db DBTX, agentID int64, approverID str
 		agentID, approverID,
 	)
 	a, err := scanAgent(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -295,11 +295,11 @@ func DeactivateAgent(ctx context.Context, db DBTX, agentID int64, approverID str
 // via approverID (the invite's user_id). The server auto-assigns the agent_id
 // (bigserial). confirmationCode is the plaintext code shown to the user on the
 // dashboard. registrationTTL controls how long (in seconds) the agent has to
-// verify; expires_at is computed server-side as now() + TTL. metadata may be nil.
+// verify; expires_at is computed server-side as strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + TTL. metadata may be nil.
 func InsertPendingAgent(ctx context.Context, db DBTX, approverID, publicKey, confirmationCode string, registrationTTL int, metadata []byte) (*Agent, error) {
 	row := db.QueryRow(ctx,
 		`INSERT INTO agents (public_key, approver_id, status, metadata, confirmation_code, registration_ttl, expires_at)
-		 VALUES ($1, $2, 'pending', $3, $4, $5, now() + make_interval(secs => $6))
+		 VALUES ($1, $2, 'pending', $3, $4, $5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || $6 || ' seconds'))
 		 RETURNING `+agentColumns,
 		publicKey, approverID, metadata, confirmationCode, registrationTTL, float64(registrationTTL),
 	)
@@ -332,13 +332,13 @@ func VerifyAgentConfirmationCode(ctx context.Context, db DBTX, agentID int64, su
 		 SET verification_attempts = verification_attempts + 1
 		 WHERE agent_id = $1
 		   AND status = 'pending'
-		   AND (expires_at IS NULL OR expires_at > now())
+		   AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 		   AND verification_attempts < $2
 		 RETURNING `+agentColumns,
 		agentID, maxVerificationAttempts,
 	)
 	a, err := scanAgent(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		// The UPDATE matched nothing — determine why for a specific error.
 		return diagnosePendingAgent(ctx, db, agentID)
 	}
@@ -364,13 +364,13 @@ func VerifyAgentConfirmationCode(ctx context.Context, db DBTX, agentID int64, su
 	// Success — transition to registered and clear the confirmation code.
 	updateRow := db.QueryRow(ctx,
 		`UPDATE agents
-		 SET status = 'registered', registered_at = now(), confirmation_code = NULL
+		 SET status = 'registered', registered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), confirmation_code = NULL
 		 WHERE agent_id = $1 AND status = 'pending'
 		 RETURNING `+agentColumns,
 		agentID,
 	)
 	registered, err := scanAgent(updateRow)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		// Another concurrent request already registered this agent.
 		// Re-fetch the current state so the caller can distinguish
 		// "already registered" from other non-pending states.
@@ -397,7 +397,7 @@ func diagnosePendingAgent(ctx context.Context, db DBTX, agentID int64) (*Agent, 
 		agentID,
 	)
 	a, err := scanAgent(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // not found
 	}
 	if err != nil {
@@ -427,7 +427,7 @@ func GetAgentByIDUnscoped(ctx context.Context, db DBTX, agentID int64) (*Agent, 
 		agentID,
 	)
 	a, err := scanAgent(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -445,17 +445,17 @@ func CountRegisteredAgentsByUser(ctx context.Context, db DBTX, userID string) (i
 		`SELECT COUNT(*) FROM agents
 		 WHERE approver_id = $1
 		   AND (status = 'registered'
-		        OR (status = 'pending' AND (expires_at IS NULL OR expires_at > now())))`,
+		        OR (status = 'pending' AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))))`,
 		userID,
 	).Scan(&count)
 	return count, err
 }
 
-// TouchAgentLastActive updates the agent's last_active_at timestamp to now().
+// TouchAgentLastActive updates the agent's last_active_at timestamp to strftime('%Y-%m-%dT%H:%M:%fZ', 'now').
 // This is a best-effort operation — callers should not fail the request if it errors.
 func TouchAgentLastActive(ctx context.Context, db DBTX, agentID int64) error {
 	_, err := db.Exec(ctx,
-		`UPDATE agents SET last_active_at = now() WHERE agent_id = $1`,
+		`UPDATE agents SET last_active_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`,
 		agentID,
 	)
 	return err

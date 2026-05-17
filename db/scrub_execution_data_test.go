@@ -26,7 +26,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 			`UPDATE approvals SET
 				execution_status = 'success',
 				execution_result = '{"data":"sensitive"}',
-				executed_at = now() - interval '1 hour'
+				executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours')
 			 WHERE approval_id = $1`, approvalID)
 
 		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -41,7 +41,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		var execResult *string
 		var actionType string
 		err = tx.QueryRow(ctx,
-			`SELECT execution_result::text, action->>'type' FROM approvals WHERE approval_id = $1`,
+			`SELECT execution_result, json_extract(action, '$.type') FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&execResult, &actionType)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -57,7 +57,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		var actionParams *string
 		var actionVersion *string
 		err = tx.QueryRow(ctx,
-			`SELECT action->>'parameters', action->>'version' FROM approvals WHERE approval_id = $1`,
+			`SELECT json_extract(action, '$.parameters'), json_extract(action, '$.version') FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&actionParams, &actionVersion)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -84,7 +84,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 			`UPDATE approvals SET
 				execution_status = 'success',
 				execution_result = '{"data":"sensitive"}',
-				executed_at = now() - interval '10 minutes'
+				executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 minutes')
 			 WHERE approval_id = $1`, approvalID)
 
 		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -98,7 +98,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		// Verify execution_result is still present.
 		var execResult *string
 		err = tx.QueryRow(ctx,
-			`SELECT execution_result::text FROM approvals WHERE approval_id = $1`,
+			`SELECT execution_result FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&execResult)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -120,7 +120,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		testhelper.InsertResolvedApproval(t, tx, approvalID, agentID, uid, "denied")
 		// Backdate denied_at to 1 hour ago (no executed_at set, which is the real scenario).
 		testhelper.MustExec(t, tx,
-			`UPDATE approvals SET denied_at = now() - interval '1 hour'
+			`UPDATE approvals SET denied_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours')
 			 WHERE approval_id = $1`, approvalID)
 
 		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -134,7 +134,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		// Verify parameters were stripped.
 		var actionParams *string
 		err = tx.QueryRow(ctx,
-			`SELECT action->>'parameters' FROM approvals WHERE approval_id = $1`,
+			`SELECT json_extract(action, '$.parameters') FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&actionParams)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -155,7 +155,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		// Insert a cancelled approval — has cancelled_at but no executed_at.
 		testhelper.InsertResolvedApproval(t, tx, approvalID, agentID, uid, "cancelled")
 		testhelper.MustExec(t, tx,
-			`UPDATE approvals SET cancelled_at = now() - interval '1 hour'
+			`UPDATE approvals SET cancelled_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours')
 			 WHERE approval_id = $1`, approvalID)
 
 		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -168,7 +168,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 
 		var actionParams *string
 		err = tx.QueryRow(ctx,
-			`SELECT action->>'parameters' FROM approvals WHERE approval_id = $1`,
+			`SELECT json_extract(action, '$.parameters') FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&actionParams)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -189,7 +189,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		// Insert a denied approval only 10 minutes ago — should NOT be scrubbed.
 		testhelper.InsertResolvedApproval(t, tx, approvalID, agentID, uid, "denied")
 		testhelper.MustExec(t, tx,
-			`UPDATE approvals SET denied_at = now() - interval '10 minutes'
+			`UPDATE approvals SET denied_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 minutes')
 			 WHERE approval_id = $1`, approvalID)
 
 		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -203,7 +203,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		// Verify parameters are still present.
 		var actionParams *string
 		err = tx.QueryRow(ctx,
-			`SELECT action->>'parameters' FROM approvals WHERE approval_id = $1`,
+			`SELECT json_extract(action, '$.parameters') FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&actionParams)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -224,7 +224,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		// Insert a cancelled approval only 10 minutes ago — should NOT be scrubbed.
 		testhelper.InsertResolvedApproval(t, tx, approvalID, agentID, uid, "cancelled")
 		testhelper.MustExec(t, tx,
-			`UPDATE approvals SET cancelled_at = now() - interval '10 minutes'
+			`UPDATE approvals SET cancelled_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 minutes')
 			 WHERE approval_id = $1`, approvalID)
 
 		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -237,7 +237,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 
 		var actionParams *string
 		err = tx.QueryRow(ctx,
-			`SELECT action->>'parameters' FROM approvals WHERE approval_id = $1`,
+			`SELECT json_extract(action, '$.parameters') FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&actionParams)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -279,7 +279,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 
 		// Backdate the execution to 1 hour ago.
 		testhelper.MustExec(t, tx,
-			`UPDATE standing_approval_executions SET executed_at = now() - interval '1 hour'
+			`UPDATE standing_approval_executions SET executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours')
 			 WHERE standing_approval_id = $1`, saID)
 
 		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -293,7 +293,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		// Verify parameters are NULL.
 		var params *string
 		err = tx.QueryRow(ctx,
-			`SELECT parameters::text FROM standing_approval_executions WHERE standing_approval_id = $1`,
+			`SELECT parameters FROM standing_approval_executions WHERE standing_approval_id = $1`,
 			saID).Scan(&params)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -313,7 +313,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)
 		testhelper.InsertStandingApprovalExecutionWithParams(t, tx, saID, []byte(`{"key":"sensitive_value"}`))
 
-		// Execution is recent (default now()) — should not be scrubbed.
+		// Execution is recent (default strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) — should not be scrubbed.
 		scrubbed, err := db.ScrubSensitiveExecutionData(ctx, tx)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
@@ -337,7 +337,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 			`UPDATE approvals SET
 				execution_status = 'success',
 				execution_result = '{"data":"sensitive"}',
-				executed_at = now() - interval '1 hour'
+				executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours')
 			 WHERE approval_id = $1`, approvalID)
 
 		_, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -368,7 +368,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 			`UPDATE approvals SET
 				execution_status = 'error',
 				execution_result = '{"error":"something failed"}',
-				executed_at = now() - interval '2 hours'
+				executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 hours')
 			 WHERE approval_id = $1`, approvalID)
 
 		_, err := db.ScrubSensitiveExecutionData(ctx, tx)
@@ -380,7 +380,7 @@ func TestScrubSensitiveExecutionData(t *testing.T) {
 		var execStatus string
 		var executedAt *string
 		err = tx.QueryRow(ctx,
-			`SELECT execution_status, executed_at::text FROM approvals WHERE approval_id = $1`,
+			`SELECT execution_status, executed_at FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&execStatus, &executedAt)
 		if err != nil {
 			t.Fatalf("query error: %v", err)
@@ -411,7 +411,7 @@ func TestScrubSensitiveExecutionData_SQLFunction(t *testing.T) {
 			`UPDATE approvals SET
 				execution_status = 'success',
 				execution_result = '{"data":"sensitive"}',
-				executed_at = now() - interval '1 hour'
+				executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours')
 			 WHERE approval_id = $1`, approvalID)
 
 		// Call the SQL function directly.
@@ -424,7 +424,7 @@ func TestScrubSensitiveExecutionData_SQLFunction(t *testing.T) {
 		var execResult *string
 		var actionType string
 		err = tx.QueryRow(ctx,
-			`SELECT execution_result::text, action->>'type' FROM approvals WHERE approval_id = $1`,
+			`SELECT execution_result, json_extract(action, '$.type') FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&execResult, &actionType)
 		if err != nil {
 			t.Fatalf("query error: %v", err)

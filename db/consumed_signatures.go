@@ -24,7 +24,7 @@ func ConsumeSignature(ctx context.Context, db DBTX, signatureHash []byte, agentI
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // CleanupExpiredConsumedSignatures deletes rows whose expires_at has passed.
@@ -35,9 +35,9 @@ func ConsumeSignature(ctx context.Context, db DBTX, signatureHash []byte, agentI
 //
 // Returns the number of rows deleted.
 func CleanupExpiredConsumedSignatures(ctx context.Context, db DBTX) (int64, error) {
-	tag, err := db.Exec(ctx, `DELETE FROM consumed_signatures WHERE expires_at < now()`)
+	tag, err := db.Exec(ctx, `DELETE FROM consumed_signatures WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`)
 	if err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), nil
+	return RowsAffected(tag), nil
 }

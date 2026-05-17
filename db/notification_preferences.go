@@ -1,9 +1,9 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // NotificationPreference represents a row from the notification_preferences table.
@@ -45,7 +45,7 @@ func IsNotificationChannelEnabled(ctx context.Context, db DBTX, userID, channel 
 		"SELECT enabled FROM notification_preferences WHERE user_id = $1 AND channel = $2",
 		userID, channel,
 	).Scan(&enabled)
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return true, nil // missing row → default enabled
 	}
 	if err != nil {

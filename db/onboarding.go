@@ -2,11 +2,10 @@ package db
 
 import (
 	"context"
+	"database/sql"
 	"errors"
+	"strings"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // OnboardingError represents a typed error from CreateProfile.
@@ -18,57 +17,20 @@ type OnboardingError struct {
 func (e *OnboardingError) Error() string { return e.Message }
 
 const (
-	OnboardingErrUsernameTaken  = "username_taken"
+	OnboardingErrUsernameTaken = "username_taken"
 	OnboardingErrProfileExists = "profile_exists"
 )
 
-// CreateProfile provisions a new user: inserts an auth.users row (if not
-// present — Supabase manages this in production; local Postgres needs it
-// inserted manually) and a profiles row.
-//
-// Returns the created Profile, or an *OnboardingError if the username is
-// already taken (OnboardingErrUsernameTaken) or if a profile already exists
-// for this user due to a concurrent request (OnboardingErrProfileExists).
+// CreateProfile provisions a profile for a user. The user row must already
+// exist in the users table (created by the auth package's signup flow).
 func CreateProfile(ctx context.Context, db DBTX, userID, username, email string, marketingOptIn bool) (*Profile, error) {
-	// Upsert auth.users so the FK from profiles is satisfied.
-	// In production (Supabase), auth.users is managed by Supabase and this
-	// row already exists by the time the user reaches onboarding.
-	// In local dev (standalone Postgres), we insert it ourselves.
-	//
-	// In production the app_backend role only has SELECT on auth.users
-	// (INSERT is intentionally omitted because Supabase creates the row
-	// during OTP login). PostgreSQL checks INSERT privilege before evaluating
-	// ON CONFLICT DO NOTHING, so the no-op INSERT raises 42501
-	// (insufficient_privilege). We treat this as success: if we lack INSERT
-	// permission, the row must already exist (managed by Supabase).
-	_, err := db.Exec(ctx,
-		`INSERT INTO auth.users (id) VALUES ($1) ON CONFLICT (id) DO NOTHING`,
-		userID,
-	)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "42501" {
-			// insufficient_privilege — expected in production where
-			// app_backend lacks INSERT on auth.users. Safe to ignore
-			// because Supabase already created the row during login.
-		} else {
-			return nil, err
-		}
-	}
-
-	// Use the email passed from the JWT session context instead of
-	// subquerying auth.users. This avoids requiring SELECT + USAGE
-	// grants on the auth schema — which caused production failures
-	// (Sentry PERMISSION-SLIP-GO-J: "permission denied for schema auth")
-	// when the app_backend role lacked auth schema access during the
-	// INSERT's prepared-statement phase.
 	var emailArg *string
 	if email != "" {
 		emailArg = &email
 	}
 
 	var p Profile
-	err = db.QueryRow(ctx,
+	err := db.QueryRow(ctx,
 		`INSERT INTO profiles (id, username, email, marketing_opt_in)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, username, email, phone, marketing_opt_in, created_at`,
@@ -76,24 +38,23 @@ func CreateProfile(ctx context.Context, db DBTX, userID, username, email string,
 	).Scan(&p.ID, &p.Username, &p.Email, &p.Phone, &p.MarketingOptIn, &p.CreatedAt)
 
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
-			// Distinguish username uniqueness (profiles_username_key) from
-			// PK conflict (profiles_pkey) to avoid misleading error messages
-			// on concurrent double-submits for the same user.
-			if pgErr.ConstraintName == "profiles_username_key" {
+		if IsUniqueViolation(err) {
+			// SQLite unique-violation messages include the column path,
+			// e.g. "UNIQUE constraint failed: profiles.username" or
+			// "UNIQUE constraint failed: profiles.id". Distinguish so the
+			// caller gets a useful error code.
+			if strings.Contains(err.Error(), "profiles.username") {
 				return nil, &OnboardingError{
 					Code:    OnboardingErrUsernameTaken,
 					Message: "username is already taken",
 				}
 			}
-			// PK conflict: profile already exists for this user (concurrent request).
 			return nil, &OnboardingError{
 				Code:    OnboardingErrProfileExists,
 				Message: "profile already exists",
 			}
 		}
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
 		return nil, err

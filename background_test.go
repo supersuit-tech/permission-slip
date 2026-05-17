@@ -3,15 +3,13 @@ package main
 import (
 	"bytes"
 	"context"
+	"database/sql"
 	"errors"
 	"io"
 	"log/slog"
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestAuditPurgeInterval(t *testing.T) {
@@ -52,7 +50,7 @@ func TestStartAuditPurge_StopsOnContextCancel(t *testing.T) {
 	t.Setenv("AUDIT_PURGE_INTERVAL", "1m")
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	mock := &purgeDBMock{execResult: pgconn.NewCommandTag("DELETE 0")}
+	mock := &purgeDBMock{execResult: mockResult{rows: 0}}
 
 	done := startAuditPurge(ctx, mock, logger)
 
@@ -116,7 +114,7 @@ func TestRunAuditPurge_DebugLogForZeroRows(t *testing.T) {
 	ctx := context.Background()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	mock := &purgeDBMock{execResult: pgconn.NewCommandTag("DELETE 0")}
+	mock := &purgeDBMock{execResult: mockResult{rows: 0}}
 
 	runAuditPurge(ctx, mock, logger)
 
@@ -132,7 +130,7 @@ func TestRunAuditPurge_InfoLogForDeletedRows(t *testing.T) {
 	ctx := context.Background()
 	var buf bytes.Buffer
 	logger := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelDebug}))
-	mock := &purgeDBMock{execResult: pgconn.NewCommandTag("DELETE 5")}
+	mock := &purgeDBMock{execResult: mockResult{rows: 5}}
 
 	runAuditPurge(ctx, mock, logger)
 
@@ -141,7 +139,7 @@ func TestRunAuditPurge_InfoLogForDeletedRows(t *testing.T) {
 		t.Errorf("expected INFO level for rows deleted, got: %s", output)
 	}
 	// PurgeExpiredAuditEvents calls Exec twice (subscribed + unsubscribed users),
-	// so the mock's "DELETE 5" is counted twice → 10 total.
+	// so the mock's 5 rows is counted twice → 10 total.
 	if !strings.Contains(output, "rows_deleted=10") {
 		t.Errorf("expected rows_deleted=10 in output, got: %s", output)
 	}
@@ -151,18 +149,26 @@ func TestRunAuditPurge_InfoLogForDeletedRows(t *testing.T) {
 // PurgeExpiredAuditEvents calls Exec twice, so the mock returns the
 // configured result/error for each call.
 type purgeDBMock struct {
-	execResult pgconn.CommandTag
+	execResult mockResult
 	execErr    error
 }
 
-func (m *purgeDBMock) Exec(_ context.Context, _ string, _ ...any) (pgconn.CommandTag, error) {
+func (m *purgeDBMock) Exec(_ context.Context, _ string, _ ...any) (sql.Result, error) {
 	return m.execResult, m.execErr
 }
 
-func (m *purgeDBMock) Query(_ context.Context, _ string, _ ...any) (pgx.Rows, error) {
+func (m *purgeDBMock) Query(_ context.Context, _ string, _ ...any) (*sql.Rows, error) {
 	return nil, nil
 }
 
-func (m *purgeDBMock) QueryRow(_ context.Context, _ string, _ ...any) pgx.Row {
+func (m *purgeDBMock) QueryRow(_ context.Context, _ string, _ ...any) *sql.Row {
 	return nil
 }
+
+// mockResult implements sql.Result for tests.
+type mockResult struct {
+	rows int64
+}
+
+func (r mockResult) LastInsertId() (int64, error) { return 0, nil }
+func (r mockResult) RowsAffected() (int64, error)  { return r.rows, nil }

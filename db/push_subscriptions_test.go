@@ -29,7 +29,7 @@ func TestPushSubscriptionsCascadeDelete(t *testing.T) {
 	}
 
 	testhelper.RequireCascadeDeletes(t, tx,
-		"DELETE FROM auth.users WHERE id = '"+uid+"'",
+		"DELETE FROM users WHERE id = '"+uid+"'",
 		[]string{"push_subscriptions"},
 		"user_id = '"+uid+"'",
 	)

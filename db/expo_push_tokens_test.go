@@ -29,7 +29,7 @@ func TestExpoPushTokensCascadeDelete(t *testing.T) {
 	}
 
 	testhelper.RequireCascadeDeletes(t, tx,
-		"DELETE FROM auth.users WHERE id = '"+uid+"'",
+		"DELETE FROM users WHERE id = '"+uid+"'",
 		[]string{"expo_push_tokens"},
 		"user_id = '"+uid+"'",
 	)

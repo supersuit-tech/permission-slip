@@ -1,13 +1,13 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // StandingApproval represents a row from the standing_approvals table.
@@ -55,7 +55,7 @@ type StandingApprovalPage struct {
 }
 
 // scanStandingApproval scans a single row into a StandingApproval. The row must select standingApprovalColumns.
-func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
+func scanStandingApproval(row *sql.Row) (*StandingApproval, error) {
 	var sa StandingApproval
 	err := row.Scan(
 		&sa.StandingApprovalID, &sa.AgentID, &sa.UserID, &sa.ActionType, &sa.ActionVersion,
@@ -71,20 +71,20 @@ func scanStandingApproval(row pgx.Row) (*StandingApproval, error) {
 // CountActiveStandingApprovalsByUser returns the number of standing approvals
 // that are currently active for the given user. An approval counts as active
 // if its status is 'active' and either has no expiry (expires_at IS NULL) or
-// has not yet expired (expires_at > now()).
+// has not yet expired (expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')).
 // This excludes approvals that have technically expired but whose status
 // hasn't yet been updated by the cleanup job, so users aren't penalized
 // by stale data.
 //
 // Note: starts_at is intentionally not checked here. Future-dated approvals
-// (starts_at > now()) still count toward the plan limit since the user
+// (starts_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')) still count toward the plan limit since the user
 // created them deliberately — otherwise users could bypass limits by
 // scheduling approvals far in the future.
 func CountActiveStandingApprovalsByUser(ctx context.Context, db DBTX, userID string) (int, error) {
 	var count int
 	err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM standing_approvals
-		 WHERE user_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > now())`,
+		 WHERE user_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
 		userID,
 	).Scan(&count)
 	return count, err
@@ -139,7 +139,7 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 	)
 	sa, err := scanStandingApproval(row)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &StandingApprovalError{Code: StandingApprovalErrAgentNotFound}
 		}
 		return nil, err
@@ -260,8 +260,8 @@ func ListActiveStandingApprovalsBySourceActionConfigIDs(ctx context.Context, db 
 		`SELECT `+standingApprovalColumns+`
 		 FROM standing_approvals
 		 WHERE user_id = $1 AND status = 'active'
-		   AND source_action_configuration_id = ANY($2::text[])`,
-		userID, configIDs,
+		   AND source_action_configuration_id IN (`+InPlaceholders(2, len(configIDs))+`)`,
+		append([]any{userID}, StringsToArgs(configIDs)...)...,
 	)
 	if err != nil {
 		return nil, err
@@ -312,14 +312,14 @@ func ListActiveStandingApprovalsBySourceActionConfigID(ctx context.Context, db D
 func RevokeActiveStandingApprovalsForSourceActionConfig(ctx context.Context, db DBTX, userID, sourceConfigID string) (int64, error) {
 	tag, err := db.Exec(ctx,
 		`UPDATE standing_approvals
-		 SET status = 'revoked', revoked_at = now()
+		 SET status = 'revoked', revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'`,
 		userID, sourceConfigID,
 	)
 	if err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), nil
+	return RowsAffected(tag), nil
 }
 
 // DeleteStandingApprovalsForSourceActionConfig deletes all standing approval rows
@@ -339,7 +339,7 @@ func DeleteStandingApprovalsForSourceActionConfig(ctx context.Context, db DBTX, 
 	if err != nil {
 		return 0, err
 	}
-	return tag.RowsAffected(), nil
+	return RowsAffected(tag), nil
 }
 
 // ListStandingApprovalsByAgent returns standing approvals for the given agent,
@@ -355,7 +355,7 @@ func ListStandingApprovalsByAgent(ctx context.Context, db DBTX, agentID int64, l
 		limit = MaxStandingApprovalListSize
 	}
 
-	var rows pgx.Rows
+	var rows *sql.Rows
 	var err error
 
 	fetchLimit := limit + 1 // fetch one extra to detect has_more
@@ -415,7 +415,7 @@ func GetStandingApprovalByIDAndUser(ctx context.Context, db DBTX, saID, userID s
 		saID, userID,
 	)
 	sa, err := scanStandingApproval(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -430,7 +430,7 @@ func GetStandingApprovalByIDAndUser(ctx context.Context, db DBTX, saID, userID s
 func RevokeStandingApproval(ctx context.Context, db DBTX, saID, userID string) (*StandingApproval, error) {
 	row := db.QueryRow(ctx,
 		`UPDATE standing_approvals
-		 SET status = 'revoked', revoked_at = now()
+		 SET status = 'revoked', revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE standing_approval_id = $1 AND user_id = $2
 		   AND status = 'active'
 		 RETURNING `+standingApprovalColumns,
@@ -440,7 +440,7 @@ func RevokeStandingApproval(ctx context.Context, db DBTX, saID, userID string) (
 	if err == nil {
 		return updated, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
@@ -475,7 +475,7 @@ func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingAppro
 			SELECT standing_approval_id, agent_id, user_id, action_type, connector_instance_id
 			FROM standing_approvals
 			WHERE standing_approval_id = $1 AND user_id = $2 AND status = 'active'
-			  AND (expires_at IS NULL OR expires_at > now())
+			  AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			FOR UPDATE
 		),
 		ins AS (
@@ -484,7 +484,7 @@ func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingAppro
 			FROM locked
 			RETURNING id, standing_approval_id, parameters, executed_at
 		)
-		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id::text,
+		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id,
 		       locked.action_type, locked.connector_instance_id, a.metadata, ins.parameters, ins.executed_at
 		FROM ins
 		JOIN locked ON locked.standing_approval_id = ins.standing_approval_id
@@ -494,7 +494,7 @@ func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingAppro
 	if err == nil {
 		return &e, nil
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, diagnoseStandingApprovalFailure(ctx, db, standingApprovalID, userID)
 	}
 	return nil, err
@@ -539,7 +539,7 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 	if err == nil {
 		return updated, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, err
 	}
 
@@ -575,12 +575,12 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 		 FROM (
 		   SELECT `+standingApprovalColumns+`, 1 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = $2 AND status = 'active'
-		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
+		     AND starts_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 		     AND `+instanceFilter+`
 		   UNION ALL
 		   SELECT `+standingApprovalColumns+`, 2 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = '*' AND action_type != $2 AND status = 'active'
-		     AND starts_at <= now() AND (expires_at IS NULL OR expires_at > now())
+		     AND starts_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 		     AND `+instanceFilter+`
 		 ) combined
 		 ORDER BY priority, created_at DESC, standing_approval_id DESC
@@ -624,8 +624,8 @@ func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standi
 			WHERE standing_approval_id = $1
 			  AND agent_id = $2
 			  AND status = 'active'
-			  AND starts_at <= now()
-			  AND (expires_at IS NULL OR expires_at > now())
+			  AND starts_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+			  AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 			FOR UPDATE
 		),
 		ins AS (
@@ -634,7 +634,7 @@ func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standi
 			FROM locked
 			RETURNING id, standing_approval_id, parameters, executed_at
 		)
-		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id::text,
+		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id,
 		       locked.action_type, locked.connector_instance_id, a.metadata, ins.parameters, ins.executed_at
 		FROM ins
 		JOIN locked ON locked.standing_approval_id = ins.standing_approval_id
@@ -645,7 +645,7 @@ func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standi
 	if err == nil {
 		return &e, nil
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &StandingApprovalError{Code: StandingApprovalErrNotActive}
 	}
 	if isUniqueViolation(err) {

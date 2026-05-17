@@ -84,6 +84,6 @@ func InsertConnectorWithStaticCredential(t *testing.T, d db.DBTX, connectorID, s
 		return
 	}
 	mustExec(t, d,
-		`INSERT INTO connector_required_credentials (connector_id, service, auth_type, credential_fields) VALUES ($1, $2, $3, $4::jsonb)`,
+		`INSERT INTO connector_required_credentials (connector_id, service, auth_type, credential_fields) VALUES ($1, $2, $3, $4)`,
 		connectorID, service, authType, fieldsJSON)
 }

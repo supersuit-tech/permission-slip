@@ -1,25 +1,19 @@
 package db
 
-import (
-	"errors"
+// Legacy error helpers retained for compatibility with call sites mid-migration.
+// New code should call db.IsUniqueViolation / db.IsForeignKeyViolation directly
+// (defined in db.go), which match SQLite errors via stable message substrings.
 
-	"github.com/jackc/pgx/v5/pgconn"
-)
-
-// PostgreSQL error codes used across the application.
-// See: https://www.postgresql.org/docs/current/errcodes-appendix.html
 const (
-	// PgCodeUniqueViolation is raised when an INSERT or UPDATE violates
-	// a UNIQUE constraint (Class 23 — Integrity Constraint Violation).
-	PgCodeUniqueViolation = "23505"
-
-	// PgCodeForeignKeyViolation is raised when an INSERT or UPDATE violates
-	// a FOREIGN KEY constraint (Class 23 — Integrity Constraint Violation).
+	// PgCodeForeignKeyViolation kept as a deprecated alias; matches nothing
+	// now that we're on SQLite. Use IsForeignKeyViolation instead.
+	//
+	// Deprecated: use IsForeignKeyViolation.
 	PgCodeForeignKeyViolation = "23503"
 )
 
-// isUniqueViolation returns true if err is a PostgreSQL unique violation.
+// isUniqueViolation is the package-private helper. Delegates to the exported
+// IsUniqueViolation so we keep one source of truth for the SQLite check.
 func isUniqueViolation(err error) bool {
-	var pgErr *pgconn.PgError
-	return errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation
+	return IsUniqueViolation(err)
 }

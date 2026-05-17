@@ -20,9 +20,9 @@ type ConnectorUsage struct {
 // ordered by request count DESC, enriched with connector names.
 func GetUsageByConnectorForUser(ctx context.Context, db DBTX, userID string, periodStart time.Time) ([]ConnectorUsage, error) {
 	rows, err := db.Query(ctx,
-		`SELECT b.key, COALESCE(c.name, ''), b.value::int AS count
+		`SELECT b.key, COALESCE(c.name, ''), CAST(b.value AS INTEGER) AS count
 		 FROM usage_periods u,
-		      jsonb_each_text(COALESCE(u.breakdown->'by_connector', '{}')) b
+		      json_each(COALESCE(json_extract(u.breakdown, '$.by_connector'), '{}')) b
 		 LEFT JOIN connectors c ON c.id = b.key
 		 WHERE u.user_id = $1 AND u.period_start = $2
 		 ORDER BY count DESC`,
@@ -60,12 +60,12 @@ type AgentUsage struct {
 func GetUsageByAgent(ctx context.Context, db DBTX, userID string, periodStart time.Time) ([]AgentUsage, error) {
 	rows, err := db.Query(ctx,
 		`SELECT b.key,
-		        COALESCE(a.metadata->>'agent_name', ''),
-		        b.value::int AS count
+		        COALESCE(json_extract(a.metadata, '$.agent_name'), ''),
+		        CAST(b.value AS INTEGER) AS count
 		 FROM usage_periods u,
-		      jsonb_each_text(COALESCE(u.breakdown->'by_agent', '{}')) b
+		      json_each(COALESCE(json_extract(u.breakdown, '$.by_agent'), '{}')) b
 		 LEFT JOIN agents a
-		   ON a.agent_id = b.key::bigint
+		   ON a.agent_id = CAST(b.key AS INTEGER)
 		   AND a.approver_id = $1
 		 WHERE u.user_id = $1 AND u.period_start = $2
 		 ORDER BY count DESC`,

@@ -33,7 +33,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 		// Insert an event dated 10 days ago — should be purged.
 		testhelper.MustExec(t, tx,
 			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
-			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_old', 'approval', '{}', now() - interval '10 days')`,
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_old', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 days'))`,
 			uid, agentID)
 
 		// Insert a recent event — should NOT be purged.
@@ -69,7 +69,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 		// Insert an event dated 30 days ago — should NOT be purged (within 90 days).
 		testhelper.MustExec(t, tx,
 			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
-			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_30d', 'approval', '{}', now() - interval '30 days')`,
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_30d', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days'))`,
 			uid, agentID)
 
 		deleted, err := db.PurgeExpiredAuditEvents(ctx, tx)
@@ -93,7 +93,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 		// Insert an event dated 10 days ago — should be purged (>7-day default).
 		testhelper.MustExec(t, tx,
 			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
-			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_nosub', 'approval', '{}', now() - interval '10 days')`,
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_nosub', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 days'))`,
 			uid, agentID)
 
 		// Insert a recent event — should NOT be purged.
@@ -129,7 +129,7 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 		// Insert event dated 100 days ago — should be purged (>90 days).
 		testhelper.MustExec(t, tx,
 			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
-			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_100d', 'approval', '{}', now() - interval '100 days')`,
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_100d', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-100 days'))`,
 			uid, agentID)
 
 		deleted, err := db.PurgeExpiredAuditEvents(ctx, tx)
@@ -152,14 +152,14 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 
 		// Simulate a recent downgrade (3 days ago) — inside the grace period.
 		testhelper.MustExec(t, tx,
-			`UPDATE subscriptions SET downgraded_at = now() - interval '3 days' WHERE user_id = $1`,
+			`UPDATE subscriptions SET downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-3 days') WHERE user_id = $1`,
 			uid)
 
 		// Insert an event dated 30 days ago — outside 7-day retention but inside
 		// the grace period's 90-day retention. Should NOT be purged.
 		testhelper.MustExec(t, tx,
 			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
-			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_grace', 'approval', '{}', now() - interval '30 days')`,
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_grace', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days'))`,
 			uid, agentID)
 
 		deleted, err := db.PurgeExpiredAuditEvents(ctx, tx)
@@ -182,14 +182,14 @@ func TestPurgeExpiredAuditEvents(t *testing.T) {
 
 		// Simulate a downgrade that happened 10 days ago — past the 7-day grace period.
 		testhelper.MustExec(t, tx,
-			`UPDATE subscriptions SET downgraded_at = now() - interval '10 days' WHERE user_id = $1`,
+			`UPDATE subscriptions SET downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 days') WHERE user_id = $1`,
 			uid)
 
 		// Insert an event dated 30 days ago — outside both 7-day retention and
 		// the expired grace period. Should be purged.
 		testhelper.MustExec(t, tx,
 			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
-			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_expired_grace', 'approval', '{}', now() - interval '30 days')`,
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'test_expired_grace', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days'))`,
 			uid, agentID)
 
 		deleted, err := db.PurgeExpiredAuditEvents(ctx, tx)
@@ -313,7 +313,7 @@ func TestPurgeExpiredAuditEvents_SQLFunction(t *testing.T) {
 		// 10-day old event on a 7-day plan — should be purged.
 		testhelper.MustExec(t, tx,
 			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
-			 VALUES ($1, $2, 'approval.approved', 'approved', 'sql_fn_test', 'approval', '{}', now() - interval '10 days')`,
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'sql_fn_test', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-10 days'))`,
 			uid, agentID)
 
 		// Recent event — should NOT be purged.
@@ -346,13 +346,13 @@ func TestPurgeExpiredAuditEvents_SQLFunction(t *testing.T) {
 
 		// Simulate a recent downgrade (3 days ago).
 		testhelper.MustExec(t, tx,
-			`UPDATE subscriptions SET downgraded_at = now() - interval '3 days' WHERE user_id = $1`,
+			`UPDATE subscriptions SET downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-3 days') WHERE user_id = $1`,
 			uid)
 
 		// 30-day old event — outside 7-day retention but inside grace period's 90-day retention.
 		testhelper.MustExec(t, tx,
 			`INSERT INTO audit_events (user_id, agent_id, event_type, outcome, source_id, source_type, agent_meta, created_at)
-			 VALUES ($1, $2, 'approval.approved', 'approved', 'sql_fn_grace', 'approval', '{}', now() - interval '30 days')`,
+			 VALUES ($1, $2, 'approval.approved', 'approved', 'sql_fn_grace', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days'))`,
 			uid, agentID)
 
 		_, err := tx.Exec(ctx, "SELECT purge_expired_audit_events()")

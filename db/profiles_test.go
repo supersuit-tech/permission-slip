@@ -28,7 +28,7 @@ func TestProfileCascadeDelete(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	testhelper.RequireCascadeDeletes(t, tx,
-		"DELETE FROM auth.users WHERE id = '"+uid+"'",
+		"DELETE FROM users WHERE id = '"+uid+"'",
 		[]string{"profiles"},
 		"id = '"+uid+"'",
 	)

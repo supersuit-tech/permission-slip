@@ -1,12 +1,12 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // SubscriptionStatus represents the status of a subscription.
@@ -52,7 +52,7 @@ type Subscription struct {
 
 const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, quota_plan_id, quota_entitlements_until, created_at, updated_at`
 
-func scanSubscription(row pgx.Row) (*Subscription, error) {
+func scanSubscription(row *sql.Row) (*Subscription, error) {
 	var s Subscription
 	err := row.Scan(
 		&s.ID,
@@ -80,7 +80,7 @@ func scanSubscription(row pgx.Row) (*Subscription, error) {
 func GetSubscriptionByUserID(ctx context.Context, db DBTX, userID string) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		"SELECT "+subscriptionColumns+" FROM subscriptions WHERE user_id = $1", userID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -106,18 +106,18 @@ func UpdateSubscriptionPlan(ctx context.Context, db DBTX, userID, planID string)
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
 		 SET downgraded_at = CASE
-		         WHEN $2 = 'free' AND plan_id != 'free' THEN now()
+		         WHEN $2 = 'free' AND plan_id != 'free' THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		         WHEN $2 != 'free' THEN NULL
 		         ELSE downgraded_at
 		     END,
 		     quota_plan_id = CASE WHEN $2 != 'free' THEN NULL ELSE quota_plan_id END,
 		     quota_entitlements_until = CASE WHEN $2 != 'free' THEN NULL ELSE quota_entitlements_until END,
 		     plan_id = $2,
-		     updated_at = now()
+		     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
 		userID, planID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -130,14 +130,14 @@ func DowngradeSubscriptionToFreeWithQuotaGrace(ctx context.Context, db DBTX, use
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
 		 SET plan_id = 'free',
-		     downgraded_at = CASE WHEN plan_id != 'free' THEN now() ELSE downgraded_at END,
+		     downgraded_at = CASE WHEN plan_id != 'free' THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ELSE downgraded_at END,
 		     quota_plan_id = COALESCE(quota_plan_id, $2),
 		     quota_entitlements_until = COALESCE(quota_entitlements_until, $3),
-		     updated_at = now()
+		     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
 		userID, paidPlanID, periodEnd))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -161,23 +161,23 @@ func ApplyStripeSubscriptionDeletedToFree(ctx context.Context, db DBTX, userID s
 		     status = $3,
 		     stripe_subscription_id = CASE WHEN $2 = 'free' THEN NULL ELSE stripe_subscription_id END,
 		     downgraded_at = CASE
-		             WHEN $2 = 'free' AND plan_id != 'free' THEN now()
+		             WHEN $2 = 'free' AND plan_id != 'free' THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		             WHEN $2 = 'free' THEN downgraded_at
 		             ELSE NULL
 		         END,
 		     quota_plan_id = CASE
-		             WHEN $4::text IS NOT NULL THEN COALESCE(quota_plan_id, $4::text)
+		             WHEN $4 IS NOT NULL THEN COALESCE(quota_plan_id, $4)
 		             ELSE quota_plan_id
 		         END,
 		     quota_entitlements_until = CASE
 		             WHEN $5::timestamptz IS NOT NULL THEN COALESCE(quota_entitlements_until, $5::timestamptz)
 		             ELSE quota_entitlements_until
 		         END,
-		     updated_at = now()
+		     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
 		userID, targetPlan, nextStatus, qPlan, qEnd))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -195,11 +195,11 @@ func UpgradeSubscriptionPlan(ctx context.Context, db DBTX, userID, expectedOldPl
 		     downgraded_at = NULL,
 		     quota_plan_id = NULL,
 		     quota_entitlements_until = NULL,
-		     updated_at = now()
+		     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1 AND plan_id = $2
 		 RETURNING `+subscriptionColumns,
 		userID, expectedOldPlanID, newPlanID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil // already upgraded or plan changed — idempotent no-op
 	}
 	return s, err
@@ -227,11 +227,11 @@ func UpdateSubscriptionStatus(ctx context.Context, db DBTX, userID string, statu
 	}
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
-		 SET status = $2, updated_at = now()
+		 SET status = $2, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
 		userID, status))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -241,11 +241,11 @@ func UpdateSubscriptionStatus(ctx context.Context, db DBTX, userID string, statu
 func UpdateSubscriptionStripe(ctx context.Context, db DBTX, userID string, stripeCustomerID, stripeSubscriptionID *string) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
-		 SET stripe_customer_id = $2, stripe_subscription_id = $3, updated_at = now()
+		 SET stripe_customer_id = $2, stripe_subscription_id = $3, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
 		userID, stripeCustomerID, stripeSubscriptionID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -255,11 +255,11 @@ func UpdateSubscriptionStripe(ctx context.Context, db DBTX, userID string, strip
 func UpdateSubscriptionPeriod(ctx context.Context, db DBTX, userID string, periodStart, periodEnd time.Time) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
-		 SET current_period_start = $2, current_period_end = $3, updated_at = now()
+		 SET current_period_start = $2, current_period_end = $3, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
 		userID, periodStart, periodEnd))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -292,7 +292,7 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	if err != nil {
 		return 0, err
 	}
-	total += tag.RowsAffected()
+	total += RowsAffected(tag)
 
 	// Step 2: When billing is disabled, upgrade free-tier subscriptions to the
 	// unlimited plan. This handles users backfilled by the initial migration
@@ -300,13 +300,13 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	// normalizes comped free_pro rows to pay_as_you_go for a single unlimited plan id.
 	if !billingEnabled {
 		tag, err = db.Exec(ctx,
-			`UPDATE subscriptions SET plan_id = $1, updated_at = now()
+			`UPDATE subscriptions SET plan_id = $1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			 WHERE plan_id IN ('free', 'free_pro')`,
 			PlanPayAsYouGo)
 		if err != nil {
 			return total, err
 		}
-		total += tag.RowsAffected()
+		total += RowsAffected(tag)
 	}
 
 	return total, nil
@@ -317,7 +317,7 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 func GetSubscriptionByStripeCustomerID(ctx context.Context, db DBTX, stripeCustomerID string) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		"SELECT "+subscriptionColumns+" FROM subscriptions WHERE stripe_customer_id = $1", stripeCustomerID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -328,7 +328,7 @@ func GetSubscriptionByStripeCustomerID(ctx context.Context, db DBTX, stripeCusto
 func GetSubscriptionByStripeSubscriptionID(ctx context.Context, db DBTX, stripeSubscriptionID string) (*Subscription, error) {
 	s, err := scanSubscription(db.QueryRow(ctx,
 		"SELECT "+subscriptionColumns+" FROM subscriptions WHERE stripe_subscription_id = $1", stripeSubscriptionID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -390,14 +390,14 @@ func ClearSubscriptionQuotaGrace(ctx context.Context, db DBTX, userID string) (*
 		`UPDATE subscriptions
 		 SET quota_plan_id = NULL,
 		     quota_entitlements_until = NULL,
-		     updated_at = now()
+		     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		   AND quota_plan_id IS NOT NULL
 		   AND quota_entitlements_until IS NOT NULL
-		   AND quota_entitlements_until > now()
+		   AND quota_entitlements_until > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 RETURNING `+subscriptionColumns,
 		userID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return s, err
@@ -410,11 +410,11 @@ func ClearExpiredSubscriptionQuotaGrace(ctx context.Context, db DBTX, userID str
 		`UPDATE subscriptions
 		 SET quota_plan_id = NULL,
 		     quota_entitlements_until = NULL,
-		     updated_at = now()
+		     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		   AND quota_plan_id IS NOT NULL
 		   AND quota_entitlements_until IS NOT NULL
-		   AND quota_entitlements_until <= now()`,
+		   AND quota_entitlements_until <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
 		userID)
 	return err
 }

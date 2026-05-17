@@ -345,7 +345,7 @@ func TestGetAgentsByApprover(t *testing.T) {
 			t.Fatalf("InsertPendingAgent expired: %v", err)
 		}
 		testhelper.MustExec(t, tx,
-			`UPDATE agents SET expires_at = now() - interval '1 hour' WHERE agent_id = $1`, expired.AgentID)
+			`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours') WHERE agent_id = $1`, expired.AgentID)
 
 		// Create a pending agent without expires_at (NULL) — should still appear.
 		pendingNoTTL := testhelper.InsertAgentWithStatus(t, tx, uid, "pending")

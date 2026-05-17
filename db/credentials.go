@@ -1,14 +1,13 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // Credential represents the metadata of a stored credential (secrets are never returned).
@@ -91,8 +90,7 @@ func CreateCredential(ctx context.Context, db DBTX, p CreateCredentialParams) (*
 		p.ID, p.UserID, p.Service, p.Label, p.VaultSecretID,
 	).Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &c.CreatedAt)
 	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
+		if IsUniqueViolation(err) {
 			return nil, &CredentialError{Code: CredentialErrDuplicate, Message: "Credentials already stored for this service with this label"}
 		}
 		return nil, err
@@ -114,9 +112,9 @@ func DeleteCredential(ctx context.Context, db DBTX, credID, userID string) (*Del
 	err := db.QueryRow(ctx, `
 		DELETE FROM credentials
 		WHERE id = $1 AND user_id = $2
-		RETURNING now(), vault_secret_id`, credID, userID,
+		RETURNING strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), vault_secret_id`, credID, userID,
 	).Scan(&result.DeletedAt, &result.VaultSecretID)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
 	}
 	if err != nil {
@@ -157,7 +155,7 @@ func GetVaultSecretID(ctx context.Context, db DBTX, userID, service string, labe
 			userID, service,
 		).Scan(&vaultSecretID)
 	}
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
 	}
 	if err != nil {
@@ -174,7 +172,7 @@ func GetVaultSecretIDByCredentialID(ctx context.Context, db DBTX, credentialID s
 		SELECT vault_secret_id FROM credentials WHERE id = $1`,
 		credentialID,
 	).Scan(&vaultSecretID)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return "", &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
 	}
 	if err != nil {
@@ -221,7 +219,7 @@ func GetCredentialByID(ctx context.Context, db DBTX, credID string) (*Credential
 		SELECT id, user_id, service, label, created_at
 		FROM credentials WHERE id = $1`, credID,
 	).Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &c.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

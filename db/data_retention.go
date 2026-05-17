@@ -35,14 +35,14 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 	}
 
 	// Build parameterized VALUES list for plan_id → retention_days mapping.
-	// Uses ($1::text, $2::int), ($3::text, $4::int), ... to avoid interpolating
+	// Uses ($1, $2), ($3, $4), ... to avoid interpolating
 	// plan IDs into SQL strings.
 	var valuesClauses []string
 	var args []any
 	paramIdx := 1
 	for _, p := range plans {
 		valuesClauses = append(valuesClauses,
-			fmt.Sprintf("($%d::text, $%d::int)", paramIdx, paramIdx+1))
+			fmt.Sprintf("($%d, $%d)", paramIdx, paramIdx+1))
 		args = append(args, p.ID, p.AuditRetentionDays)
 		paramIdx += 2
 	}
@@ -60,18 +60,22 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 	// Pass 1: Purge events for users with a subscription, using their plan's
 	// retention period. During the downgrade grace period, use the paid plan's
 	// retention instead so users have time to export data.
+	//
+	// SQLite doesn't support DELETE...USING, so we use a CTE + subquery.
+	// strftime %% escaping is required because this string is built via fmt.Sprintf.
 	query := fmt.Sprintf(`
-		DELETE FROM audit_events ae
-		USING subscriptions s
-		LEFT JOIN (VALUES %s) AS plan_retention(plan_id, retention_days)
-		    ON s.plan_id = plan_retention.plan_id
-		WHERE ae.user_id = s.user_id
-		  AND ae.created_at < now() - make_interval(days =>
-		      CASE WHEN s.downgraded_at IS NOT NULL
-		                AND s.downgraded_at > now() - make_interval(days => $%d)
-		           THEN $%d
-		           ELSE COALESCE(plan_retention.retention_days, $%d)
-		      END)`,
+		WITH plan_retention(plan_id, retention_days) AS (VALUES %s)
+		DELETE FROM audit_events WHERE id IN (
+		    SELECT ae.id FROM audit_events ae
+		    JOIN subscriptions s ON ae.user_id = s.user_id
+		    LEFT JOIN plan_retention ON s.plan_id = plan_retention.plan_id
+		    WHERE ae.created_at < strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ', 'now', '-' || (
+		        CASE WHEN s.downgraded_at IS NOT NULL
+		                  AND s.downgraded_at > strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ', 'now', '-' || $%d || ' days')
+		             THEN $%d
+		             ELSE COALESCE(plan_retention.retention_days, $%d)
+		        END) || ' days')
+		)`,
 		strings.Join(valuesClauses, ", "),
 		gracePeriodParam,
 		paidRetentionParam,
@@ -89,26 +93,22 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 	tag2, err := db.Exec(ctx,
 		`DELETE FROM audit_events ae
 		 WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = ae.user_id)
-		   AND ae.created_at < now() - make_interval(days => $1)`,
+		   AND ae.created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-' || $1 || ' days')`,
 		defaultRetention)
 	if err != nil {
-		return tag1.RowsAffected(), fmt.Errorf("purge expired audit events (unsubscribed users): %w", err)
+		return RowsAffected(tag1), fmt.Errorf("purge expired audit events (unsubscribed users): %w", err)
 	}
 
-	return tag1.RowsAffected() + tag2.RowsAffected(), nil
+	return RowsAffected(tag1) + RowsAffected(tag2), nil
 }
 
-// DeleteAccount deletes a user's profile and all associated data. Because most
-// child tables use ON DELETE CASCADE, deleting the profile row removes agents,
-// approvals, credentials, standing approvals, subscriptions, audit events, etc.
+// DeleteAccount deletes a user and all associated data. Deleting the users row
+// cascades to profiles, which cascades to agents, approvals, credentials,
+// standing approvals, subscriptions, audit events, etc.
 //
-// Vault secrets (encrypted credentials) are stored outside the FK graph in
-// Supabase Vault's vault.secrets table, so they must be deleted separately
-// before the profile row is removed. Pass a nil vaultDeleteFn if no vault
-// cleanup is needed (e.g. in tests).
-//
-// The caller is responsible for deleting the Supabase auth.users row (via
-// Supabase Admin API) after this function succeeds.
+// Vault secrets (encrypted credentials) are stored in vault_secrets outside
+// the FK cascade, so they must be deleted separately before the user row is
+// removed. Pass a nil vaultDeleteFn if no vault cleanup is needed (e.g. in tests).
 func DeleteAccount(ctx context.Context, d DBTX, userID string, vaultDeleteFn func(ctx context.Context, tx DBTX, secretID string) error) error {
 	// Step 1: Delete vault secrets for all user credentials.
 	if vaultDeleteFn != nil {
@@ -138,14 +138,14 @@ func DeleteAccount(ctx context.Context, d DBTX, userID string, vaultDeleteFn fun
 		}
 	}
 
-	// Step 2: Delete the profile row. ON DELETE CASCADE removes all child rows
-	// (agents, approvals, credentials, subscriptions, audit_events, etc.).
-	tag, err := d.Exec(ctx, `DELETE FROM profiles WHERE id = $1`, userID)
+	// Step 2: Delete the user row. CASCADE removes auth_sessions, profiles,
+	// and all downstream child rows (agents, approvals, credentials, etc.).
+	tag, err := d.Exec(ctx, `DELETE FROM users WHERE id = $1`, userID)
 	if err != nil {
-		return fmt.Errorf("delete profile: %w", err)
+		return fmt.Errorf("delete user: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("profile not found")
+	if RowsAffected(tag) == 0 {
+		return fmt.Errorf("user not found")
 	}
 	return nil
 }

@@ -1,13 +1,13 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // OAuth connection status values. Must match the CHECK constraint on
@@ -64,7 +64,7 @@ const (
 const oauthConnectionColumns = `id, user_id, provider, access_token_vault_id, refresh_token_vault_id,
 		       scopes, token_expiry, status, extra_data, created_at, updated_at`
 
-// scanOAuthConnection scans an OAuthConnection from a row scanner (pgx.Row or pgx.Rows).
+// scanOAuthConnection scans an OAuthConnection from a row scanner (*sql.Row or *sql.Rows).
 func scanOAuthConnection(scan func(dest ...any) error) (OAuthConnection, error) {
 	var c OAuthConnection
 	err := scan(&c.ID, &c.UserID, &c.Provider, &c.AccessTokenVaultID,
@@ -110,7 +110,7 @@ func GetOAuthConnectionByProvider(ctx context.Context, db DBTX, userID, provider
 		userID, provider,
 	)
 	c, err := scanOAuthConnection(row.Scan)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -172,7 +172,7 @@ func GetOAuthConnectionByID(ctx context.Context, db DBTX, id string) (*OAuthConn
 		FROM oauth_connections
 		WHERE id = $1`, id)
 	c, err := scanOAuthConnection(row.Scan)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -191,13 +191,13 @@ func UpdateOAuthConnectionTokens(ctx context.Context, db DBTX, id, userID string
 		    refresh_token_vault_id = $3,
 		    token_expiry = $4,
 		    status = $5,
-		    updated_at = now()
+		    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		WHERE id = $1 AND user_id = $6`,
 		id, accessTokenVaultID, refreshTokenVaultID, tokenExpiry, OAuthStatusActive, userID)
 	if err != nil {
 		return err
 	}
-	if result.RowsAffected() == 0 {
+	if RowsAffected(result) == 0 {
 		return &OAuthConnectionError{Code: OAuthConnectionErrNotFound, Message: "OAuth connection not found"}
 	}
 	return nil
@@ -220,13 +220,13 @@ func UpdateOAuthConnectionStatus(ctx context.Context, db DBTX, id, userID, statu
 	}
 	result, err := db.Exec(ctx, `
 		UPDATE oauth_connections
-		SET status = $2, updated_at = now()
+		SET status = $2, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		WHERE id = $1 AND user_id = $3`,
 		id, status, userID)
 	if err != nil {
 		return err
 	}
-	if result.RowsAffected() == 0 {
+	if RowsAffected(result) == 0 {
 		return &OAuthConnectionError{Code: OAuthConnectionErrNotFound, Message: "OAuth connection not found"}
 	}
 	return nil
@@ -249,7 +249,7 @@ func DeleteOAuthConnectionByID(ctx context.Context, db DBTX, userID, connectionI
 		RETURNING access_token_vault_id, refresh_token_vault_id`,
 		connectionID, userID,
 	).Scan(&result.AccessTokenVaultID, &result.RefreshTokenVaultID)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &OAuthConnectionError{Code: OAuthConnectionErrNotFound, Message: "OAuth connection not found"}
 	}
 	if err != nil {
@@ -269,9 +269,9 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 		WHERE status = $1
 		  AND refresh_token_vault_id IS NOT NULL
 		  AND token_expiry IS NOT NULL
-		  AND token_expiry <= now() + $2::interval
+		  AND token_expiry <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || $2 || ' seconds')
 		ORDER BY token_expiry ASC`,
-		OAuthStatusActive, fmt.Sprintf("%d seconds", int(horizon.Seconds())),
+		OAuthStatusActive, int(horizon.Seconds()),
 	)
 	if err != nil {
 		return nil, err
@@ -299,7 +299,7 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 	var rc RequiredCredential
 	var fieldsRaw []byte
 	err := db.QueryRow(ctx, `
-		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes, COALESCE(crc.credential_fields, '[]'::jsonb), crc.auth_option_group
+		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes, COALESCE(crc.credential_fields, '[]'), crc.auth_option_group
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1
@@ -307,7 +307,7 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		LIMIT 1`,
 		actionType,
 	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -329,7 +329,7 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 // fall back to static credentials when the user hasn't connected via OAuth.
 func GetRequiredCredentialsByActionType(ctx context.Context, db DBTX, actionType string) ([]RequiredCredential, error) {
 	rows, err := db.Query(ctx, `
-		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes, COALESCE(crc.credential_fields, '[]'::jsonb), crc.auth_option_group
+		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes, COALESCE(crc.credential_fields, '[]'), crc.auth_option_group
 		FROM connector_actions ca
 		JOIN connector_required_credentials crc ON crc.connector_id = ca.connector_id
 		WHERE ca.action_type = $1

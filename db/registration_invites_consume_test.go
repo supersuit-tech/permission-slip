@@ -91,7 +91,7 @@ func TestConsumeInvite_Expired(t *testing.T) {
 	}
 
 	// Backdate expires_at to the past.
-	testhelper.MustExec(t, tx, `UPDATE registration_invites SET expires_at = now() - interval '1 hour' WHERE id = $1`, riID)
+	testhelper.MustExec(t, tx, `UPDATE registration_invites SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours') WHERE id = $1`, riID)
 
 	invite, err := db.ConsumeInvite(context.Background(), tx, hash)
 	if err != nil {

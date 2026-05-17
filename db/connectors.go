@@ -1,12 +1,12 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
-
-	"github.com/jackc/pgx/v5"
+	"strings"
 )
 
 // ConnectorSummary represents a connector with its action types and required credential services.
@@ -69,12 +69,11 @@ type RequiredCredential struct {
 func ListConnectors(ctx context.Context, db DBTX) ([]ConnectorSummary, error) {
 	rows, err := db.Query(ctx, `
 		SELECT c.id, c.name, c.description, c.status, c.logo_svg,
-		       COALESCE(array_agg(DISTINCT ca.action_type ORDER BY ca.action_type) FILTER (WHERE ca.action_type IS NOT NULL), '{}'),
-		       COALESCE(array_agg(DISTINCT crc.service ORDER BY crc.service) FILTER (WHERE crc.service IS NOT NULL), '{}')
+		       (SELECT json_group_array(action_type)
+		        FROM (SELECT DISTINCT action_type FROM connector_actions WHERE connector_id = c.id ORDER BY action_type)),
+		       (SELECT json_group_array(service)
+		        FROM (SELECT DISTINCT service FROM connector_required_credentials WHERE connector_id = c.id ORDER BY service))
 		FROM connectors c
-		LEFT JOIN connector_actions ca ON ca.connector_id = c.id
-		LEFT JOIN connector_required_credentials crc ON crc.connector_id = c.id
-		GROUP BY c.id, c.name, c.description, c.status, c.logo_svg
 		ORDER BY c.id`)
 	if err != nil {
 		return nil, err
@@ -84,8 +83,19 @@ func ListConnectors(ctx context.Context, db DBTX) ([]ConnectorSummary, error) {
 	var connectors []ConnectorSummary
 	for rows.Next() {
 		var cs ConnectorSummary
-		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.Status, &cs.LogoSVG, &cs.Actions, &cs.RequiredCredentials); err != nil {
+		var actionsJSON, credsJSON []byte
+		if err := rows.Scan(&cs.ID, &cs.Name, &cs.Description, &cs.Status, &cs.LogoSVG, &actionsJSON, &credsJSON); err != nil {
 			return nil, err
+		}
+		if len(actionsJSON) > 0 && string(actionsJSON) != "null" {
+			if err := json.Unmarshal(actionsJSON, &cs.Actions); err != nil {
+				return nil, fmt.Errorf("unmarshal actions for connector %s: %w", cs.ID, err)
+			}
+		}
+		if len(credsJSON) > 0 && string(credsJSON) != "null" {
+			if err := json.Unmarshal(credsJSON, &cs.RequiredCredentials); err != nil {
+				return nil, fmt.Errorf("unmarshal credentials for connector %s: %w", cs.ID, err)
+			}
 		}
 		connectors = append(connectors, cs)
 	}
@@ -101,7 +111,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 		`SELECT id, name, description, status, logo_svg FROM connectors WHERE id = $1`,
 		connectorID,
 	).Scan(&cd.ID, &cd.Name, &cd.Description, &cd.Status, &cd.LogoSVG)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -134,7 +144,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch required credentials.
 	credRows, err := db.Query(ctx,
-		`SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'::jsonb), auth_option_group
+		`SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'), auth_option_group
 		 FROM connector_required_credentials
 		 WHERE connector_id = $1
 		 ORDER BY service`,
@@ -147,9 +157,14 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	for credRows.Next() {
 		var rc RequiredCredential
-		var fieldsRaw []byte
-		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
+		var scopesRaw, fieldsRaw []byte
+		if err := credRows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &scopesRaw, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
 			return nil, err
+		}
+		if len(scopesRaw) > 0 && string(scopesRaw) != "null" && string(scopesRaw) != "[]" {
+			if err := json.Unmarshal(scopesRaw, &rc.OAuthScopes); err != nil {
+				return nil, fmt.Errorf("unmarshal oauth_scopes for %s/%s: %w", rc.Service, rc.AuthType, err)
+			}
 		}
 		if len(fieldsRaw) > 0 && string(fieldsRaw) != "[]" && string(fieldsRaw) != "null" {
 			if err := json.Unmarshal(fieldsRaw, &rc.CredentialFields); err != nil {
@@ -166,7 +181,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 // service string — callers should handle ambiguity).
 func GetRequiredCredentialsByService(ctx context.Context, db DBTX, service string) ([]RequiredCredential, error) {
 	rows, err := db.Query(ctx, `
-		SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'::jsonb), auth_option_group
+		SELECT service, auth_type, instructions_url, oauth_provider, oauth_scopes, COALESCE(credential_fields, '[]'), auth_option_group
 		FROM connector_required_credentials
 		WHERE service = $1`,
 		service,
@@ -179,9 +194,14 @@ func GetRequiredCredentialsByService(ctx context.Context, db DBTX, service strin
 	var out []RequiredCredential
 	for rows.Next() {
 		var rc RequiredCredential
-		var fieldsRaw []byte
-		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
+		var scopesRaw, fieldsRaw []byte
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &scopesRaw, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
 			return nil, err
+		}
+		if len(scopesRaw) > 0 && string(scopesRaw) != "null" && string(scopesRaw) != "[]" {
+			if err := json.Unmarshal(scopesRaw, &rc.OAuthScopes); err != nil {
+				return nil, fmt.Errorf("unmarshal oauth_scopes for service %q: %w", service, err)
+			}
 		}
 		if len(fieldsRaw) > 0 && string(fieldsRaw) != "[]" && string(fieldsRaw) != "null" {
 			if err := json.Unmarshal(fieldsRaw, &rc.CredentialFields); err != nil {
@@ -273,7 +293,7 @@ func DeleteConnectorByID(ctx context.Context, db DBTX, connectorID string) (int6
 	if err != nil {
 		return 0, err
 	}
-	return ct.RowsAffected(), nil
+	return RowsAffected(ct), nil
 }
 
 // GetActionRequiresPaymentMethod checks whether the given action type requires
@@ -286,7 +306,7 @@ func GetActionRequiresPaymentMethod(ctx context.Context, db DBTX, actionType str
 		`SELECT requires_payment_method FROM connector_actions WHERE action_type = $1`,
 		actionType,
 	).Scan(&requires)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return false, nil
 	}
 	if err != nil {
@@ -402,8 +422,8 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 	// Remove actions no longer in the manifest.
 	if len(actionTypes) > 0 {
 		_, err = tx.Exec(ctx,
-			`DELETE FROM connector_actions WHERE connector_id = $1 AND action_type != ALL($2)`,
-			m.ID, actionTypes)
+			`DELETE FROM connector_actions WHERE connector_id = $1 AND action_type NOT IN (`+InPlaceholders(2, len(actionTypes))+`)`,
+			append([]any{m.ID}, StringsToArgs(actionTypes)...)...)
 	} else {
 		_, err = tx.Exec(ctx,
 			`DELETE FROM connector_actions WHERE connector_id = $1`, m.ID)
@@ -422,40 +442,39 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 		if len(fieldsVal) == 0 {
 			fieldsVal = []byte("[]")
 		}
-		_, err := tx.Exec(ctx, `
+		scopesJSON, err := json.Marshal(c.OAuthScopes)
+		if err != nil {
+			return fmt.Errorf("marshal oauth_scopes for %s/%s: %w", c.Service, c.AuthType, err)
+		}
+		_, err = tx.Exec(ctx, `
 			INSERT INTO connector_required_credentials (connector_id, service, auth_type, instructions_url, oauth_provider, oauth_scopes, credential_fields, auth_option_group)
-			VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 			ON CONFLICT (connector_id, service, auth_type) DO UPDATE SET
 				instructions_url = EXCLUDED.instructions_url,
 				oauth_provider = EXCLUDED.oauth_provider,
 				oauth_scopes = EXCLUDED.oauth_scopes,
 				credential_fields = EXCLUDED.credential_fields,
 				auth_option_group = EXCLUDED.auth_option_group`,
-			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL), nilIfEmpty(c.OAuthProvider), c.OAuthScopes, fieldsVal, nilIfEmpty(c.AuthOptionGroup))
+			m.ID, c.Service, c.AuthType, nilIfEmpty(c.InstructionsURL), nilIfEmpty(c.OAuthProvider), string(scopesJSON), fieldsVal, nilIfEmpty(c.AuthOptionGroup))
 		if err != nil {
 			return err
 		}
 	}
 
 	// Remove credentials no longer in the manifest.
-	// Build parallel arrays of service and auth_type for the WHERE clause.
+	// Remove credentials no longer in the manifest using composite key string.
 	if len(credKeys) > 0 {
-		services := make([]string, len(credKeys))
-		authTypes := make([]string, len(credKeys))
+		args := []any{m.ID}
+		pairs := make([]string, len(credKeys))
 		for i, k := range credKeys {
-			services[i] = k.service
-			authTypes[i] = k.authType
+			pairs[i] = fmt.Sprintf("$%d", len(args)+1)
+			args = append(args, k.service+"|"+k.authType)
 		}
-		_, err = tx.Exec(ctx, `
-			DELETE FROM connector_required_credentials
-			WHERE connector_id = $1
-			  AND NOT EXISTS (
-			    SELECT 1
-			    FROM unnest($2::text[], $3::text[]) AS keep(service, auth_type)
-			    WHERE keep.service = connector_required_credentials.service
-			      AND keep.auth_type = connector_required_credentials.auth_type
-			  )`,
-			m.ID, services, authTypes)
+		_, err = tx.Exec(ctx,
+			`DELETE FROM connector_required_credentials
+			 WHERE connector_id = $1
+			   AND (service || '|' || auth_type) NOT IN (`+strings.Join(pairs, ",")+`)`,
+			args...)
 	} else {
 		_, err = tx.Exec(ctx,
 			`DELETE FROM connector_required_credentials WHERE connector_id = $1`, m.ID)
@@ -505,9 +524,10 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 
 	// Remove templates no longer in the manifest.
 	if len(templateIDs) > 0 {
+		tplArgs := append([]any{m.ID}, StringsToArgs(templateIDs)...)
 		_, err = tx.Exec(ctx,
-			`DELETE FROM action_config_templates WHERE connector_id = $1 AND id != ALL($2)`,
-			m.ID, templateIDs)
+			`DELETE FROM action_config_templates WHERE connector_id = $1 AND id NOT IN (`+InPlaceholders(2, len(templateIDs))+`)`,
+			tplArgs...)
 	} else {
 		_, err = tx.Exec(ctx,
 			`DELETE FROM action_config_templates WHERE connector_id = $1`, m.ID)

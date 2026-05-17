@@ -1,13 +1,13 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // Approval represents a row from the approvals table.
@@ -50,7 +50,7 @@ type ApprovalPage struct {
 }
 
 // scanApproval scans a single row into an Approval. The row must select approvalColumns.
-func scanApproval(row pgx.Row) (*Approval, error) {
+func scanApproval(row *sql.Row) (*Approval, error) {
 	var a Approval
 	err := row.Scan(
 		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
@@ -64,7 +64,7 @@ func scanApproval(row pgx.Row) (*Approval, error) {
 }
 
 // scanApprovalWithMeta scans approvalColumns plus an extra agents.metadata column.
-func scanApprovalWithMeta(row pgx.Row) (*Approval, []byte, error) {
+func scanApprovalWithMeta(row *sql.Row) (*Approval, []byte, error) {
 	var a Approval
 	var agentMeta []byte
 	err := row.Scan(
@@ -106,7 +106,7 @@ func ListApprovalsByApproverPaginated(ctx context.Context, db DBTX, approverID, 
 
 	switch statusFilter {
 	case "", "pending":
-		where += " AND status = 'pending' AND expires_at > now()"
+		where += " AND status = 'pending' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
 	case "all":
 		// No additional status filter.
 	default:
@@ -177,7 +177,7 @@ func GetApprovalByIDAndApprover(ctx context.Context, db DBTX, approvalID, approv
 		approvalID, approverID,
 	)
 	a, err := scanApproval(row)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
@@ -200,7 +200,7 @@ func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID string) (
 
 // resolveApproval is the shared implementation for ApproveApproval and
 // DenyApproval. It atomically updates the approval status while enforcing
-// status='pending' AND expires_at > now() to eliminate TOCTOU races. On
+// status='pending' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') to eliminate TOCTOU races. On
 // failure it reads the current row to produce a precise error.
 //
 // Safety: newStatus and timestampCol are caller-controlled constants
@@ -209,9 +209,9 @@ func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newSt
 	query := fmt.Sprintf(
 		`WITH updated AS (
 			UPDATE approvals
-			SET status = $3, %s = now()
+			SET status = $3, %s = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE approval_id = $1 AND approver_id = $2
-			  AND status = 'pending' AND expires_at > now()
+			  AND status = 'pending' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			RETURNING %s
 		)
 		SELECT updated.*, a.metadata
@@ -224,7 +224,7 @@ func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newSt
 	if err == nil {
 		return appr, agentMeta, nil
 	}
-	if !errors.Is(err, pgx.ErrNoRows) {
+	if !errors.Is(err, sql.ErrNoRows) {
 		return nil, nil, err
 	}
 
@@ -238,7 +238,7 @@ func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newSt
 func UpdateApprovalExecution(ctx context.Context, db DBTX, approvalID, executionStatus string, executionResult json.RawMessage) error {
 	tag, err := db.Exec(ctx,
 		`UPDATE approvals
-		 SET execution_status = $2, execution_result = $3, executed_at = now()
+		 SET execution_status = $2, execution_result = $3, executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE approval_id = $1
 		   AND status = 'approved'
 		   AND executed_at IS NULL`,
@@ -247,7 +247,7 @@ func UpdateApprovalExecution(ctx context.Context, db DBTX, approvalID, execution
 	if err != nil {
 		return fmt.Errorf("update approval execution: %w", err)
 	}
-	if tag.RowsAffected() == 0 {
+	if RowsAffected(tag) == 0 {
 		return fmt.Errorf("approval %s not eligible for execution update", approvalID)
 	}
 	return nil

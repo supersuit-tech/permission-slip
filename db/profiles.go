@@ -1,11 +1,11 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // Profile represents a row from the profiles table.
@@ -26,7 +26,7 @@ func GetProfileByUserID(ctx context.Context, db DBTX, userID string) (*Profile, 
 		"SELECT id, username, email, phone, marketing_opt_in, created_at FROM profiles WHERE id = $1",
 		userID,
 	).Scan(&p.ID, &p.Username, &p.Email, &p.Phone, &p.MarketingOptIn, &p.CreatedAt)
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {

@@ -2,11 +2,11 @@ package db
 
 import (
 	"context"
+	"database/sql"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
-
-	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // AgentConnector represents a connector enabled for an agent,
@@ -58,13 +58,13 @@ func AgentConnectorEnabled(ctx context.Context, db DBTX, agentID int64, approver
 func ListAgentConnectors(ctx context.Context, db DBTX, agentID int64, approverID string) ([]AgentConnector, error) {
 	rows, err := db.Query(ctx, `
 		SELECT c.id, c.name, c.description,
-		       COALESCE(array_agg(DISTINCT ca.action_type ORDER BY ca.action_type) FILTER (WHERE ca.action_type IS NOT NULL), '{}'),
-		       COALESCE(array_agg(DISTINCT crc.service ORDER BY crc.service) FILTER (WHERE crc.service IS NOT NULL), '{}'),
+		       (SELECT json_group_array(action_type)
+		        FROM (SELECT DISTINCT action_type FROM connector_actions WHERE connector_id = c.id ORDER BY action_type)),
+		       (SELECT json_group_array(service)
+		        FROM (SELECT DISTINCT service FROM connector_required_credentials WHERE connector_id = c.id ORDER BY service)),
 		       ac.enabled_at
 		FROM agent_connectors ac
 		JOIN connectors c ON c.id = ac.connector_id
-		LEFT JOIN connector_actions ca ON ca.connector_id = c.id
-		LEFT JOIN connector_required_credentials crc ON crc.connector_id = c.id
 		WHERE ac.agent_id = $1 AND ac.approver_id = $2
 		GROUP BY c.id, c.name, c.description, ac.enabled_at
 		ORDER BY ac.enabled_at DESC`,
@@ -78,8 +78,19 @@ func ListAgentConnectors(ctx context.Context, db DBTX, agentID int64, approverID
 	var result []AgentConnector
 	for rows.Next() {
 		var ac AgentConnector
-		if err := rows.Scan(&ac.ID, &ac.Name, &ac.Description, &ac.Actions, &ac.RequiredCredentials, &ac.EnabledAt); err != nil {
+		var actionsJSON, credsJSON []byte
+		if err := rows.Scan(&ac.ID, &ac.Name, &ac.Description, &actionsJSON, &credsJSON, &ac.EnabledAt); err != nil {
 			return nil, err
+		}
+		if len(actionsJSON) > 0 && string(actionsJSON) != "null" {
+			if err := json.Unmarshal(actionsJSON, &ac.Actions); err != nil {
+				return nil, fmt.Errorf("unmarshal actions for connector %s: %w", ac.ID, err)
+			}
+		}
+		if len(credsJSON) > 0 && string(credsJSON) != "null" {
+			if err := json.Unmarshal(credsJSON, &ac.RequiredCredentials); err != nil {
+				return nil, fmt.Errorf("unmarshal credentials for connector %s: %w", ac.ID, err)
+			}
 		}
 		result = append(result, ac)
 	}
@@ -133,14 +144,13 @@ func EnableAgentConnector(ctx context.Context, db DBTX, agentID int64, approverI
 		agentID, approverID, connectorID,
 	).Scan(&row.AgentID, &row.ConnectorID, &row.EnabledAt)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+		if errors.Is(err, sql.ErrNoRows) {
 			return nil, &AgentConnectorError{Code: AgentConnectorErrAgentNotFound}
 		}
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeForeignKeyViolation {
+		if IsForeignKeyViolation(err) {
 			return nil, &AgentConnectorError{Code: AgentConnectorErrConnectorNotFound}
 		}
-		if errors.As(err, &pgErr) && pgErr.Code == PgCodeUniqueViolation {
+		if IsUniqueViolation(err) {
 			// Concurrent enable: retry read of existing row (idempotent success).
 			return readEnabledAgentConnectorRow(ctx, db, agentID, approverID, connectorID)
 		}
@@ -168,7 +178,7 @@ func DisableAgentConnector(ctx context.Context, db DBTX, agentID int64, approver
 			RETURNING agent_id, connector_id, connector_instance_id
 		), revoked AS (
 			UPDATE standing_approvals
-			SET status = 'revoked', revoked_at = now()
+			SET status = 'revoked', revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 			WHERE agent_id = $1
 			  AND user_id = $2
 			  AND status = 'active'
@@ -182,7 +192,7 @@ func DisableAgentConnector(ctx context.Context, db DBTX, agentID int64, approver
 		SELECT
 			(SELECT agent_id FROM deleted LIMIT 1),
 			(SELECT connector_id FROM deleted LIMIT 1),
-			now(),
+			strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 			(SELECT count(*) FROM revoked)`,
 		agentID, approverID, connectorID,
 	)

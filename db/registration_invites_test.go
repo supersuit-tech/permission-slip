@@ -60,7 +60,7 @@ func TestRegistrationInvitesStatusCheckConstraint(t *testing.T) {
 		func(value string, i int) error {
 			_, err := tx.Exec(context.Background(),
 				`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-				 VALUES ($1, $2, $3, $4, now() + interval '1 hour')`,
+				 VALUES ($1, $2, $3, $4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 				fmt.Sprintf("%s_s_%d", base, i), uid, fmt.Sprintf("hash_%s_%d", base, i), value)
 			return err
 		})
@@ -70,7 +70,7 @@ func TestRegistrationInvitesStatusCheckConstraint(t *testing.T) {
 		err := testhelper.WithSavepoint(t, tx, func() error {
 			_, err := tx.Exec(context.Background(),
 				`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-				 VALUES ($1, $2, $3, $4, now() + interval '1 hour')`,
+				 VALUES ($1, $2, $3, $4, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 				fmt.Sprintf("%s_inv_%d", base, i), uid, fmt.Sprintf("hash_%s_inv_%d", base, i), invalid)
 			return err
 		})
@@ -114,7 +114,7 @@ func TestRegistrationInvitesIDLengthCheckConstraint(t *testing.T) {
 	id255 := prefix + strings.Repeat("a", 255-len(prefix))
 	_, err := tx.Exec(context.Background(),
 		`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-		 VALUES ($1, $2, $3, 'active', now() + interval '1 hour')`,
+		 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 		id255, uid, hashBase+"_255")
 	if err != nil {
 		t.Errorf("id with 255 chars was rejected: %v", err)
@@ -126,7 +126,7 @@ func TestRegistrationInvitesIDLengthCheckConstraint(t *testing.T) {
 	err = testhelper.WithSavepoint(t, tx, func() error {
 		_, err := tx.Exec(context.Background(),
 			`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-			 VALUES ($1, $2, $3, 'active', now() + interval '1 hour')`,
+			 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 			id256, uid, hashBase+"_256")
 		return err
 	})
@@ -149,7 +149,7 @@ func TestRegistrationInvitesInviteCodeHashLengthCheckConstraint(t *testing.T) {
 	hash128 := prefix + strings.Repeat("a", 128-len(prefix))
 	_, err := tx.Exec(context.Background(),
 		`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-		 VALUES ($1, $2, $3, 'active', now() + interval '1 hour')`,
+		 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 		idBase+"_ok", uid, hash128)
 	if err != nil {
 		t.Errorf("invite_code_hash with 128 chars was rejected: %v", err)
@@ -161,7 +161,7 @@ func TestRegistrationInvitesInviteCodeHashLengthCheckConstraint(t *testing.T) {
 	err = testhelper.WithSavepoint(t, tx, func() error {
 		_, err := tx.Exec(context.Background(),
 			`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-			 VALUES ($1, $2, $3, 'active', now() + interval '1 hour')`,
+			 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 			idBase+"_fail", uid, hash129)
 		return err
 	})
@@ -185,14 +185,14 @@ func TestRegistrationInvitesInviteCodeHashUnique(t *testing.T) {
 		func() error {
 			_, err := tx.Exec(context.Background(),
 				`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-				 VALUES ($1, $2, $3, 'active', now() + interval '1 hour')`,
+				 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 				idA, uid, hash)
 			return err
 		},
 		func() error {
 			_, err := tx.Exec(context.Background(),
 				`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-				 VALUES ($1, $2, $3, 'active', now() + interval '1 hour')`,
+				 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now') + interval '1 hour')`,
 				idB, uid, hash)
 			return err
 		})
@@ -336,7 +336,7 @@ func TestCountRecentInvitesByUser_ExcludesOutsideWindow(t *testing.T) {
 		t.Fatalf("insert: %v", err)
 	}
 	_, err = tx.Exec(context.Background(),
-		`UPDATE registration_invites SET created_at = now() - interval '2 hours' WHERE id = $1`, riID)
+		`UPDATE registration_invites SET created_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-2 hours') WHERE id = $1`, riID)
 	if err != nil {
 		t.Fatalf("backdate: %v", err)
 	}

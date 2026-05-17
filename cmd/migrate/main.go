@@ -16,12 +16,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	dbURL := os.Getenv("DATABASE_URL")
-	if dbURL == "" {
-		log.Fatal("DATABASE_URL is required")
+	dbPath := os.Getenv("DATABASE_PATH")
+	if dbPath == "" {
+		log.Fatal("DATABASE_PATH is required")
 	}
 
-	conn, err := db.OpenMigrationDB(dbURL)
+	conn, err := db.OpenMigrationDB(dbPath)
 	if err != nil {
 		log.Fatalf("failed to open migration database: %v", err)
 	}
@@ -32,15 +32,15 @@ func main() {
 
 	switch command {
 	case "up":
-		if err := goose.UpContext(ctx, conn, "migrations"); err != nil {
+		if err := goose.UpContext(ctx, conn, "migrations_sqlite"); err != nil {
 			log.Fatalf("migration up failed: %v", err)
 		}
 	case "down":
-		if err := goose.DownContext(ctx, conn, "migrations"); err != nil {
+		if err := goose.DownContext(ctx, conn, "migrations_sqlite"); err != nil {
 			log.Fatalf("migration down failed: %v", err)
 		}
 	case "status":
-		if err := goose.StatusContext(ctx, conn, "migrations"); err != nil {
+		if err := goose.StatusContext(ctx, conn, "migrations_sqlite"); err != nil {
 			log.Fatalf("migration status failed: %v", err)
 		}
 	default:

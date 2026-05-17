@@ -1,11 +1,11 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 	"errors"
 	"time"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // PaymentMethod represents a stored payment method (credit/debit card).
@@ -40,7 +40,7 @@ const paymentMethodColumns = `id, user_id, stripe_payment_method_id, label, bran
 	billing_address_state, billing_address_postal, billing_address_country,
 	is_default, per_transaction_limit, monthly_limit, expiration_alert_sent_at, created_at, updated_at`
 
-func scanPaymentMethod(row pgx.Row) (*PaymentMethod, error) {
+func scanPaymentMethod(row *sql.Row) (*PaymentMethod, error) {
 	var pm PaymentMethod
 	err := row.Scan(
 		&pm.ID, &pm.UserID, &pm.StripePaymentMethodID,
@@ -115,7 +115,7 @@ func GetPaymentMethodByID(ctx context.Context, db DBTX, userID, paymentMethodID 
 	pm, err := scanPaymentMethod(db.QueryRow(ctx,
 		`SELECT `+paymentMethodColumns+` FROM payment_methods WHERE id = $1 AND user_id = $2`,
 		paymentMethodID, userID))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return pm, err
@@ -143,15 +143,15 @@ func UpdatePaymentMethod(ctx context.Context, db DBTX, userID, paymentMethodID s
 			is_default = COALESCE($4, is_default),
 			per_transaction_limit = CASE
 				WHEN $7 THEN NULL
-				WHEN $5::int IS NOT NULL THEN $5
+				WHEN $5 IS NOT NULL THEN $5
 				ELSE per_transaction_limit
 			END,
 			monthly_limit = CASE
 				WHEN $8 THEN NULL
-				WHEN $6::int IS NOT NULL THEN $6
+				WHEN $6 IS NOT NULL THEN $6
 				ELSE monthly_limit
 			END,
-			updated_at = now()
+			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		WHERE id = $1 AND user_id = $2
 		RETURNING `+paymentMethodColumns,
 		paymentMethodID, userID,
@@ -160,7 +160,7 @@ func UpdatePaymentMethod(ctx context.Context, db DBTX, userID, paymentMethodID s
 		params.ClearPerTxLimit, params.ClearMonthlyLimit,
 		params.ClearLabel,
 	))
-	if errors.Is(err, pgx.ErrNoRows) {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	return pm, err
@@ -175,14 +175,14 @@ func DeletePaymentMethod(ctx context.Context, db DBTX, userID, paymentMethodID s
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // ClearDefaultPaymentMethod removes the default flag from all payment methods
 // for a user. Used before setting a new default.
 func ClearDefaultPaymentMethod(ctx context.Context, db DBTX, userID string) error {
 	_, err := db.Exec(ctx,
-		`UPDATE payment_methods SET is_default = false, updated_at = now() WHERE user_id = $1 AND is_default = true`,
+		`UPDATE payment_methods SET is_default = false, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE user_id = $1 AND is_default = true`,
 		userID)
 	return err
 }
@@ -228,7 +228,7 @@ func GetMonthlySpend(ctx context.Context, db DBTX, paymentMethodID string) (int,
 	var total int
 	err := db.QueryRow(ctx,
 		`SELECT COALESCE(SUM(amount_cents), 0) FROM payment_method_transactions
-		 WHERE payment_method_id = $1 AND created_at >= now() - interval '30 days'`,
+		 WHERE payment_method_id = $1 AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')`,
 		paymentMethodID).Scan(&total)
 	return total, err
 }
@@ -258,9 +258,10 @@ func ListExpiringPaymentMethods(ctx context.Context, db DBTX, withinDays int) ([
 		JOIN profiles p ON p.id = pm.user_id
 		WHERE pm.expiration_alert_sent_at IS NULL
 		  AND pm.exp_month > 0 AND pm.exp_year > 0
-		  AND make_date(pm.exp_year, pm.exp_month, 1)
-		      + (interval '1 month' - interval '1 day')  -- last day of exp month
-		      < now() + make_interval(days => $1)`,
+		  AND date(
+		      printf('%04d', pm.exp_year) || '-' || printf('%02d', pm.exp_month) || '-01',
+		      '+1 month', '-1 day'
+		  ) < date(strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || $1 || ' days'))`,
 		withinDays)
 	if err != nil {
 		return nil, err
@@ -289,20 +290,20 @@ func ListExpiringPaymentMethods(ctx context.Context, db DBTX, withinDays int) ([
 	return results, rows.Err()
 }
 
-// MarkExpirationAlertSent atomically sets expiration_alert_sent_at to now()
+// MarkExpirationAlertSent atomically sets expiration_alert_sent_at to strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 // for the given payment method, but only if it hasn't been set yet. Returns
 // true if the row was updated (caller should send the notification), false
 // if another process already marked it (caller should skip). This prevents
 // duplicate alerts when multiple instances race.
 func MarkExpirationAlertSent(ctx context.Context, db DBTX, paymentMethodID string) (bool, error) {
 	tag, err := db.Exec(ctx,
-		`UPDATE payment_methods SET expiration_alert_sent_at = now()
+		`UPDATE payment_methods SET expiration_alert_sent_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE id = $1 AND expiration_alert_sent_at IS NULL`,
 		paymentMethodID)
 	if err != nil {
 		return false, err
 	}
-	return tag.RowsAffected() > 0, nil
+	return RowsAffected(tag) > 0, nil
 }
 
 // GetMonthlySpendBatch returns the total amount_cents spent in the last 30 days
@@ -314,9 +315,10 @@ func GetMonthlySpendBatch(ctx context.Context, db DBTX, paymentMethodIDs []strin
 	rows, err := db.Query(ctx,
 		`SELECT payment_method_id, COALESCE(SUM(amount_cents), 0)
 		 FROM payment_method_transactions
-		 WHERE payment_method_id = ANY($1) AND created_at >= now() - interval '30 days'
+		 WHERE payment_method_id IN (`+InPlaceholders(1, len(paymentMethodIDs))+`)
+		   AND created_at >= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days')
 		 GROUP BY payment_method_id`,
-		paymentMethodIDs)
+		StringsToArgs(paymentMethodIDs)...)
 	if err != nil {
 		return nil, err
 	}

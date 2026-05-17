@@ -13,11 +13,14 @@ import (
 // Used to validate table names and simple WHERE clauses before interpolation.
 var safeIdentifier = regexp.MustCompile(`^[a-z][a-z0-9_.]+$`)
 
-// TableColumns returns the set of column names for a table in the public schema.
+// TableColumns returns the set of column names for a table.
 func TableColumns(t *testing.T, d db.DBTX, table string) map[string]bool {
 	t.Helper()
+	if !safeIdentifier.MatchString(table) {
+		t.Fatalf("TableColumns: unsafe table name %q", table)
+	}
 	rows, err := d.Query(context.Background(),
-		"SELECT column_name FROM information_schema.columns WHERE table_schema = 'public' AND table_name = $1",
+		"SELECT name FROM pragma_table_info($1)",
 		table)
 	if err != nil {
 		t.Fatalf("failed to query columns for %s: %v", table, err)
@@ -85,16 +88,16 @@ func RequireCascadeDeletes(t *testing.T, d db.DBTX, deleteSQL string, childTable
 }
 
 // RequireIndex asserts that an index with the given name exists on the
-// specified table in the public schema.
+// specified table.
 func RequireIndex(t *testing.T, d db.DBTX, table, indexName string) {
 	t.Helper()
 	var exists bool
 	err := d.QueryRow(context.Background(), `
 		SELECT EXISTS(
-			SELECT 1 FROM pg_indexes
-			WHERE schemaname = 'public'
-			  AND tablename = $1
-			  AND indexname = $2
+			SELECT 1 FROM sqlite_master
+			WHERE type = 'index'
+			  AND tbl_name = $1
+			  AND name = $2
 		)`, table, indexName).Scan(&exists)
 	if err != nil {
 		t.Fatalf("failed to check index %s on %s: %v", indexName, table, err)
@@ -144,20 +147,20 @@ func RequireUniqueViolation(t *testing.T, d db.DBTX, description string, firstIn
 	}
 }
 
-// RequireConstraintExists asserts that a constraint with the given name
-// and type exists on the specified table. constraintType should be one of:
-// "UNIQUE", "CHECK", "PRIMARY KEY", "FOREIGN KEY".
+// RequireConstraintExists asserts that a named UNIQUE index or CHECK constraint
+// exists on the specified table. In SQLite, named constraints are represented
+// as indexes in sqlite_master (UNIQUE) or inline in the CREATE TABLE DDL (CHECK).
+// This function checks sqlite_master for a matching index name.
 func RequireConstraintExists(t *testing.T, d db.DBTX, table, constraintName, constraintType string) {
 	t.Helper()
 	var exists bool
 	err := d.QueryRow(context.Background(), `
 		SELECT EXISTS(
-			SELECT 1 FROM information_schema.table_constraints
-			WHERE table_schema = 'public'
-			  AND table_name = $1
-			  AND constraint_name = $2
-			  AND constraint_type = $3
-		)`, table, constraintName, constraintType).Scan(&exists)
+			SELECT 1 FROM sqlite_master
+			WHERE type IN ('index', 'table')
+			  AND tbl_name = $1
+			  AND name = $2
+		)`, table, constraintName).Scan(&exists)
 	if err != nil {
 		t.Fatalf("failed to check constraint %s on %s: %v", constraintName, table, err)
 	}
@@ -208,29 +211,9 @@ func RequireAuditEventCount(t *testing.T, d db.DBTX, userID, eventType string, w
 	}
 }
 
-// RequirePgCronJob asserts that a pg_cron job with the given name is
-// scheduled. Skips the test if pg_cron is not available.
-func RequirePgCronJob(t *testing.T, d db.DBTX, jobName string) {
+// RequirePgCronJob always skips: cron jobs are handled by Go background goroutines,
+// not pg_cron, in the SQLite-backed stack.
+func RequirePgCronJob(t *testing.T, _ db.DBTX, jobName string) {
 	t.Helper()
-	ctx := context.Background()
-
-	var hasCronSchema bool
-	err := d.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM information_schema.schemata WHERE schema_name = 'cron')`).Scan(&hasCronSchema)
-	if err != nil {
-		t.Fatalf("failed to check for cron schema: %v", err)
-	}
-	if !hasCronSchema {
-		t.Skip("pg_cron not available, skipping cron job verification")
-	}
-
-	var exists bool
-	err = d.QueryRow(ctx,
-		`SELECT EXISTS(SELECT 1 FROM cron.job WHERE jobname = $1)`, jobName).Scan(&exists)
-	if err != nil {
-		t.Fatalf("failed to check cron job %s: %v", jobName, err)
-	}
-	if !exists {
-		t.Errorf("expected pg_cron job %q to be scheduled, but it was not found", jobName)
-	}
+	t.Skipf("pg_cron removed: %s is a Go background job", jobName)
 }

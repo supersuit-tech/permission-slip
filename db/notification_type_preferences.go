@@ -1,9 +1,9 @@
 package db
 
 import (
+	"database/sql"
 	"context"
 
-	"github.com/jackc/pgx/v5"
 )
 
 // NotificationTypeStandingExecution is stored in notification_type_preferences.notification_type
@@ -47,7 +47,7 @@ func IsNotificationTypeEnabled(ctx context.Context, db DBTX, userID, notificatio
 		"SELECT enabled FROM notification_type_preferences WHERE user_id = $1 AND notification_type = $2",
 		userID, notificationType,
 	).Scan(&enabled)
-	if err == pgx.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return true, nil
 	}
 	if err != nil {
