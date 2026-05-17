@@ -1,19 +1,27 @@
 version: 2
+# Version updates are disabled (open-pull-requests-limit: 0) to keep noise down.
+# Security updates are unaffected — they're controlled at the repo level
+# (Settings → Code security → Dependabot security updates) and continue to flow
+# through regardless of this file. To re-enable version updates for an
+# ecosystem, raise its open-pull-requests-limit (default is 5).
 updates:
   - package-ecosystem: "gomod"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "npm"
     directory: "/frontend"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "npm"
     directory: "/mobile"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
     ignore:
       # react-native's version is dictated by the Expo SDK we're on.
       # Bump it via an Expo SDK upgrade, not directly.
@@ -24,13 +32,16 @@ updates:
     directory: "/cli"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "docker"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
+    open-pull-requests-limit: 0
