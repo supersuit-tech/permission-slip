@@ -1,12 +1,11 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"fmt"
 	"strings"
 	"time"
-
 )
 
 // AuditEventType represents the type of an audit event.
@@ -147,12 +146,12 @@ const resolvedOutcomeExpr = `CASE
 		WHEN ae.outcome = 'pending'
 		 AND a.status = 'pending'
 		 AND a.expires_at IS NOT NULL
-		 AND a.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		 AND datetime(a.expires_at) <= datetime('now')
 		THEN 'expired'
 		WHEN ae.outcome = 'pending'
 		 AND ae.source_type = 'approval'
 		 AND appr.status = 'pending'
-		 AND appr.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		 AND datetime(appr.expires_at) <= datetime('now')
 		THEN 'expired'
 		ELSE ae.outcome
 	END`
@@ -274,14 +273,14 @@ func outcomeFilter(outcome string, b *queryBuilder) string {
 	case "expired":
 		// Agent registration expired OR approval request expired.
 		return `(ae.outcome = 'pending' AND (
-			(a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			OR (ae.source_type = 'approval' AND appr.status = 'pending' AND appr.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			(a.status = 'pending' AND a.expires_at IS NOT NULL AND datetime(a.expires_at) <= datetime('now'))
+			OR (ae.source_type = 'approval' AND appr.status = 'pending' AND datetime(appr.expires_at) <= datetime('now'))
 		))`
 	case "pending":
 		// Still active: neither agent registration nor approval has expired.
 		return `(ae.outcome = 'pending'
-			AND NOT (a.status = 'pending' AND a.expires_at IS NOT NULL AND a.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			AND NOT (ae.source_type = 'approval' AND appr.status = 'pending' AND appr.expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+			AND NOT (a.status = 'pending' AND a.expires_at IS NOT NULL AND datetime(a.expires_at) <= datetime('now'))
+			AND NOT (ae.source_type = 'approval' AND appr.status = 'pending' AND datetime(appr.expires_at) <= datetime('now'))
 		)`
 	default:
 		return "ae.outcome = " + b.addArg(outcome)
@@ -405,10 +404,16 @@ func scanAuditEvents(rows *sql.Rows) ([]AuditEvent, error) {
 	for rows.Next() {
 		var e AuditEvent
 		var eventType string
+		var ts sql.NullString
 		if err := rows.Scan(
-			&e.ID, &eventType, &e.Timestamp, &e.AgentID, &e.AgentMeta, &e.Action,
+			&e.ID, &eventType, &ts, &e.AgentID, &e.AgentMeta, &e.Action,
 			&e.Outcome, &e.SourceID, &e.SourceType, &e.ConnectorID, &e.ExecutionStatus, &e.ExecutionError,
 		); err != nil {
+			return nil, fmt.Errorf("scan audit event: %w", err)
+		}
+		var err error
+		e.Timestamp, err = sqliteTimeRequired(ts)
+		if err != nil {
 			return nil, fmt.Errorf("scan audit event: %w", err)
 		}
 		e.EventType = AuditEventType(eventType)

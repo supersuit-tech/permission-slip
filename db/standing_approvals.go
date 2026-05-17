@@ -1,13 +1,12 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
-
 )
 
 // StandingApproval represents a row from the standing_approvals table.
@@ -55,15 +54,37 @@ type StandingApprovalPage struct {
 }
 
 // scanStandingApproval scans a single row into a StandingApproval. The row must select standingApprovalColumns.
-func scanStandingApproval(row *sql.Row) (*StandingApproval, error) {
+func scanStandingApproval(row rowScanner) (*StandingApproval, error) {
 	var sa StandingApproval
+	var startsAt, expiresAt, createdAt, revokedAt, expiredAt sql.NullString
 	err := row.Scan(
 		&sa.StandingApprovalID, &sa.AgentID, &sa.UserID, &sa.ActionType, &sa.ActionVersion,
 		&sa.Constraints, &sa.SourceActionConfigurationID, &sa.ConnectorInstanceID, &sa.Status,
-		&sa.StartsAt, &sa.ExpiresAt, &sa.CreatedAt, &sa.RevokedAt, &sa.ExpiredAt,
+		&startsAt, &expiresAt, &createdAt, &revokedAt, &expiredAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	sa.StartsAt, err2 = sqliteTimeRequired(startsAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	sa.ExpiresAt, err2 = sqliteTimePtr(expiresAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	sa.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	sa.RevokedAt, err2 = sqliteTimePtr(revokedAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	sa.ExpiredAt, err2 = sqliteTimePtr(expiredAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &sa, nil
 }
@@ -84,7 +105,7 @@ func CountActiveStandingApprovalsByUser(ctx context.Context, db DBTX, userID str
 	var count int
 	err := db.QueryRow(ctx,
 		`SELECT COUNT(*) FROM standing_approvals
-		 WHERE user_id = $1 AND status = 'active' AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))`,
+		 WHERE user_id = $1 AND status = 'active' AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))`,
 		userID,
 	).Scan(&count)
 	return count, err
@@ -135,7 +156,8 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 		 WHERE EXISTS (SELECT 1 FROM agent_check)
 		 RETURNING `+standingApprovalColumns,
 		p.StandingApprovalID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion,
-		p.Constraints, p.SourceActionConfigurationID, p.ConnectorInstanceID, p.StartsAt, p.ExpiresAt,
+		p.Constraints, p.SourceActionConfigurationID, p.ConnectorInstanceID,
+		TimestampForSQLite(p.StartsAt), NullableTimestampForSQLite(p.ExpiresAt),
 	)
 	sa, err := scanStandingApproval(row)
 	if err != nil {
@@ -190,7 +212,7 @@ func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFil
 	}
 
 	if cursor != nil {
-		tsPlaceholder := b.addArg(cursor.CreatedAt)
+		tsPlaceholder := b.addArg(TimestampForSQLite(cursor.CreatedAt))
 		idPlaceholder := b.addArg(cursor.StandingApprovalID)
 		where = append(where, fmt.Sprintf("(created_at, standing_approval_id) < (%s, %s)", tsPlaceholder, idPlaceholder))
 	}
@@ -368,7 +390,7 @@ func ListStandingApprovalsByAgent(ctx context.Context, db DBTX, agentID int64, l
 			   AND (created_at, standing_approval_id) < ($2, $3)
 			 ORDER BY created_at DESC, standing_approval_id DESC
 			 LIMIT $4`,
-			agentID, cursor.CreatedAt, cursor.StandingApprovalID, fetchLimit,
+			agentID, TimestampForSQLite(cursor.CreatedAt), cursor.StandingApprovalID, fetchLimit,
 		)
 	} else {
 		rows, err = db.Query(ctx,
@@ -469,35 +491,47 @@ type StandingApprovalExecution struct {
 // Returns a domain error via diagnoseStandingApprovalFailure if no matching row.
 func RecordStandingApprovalExecution(ctx context.Context, db DBTX, standingApprovalID string, userID string, parameters []byte) (*StandingApprovalExecution, error) {
 	var e StandingApprovalExecution
-
-	err := db.QueryRow(ctx,
-		`WITH locked AS (
-			SELECT standing_approval_id, agent_id, user_id, action_type, connector_instance_id
-			FROM standing_approvals
-			WHERE standing_approval_id = $1 AND user_id = $2 AND status = 'active'
-			  AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			FOR UPDATE
-		),
-		ins AS (
-			INSERT INTO standing_approval_executions (standing_approval_id, parameters)
-			SELECT standing_approval_id, $3
-			FROM locked
-			RETURNING id, standing_approval_id, parameters, executed_at
-		)
-		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id,
-		       locked.action_type, locked.connector_instance_id, a.metadata, ins.parameters, ins.executed_at
-		FROM ins
-		JOIN locked ON locked.standing_approval_id = ins.standing_approval_id
-		LEFT JOIN agents a ON a.agent_id = locked.agent_id`,
-		standingApprovalID, userID, parameters,
-	).Scan(&e.ExecutionID, &e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType, &e.ConnectorInstanceID, &e.AgentMeta, &e.Parameters, &e.ExecutedAt)
-	if err == nil {
-		return &e, nil
-	}
+	var connectorInst sql.NullString
+	err := db.QueryRow(ctx, `
+		SELECT standing_approval_id, agent_id, user_id, action_type, connector_instance_id
+		FROM standing_approvals
+		WHERE standing_approval_id = $1 AND user_id = $2 AND status = 'active'
+		  AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))`,
+		standingApprovalID, userID,
+	).Scan(&e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType, &connectorInst)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, diagnoseStandingApprovalFailure(ctx, db, standingApprovalID, userID)
 	}
-	return nil, err
+	if err != nil {
+		return nil, err
+	}
+	if connectorInst.Valid {
+		s := connectorInst.String
+		e.ConnectorInstanceID = &s
+	}
+
+	var executedAt sql.NullString
+	err = db.QueryRow(ctx, `
+		INSERT INTO standing_approval_executions (standing_approval_id, parameters)
+		VALUES ($1, $2)
+		RETURNING id, parameters, executed_at`,
+		standingApprovalID, parameters,
+	).Scan(&e.ExecutionID, &e.Parameters, &executedAt)
+	if err != nil {
+		return nil, err
+	}
+	e.ExecutedAt, err = sqliteTimeRequired(executedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.QueryRow(ctx, `SELECT metadata FROM agents WHERE agent_id = $1`, e.AgentID).Scan(&e.AgentMeta)
+	if errors.Is(err, sql.ErrNoRows) {
+		e.AgentMeta = nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &e, nil
 }
 
 // diagnoseStandingApprovalFailure reads the current standing approval row to
@@ -533,7 +567,7 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 		 WHERE standing_approval_id = $1 AND user_id = $2
 		   AND status = 'active'
 		 RETURNING `+standingApprovalColumns,
-		p.StandingApprovalID, p.UserID, p.Constraints, p.ExpiresAt,
+		p.StandingApprovalID, p.UserID, p.Constraints, NullableTimestampForSQLite(p.ExpiresAt),
 	)
 	updated, err := scanStandingApproval(row)
 	if err == nil {
@@ -566,7 +600,7 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 	instanceFilter := `1=1`
 	args := []any{agentID, actionType}
 	if connectorInstanceID != "" {
-		instanceFilter = `(connector_instance_id IS NULL OR connector_instance_id = $3::uuid)`
+		instanceFilter = `(connector_instance_id IS NULL OR connector_instance_id = $3)`
 		args = append(args, connectorInstanceID)
 	}
 
@@ -575,12 +609,12 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 		 FROM (
 		   SELECT `+standingApprovalColumns+`, 1 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = $2 AND status = 'active'
-		     AND starts_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		     AND datetime(starts_at) <= datetime('now') AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))
 		     AND `+instanceFilter+`
 		   UNION ALL
 		   SELECT `+standingApprovalColumns+`, 2 AS priority FROM standing_approvals
 		   WHERE agent_id = $1 AND action_type = '*' AND action_type != $2 AND status = 'active'
-		     AND starts_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		     AND datetime(starts_at) <= datetime('now') AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))
 		     AND `+instanceFilter+`
 		 ) combined
 		 ORDER BY priority, created_at DESC, standing_approval_id DESC
@@ -616,40 +650,51 @@ func FindActiveStandingApprovalsForAgent(ctx context.Context, db DBTX, agentID i
 // request_id returns StandingApprovalErrDuplicateRequest.
 func RecordStandingApprovalExecutionByAgent(ctx context.Context, db DBTX, standingApprovalID string, agentID int64, requestID string, parameters []byte) (*StandingApprovalExecution, error) {
 	var e StandingApprovalExecution
-
-	err := db.QueryRow(ctx,
-		`WITH locked AS (
-			SELECT standing_approval_id, agent_id, user_id, action_type, connector_instance_id
-			FROM standing_approvals
-			WHERE standing_approval_id = $1
-			  AND agent_id = $2
-			  AND status = 'active'
-			  AND starts_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			  AND (expires_at IS NULL OR expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-			FOR UPDATE
-		),
-		ins AS (
-			INSERT INTO standing_approval_executions (standing_approval_id, parameters, request_id)
-			SELECT standing_approval_id, $3, $4
-			FROM locked
-			RETURNING id, standing_approval_id, parameters, executed_at
-		)
-		SELECT ins.id, ins.standing_approval_id, locked.agent_id, locked.user_id,
-		       locked.action_type, locked.connector_instance_id, a.metadata, ins.parameters, ins.executed_at
-		FROM ins
-		JOIN locked ON locked.standing_approval_id = ins.standing_approval_id
-		LEFT JOIN agents a ON a.agent_id = locked.agent_id`,
-		standingApprovalID, agentID, parameters, requestID,
-	).Scan(&e.ExecutionID, &e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType,
-		&e.ConnectorInstanceID, &e.AgentMeta, &e.Parameters, &e.ExecutedAt)
-	if err == nil {
-		return &e, nil
-	}
+	var connectorInst sql.NullString
+	err := db.QueryRow(ctx, `
+		SELECT standing_approval_id, agent_id, user_id, action_type, connector_instance_id
+		FROM standing_approvals
+		WHERE standing_approval_id = $1
+		  AND agent_id = $2
+		  AND status = 'active'
+		  AND datetime(starts_at) <= datetime('now')
+		  AND (expires_at IS NULL OR datetime(expires_at) > datetime('now'))`,
+		standingApprovalID, agentID,
+	).Scan(&e.StandingApprovalID, &e.AgentID, &e.UserID, &e.ActionType, &connectorInst)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, &StandingApprovalError{Code: StandingApprovalErrNotActive}
 	}
-	if isUniqueViolation(err) {
-		return nil, &StandingApprovalError{Code: StandingApprovalErrDuplicateRequest}
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	if connectorInst.Valid {
+		s := connectorInst.String
+		e.ConnectorInstanceID = &s
+	}
+
+	var executedAt sql.NullString
+	err = db.QueryRow(ctx, `
+		INSERT INTO standing_approval_executions (standing_approval_id, parameters, request_id)
+		VALUES ($1, $2, $3)
+		RETURNING id, parameters, executed_at`,
+		standingApprovalID, parameters, requestID,
+	).Scan(&e.ExecutionID, &e.Parameters, &executedAt)
+	if err != nil {
+		if isUniqueViolation(err) {
+			return nil, &StandingApprovalError{Code: StandingApprovalErrDuplicateRequest}
+		}
+		return nil, err
+	}
+	e.ExecutedAt, err = sqliteTimeRequired(executedAt)
+	if err != nil {
+		return nil, err
+	}
+
+	err = db.QueryRow(ctx, `SELECT metadata FROM agents WHERE agent_id = $1`, e.AgentID).Scan(&e.AgentMeta)
+	if errors.Is(err, sql.ErrNoRows) {
+		e.AgentMeta = nil
+	} else if err != nil {
+		return nil, err
+	}
+	return &e, nil
 }

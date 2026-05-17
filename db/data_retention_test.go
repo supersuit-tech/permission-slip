@@ -320,10 +320,13 @@ func TestPurgeExpiredAuditEvents_SQLFunction(t *testing.T) {
 		testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied",
 			testhelper.GenerateID(t, "appr_"))
 
-		// Call the SQL function directly.
-		_, err := tx.Exec(ctx, "SELECT purge_expired_audit_events()")
+		// Purge via Go (Postgres SQL function removed in SQLite migration).
+		deleted, err := db.PurgeExpiredAuditEvents(ctx, tx)
 		if err != nil {
-			t.Fatalf("SQL function error: %v", err)
+			t.Fatalf("purge error: %v", err)
+		}
+		if deleted < 1 {
+			t.Fatalf("expected at least 1 deleted event, got %d", deleted)
 		}
 
 		// Verify only the recent event remains.
@@ -355,9 +358,8 @@ func TestPurgeExpiredAuditEvents_SQLFunction(t *testing.T) {
 			 VALUES ($1, $2, 'approval.approved', 'approved', 'sql_fn_grace', 'approval', '{}', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 days'))`,
 			uid, agentID)
 
-		_, err := tx.Exec(ctx, "SELECT purge_expired_audit_events()")
-		if err != nil {
-			t.Fatalf("SQL function error: %v", err)
+		if _, err := db.PurgeExpiredAuditEvents(ctx, tx); err != nil {
+			t.Fatalf("purge error: %v", err)
 		}
 
 		// Should still be there thanks to the grace period.

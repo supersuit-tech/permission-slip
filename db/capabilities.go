@@ -87,12 +87,12 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	// Connectors with no connector_required_credentials rows are always ready.
 	connRows, err := db.Query(ctx, `
 		SELECT c.id, c.name, c.description,
-		       BOOL_OR(
+		       (MAX(CASE WHEN
 		           NOT EXISTS (
 		               SELECT 1 FROM connector_required_credentials crc
 		               WHERE crc.connector_id = c.id
 		                 AND NOT (
-		                     (crc.auth_type <> 'oauth2' AND EXISTS (
+		                     (crc.auth_type != 'oauth2' AND EXISTS (
 		                         SELECT 1 FROM agent_connector_credentials acc
 		                         INNER JOIN credentials cr ON cr.id = acc.credential_id
 		                         WHERE acc.agent_id = ac.agent_id
@@ -114,7 +114,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		                     ))
 		                 )
 		           )
-		       ) AS credentials_ready
+		           THEN 1 ELSE 0 END) = 1) AS credentials_ready
 		FROM agent_connectors ac
 		JOIN connectors c ON c.id = ac.connector_id
 		WHERE ac.agent_id = $1 AND ac.approver_id = $2
@@ -155,7 +155,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		           SELECT 1 FROM connector_required_credentials crc
 		           WHERE crc.connector_id = ac.connector_id
 		             AND NOT (
-		                 (crc.auth_type <> 'oauth2' AND EXISTS (
+		                 (crc.auth_type != 'oauth2' AND EXISTS (
 		                     SELECT 1 FROM agent_connector_credentials acc
 		                     INNER JOIN credentials cr ON cr.id = acc.credential_id
 		                     WHERE acc.agent_id = ac.agent_id
@@ -223,8 +223,12 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 
 	for actionRows.Next() {
 		var a CapabilityAction
-		if err := actionRows.Scan(&a.ConnectorID, &a.ActionType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema); err != nil {
+		var paramsSchema []byte
+		if err := actionRows.Scan(&a.ConnectorID, &a.ActionType, &a.Name, &a.Description, &a.RiskLevel, &paramsSchema); err != nil {
 			return nil, err
+		}
+		if len(paramsSchema) > 0 {
+			a.ParametersSchema = json.RawMessage(paramsSchema)
 		}
 		caps.Actions = append(caps.Actions, a)
 	}
@@ -240,9 +244,9 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		WHERE sa.agent_id = $1
 		  AND sa.user_id = $2
 		  AND sa.status = 'active'
-		  AND (sa.expires_at IS NULL OR sa.expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-		  AND sa.starts_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-		ORDER BY sa.action_type, sa.expires_at NULLS LAST`,
+		  AND (sa.expires_at IS NULL OR datetime(sa.expires_at) > datetime('now'))
+		  AND datetime(sa.starts_at) <= datetime('now')
+		ORDER BY sa.action_type, (sa.expires_at IS NULL) ASC, sa.expires_at ASC`,
 		agentID, approverID,
 	)
 	if err != nil {
@@ -253,8 +257,18 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	for saRows.Next() {
 		var sa CapabilityStandingApproval
 		var instID sql.NullString
-		if err := saRows.Scan(&sa.StandingApprovalID, &sa.ActionType, &sa.Constraints, &sa.ExpiresAt, &instID); err != nil {
+		var expiresAt sql.NullString
+		var constraints []byte
+		if err := saRows.Scan(&sa.StandingApprovalID, &sa.ActionType, &constraints, &expiresAt, &instID); err != nil {
 			return nil, err
+		}
+		if len(constraints) > 0 {
+			sa.Constraints = json.RawMessage(constraints)
+		}
+		var expErr error
+		sa.ExpiresAt, expErr = sqliteTimePtr(expiresAt)
+		if expErr != nil {
+			return nil, expErr
 		}
 		if instID.Valid {
 			s := instID.String
@@ -290,9 +304,13 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 
 	for acRows.Next() {
 		var ac CapabilityActionConfig
+		var params []byte
 		if err := acRows.Scan(&ac.ConfigurationID, &ac.ConnectorID, &ac.ActionType,
-			&ac.Name, &ac.Description, &ac.Parameters); err != nil {
+			&ac.Name, &ac.Description, &params); err != nil {
 			return nil, err
+		}
+		if len(params) > 0 {
+			ac.Parameters = json.RawMessage(params)
 		}
 		caps.ActionConfigs = append(caps.ActionConfigs, ac)
 	}

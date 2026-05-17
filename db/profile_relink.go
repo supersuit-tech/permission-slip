@@ -26,12 +26,11 @@ func RelinkProfile(_ context.Context, _ DBTX, _, _ string) error {
 // FindProfileByUsername returns the profile with the given username, or nil
 // if no such profile exists.
 func FindProfileByUsername(ctx context.Context, db DBTX, username string) (*Profile, error) {
-	var p Profile
-	err := db.QueryRow(ctx,
+	p, err := scanProfile(db.QueryRow(ctx,
 		`SELECT id, username, email, phone, marketing_opt_in, created_at
 		 FROM profiles WHERE username = $1`,
 		username,
-	).Scan(&p.ID, &p.Username, &p.Email, &p.Phone, &p.MarketingOptIn, &p.CreatedAt)
+	))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -39,5 +38,5 @@ func FindProfileByUsername(ctx context.Context, db DBTX, username string) (*Prof
 		return nil, err
 	}
 	p.CreatedAt = p.CreatedAt.UTC().Truncate(time.Millisecond)
-	return &p, nil
+	return p, nil
 }

@@ -12,6 +12,6 @@ func InsertRegistrationInvite(t *testing.T, d db.DBTX, id, userID string) {
 	t.Helper()
 	mustExec(t, d,
 		`INSERT INTO registration_invites (id, user_id, invite_code_hash, status, expires_at)
-		 VALUES ($1, $2, $3, 'active', now() + interval '1 hour')`,
+		 VALUES ($1, $2, $3, 'active', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'))`,
 		id, userID, "testhash_"+id)
 }

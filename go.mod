@@ -31,6 +31,7 @@ require (
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.274.0
 	google.golang.org/grpc v1.80.0
+	modernc.org/sqlite v1.49.1
 )
 
 require (
@@ -80,6 +81,7 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
+	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/dvsekhvalnov/jose2go v1.7.0 // indirect
 	github.com/ethereum/c-kzg-4844/v2 v2.1.6 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
@@ -104,11 +106,14 @@ require (
 	github.com/klauspost/compress v1.18.5 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
 	github.com/leodido/go-urn v1.4.0 // indirect
+	github.com/mattn/go-isatty v0.0.21 // indirect
 	github.com/mfridman/interpolate v0.0.2 // indirect
 	github.com/mtibben/percent v0.2.1 // indirect
+	github.com/ncruces/go-strftime v1.0.0 // indirect
 	github.com/oapi-codegen/runtime v1.1.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.26 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
+	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
 	github.com/sethvargo/go-retry v0.3.0 // indirect
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
@@ -144,4 +149,7 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20260401024825-9d38bb4040a9 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260420184626-e10c466a9529 // indirect
 	google.golang.org/protobuf v1.36.11 // indirect
+	modernc.org/libc v1.72.1 // indirect
+	modernc.org/mathutil v1.7.1 // indirect
+	modernc.org/memory v1.11.0 // indirect
 )

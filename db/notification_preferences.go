@@ -1,9 +1,9 @@
 package db
 
 import (
-	"database/sql"
 	"context"
-
+	"database/sql"
+	"errors"
 )
 
 // NotificationPreference represents a row from the notification_preferences table.

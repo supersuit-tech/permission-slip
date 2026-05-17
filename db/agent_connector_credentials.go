@@ -23,6 +23,22 @@ type AgentConnectorCredential struct {
 	CreatedAt           time.Time
 }
 
+func scanAgentConnectorCredential(row rowScanner) (*AgentConnectorCredential, error) {
+	var acc AgentConnectorCredential
+	var createdAt sql.NullString
+	err := row.Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ConnectorInstanceID, &acc.ApproverID,
+		&acc.CredentialID, &acc.OAuthConnectionID, &createdAt)
+	if err != nil {
+		return nil, err
+	}
+	var err2 error
+	acc.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	return &acc, nil
+}
+
 // GetAgentConnectorCredential returns the credential binding for the default
 // agent+connector instance, or nil if no binding exists.
 //
@@ -40,22 +56,17 @@ func GetAgentConnectorCredential(ctx context.Context, db DBTX, agentID int64, co
 
 // GetAgentConnectorCredentialByInstance returns the credential binding for a specific connector instance.
 func GetAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, agentID int64, connectorID, connectorInstanceID string) (*AgentConnectorCredential, error) {
-	var acc AgentConnectorCredential
-	err := db.QueryRow(ctx, `
+	acc, err := scanAgentConnectorCredential(db.QueryRow(ctx, `
 		SELECT id, agent_id, connector_id, connector_instance_id, approver_id,
 		       credential_id, oauth_connection_id, created_at
 		FROM agent_connector_credentials
-		WHERE agent_id = $1 AND connector_id = $2 AND connector_instance_id = $3::uuid`,
+		WHERE agent_id = $1 AND connector_id = $2 AND connector_instance_id = $3`,
 		agentID, connectorID, connectorInstanceID,
-	).Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ConnectorInstanceID, &acc.ApproverID,
-		&acc.CredentialID, &acc.OAuthConnectionID, &acc.CreatedAt)
+	))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
-	if err != nil {
-		return nil, err
-	}
-	return &acc, nil
+	return acc, err
 }
 
 // UpsertAgentConnectorCredentialParams holds the parameters for upserting a
@@ -104,11 +115,10 @@ type UpsertAgentConnectorCredentialByInstanceParams struct {
 
 // UpsertAgentConnectorCredentialByInstance creates or replaces the credential binding for a specific instance.
 func UpsertAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, p UpsertAgentConnectorCredentialByInstanceParams) (*AgentConnectorCredential, error) {
-	var acc AgentConnectorCredential
-	err := db.QueryRow(ctx, `
+	return scanAgentConnectorCredential(db.QueryRow(ctx, `
 		INSERT INTO agent_connector_credentials
 		    (id, agent_id, connector_id, connector_instance_id, approver_id, credential_id, oauth_connection_id)
-		VALUES ($1, $2, $3, $4::uuid, $5, $6, $7)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		ON CONFLICT (agent_id, connector_id, connector_instance_id) DO UPDATE
 		    SET credential_id = EXCLUDED.credential_id,
 		        oauth_connection_id = EXCLUDED.oauth_connection_id,
@@ -117,12 +127,7 @@ func UpsertAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, p Up
 		          credential_id, oauth_connection_id, created_at`,
 		p.ID, p.AgentID, p.ConnectorID, p.ConnectorInstanceID, p.ApproverID,
 		p.CredentialID, p.OAuthConnectionID,
-	).Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ConnectorInstanceID, &acc.ApproverID,
-		&acc.CredentialID, &acc.OAuthConnectionID, &acc.CreatedAt)
-	if err != nil {
-		return nil, err
-	}
-	return &acc, nil
+	))
 }
 
 // DeleteAgentConnectorCredential removes the credential binding for the default instance.
@@ -141,7 +146,7 @@ func DeleteAgentConnectorCredential(ctx context.Context, db DBTX, agentID int64,
 func DeleteAgentConnectorCredentialByInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID string) (bool, error) {
 	tag, err := db.Exec(ctx, `
 		DELETE FROM agent_connector_credentials
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	if err != nil {
@@ -167,12 +172,11 @@ func ListAgentConnectorCredentialsForAgentConnector(ctx context.Context, db DBTX
 
 	var out []AgentConnectorCredential
 	for rows.Next() {
-		var acc AgentConnectorCredential
-		if err := rows.Scan(&acc.ID, &acc.AgentID, &acc.ConnectorID, &acc.ConnectorInstanceID, &acc.ApproverID,
-			&acc.CredentialID, &acc.OAuthConnectionID, &acc.CreatedAt); err != nil {
+		acc, err := scanAgentConnectorCredential(rows)
+		if err != nil {
 			return nil, err
 		}
-		out = append(out, acc)
+		out = append(out, *acc)
 	}
 	return out, rows.Err()
 }

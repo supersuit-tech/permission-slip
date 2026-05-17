@@ -1,12 +1,11 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
-
 )
 
 // DefaultApprovalTTL is the default time-to-live for a new approval request.
@@ -54,7 +53,7 @@ func InsertApproval(ctx context.Context, d DBTX, p InsertApprovalParams, request
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, resource_details, status, expires_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
 		 RETURNING `+approvalColumns,
-		p.ApprovalID, p.AgentID, p.ApproverID, p.Action, p.Context, p.ResourceDetails, p.ExpiresAt,
+		p.ApprovalID, p.AgentID, p.ApproverID, p.Action, p.Context, p.ResourceDetails, TimestampForSQLite(p.ExpiresAt),
 	)
 	appr, err := scanApproval(row)
 	if err != nil {
@@ -97,7 +96,7 @@ func CancelApproval(ctx context.Context, db DBTX, approvalID string, agentID int
 		`UPDATE approvals
 		 SET status = 'cancelled', cancelled_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE approval_id = $1 AND agent_id = $2
-		   AND status = 'pending' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		   AND status = 'pending' AND datetime(expires_at) > datetime('now')
 		 RETURNING `+approvalColumns,
 		approvalID, agentID,
 	)

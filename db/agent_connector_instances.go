@@ -129,12 +129,12 @@ func CreateAgentConnectorInstance(ctx context.Context, db DBTX, p CreateAgentCon
 		return nil, &AgentConnectorError{Code: AgentConnectorErrConnectorNotEnabled}
 	}
 
-	var newID string
+	var newID = uuid.NewString()
 	err := db.QueryRow(ctx, `
-		INSERT INTO agent_connectors (agent_id, approver_id, connector_id, is_default)
-		VALUES ($1, $2, $3, false)
+		INSERT INTO agent_connectors (agent_id, approver_id, connector_id, connector_instance_id, is_default)
+		VALUES ($1, $2, $3, $4, 0)
 		RETURNING connector_instance_id`,
-		p.AgentID, p.ApproverID, p.ConnectorID,
+		p.AgentID, p.ApproverID, p.ConnectorID, newID,
 	).Scan(&newID)
 	if err != nil {
 		return nil, err
@@ -142,14 +142,20 @@ func CreateAgentConnectorInstance(ctx context.Context, db DBTX, p CreateAgentCon
 	return GetAgentConnectorInstance(ctx, db, p.AgentID, p.ApproverID, p.ConnectorID, newID)
 }
 
-func scanAgentConnectorInstance(row *sql.Row) (*AgentConnectorInstance, error) {
+func scanAgentConnectorInstance(row rowScanner) (*AgentConnectorInstance, error) {
 	var inst AgentConnectorInstance
+	var enabledAt sql.NullString
 	err := row.Scan(
 		&inst.ConnectorInstanceID, &inst.AgentID, &inst.ConnectorID, &inst.ApproverID,
-		&inst.DisplayName, &inst.IsDefault, &inst.EnabledAt,
+		&inst.DisplayName, &inst.IsDefault, &enabledAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	inst.EnabledAt, err2 = sqliteTimeRequired(enabledAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &inst, nil
 }
@@ -180,7 +186,7 @@ func ListAgentConnectorInstances(ctx context.Context, db DBTX, agentID int64, ap
 // GetAgentConnectorInstance returns a single instance by ID, scoped to agent and approver.
 func GetAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, approverID, connectorID, connectorInstanceID string) (*AgentConnectorInstance, error) {
 	row := db.QueryRow(ctx, agentConnectorInstanceSelect+`
-		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3 AND ac.connector_instance_id = $4::uuid`,
+		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3 AND ac.connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	inst, err := scanAgentConnectorInstance(row)
@@ -242,7 +248,7 @@ func SetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int6
 		SET is_default = false
 		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
 		  AND is_default
-		  AND connector_instance_id <> $4::uuid`,
+		  AND connector_instance_id <> $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	if err != nil {
@@ -252,7 +258,7 @@ func SetDefaultAgentConnectorInstance(ctx context.Context, db DBTX, agentID int6
 	tag, err := tx.Exec(ctx, `
 		UPDATE agent_connectors
 		SET is_default = true
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	if err != nil {
@@ -286,7 +292,7 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 	var isDefault bool
 	err = tx.QueryRow(ctx, `
 		SELECT is_default FROM agent_connectors
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	).Scan(&isDefault)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -305,7 +311,7 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 		WHERE agent_id = $1
 		  AND user_id = $2
 		  AND status = 'active'
-		  AND connector_instance_id = $3::uuid`,
+		  AND connector_instance_id = $3`,
 		agentID, approverID, connectorInstanceID,
 	)
 	if err != nil {
@@ -314,7 +320,7 @@ func DeleteAgentConnectorInstance(ctx context.Context, db DBTX, agentID int64, a
 
 	tag, err := tx.Exec(ctx, `
 		DELETE FROM agent_connectors
-		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4::uuid`,
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3 AND connector_instance_id = $4`,
 		agentID, approverID, connectorID, connectorInstanceID,
 	)
 	if err != nil {

@@ -1,9 +1,9 @@
 package db
 
 import (
-	"database/sql"
 	"context"
-
+	"database/sql"
+	"errors"
 )
 
 // NotificationTypeStandingExecution is stored in notification_type_preferences.notification_type

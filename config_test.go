@@ -99,13 +99,13 @@ func TestValidateConfig_MissingDatabaseURL(t *testing.T) {
 
 	found := false
 	for _, e := range errs {
-		if e.envVar == "DATABASE_URL" {
+		if e.envVar == "DATABASE_PATH" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected error for missing DATABASE_URL")
+		t.Error("expected error for missing DATABASE_PATH")
 	}
 }
 

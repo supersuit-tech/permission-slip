@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // AgentConnector represents a connector enabled for an agent,
@@ -79,8 +81,14 @@ func ListAgentConnectors(ctx context.Context, db DBTX, agentID int64, approverID
 	for rows.Next() {
 		var ac AgentConnector
 		var actionsJSON, credsJSON []byte
-		if err := rows.Scan(&ac.ID, &ac.Name, &ac.Description, &actionsJSON, &credsJSON, &ac.EnabledAt); err != nil {
+		var enabledAt sql.NullString
+		if err := rows.Scan(&ac.ID, &ac.Name, &ac.Description, &actionsJSON, &credsJSON, &enabledAt); err != nil {
 			return nil, err
+		}
+		var tErr error
+		ac.EnabledAt, tErr = sqliteTimeRequired(enabledAt)
+		if tErr != nil {
+			return nil, tErr
 		}
 		if len(actionsJSON) > 0 && string(actionsJSON) != "null" {
 			if err := json.Unmarshal(actionsJSON, &ac.Actions); err != nil {
@@ -99,6 +107,7 @@ func ListAgentConnectors(ctx context.Context, db DBTX, agentID int64, approverID
 
 func readEnabledAgentConnectorRow(ctx context.Context, db DBTX, agentID int64, approverID, connectorID string) (*AgentConnectorRow, error) {
 	var row AgentConnectorRow
+	var enabledAt sql.NullString
 	err := db.QueryRow(ctx, `
 		SELECT ac.agent_id, ac.connector_id, ac.enabled_at
 		FROM agent_connectors ac
@@ -106,9 +115,14 @@ func readEnabledAgentConnectorRow(ctx context.Context, db DBTX, agentID int64, a
 		ORDER BY ac.is_default DESC, ac.enabled_at ASC
 		LIMIT 1`,
 		agentID, approverID, connectorID,
-	).Scan(&row.AgentID, &row.ConnectorID, &row.EnabledAt)
+	).Scan(&row.AgentID, &row.ConnectorID, &enabledAt)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	row.EnabledAt, err2 = sqliteTimeRequired(enabledAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &row, nil
 }
@@ -118,43 +132,48 @@ func readEnabledAgentConnectorRow(ctx context.Context, db DBTX, agentID int64, a
 // belong to the approver, no row is inserted and AgentConnectorErrAgentNotFound
 // is returned. If the connector does not exist, the FK violation is mapped to
 // AgentConnectorErrConnectorNotFound.
+//
+// SQLite does not support INSERT/DELETE as nested WITH common table expressions
+// (unlike PostgreSQL), so we use INSERT…RETURNING and fall back to a read when
+// no row was inserted.
 func EnableAgentConnector(ctx context.Context, db DBTX, agentID int64, approverID string, connectorID string) (*AgentConnectorRow, error) {
+	instID := uuid.NewString()
 	var row AgentConnectorRow
+	var enabledAt sql.NullString
 	err := db.QueryRow(ctx, `
-		WITH agent_check AS (
-			SELECT 1 FROM agents WHERE agent_id = $1 AND approver_id = $2
-		), inserted AS (
-			INSERT INTO agent_connectors (agent_id, approver_id, connector_id)
-			SELECT $1, $2, $3
-			WHERE EXISTS (SELECT 1 FROM agent_check)
-			  AND NOT EXISTS (
-			      SELECT 1 FROM agent_connectors ac0
-			      WHERE ac0.agent_id = $1 AND ac0.approver_id = $2 AND ac0.connector_id = $3
-			  )
-			ON CONFLICT (agent_id, connector_id) WHERE (is_default) DO NOTHING
-			RETURNING agent_id, connector_id, enabled_at
-		)
-		SELECT agent_id, connector_id, enabled_at FROM inserted
-		UNION ALL
-		SELECT ac.agent_id, ac.connector_id, ac.enabled_at
-		FROM agent_connectors ac
-		WHERE ac.agent_id = $1 AND ac.approver_id = $2 AND ac.connector_id = $3
-		  AND NOT EXISTS (SELECT 1 FROM inserted)
-		  AND EXISTS (SELECT 1 FROM agent_check)`,
-		agentID, approverID, connectorID,
-	).Scan(&row.AgentID, &row.ConnectorID, &row.EnabledAt)
+		INSERT INTO agent_connectors (agent_id, approver_id, connector_id, connector_instance_id, is_default)
+		SELECT $1, $2, $3, $4, 1
+		WHERE EXISTS (SELECT 1 FROM agents WHERE agent_id = $1 AND approver_id = $2)
+		  AND NOT EXISTS (
+		      SELECT 1 FROM agent_connectors ac0
+		      WHERE ac0.agent_id = $1 AND ac0.approver_id = $2 AND ac0.connector_id = $3
+		  )
+		RETURNING agent_id, connector_id, enabled_at`,
+		agentID, approverID, connectorID, instID,
+	).Scan(&row.AgentID, &row.ConnectorID, &enabledAt)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, &AgentConnectorError{Code: AgentConnectorErrAgentNotFound}
-		}
 		if IsForeignKeyViolation(err) {
 			return nil, &AgentConnectorError{Code: AgentConnectorErrConnectorNotFound}
 		}
 		if IsUniqueViolation(err) {
-			// Concurrent enable: retry read of existing row (idempotent success).
 			return readEnabledAgentConnectorRow(ctx, db, agentID, approverID, connectorID)
 		}
+		if errors.Is(err, sql.ErrNoRows) {
+			already, errExists := AgentConnectorEnabled(ctx, db, agentID, approverID, connectorID)
+			if errExists != nil {
+				return nil, errExists
+			}
+			if already {
+				return readEnabledAgentConnectorRow(ctx, db, agentID, approverID, connectorID)
+			}
+			return nil, &AgentConnectorError{Code: AgentConnectorErrAgentNotFound}
+		}
 		return nil, err
+	}
+	var parseErr error
+	row.EnabledAt, parseErr = sqliteTimeRequired(enabledAt)
+	if parseErr != nil {
+		return nil, parseErr
 	}
 	return &row, nil
 }
@@ -172,44 +191,42 @@ type DisableAgentConnectorResult struct {
 // Returns nil if the agent-connector association was not found.
 func DisableAgentConnector(ctx context.Context, db DBTX, agentID int64, approverID string, connectorID string) (*DisableAgentConnectorResult, error) {
 	row := db.QueryRow(ctx, `
-		WITH deleted AS (
-			DELETE FROM agent_connectors
-			WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
-			RETURNING agent_id, connector_id, connector_instance_id
-		), revoked AS (
-			UPDATE standing_approvals
-			SET status = 'revoked', revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			WHERE agent_id = $1
-			  AND user_id = $2
-			  AND status = 'active'
-			  AND action_type IN (
-			      SELECT action_type FROM connector_actions
-			      WHERE connector_id = $3
-			  )
-			  AND EXISTS (SELECT 1 FROM deleted)
-			RETURNING 1
-		)
-		SELECT
-			(SELECT agent_id FROM deleted LIMIT 1),
-			(SELECT connector_id FROM deleted LIMIT 1),
-			strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
-			(SELECT count(*) FROM revoked)`,
+		DELETE FROM agent_connectors
+		WHERE agent_id = $1 AND approver_id = $2 AND connector_id = $3
+		RETURNING agent_id, connector_id, strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS disabled_at`,
 		agentID, approverID, connectorID,
 	)
 
-	var agentIDResult *int64
-	var connectorIDResult *string
 	var result DisableAgentConnectorResult
-	err := row.Scan(&agentIDResult, &connectorIDResult, &result.DisabledAt, &result.RevokedStandingApprovals)
+	var disabledAt sql.NullString
+	err := row.Scan(&result.AgentID, &result.ConnectorID, &disabledAt)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	var parseErr error
+	result.DisabledAt, parseErr = sqliteTimeRequired(disabledAt)
+	if parseErr != nil {
+		return nil, parseErr
+	}
+
+	tag, err := db.Exec(ctx, `
+		UPDATE standing_approvals
+		SET status = 'revoked', revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		WHERE agent_id = $1
+		  AND user_id = $2
+		  AND status = 'active'
+		  AND action_type IN (
+		      SELECT action_type FROM connector_actions
+		      WHERE connector_id = $3
+		  )`,
+		agentID, approverID, connectorID,
+	)
 	if err != nil {
 		return nil, err
 	}
-	// If the DELETE matched nothing, agent_id/connector_id will be NULL.
-	if agentIDResult == nil {
-		return nil, nil
-	}
-
-	result.AgentID = *agentIDResult
-	result.ConnectorID = *connectorIDResult
+	result.RevokedStandingApprovals = RowsAffected(tag)
 	return &result, nil
 }

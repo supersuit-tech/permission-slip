@@ -1,13 +1,12 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
-
 )
 
 // Approval represents a row from the approvals table.
@@ -19,10 +18,10 @@ type Approval struct {
 	Context         []byte // raw JSONB
 	Status          string
 	ExecutionStatus *string
-	ExecutionResult  []byte // raw JSONB
-	ExecutedAt       *time.Time
-	ResourceDetails  []byte // raw JSONB — human-readable resource metadata
-	ExpiresAt        time.Time
+	ExecutionResult []byte // raw JSONB
+	ExecutedAt      *time.Time
+	ResourceDetails []byte // raw JSONB — human-readable resource metadata
+	ExpiresAt       time.Time
 	ApprovedAt      *time.Time
 	DeniedAt        *time.Time
 	CancelledAt     *time.Time
@@ -50,33 +49,43 @@ type ApprovalPage struct {
 }
 
 // scanApproval scans a single row into an Approval. The row must select approvalColumns.
-func scanApproval(row *sql.Row) (*Approval, error) {
+func scanApproval(row rowScanner) (*Approval, error) {
 	var a Approval
+	var executedAt, expiresAt, approvedAt, deniedAt, cancelledAt, createdAt sql.NullString
 	err := row.Scan(
 		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
-		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &a.ExecutedAt, &a.ResourceDetails,
-		&a.ExpiresAt, &a.ApprovedAt, &a.DeniedAt, &a.CancelledAt, &a.CreatedAt,
+		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &executedAt, &a.ResourceDetails,
+		&expiresAt, &approvedAt, &deniedAt, &cancelledAt, &createdAt,
 	)
 	if err != nil {
 		return nil, err
 	}
-	return &a, nil
-}
-
-// scanApprovalWithMeta scans approvalColumns plus an extra agents.metadata column.
-func scanApprovalWithMeta(row *sql.Row) (*Approval, []byte, error) {
-	var a Approval
-	var agentMeta []byte
-	err := row.Scan(
-		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
-		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &a.ExecutedAt, &a.ResourceDetails,
-		&a.ExpiresAt, &a.ApprovedAt, &a.DeniedAt, &a.CancelledAt, &a.CreatedAt,
-		&agentMeta,
-	)
-	if err != nil {
-		return nil, nil, err
+	var err2 error
+	a.ExecutedAt, err2 = sqliteTimePtr(executedAt)
+	if err2 != nil {
+		return nil, err2
 	}
-	return &a, agentMeta, nil
+	a.ExpiresAt, err2 = sqliteTimeRequired(expiresAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	a.ApprovedAt, err2 = sqliteTimePtr(approvedAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	a.DeniedAt, err2 = sqliteTimePtr(deniedAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	a.CancelledAt, err2 = sqliteTimePtr(cancelledAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	a.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	return &a, nil
 }
 
 // ListApprovalsByApproverPaginated returns approvals for the given approver with
@@ -106,7 +115,7 @@ func ListApprovalsByApproverPaginated(ctx context.Context, db DBTX, approverID, 
 
 	switch statusFilter {
 	case "", "pending":
-		where += " AND status = 'pending' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')"
+		where += " AND status = 'pending' AND datetime(expires_at) > datetime('now')"
 	case "all":
 		// No additional status filter.
 	default:
@@ -117,7 +126,7 @@ func ListApprovalsByApproverPaginated(ctx context.Context, db DBTX, approverID, 
 
 	if cursor != nil {
 		where += fmt.Sprintf(" AND (created_at, approval_id) < ($%d, $%d)", nextParam, nextParam+1)
-		args = append(args, cursor.CreatedAt, cursor.ApprovalID)
+		args = append(args, TimestampForSQLite(cursor.CreatedAt), cursor.ApprovalID)
 		nextParam += 2
 	}
 
@@ -200,28 +209,44 @@ func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID string) (
 
 // resolveApproval is the shared implementation for ApproveApproval and
 // DenyApproval. It atomically updates the approval status while enforcing
-// status='pending' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now') to eliminate TOCTOU races. On
+// status='pending' AND datetime(expires_at) > datetime('now') to eliminate TOCTOU races. On
 // failure it reads the current row to produce a precise error.
 //
 // Safety: newStatus and timestampCol are caller-controlled constants
 // ("approved"/"denied" and "approved_at"/"denied_at"), never user input.
 func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newStatus, timestampCol string) (*Approval, []byte, error) {
+	// SQLite rejects UPDATE-in-WITH combined with JOIN to agents (PostgreSQL shape).
+	tx, owned, err := BeginOrContinue(ctx, db)
+	if err != nil {
+		return nil, nil, fmt.Errorf("begin tx: %w", err)
+	}
+	if owned {
+		defer func() { _ = RollbackTx(ctx, tx) }()
+	}
+
 	query := fmt.Sprintf(
-		`WITH updated AS (
-			UPDATE approvals
-			SET status = $3, %s = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			WHERE approval_id = $1 AND approver_id = $2
-			  AND status = 'pending' AND expires_at > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			RETURNING %s
-		)
-		SELECT updated.*, a.metadata
-		FROM updated
-		LEFT JOIN agents a ON a.agent_id = updated.agent_id`,
+		`UPDATE approvals
+		 SET status = $3, %s = strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ', 'now')
+		 WHERE approval_id = $1 AND approver_id = $2
+		   AND status = 'pending' AND datetime(expires_at) > datetime('now')
+		 RETURNING %s`,
 		timestampCol, approvalColumns,
 	)
-	row := db.QueryRow(ctx, query, approvalID, approverID, newStatus)
-	appr, agentMeta, err := scanApprovalWithMeta(row)
+	row := tx.QueryRow(ctx, query, approvalID, approverID, newStatus)
+	appr, err := scanApproval(row)
 	if err == nil {
+		var agentMeta []byte
+		if err := tx.QueryRow(ctx,
+			`SELECT metadata FROM agents WHERE agent_id = $1`,
+			appr.AgentID,
+		).Scan(&agentMeta); err != nil {
+			return nil, nil, err
+		}
+		if owned {
+			if err := CommitTx(ctx, tx); err != nil {
+				return nil, nil, fmt.Errorf("commit: %w", err)
+			}
+		}
 		return appr, agentMeta, nil
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
@@ -229,7 +254,7 @@ func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newSt
 	}
 
 	// UPDATE matched zero rows — determine why.
-	return nil, nil, diagnoseApprovalFailure(ctx, db, approvalID, approverID)
+	return nil, nil, diagnoseApprovalFailure(ctx, tx, approvalID, approverID)
 }
 
 // UpdateApprovalExecution atomically sets execution_status, execution_result,

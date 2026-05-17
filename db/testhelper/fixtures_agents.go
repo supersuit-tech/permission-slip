@@ -45,7 +45,7 @@ func InsertAgentWithCreatedAt(t *testing.T, d db.DBTX, approverID string, create
 	var agentID int64
 	err := d.QueryRow(context.Background(),
 		`INSERT INTO agents (public_key, approver_id, status, created_at) VALUES ('pk', $1, 'pending', $2) RETURNING agent_id`,
-		approverID, createdAt).Scan(&agentID)
+		approverID, db.TimestampForSQLite(createdAt)).Scan(&agentID)
 	if err != nil {
 		t.Fatalf("InsertAgentWithCreatedAt: %v", err)
 	}
@@ -60,7 +60,7 @@ func InsertAgentWithPublicKey(t *testing.T, d db.DBTX, approverID, status, publi
 	var agentID int64
 	err := d.QueryRow(context.Background(),
 		`INSERT INTO agents (public_key, approver_id, status, registered_at)
-		 VALUES ($1, $2, $3, CASE WHEN $3 = 'registered' THEN now() ELSE NULL END)
+		 VALUES ($1, $2, $3, CASE WHEN $3 = 'registered' THEN strftime('%Y-%m-%dT%H:%M:%fZ', 'now') ELSE NULL END)
 		 RETURNING agent_id`,
 		publicKey, approverID, status).Scan(&agentID)
 	if err != nil {
@@ -74,5 +74,5 @@ func SetAgentLastActiveAt(t *testing.T, d db.DBTX, agentID int64, approverID str
 	t.Helper()
 	mustExec(t, d,
 		`UPDATE agents SET last_active_at = $1 WHERE agent_id = $2 AND approver_id = $3`,
-		lastActiveAt, agentID, approverID)
+		db.TimestampForSQLite(lastActiveAt), agentID, approverID)
 }

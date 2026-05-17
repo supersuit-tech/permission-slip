@@ -414,16 +414,15 @@ func TestScrubSensitiveExecutionData_SQLFunction(t *testing.T) {
 				executed_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 hours')
 			 WHERE approval_id = $1`, approvalID)
 
-		// Call the SQL function directly.
-		_, err := tx.Exec(ctx, "SELECT scrub_sensitive_execution_data()")
-		if err != nil {
-			t.Fatalf("SQL function error: %v", err)
+		// Scrub via Go (Postgres SQL function removed in SQLite migration).
+		if _, err := db.ScrubSensitiveExecutionData(ctx, tx); err != nil {
+			t.Fatalf("scrub error: %v", err)
 		}
 
 		// Verify scrubbed.
 		var execResult *string
 		var actionType string
-		err = tx.QueryRow(ctx,
+		err := tx.QueryRow(ctx,
 			`SELECT execution_result, json_extract(action, '$.type') FROM approvals WHERE approval_id = $1`,
 			approvalID).Scan(&execResult, &actionType)
 		if err != nil {

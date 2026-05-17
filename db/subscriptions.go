@@ -1,12 +1,13 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 )
 
 // SubscriptionStatus represents the status of a subscription.
@@ -52,8 +53,10 @@ type Subscription struct {
 
 const subscriptionColumns = `id, user_id, plan_id, status, stripe_customer_id, stripe_subscription_id, current_period_start, current_period_end, downgraded_at, quota_plan_id, quota_entitlements_until, created_at, updated_at`
 
-func scanSubscription(row *sql.Row) (*Subscription, error) {
+func scanSubscription(row rowScanner) (*Subscription, error) {
 	var s Subscription
+	var curStart, curEnd, createdAt, updatedAt sql.NullString
+	var downgradedAt, quotaUntil sql.NullString
 	err := row.Scan(
 		&s.ID,
 		&s.UserID,
@@ -61,16 +64,41 @@ func scanSubscription(row *sql.Row) (*Subscription, error) {
 		&s.Status,
 		&s.StripeCustomerID,
 		&s.StripeSubscriptionID,
-		&s.CurrentPeriodStart,
-		&s.CurrentPeriodEnd,
-		&s.DowngradedAt,
+		&curStart,
+		&curEnd,
+		&downgradedAt,
 		&s.QuotaPlanID,
-		&s.QuotaEntitlementsUntil,
-		&s.CreatedAt,
-		&s.UpdatedAt,
+		&quotaUntil,
+		&createdAt,
+		&updatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	s.CurrentPeriodStart, err2 = sqliteTimeRequired(curStart)
+	if err2 != nil {
+		return nil, err2
+	}
+	s.CurrentPeriodEnd, err2 = sqliteTimeRequired(curEnd)
+	if err2 != nil {
+		return nil, err2
+	}
+	s.DowngradedAt, err2 = sqliteTimePtr(downgradedAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	s.QuotaEntitlementsUntil, err2 = sqliteTimePtr(quotaUntil)
+	if err2 != nil {
+		return nil, err2
+	}
+	s.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	s.UpdatedAt, err2 = sqliteTimeRequired(updatedAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &s, nil
 }
@@ -88,11 +116,12 @@ func GetSubscriptionByUserID(ctx context.Context, db DBTX, userID string) (*Subs
 
 // CreateSubscription inserts a new subscription and returns it.
 func CreateSubscription(ctx context.Context, db DBTX, userID, planID string) (*Subscription, error) {
+	id := uuid.NewString()
 	return scanSubscription(db.QueryRow(ctx,
-		`INSERT INTO subscriptions (user_id, plan_id)
-		 VALUES ($1, $2)
+		`INSERT INTO subscriptions (id, user_id, plan_id)
+		 VALUES ($1, $2, $3)
 		 RETURNING `+subscriptionColumns,
-		userID, planID))
+		id, userID, planID))
 }
 
 // UpdateSubscriptionPlan changes the plan for a user's subscription.
@@ -136,7 +165,7 @@ func DowngradeSubscriptionToFreeWithQuotaGrace(ctx context.Context, db DBTX, use
 		     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
-		userID, paidPlanID, periodEnd))
+		userID, paidPlanID, TimestampForSQLite(periodEnd)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -153,7 +182,7 @@ func ApplyStripeSubscriptionDeletedToFree(ctx context.Context, db DBTX, userID s
 	}
 	var qEnd any
 	if periodEnd != nil {
-		qEnd = *periodEnd
+		qEnd = TimestampForSQLite(*periodEnd)
 	}
 	s, err := scanSubscription(db.QueryRow(ctx,
 		`UPDATE subscriptions
@@ -170,7 +199,7 @@ func ApplyStripeSubscriptionDeletedToFree(ctx context.Context, db DBTX, userID s
 		             ELSE quota_plan_id
 		         END,
 		     quota_entitlements_until = CASE
-		             WHEN $5::timestamptz IS NOT NULL THEN COALESCE(quota_entitlements_until, $5::timestamptz)
+		             WHEN $5 IS NOT NULL THEN COALESCE(quota_entitlements_until, $5)
 		             ELSE quota_entitlements_until
 		         END,
 		     updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
@@ -258,7 +287,7 @@ func UpdateSubscriptionPeriod(ctx context.Context, db DBTX, userID string, perio
 		 SET current_period_start = $2, current_period_end = $3, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		 WHERE user_id = $1
 		 RETURNING `+subscriptionColumns,
-		userID, periodStart, periodEnd))
+		userID, TimestampForSQLite(periodStart), TimestampForSQLite(periodEnd)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -279,15 +308,11 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	var total int64
 
 	// Step 1: Create subscriptions for users without one.
-	// FOR KEY SHARE prevents concurrent deletion of the profile row between
-	// the SELECT and the INSERT, avoiding FK violations when parallel
-	// transactions delete profiles (e.g. test cleanup).
 	tag, err := db.Exec(ctx,
-		`INSERT INTO subscriptions (user_id, plan_id)
-		 SELECT p.id, $1
+		`INSERT INTO subscriptions (id, user_id, plan_id)
+		 SELECT lower(hex(randomblob(16))), p.id, $1
 		 FROM profiles p
-		 WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = p.id)
-		 FOR KEY SHARE OF p`,
+		 WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = p.id)`,
 		defaultPlan)
 	if err != nil {
 		return 0, err
@@ -394,7 +419,7 @@ func ClearSubscriptionQuotaGrace(ctx context.Context, db DBTX, userID string) (*
 		 WHERE user_id = $1
 		   AND quota_plan_id IS NOT NULL
 		   AND quota_entitlements_until IS NOT NULL
-		   AND quota_entitlements_until > strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		   AND datetime(quota_entitlements_until) > datetime('now')
 		 RETURNING `+subscriptionColumns,
 		userID))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -414,7 +439,7 @@ func ClearExpiredSubscriptionQuotaGrace(ctx context.Context, db DBTX, userID str
 		 WHERE user_id = $1
 		   AND quota_plan_id IS NOT NULL
 		   AND quota_entitlements_until IS NOT NULL
-		   AND quota_entitlements_until <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`,
+		   AND datetime(quota_entitlements_until) <= datetime('now')`,
 		userID)
 	return err
 }

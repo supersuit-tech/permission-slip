@@ -31,7 +31,7 @@ func TestInviteExpirationBoundary(t *testing.T) {
 
 	// Backdate expires_at to 1 second in the past — simulates "just expired".
 	testhelper.MustExec(t, tx,
-		`UPDATE registration_invites SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') - interval '1 second' WHERE id = $1`, riID)
+		`UPDATE registration_invites SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second') WHERE id = $1`, riID)
 
 	// ConsumeInvite should return nil (no match) because expires_at <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now').
 	invite, err := db.ConsumeInvite(ctx, tx, hash)
@@ -70,7 +70,7 @@ func TestInviteExpirationBoundary(t *testing.T) {
 		t.Fatalf("consume invite 2: unexpected error: %v", err)
 	}
 	if invite2 != nil {
-		t.Error("expected nil when expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') (boundary: > not >=), got non-nil")
+		t.Error("expected nil when expires_at equals current time (boundary: > not >=), got non-nil")
 	}
 
 	// Finally, confirm that a non-expired invite CAN still be consumed.
@@ -121,7 +121,7 @@ func TestAgentRegistrationTTLBoundary(t *testing.T) {
 
 	// Backdate expires_at to 1 second in the past.
 	testhelper.MustExec(t, tx,
-		`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') - interval '1 second' WHERE agent_id = $1`, agent.AgentID)
+		`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second') WHERE agent_id = $1`, agent.AgentID)
 
 	// Verification should fail with ErrRegistrationExpired.
 	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "AA1BB2CDEF")
@@ -135,7 +135,7 @@ func TestAgentRegistrationTTLBoundary(t *testing.T) {
 
 	_, err = db.VerifyAgentConfirmationCode(ctx, tx, agent.AgentID, "AA1BB2CDEF")
 	if err != db.ErrRegistrationExpired {
-		t.Errorf("at boundary (expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')): expected ErrRegistrationExpired, got %v", err)
+		t.Errorf("at boundary (expires_at equals now): expected ErrRegistrationExpired, got %v", err)
 	}
 
 	// Verify that a non-expired agent CAN still be verified.

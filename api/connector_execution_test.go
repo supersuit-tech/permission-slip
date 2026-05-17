@@ -604,8 +604,8 @@ func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentSuccessDo
 		newAccessID := "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
 		_, bumpErr = tx.Exec(t.Context(), `
 			UPDATE oauth_connections SET
-				token_expiry = now() + interval '2 hours',
-				updated_at = now(),
+				token_expiry = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+7200 seconds'),
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				access_token_vault_id = $1,
 				status = $2
 			WHERE id = $3 AND user_id = $4`,
@@ -708,8 +708,8 @@ func TestExecuteConnectorAction_OAuthPath_RefreshInvalidGrantConcurrentNeedsReau
 		<-bumpCh
 		_, bumpErr = tx.Exec(t.Context(), `
 			UPDATE oauth_connections SET
-				token_expiry = now() + interval '2 hours',
-				updated_at = now(),
+				token_expiry = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+7200 seconds'),
+				updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now'),
 				access_token_vault_id = $1,
 				status = $2
 			WHERE id = $3 AND user_id = $4`,

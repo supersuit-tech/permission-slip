@@ -1,11 +1,12 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 )
 
 // PaymentMethod represents a stored payment method (credit/debit card).
@@ -40,8 +41,9 @@ const paymentMethodColumns = `id, user_id, stripe_payment_method_id, label, bran
 	billing_address_state, billing_address_postal, billing_address_country,
 	is_default, per_transaction_limit, monthly_limit, expiration_alert_sent_at, created_at, updated_at`
 
-func scanPaymentMethod(row *sql.Row) (*PaymentMethod, error) {
+func scanPaymentMethod(row rowScanner) (*PaymentMethod, error) {
 	var pm PaymentMethod
+	var expirationAlertSentAt, createdAt, updatedAt sql.NullString
 	err := row.Scan(
 		&pm.ID, &pm.UserID, &pm.StripePaymentMethodID,
 		&pm.Label, &pm.Brand, &pm.Last4,
@@ -49,27 +51,43 @@ func scanPaymentMethod(row *sql.Row) (*PaymentMethod, error) {
 		&pm.BillingAddressLine1, &pm.BillingAddressLine2, &pm.BillingAddressCity,
 		&pm.BillingAddressState, &pm.BillingAddressPostal, &pm.BillingAddressCountry,
 		&pm.IsDefault, &pm.PerTransactionLimit, &pm.MonthlyLimit,
-		&pm.ExpirationAlertSentAt,
-		&pm.CreatedAt, &pm.UpdatedAt,
+		&expirationAlertSentAt,
+		&createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	pm.ExpirationAlertSentAt, err2 = sqliteTimePtr(expirationAlertSentAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	pm.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	pm.UpdatedAt, err2 = sqliteTimeRequired(updatedAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &pm, nil
 }
 
 // CreatePaymentMethod inserts a new payment method for the user.
 func CreatePaymentMethod(ctx context.Context, db DBTX, pm *PaymentMethod) (*PaymentMethod, error) {
+	if pm.ID == "" {
+		pm.ID = uuid.NewString()
+	}
 	return scanPaymentMethod(db.QueryRow(ctx,
 		`INSERT INTO payment_methods (
-			user_id, stripe_payment_method_id, label, brand, last4,
+			id, user_id, stripe_payment_method_id, label, brand, last4,
 			exp_month, exp_year,
 			billing_address_line1, billing_address_line2, billing_address_city,
 			billing_address_state, billing_address_postal, billing_address_country,
 			is_default, per_transaction_limit, monthly_limit
-		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		RETURNING `+paymentMethodColumns,
-		pm.UserID, pm.StripePaymentMethodID, pm.Label, pm.Brand, pm.Last4,
+		pm.ID, pm.UserID, pm.StripePaymentMethodID, pm.Label, pm.Brand, pm.Last4,
 		pm.ExpMonth, pm.ExpYear,
 		pm.BillingAddressLine1, pm.BillingAddressLine2, pm.BillingAddressCity,
 		pm.BillingAddressState, pm.BillingAddressPostal, pm.BillingAddressCountry,
@@ -92,20 +110,11 @@ func ListPaymentMethodsByUser(ctx context.Context, db DBTX, userID string) ([]Pa
 
 	var methods []PaymentMethod
 	for rows.Next() {
-		var pm PaymentMethod
-		if err := rows.Scan(
-			&pm.ID, &pm.UserID, &pm.StripePaymentMethodID,
-			&pm.Label, &pm.Brand, &pm.Last4,
-			&pm.ExpMonth, &pm.ExpYear,
-			&pm.BillingAddressLine1, &pm.BillingAddressLine2, &pm.BillingAddressCity,
-			&pm.BillingAddressState, &pm.BillingAddressPostal, &pm.BillingAddressCountry,
-			&pm.IsDefault, &pm.PerTransactionLimit, &pm.MonthlyLimit,
-			&pm.ExpirationAlertSentAt,
-			&pm.CreatedAt, &pm.UpdatedAt,
-		); err != nil {
+		pm, err := scanPaymentMethod(rows)
+		if err != nil {
 			return nil, err
 		}
-		methods = append(methods, pm)
+		methods = append(methods, *pm)
 	}
 	return methods, rows.Err()
 }
@@ -209,15 +218,24 @@ type PaymentMethodTransaction struct {
 
 // CreatePaymentMethodTransaction records a transaction against a payment method.
 func CreatePaymentMethodTransaction(ctx context.Context, db DBTX, tx *PaymentMethodTransaction) (*PaymentMethodTransaction, error) {
+	if tx.ID == "" {
+		tx.ID = uuid.NewString()
+	}
 	var t PaymentMethodTransaction
+	var createdAt sql.NullString
 	err := db.QueryRow(ctx,
-		`INSERT INTO payment_method_transactions (payment_method_id, user_id, connector_id, action_type, amount_cents, description)
-		 VALUES ($1, $2, $3, $4, $5, $6)
+		`INSERT INTO payment_method_transactions (id, payment_method_id, user_id, connector_id, action_type, amount_cents, description)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7)
 		 RETURNING id, payment_method_id, user_id, connector_id, action_type, amount_cents, description, created_at`,
-		tx.PaymentMethodID, tx.UserID, tx.ConnectorID, tx.ActionType, tx.AmountCents, tx.Description,
-	).Scan(&t.ID, &t.PaymentMethodID, &t.UserID, &t.ConnectorID, &t.ActionType, &t.AmountCents, &t.Description, &t.CreatedAt)
+		tx.ID, tx.PaymentMethodID, tx.UserID, tx.ConnectorID, tx.ActionType, tx.AmountCents, tx.Description,
+	).Scan(&t.ID, &t.PaymentMethodID, &t.UserID, &t.ConnectorID, &t.ActionType, &t.AmountCents, &t.Description, &createdAt)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	t.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &t, nil
 }
@@ -271,6 +289,7 @@ func ListExpiringPaymentMethods(ctx context.Context, db DBTX, withinDays int) ([
 	var results []ExpiringPaymentMethod
 	for rows.Next() {
 		var epm ExpiringPaymentMethod
+		var pmExpAlert, pmCreated, pmUpdated, profCreated sql.NullString
 		if err := rows.Scan(
 			&epm.PaymentMethod.ID, &epm.PaymentMethod.UserID, &epm.PaymentMethod.StripePaymentMethodID,
 			&epm.PaymentMethod.Label, &epm.PaymentMethod.Brand, &epm.PaymentMethod.Last4,
@@ -278,12 +297,29 @@ func ListExpiringPaymentMethods(ctx context.Context, db DBTX, withinDays int) ([
 			&epm.PaymentMethod.BillingAddressLine1, &epm.PaymentMethod.BillingAddressLine2, &epm.PaymentMethod.BillingAddressCity,
 			&epm.PaymentMethod.BillingAddressState, &epm.PaymentMethod.BillingAddressPostal, &epm.PaymentMethod.BillingAddressCountry,
 			&epm.PaymentMethod.IsDefault, &epm.PaymentMethod.PerTransactionLimit, &epm.PaymentMethod.MonthlyLimit,
-			&epm.PaymentMethod.ExpirationAlertSentAt,
-			&epm.PaymentMethod.CreatedAt, &epm.PaymentMethod.UpdatedAt,
+			&pmExpAlert,
+			&pmCreated, &pmUpdated,
 			&epm.Profile.ID, &epm.Profile.Username, &epm.Profile.Email, &epm.Profile.Phone,
-			&epm.Profile.MarketingOptIn, &epm.Profile.CreatedAt,
+			&epm.Profile.MarketingOptIn, &profCreated,
 		); err != nil {
 			return nil, err
+		}
+		var err2 error
+		epm.PaymentMethod.ExpirationAlertSentAt, err2 = sqliteTimePtr(pmExpAlert)
+		if err2 != nil {
+			return nil, err2
+		}
+		epm.PaymentMethod.CreatedAt, err2 = sqliteTimeRequired(pmCreated)
+		if err2 != nil {
+			return nil, err2
+		}
+		epm.PaymentMethod.UpdatedAt, err2 = sqliteTimeRequired(pmUpdated)
+		if err2 != nil {
+			return nil, err2
+		}
+		epm.Profile.CreatedAt, err2 = sqliteTimeRequired(profCreated)
+		if err2 != nil {
+			return nil, err2
 		}
 		results = append(results, epm)
 	}

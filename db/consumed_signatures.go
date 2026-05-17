@@ -15,11 +15,12 @@ import (
 // not yet have an ID. expiresAt is when the row becomes safe to delete; callers
 // should set it to signed_timestamp + signature_window + skew_buffer.
 func ConsumeSignature(ctx context.Context, db DBTX, signatureHash []byte, agentID int64, expiresAt time.Time) (inserted bool, err error) {
+	expiresStr := expiresAt.UTC().Format("2006-01-02T15:04:05.000000Z")
 	tag, err := db.Exec(ctx, `
 		INSERT INTO consumed_signatures (signature_hash, agent_id, expires_at)
 		VALUES ($1, $2, $3)
 		ON CONFLICT (signature_hash) DO NOTHING`,
-		signatureHash, agentID, expiresAt,
+		signatureHash, agentID, expiresStr,
 	)
 	if err != nil {
 		return false, err
@@ -35,7 +36,7 @@ func ConsumeSignature(ctx context.Context, db DBTX, signatureHash []byte, agentI
 //
 // Returns the number of rows deleted.
 func CleanupExpiredConsumedSignatures(ctx context.Context, db DBTX) (int64, error) {
-	tag, err := db.Exec(ctx, `DELETE FROM consumed_signatures WHERE expires_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now')`)
+	tag, err := db.Exec(ctx, `DELETE FROM consumed_signatures WHERE datetime(expires_at) < datetime('now')`)
 	if err != nil {
 		return 0, err
 	}

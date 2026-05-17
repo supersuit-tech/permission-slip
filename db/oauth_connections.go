@@ -67,10 +67,37 @@ const oauthConnectionColumns = `id, user_id, provider, access_token_vault_id, re
 // scanOAuthConnection scans an OAuthConnection from a row scanner (*sql.Row or *sql.Rows).
 func scanOAuthConnection(scan func(dest ...any) error) (OAuthConnection, error) {
 	var c OAuthConnection
+	var scopesRaw []byte
+	var tokenExpiry, createdAt, updatedAt sql.NullString
+	var extraRaw []byte
 	err := scan(&c.ID, &c.UserID, &c.Provider, &c.AccessTokenVaultID,
-		&c.RefreshTokenVaultID, &c.Scopes, &c.TokenExpiry, &c.Status,
-		&c.ExtraData, &c.CreatedAt, &c.UpdatedAt)
-	return c, err
+		&c.RefreshTokenVaultID, &scopesRaw, &tokenExpiry, &c.Status,
+		&extraRaw, &createdAt, &updatedAt)
+	if err != nil {
+		return c, err
+	}
+	if len(extraRaw) > 0 {
+		c.ExtraData = json.RawMessage(extraRaw)
+	}
+	if len(scopesRaw) > 0 && string(scopesRaw) != "null" {
+		if err := json.Unmarshal(scopesRaw, &c.Scopes); err != nil {
+			return c, fmt.Errorf("unmarshal oauth scopes: %w", err)
+		}
+	}
+	var err2 error
+	c.TokenExpiry, err2 = sqliteTimePtr(tokenExpiry)
+	if err2 != nil {
+		return c, err2
+	}
+	c.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return c, err2
+	}
+	c.UpdatedAt, err2 = sqliteTimeRequired(updatedAt)
+	if err2 != nil {
+		return c, err2
+	}
+	return c, nil
 }
 
 // ListOAuthConnectionsByUser returns all OAuth connections for the given user,
@@ -151,11 +178,28 @@ func ReloadOAuthConnectionIfConcurrentRefreshSucceeded(ctx context.Context, db D
 
 // CreateOAuthConnection inserts a new OAuth connection row.
 func CreateOAuthConnection(ctx context.Context, db DBTX, p CreateOAuthConnectionParams) (*OAuthConnection, error) {
+	scopesJSON := []byte("[]")
+	if len(p.Scopes) > 0 {
+		b, err := json.Marshal(p.Scopes)
+		if err != nil {
+			return nil, fmt.Errorf("marshal scopes: %w", err)
+		}
+		scopesJSON = b
+	}
+	var tokenExpiryArg any
+	if p.TokenExpiry != nil {
+		s := p.TokenExpiry.UTC().Format("2006-01-02T15:04:05.000000Z")
+		tokenExpiryArg = s
+	}
+	extra := p.ExtraData
+	if len(extra) == 0 {
+		extra = json.RawMessage("null")
+	}
 	row := db.QueryRow(ctx, `
 		INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, refresh_token_vault_id, scopes, token_expiry, extra_data)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		RETURNING `+oauthConnectionColumns,
-		p.ID, p.UserID, p.Provider, p.AccessTokenVaultID, p.RefreshTokenVaultID, p.Scopes, p.TokenExpiry, p.ExtraData,
+		p.ID, p.UserID, p.Provider, p.AccessTokenVaultID, p.RefreshTokenVaultID, scopesJSON, tokenExpiryArg, extra,
 	)
 	c, err := scanOAuthConnection(row.Scan)
 	if err != nil {
@@ -185,6 +229,11 @@ func GetOAuthConnectionByID(ctx context.Context, db DBTX, id string) (*OAuthConn
 // after a successful token refresh. The userID parameter ensures the caller
 // owns the connection (defense-in-depth against horizontal privilege escalation).
 func UpdateOAuthConnectionTokens(ctx context.Context, db DBTX, id, userID string, accessTokenVaultID string, refreshTokenVaultID *string, tokenExpiry *time.Time) error {
+	var tokenExpiryArg any
+	if tokenExpiry != nil {
+		s := tokenExpiry.UTC().Format("2006-01-02T15:04:05.000000Z")
+		tokenExpiryArg = s
+	}
 	result, err := db.Exec(ctx, `
 		UPDATE oauth_connections
 		SET access_token_vault_id = $2,
@@ -193,7 +242,7 @@ func UpdateOAuthConnectionTokens(ctx context.Context, db DBTX, id, userID string
 		    status = $5,
 		    updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 		WHERE id = $1 AND user_id = $6`,
-		id, accessTokenVaultID, refreshTokenVaultID, tokenExpiry, OAuthStatusActive, userID)
+		id, accessTokenVaultID, refreshTokenVaultID, tokenExpiryArg, OAuthStatusActive, userID)
 	if err != nil {
 		return err
 	}
@@ -269,7 +318,7 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 		WHERE status = $1
 		  AND refresh_token_vault_id IS NOT NULL
 		  AND token_expiry IS NOT NULL
-		  AND token_expiry <= strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+' || $2 || ' seconds')
+		  AND datetime(token_expiry) <= datetime('now', '+' || $2 || ' seconds')
 		ORDER BY token_expiry ASC`,
 		OAuthStatusActive, int(horizon.Seconds()),
 	)
@@ -297,7 +346,7 @@ func ListExpiringOAuthConnections(ctx context.Context, db DBTX, horizon time.Dur
 // This function is retained for backward compatibility.
 func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType string) (*RequiredCredential, error) {
 	var rc RequiredCredential
-	var fieldsRaw []byte
+	var fieldsRaw, oauthScopesRaw []byte
 	err := db.QueryRow(ctx, `
 		SELECT crc.service, crc.auth_type, crc.instructions_url, crc.oauth_provider, crc.oauth_scopes, COALESCE(crc.credential_fields, '[]'), crc.auth_option_group
 		FROM connector_actions ca
@@ -306,12 +355,17 @@ func GetRequiredCredentialByActionType(ctx context.Context, db DBTX, actionType 
 		ORDER BY CASE WHEN crc.auth_type = 'oauth2' THEN 0 ELSE 1 END, crc.service
 		LIMIT 1`,
 		actionType,
-	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup)
+	).Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &oauthScopesRaw, &fieldsRaw, &rc.AuthOptionGroup)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
+	}
+	if len(oauthScopesRaw) > 0 && string(oauthScopesRaw) != "null" {
+		if err := json.Unmarshal(oauthScopesRaw, &rc.OAuthScopes); err != nil {
+			return nil, fmt.Errorf("unmarshal oauth_scopes: %w", err)
+		}
 	}
 	if len(fieldsRaw) > 0 && string(fieldsRaw) != "[]" && string(fieldsRaw) != "null" {
 		if err := json.Unmarshal(fieldsRaw, &rc.CredentialFields); err != nil {
@@ -344,9 +398,14 @@ func GetRequiredCredentialsByActionType(ctx context.Context, db DBTX, actionType
 	var creds []RequiredCredential
 	for rows.Next() {
 		var rc RequiredCredential
-		var fieldsRaw []byte
-		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &rc.OAuthScopes, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
+		var fieldsRaw, oauthScopesRaw []byte
+		if err := rows.Scan(&rc.Service, &rc.AuthType, &rc.InstructionsURL, &rc.OAuthProvider, &oauthScopesRaw, &fieldsRaw, &rc.AuthOptionGroup); err != nil {
 			return nil, err
+		}
+		if len(oauthScopesRaw) > 0 && string(oauthScopesRaw) != "null" {
+			if err := json.Unmarshal(oauthScopesRaw, &rc.OAuthScopes); err != nil {
+				return nil, fmt.Errorf("unmarshal oauth_scopes: %w", err)
+			}
 		}
 		if len(fieldsRaw) > 0 && string(fieldsRaw) != "[]" && string(fieldsRaw) != "null" {
 			if err := json.Unmarshal(fieldsRaw, &rc.CredentialFields); err != nil {

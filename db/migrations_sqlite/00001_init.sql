@@ -81,14 +81,30 @@ CREATE TABLE vault_secrets (
 
 CREATE TABLE profiles (
     id TEXT PRIMARY KEY,
-    username TEXT NOT NULL UNIQUE,
+    username TEXT NOT NULL,
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     email TEXT,
     phone TEXT,
     marketing_opt_in INTEGER NOT NULL DEFAULT 0,
     CONSTRAINT profiles_username_check CHECK (length(username) <= 255),
+    CONSTRAINT profiles_email_format CHECK (
+        email IS NULL OR (
+            email NOT LIKE '% %'
+            AND (length(email) - length(replace(email, '@', ''))) = 1
+            AND instr(email, '.') > instr(email, '@')
+        )
+    ),
+    CONSTRAINT profiles_phone_e164 CHECK (
+        phone IS NULL OR (
+            substr(phone, 1, 1) = '+'
+            AND length(phone) BETWEEN 2 AND 16
+            AND substr(phone, 2, 1) BETWEEN '1' AND '9'
+            AND replace(replace(replace(replace(replace(replace(replace(replace(replace(replace(substr(phone, 2), '0', ''), '1', ''), '2', ''), '3', ''), '4', ''), '5', ''), '6', ''), '7', ''), '8', ''), '9', '') = ''
+        )
+    ),
     FOREIGN KEY (id) REFERENCES users(id) ON DELETE CASCADE
 );
+CREATE UNIQUE INDEX profiles_username_key ON profiles(username);
 
 CREATE TABLE connectors (
     id TEXT PRIMARY KEY,
@@ -702,6 +718,7 @@ DROP TABLE IF EXISTS agents;
 DROP TABLE IF EXISTS connector_required_credentials;
 DROP TABLE IF EXISTS connector_actions;
 DROP TABLE IF EXISTS connectors;
+DROP INDEX IF EXISTS profiles_username_key;
 DROP TABLE IF EXISTS profiles;
 DROP TABLE IF EXISTS vault_secrets;
 DROP TABLE IF EXISTS auth_sessions;

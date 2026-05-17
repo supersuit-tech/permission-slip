@@ -30,15 +30,25 @@ const actionConfigColumns = `id, agent_id, user_id, connector_id, action_type,
 
 // scanActionConfig scans a single row into an ActionConfiguration.
 // The row must select actionConfigColumns.
-func scanActionConfig(row *sql.Row) (*ActionConfiguration, error) {
+func scanActionConfig(row rowScanner) (*ActionConfiguration, error) {
 	var ac ActionConfiguration
+	var createdAt, updatedAt sql.NullString
 	err := row.Scan(
 		&ac.ID, &ac.AgentID, &ac.UserID, &ac.ConnectorID, &ac.ActionType,
 		&ac.Parameters, &ac.Status, &ac.Name, &ac.Description,
-		&ac.CreatedAt, &ac.UpdatedAt,
+		&createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	ac.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
+	}
+	ac.UpdatedAt, err2 = sqliteTimeRequired(updatedAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &ac, nil
 }

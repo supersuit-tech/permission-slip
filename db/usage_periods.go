@@ -1,14 +1,13 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"strconv"
 	"time"
-
 )
 
 // UsagePeriod represents a row from the usage_periods table.
@@ -32,20 +31,34 @@ type UsagePeriod struct {
 
 const usagePeriodColumns = `id, user_id, period_start, period_end, request_count, sms_count, breakdown, created_at`
 
-func scanUsagePeriod(row *sql.Row) (*UsagePeriod, error) {
+func scanUsagePeriod(row rowScanner) (*UsagePeriod, error) {
 	var u UsagePeriod
+	var periodStart, periodEnd, createdAt sql.NullString
 	err := row.Scan(
 		&u.ID,
 		&u.UserID,
-		&u.PeriodStart,
-		&u.PeriodEnd,
+		&periodStart,
+		&periodEnd,
 		&u.RequestCount,
 		&u.SMSCount,
 		&u.Breakdown,
-		&u.CreatedAt,
+		&createdAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	var err2 error
+	u.PeriodStart, err2 = sqliteTimeRequired(periodStart)
+	if err2 != nil {
+		return nil, err2
+	}
+	u.PeriodEnd, err2 = sqliteTimeRequired(periodEnd)
+	if err2 != nil {
+		return nil, err2
+	}
+	u.CreatedAt, err2 = sqliteTimeRequired(createdAt)
+	if err2 != nil {
+		return nil, err2
 	}
 	return &u, nil
 }
@@ -278,4 +291,3 @@ func BillingPeriodBounds(t time.Time) (start, end time.Time) {
 	end = start.AddDate(0, 1, 0)
 	return start, end
 }
-

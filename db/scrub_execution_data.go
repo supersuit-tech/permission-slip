@@ -25,9 +25,9 @@ func ScrubSensitiveExecutionData(ctx context.Context, d DBTX) (int64, error) {
 	tag1, err := d.Exec(ctx, `
 		UPDATE approvals
 		SET execution_result = NULL,
-		    action = action - 'parameters'
+		    action = json_remove(action, '$.parameters')
 		WHERE (execution_result IS NOT NULL
-		       OR action ? 'parameters')
+		       OR json_type(action, '$.parameters') IS NOT NULL)
 		  AND (
 		    (status = 'approved'   AND executed_at  IS NOT NULL AND executed_at  < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))
 		    OR (status = 'denied'    AND denied_at    IS NOT NULL AND denied_at    < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-30 minutes'))

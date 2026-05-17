@@ -38,11 +38,18 @@ func getSharedPool(t *testing.T) *db.Pool {
 		defer cancel()
 		path := TestDatabasePath()
 
-		if err := db.Migrate(ctx, path); err != nil {
-			sharedPoolErr = fmt.Errorf("migrate test database: %w", err)
+		var err error
+		sharedPool, err = db.Connect(ctx, path)
+		if err != nil {
+			sharedPoolErr = fmt.Errorf("connect test database: %w", err)
 			return
 		}
-		sharedPool, sharedPoolErr = db.Connect(ctx, path)
+		if err := db.MigratePool(ctx, sharedPool); err != nil {
+			sharedPoolErr = fmt.Errorf("migrate test database: %w", err)
+			_ = sharedPool.Close()
+			sharedPool = nil
+			return
+		}
 	})
 	if sharedPoolErr != nil {
 		t.Fatalf("failed to initialize shared test pool: %v", sharedPoolErr)

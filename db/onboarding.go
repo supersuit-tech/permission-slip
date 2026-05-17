@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -29,13 +30,26 @@ func CreateProfile(ctx context.Context, db DBTX, userID, username, email string,
 		emailArg = &email
 	}
 
-	var p Profile
-	err := db.QueryRow(ctx,
+	// profiles.id references users(id); JWT-authenticated onboarding may run
+	// before any auth/signup row exists locally (tests use session-only JWT).
+	stubEmail := email
+	if stubEmail == "" {
+		stubEmail = userID + "@onboarding.local"
+	}
+	if _, err := db.Exec(ctx,
+		`INSERT INTO users (id, email, password_hash) VALUES ($1, $2, 'onboarding-pending')
+		 ON CONFLICT (id) DO NOTHING`,
+		userID, stubEmail,
+	); err != nil {
+		return nil, fmt.Errorf("ensure user row: %w", err)
+	}
+
+	p, err := scanProfile(db.QueryRow(ctx,
 		`INSERT INTO profiles (id, username, email, marketing_opt_in)
 		 VALUES ($1, $2, $3, $4)
 		 RETURNING id, username, email, phone, marketing_opt_in, created_at`,
 		userID, username, emailArg, marketingOptIn,
-	).Scan(&p.ID, &p.Username, &p.Email, &p.Phone, &p.MarketingOptIn, &p.CreatedAt)
+	))
 
 	if err != nil {
 		if IsUniqueViolation(err) {
@@ -67,5 +81,5 @@ func CreateProfile(ctx context.Context, db DBTX, userID, username, email string,
 		return nil, err
 	}
 
-	return &p, nil
+	return p, nil
 }

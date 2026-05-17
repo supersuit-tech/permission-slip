@@ -91,9 +91,9 @@ func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
 	// free-tier default. This is defensive — every user should have
 	// a subscription, but we don't want orphaned events to accumulate.
 	tag2, err := db.Exec(ctx,
-		`DELETE FROM audit_events ae
-		 WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = ae.user_id)
-		   AND ae.created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-' || $1 || ' days')`,
+		`DELETE FROM audit_events
+		 WHERE NOT EXISTS (SELECT 1 FROM subscriptions s WHERE s.user_id = audit_events.user_id)
+		   AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-' || $1 || ' days')`,
 		defaultRetention)
 	if err != nil {
 		return RowsAffected(tag1), fmt.Errorf("purge expired audit events (unsubscribed users): %w", err)

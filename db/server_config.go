@@ -1,9 +1,9 @@
 package db
 
 import (
-	"database/sql"
 	"context"
-
+	"database/sql"
+	"errors"
 )
 
 // GetServerConfig returns the value for the given key, or empty string if not found.

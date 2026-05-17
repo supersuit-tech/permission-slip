@@ -11,6 +11,6 @@ import (
 func InsertSubscription(t *testing.T, d db.DBTX, userID, planID string) {
 	t.Helper()
 	mustExec(t, d,
-		`INSERT INTO subscriptions (user_id, plan_id) VALUES ($1, $2)`,
-		userID, planID)
+		`INSERT INTO subscriptions (id, user_id, plan_id) VALUES ($1, $2, $3)`,
+		GenerateID(t, "sub_"), userID, planID)
 }

@@ -21,6 +21,12 @@ type DBTX interface {
 	QueryRow(ctx context.Context, query string, args ...any) *sql.Row
 }
 
+// rowScanner matches *sql.Row and *sql.Rows for Scan-only helpers. When the
+// underlying value is *sql.Rows, Scan must only be called after Next is true.
+type rowScanner interface {
+	Scan(dest ...any) error
+}
+
 // stdlibSQL is the subset of *sql.DB / *sql.Tx that Pool / Tx delegate to.
 type stdlibSQL interface {
 	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
@@ -179,7 +185,10 @@ func OpenMigrationDB(path string) (*sql.DB, error) {
 	return conn, nil
 }
 
-// Migrate runs all pending migrations against the database.
+// Migrate runs all pending migrations against the database at path.
+// For file-backed databases the migration connection is closed after Up and
+// the schema persists on disk. Callers opening :memory: separately should use
+// MigratePool on the live pool instead (see testhelper).
 func Migrate(ctx context.Context, path string) error {
 	conn, err := OpenMigrationDB(path)
 	if err != nil {
@@ -187,6 +196,20 @@ func Migrate(ctx context.Context, path string) error {
 	}
 	defer conn.Close()
 	if err := goose.UpContext(ctx, conn, "migrations_sqlite"); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
+	}
+	return nil
+}
+
+// MigratePool applies embedded SQLite migrations to an already-open pool.
+// Required for shared-cache :memory: databases: migrating on a temporary
+// connection then closing it drops the entire in-memory schema.
+func MigratePool(ctx context.Context, pool *Pool) error {
+	goose.SetBaseFS(Migrations)
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		return fmt.Errorf("set goose dialect: %w", err)
+	}
+	if err := goose.UpContext(ctx, pool.raw, "migrations_sqlite"); err != nil {
 		return fmt.Errorf("run migrations: %w", err)
 	}
 	return nil

@@ -1,6 +1,7 @@
 package testhelper
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -13,7 +14,7 @@ func InsertOAuthConnection(t *testing.T, d db.DBTX, connID, userID, provider str
 	t.Helper()
 	mustExec(t, d,
 		`INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, scopes, status)
-		 VALUES ($1, $2, $3, '00000000-0000-0000-0000-000000000001', '{}', 'active')`,
+		 VALUES ($1, $2, $3, '00000000-0000-0000-0000-000000000001', '[]', 'active')`,
 		connID, userID, provider)
 }
 
@@ -39,18 +40,34 @@ func InsertOAuthConnectionFull(t *testing.T, d db.DBTX, connID, userID, provider
 	if accessVaultID == "" {
 		accessVaultID = "00000000-0000-0000-0000-000000000001"
 	}
+	scopesJSON, err := json.Marshal(opts.Scopes)
+	if err != nil {
+		t.Fatalf("marshal oauth scopes: %v", err)
+	}
+	var expiryArg any
+	if opts.TokenExpiry != nil {
+		expiryArg = opts.TokenExpiry.UTC().Format("2006-01-02T15:04:05.000000Z")
+	}
+	var extraArg any
+	if len(opts.ExtraData) > 0 {
+		extraArg = opts.ExtraData
+	}
 	mustExec(t, d,
 		`INSERT INTO oauth_connections (id, user_id, provider, access_token_vault_id, refresh_token_vault_id, scopes, token_expiry, status, extra_data)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		connID, userID, provider, accessVaultID, opts.RefreshTokenVaultID, opts.Scopes, opts.TokenExpiry, status, opts.ExtraData)
+		connID, userID, provider, accessVaultID, opts.RefreshTokenVaultID, string(scopesJSON), expiryArg, status, extraArg)
 }
 
 // InsertConnectorRequiredCredentialOAuth creates an OAuth-type required credential entry.
 // The connector must already exist via InsertConnector.
 func InsertConnectorRequiredCredentialOAuth(t *testing.T, d db.DBTX, connectorID, service, oauthProvider string, oauthScopes []string) {
 	t.Helper()
+	scopesJSON, err := json.Marshal(oauthScopes)
+	if err != nil {
+		t.Fatalf("marshal oauth scopes: %v", err)
+	}
 	mustExec(t, d,
 		`INSERT INTO connector_required_credentials (connector_id, service, auth_type, oauth_provider, oauth_scopes)
 		 VALUES ($1, $2, 'oauth2', $3, $4)`,
-		connectorID, service, oauthProvider, oauthScopes)
+		connectorID, service, oauthProvider, string(scopesJSON))
 }
