@@ -16,7 +16,7 @@ func TestCreateExpoPushToken_Valid(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/expo-push-tokens", uid,
@@ -46,7 +46,7 @@ func TestCreateExpoPushToken_ExpoPushTokenPrefix(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/expo-push-tokens", uid,
@@ -65,7 +65,7 @@ func TestCreateExpoPushToken_EmptyToken(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/expo-push-tokens", uid,
@@ -84,7 +84,7 @@ func TestCreateExpoPushToken_InvalidPrefix(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/expo-push-tokens", uid,
@@ -103,7 +103,7 @@ func TestCreateExpoPushToken_Idempotent(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"token":"ExponentPushToken[idempotent]"}`
@@ -146,7 +146,7 @@ func TestListExpoPushTokens_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/expo-push-tokens", uid)
@@ -172,7 +172,7 @@ func TestDeleteExpoPushToken_Success(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Create a token first
@@ -211,7 +211,7 @@ func TestDeleteExpoPushToken_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/expo-push-tokens/99999", uid)
@@ -231,7 +231,7 @@ func TestDeleteExpoPushToken_WrongUser(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid1, "u_"+uid1[:8])
 	testhelper.InsertUser(t, tx, uid2, "u_"+uid2[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// User1 creates a token
@@ -259,7 +259,7 @@ func TestDeleteExpoPushToken_InvalidID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/expo-push-tokens/not-a-number", uid)
@@ -277,7 +277,7 @@ func TestCreateExpoPushToken_WhitespaceTrimmed(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Token with leading/trailing whitespace should be trimmed

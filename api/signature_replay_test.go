@@ -23,7 +23,7 @@ func TestSignatureReplay_DuplicateRejected(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
 
 	path := fmt.Sprintf("/agents/%d/capabilities", agentID)
 	ts := time.Now().Unix()
@@ -60,7 +60,7 @@ func TestSignatureReplay_DifferentTimestampsAllowed(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
 
 	path := fmt.Sprintf("/agents/%d/capabilities", agentID)
 	now := time.Now().Unix()

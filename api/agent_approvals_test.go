@@ -20,7 +20,7 @@ func testDepsForDB(t *testing.T, tx db.DBTX) *Deps {
 	t.Helper()
 	return &Deps{
 		DB:                tx,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 	}
 }
 
@@ -38,7 +38,7 @@ func TestAgentRequestApproval_Success(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_001","action":{"type":"email.send","parameters":{"to":"alice@example.com"}},"context":{"description":"Send email to Alice"}}`
@@ -88,7 +88,7 @@ func TestAgentRequestApproval_UnknownActionType(t *testing.T) {
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector("google", "google.list_emails"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	// Use "gmail.list_messages" — a plausible but unregistered action type.
@@ -130,7 +130,7 @@ func TestAgentRequestApproval_KnownActionType(t *testing.T) {
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector("google", "google.list_emails"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_known","action":{"type":"google.list_emails","parameters":{}},"context":{"description":"List emails"}}`
@@ -167,7 +167,7 @@ func TestAgentRequestApproval_CustomExpiresIn(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_002","action":{"type":"email.send"},"context":{"description":"test"},"expires_in":3600}`
@@ -208,7 +208,7 @@ func TestAgentRequestApproval_DuplicateRequestID(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_dup_test","action":{"type":"email.send"},"context":{"description":"test"}}`
@@ -252,7 +252,7 @@ func TestAgentRequestApproval_MissingFields(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	tests := []struct {
@@ -291,7 +291,7 @@ func TestAgentRequestApproval_MissingActionType(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_no_type","action":{"parameters":{}},"context":{"description":"test"}}`
@@ -316,7 +316,7 @@ func TestAgentRequestApproval_InvalidExpiresIn(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// expires_in too small (< 60 seconds).
@@ -333,7 +333,7 @@ func TestAgentRequestApproval_InvalidExpiresIn(t *testing.T) {
 func TestAgentRequestApproval_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/approvals/request", nil)
@@ -357,7 +357,7 @@ func TestAgentRequestApproval_ApprovalAppearsInDashboardList(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Create an approval as the agent.
@@ -419,7 +419,7 @@ func TestAgentCancelApproval_Success(t *testing.T) {
 	apprID := testhelper.GenerateID(t, "appr_")
 	testhelper.InsertApproval(t, tx, apprID, agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := signedJSONRequest(t, http.MethodPost, "/approvals/"+apprID+"/cancel", "", privKey, agentID)
@@ -469,7 +469,7 @@ func TestAgentCancelApproval_NotFound(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := signedJSONRequest(t, http.MethodPost, "/approvals/appr_nonexistent/cancel", "", privKey, agentID)
@@ -495,7 +495,7 @@ func TestAgentCancelApproval_AlreadyApproved(t *testing.T) {
 	apprID := testhelper.GenerateID(t, "appr_")
 	testhelper.InsertApprovalWithStatus(t, tx, apprID, agentID, uid, "approved")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := signedJSONRequest(t, http.MethodPost, "/approvals/"+apprID+"/cancel", "", privKey, agentID)
@@ -527,7 +527,7 @@ func TestAgentCancelApproval_Expired(t *testing.T) {
 	apprID := testhelper.GenerateID(t, "appr_")
 	testhelper.InsertApprovalWithExpiresAt(t, tx, apprID, agentID, uid, time.Now().Add(-1*time.Hour))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := signedJSONRequest(t, http.MethodPost, "/approvals/"+apprID+"/cancel", "", privKey, agentID)
@@ -560,7 +560,7 @@ func TestAgentCancelApproval_OtherAgentsApproval(t *testing.T) {
 	apprID := testhelper.GenerateID(t, "appr_")
 	testhelper.InsertApproval(t, tx, apprID, agent1, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Agent 2 tries to cancel agent 1's approval — should get 404.
@@ -576,7 +576,7 @@ func TestAgentCancelApproval_OtherAgentsApproval(t *testing.T) {
 func TestAgentCancelApproval_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/approvals/appr_xyz/cancel", nil)
@@ -602,7 +602,7 @@ func TestAgentApproval_RequestThenCancel(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// 1. Agent requests approval.
@@ -657,7 +657,7 @@ func TestAgentRequestApproval_EmitsAuditEvent(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_audit","action":{"type":"email.send"},"context":{"description":"test"}}`
@@ -967,7 +967,7 @@ func TestAgentRequestApproval_RequestValidatorRejectsInvalidChannel(t *testing.T
 	registry.Register(slack.New())
 	deps := &Deps{
 		DB:                tx,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		Connectors:        registry,
 	}
 	router := NewRouter(deps)
@@ -1011,7 +1011,7 @@ func TestAgentRequestApproval_RequestValidatorAllowsValidChannel(t *testing.T) {
 	registry.Register(slack.New())
 	deps := &Deps{
 		DB:                tx,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		Connectors:        registry,
 	}
 	router := NewRouter(deps)
@@ -1101,7 +1101,7 @@ func TestAgentRequestApproval_MultiInstance_UsesDefaultWhenUnset(t *testing.T) {
 
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector(connID, connID+".ping"))
-	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, Vault: v, JWTSigningSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_mi_need_inst","action":{"type":"` + connID + `.ping","parameters":{}},"context":{"description":"x"}}`
@@ -1213,7 +1213,7 @@ func TestAgentRequestApproval_MultiInstance_NoDefault_RequiresConnectorInstance(
 
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector(connID, connID+".ping"))
-	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, Vault: v, JWTSigningSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_mi_need_inst_nd","action":{"type":"` + connID + `.ping","parameters":{}},"context":{"description":"x"}}`
@@ -1312,7 +1312,7 @@ func TestAgentRequestApproval_MultiInstance_ExplicitSelector_OverridesDefault(t 
 
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector(connID, connID+".ping"))
-	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, Vault: v, JWTSigningSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_mi_override","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"` + inst2.ConnectorInstanceID + `"}},"context":{"description":"x"}}`
@@ -1405,7 +1405,7 @@ func TestAgentRequestApproval_MultiInstance_WithLabel_FreezesInstanceOnAction(t 
 
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector(connID, connID+".ping"))
-	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, Vault: v, JWTSigningSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_mi_label","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"Sales"}},"context":{"description":"x"}}`
@@ -1513,7 +1513,7 @@ func TestAgentRequestApproval_MultiInstance_OnlyConnectorInstance_PreservesEmpty
 
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector(connID, connID+".ping"))
-	deps := &Deps{DB: tx, Vault: v, SupabaseJWTSecret: testJWTSecret, Connectors: reg}
+	deps := &Deps{DB: tx, Vault: v, JWTSigningSecret: testJWTSecret, Connectors: reg}
 	router := NewRouter(deps)
 
 	// Body sends connector_instance as the ONLY parameter.

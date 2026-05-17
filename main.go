@@ -113,26 +113,7 @@ func main() {
 	// Configure dependencies
 	var deps api.Deps
 	deps.Logger = logger
-	deps.SupabaseJWTSecret = os.Getenv("SUPABASE_JWT_SECRET")
-	deps.SupabaseJWKSURL = os.Getenv("SUPABASE_JWKS_URL")
-	deps.SupabaseURL = strings.TrimRight(os.Getenv("SUPABASE_URL"), "/")
-	deps.SupabaseServiceRoleKey = os.Getenv("SUPABASE_SERVICE_ROLE_KEY")
-	// Derive JWKS URL from SUPABASE_URL if not explicitly set.
-	// Supabase CLI v2+ uses ES256 (asymmetric signing); the JWKS endpoint
-	// provides the public key. Legacy CLI v1 and tests use HS256 + JWT secret.
-	if deps.SupabaseJWKSURL == "" {
-		if deps.SupabaseURL != "" {
-			deps.SupabaseJWKSURL = deps.SupabaseURL + "/auth/v1/.well-known/jwks.json"
-		}
-	}
-	if deps.SupabaseJWKSURL != "" {
-		deps.JWKSCache = api.NewJWKSCache(deps.SupabaseJWKSURL)
-		log.Printf("JWT: using JWKS endpoint %s (ES256 support enabled)", deps.SupabaseJWKSURL)
-	} else if deps.SupabaseJWTSecret != "" {
-		log.Printf("JWT: using HS256 secret (legacy/test mode)")
-	} else {
-		log.Printf("Warning: neither SUPABASE_JWKS_URL/SUPABASE_URL nor SUPABASE_JWT_SECRET is set; authentication will fail")
-	}
+	deps.JWTSigningSecret = strings.TrimSpace(os.Getenv("JWT_SIGNING_SECRET"))
 	deps.BillingEnabled = os.Getenv("BILLING_ENABLED") == "true"
 	if deps.BillingEnabled {
 		log.Println("Billing: enabled (new users get free plan, Stripe/metering active)")
@@ -167,6 +148,7 @@ func main() {
 	deps.DevMode = os.Getenv("MODE") == "development"
 	if !deps.DevMode {
 		deps.RateLimiter = api.NewRateLimiter(api.DefaultRateLimiterConfig())
+		deps.AuthRateLimiter = api.NewRateLimiter(api.AuthRateLimiterConfig())
 		deps.AgentRateLimiter = api.NewRateLimiter(api.DefaultAgentRateLimiterConfig())
 		deps.VerifyRateLimiter = api.NewRateLimiter(api.DefaultVerifyRateLimiterConfig())
 		deps.TrustedProxyHeader = os.Getenv("TRUSTED_PROXY_HEADER")
@@ -398,6 +380,9 @@ func main() {
 		healthPinger = p
 	}
 	mux.HandleFunc("GET /api/health", handleHealth(healthPinger))
+	authMux := http.NewServeMux()
+	api.RegisterAuthRoutes(authMux, &deps)
+	mux.Handle("/api/auth/", http.StripPrefix("/api/auth", authMux))
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", api.NewRouter(&deps)))
 
 	// Stripe webhook endpoint lives outside /api/v1/ — it must bypass auth
@@ -414,19 +399,6 @@ func main() {
 	// URL (e.g., https://app.permissionslip.dev/invite/PS-XXXX-XXXX), not a
 	// versioned API resource.
 	mux.Handle("/invite/", api.InviteHandler(&deps))
-
-	// Supabase reverse proxy — lets the frontend reach Supabase Auth through
-	// the same origin as the app, eliminating CORS issues and extra port
-	// exposure. Active when SUPABASE_URL is set. The frontend falls back to
-	// this proxy automatically when VITE_SUPABASE_URL is not baked in.
-	if deps.SupabaseURL != "" {
-		supabaseTarget, err := url.Parse(deps.SupabaseURL)
-		if err != nil {
-			log.Fatalf("invalid SUPABASE_URL for proxy: %v", err)
-		}
-		mux.Handle("/supabase/", supabaseProxy(supabaseTarget))
-		log.Printf("Supabase proxy: /supabase/* → %s", deps.SupabaseURL)
-	}
 
 	// In production, serve the built React app.
 	// In development, use Vite's dev server (port 5173) instead.
@@ -458,14 +430,6 @@ func main() {
 	// report-uri so CSP violations show up as Sentry events.
 	sentryCSPEndpoint := os.Getenv("SENTRY_CSP_ENDPOINT")
 	var extraConnectSrc []string
-	if rawSupabaseURL := strings.TrimSpace(os.Getenv("SUPABASE_URL")); rawSupabaseURL != "" {
-		parsed, err := url.Parse(rawSupabaseURL)
-		if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-			log.Printf("Warning: SUPABASE_URL %q is not a valid URL; skipping CSP connect-src entry", rawSupabaseURL)
-		} else {
-			extraConnectSrc = append(extraConnectSrc, parsed.Scheme+"://"+parsed.Host)
-		}
-	}
 	var extraScriptSrc []string
 	// PostHog product analytics — allow the frontend to send events and load
 	// SDK assets (config.js, toolbar, surveys) from the PostHog proxy host.

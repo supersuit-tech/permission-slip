@@ -22,7 +22,7 @@ func setupInviteTest(t *testing.T, modDeps ...func(*Deps)) (http.Handler, string
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	for _, fn := range modDeps {
 		fn(deps)
 	}
@@ -182,7 +182,7 @@ func TestCreateRegistrationInvite_TTLTooHigh(t *testing.T) {
 
 func TestCreateRegistrationInvite_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := strings.NewReader(`{}`)
@@ -199,7 +199,7 @@ func TestCreateRegistrationInvite_Unauthenticated(t *testing.T) {
 
 func TestCreateRegistrationInvite_NilDB(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	uid := testhelper.GenerateUID(t)
@@ -236,7 +236,7 @@ func TestCreateRegistrationInvite_ProfileNotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	// Auth user exists in Supabase but has no profile row
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/registration-invites", uid, `{}`)
@@ -406,7 +406,7 @@ func TestCreateRegistrationInvite_RateLimitPerUser(t *testing.T) {
 	testhelper.InsertUser(t, tx, userA, "u_"+userA[:8])
 	testhelper.InsertUser(t, tx, userB, "u_"+userB[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Exhaust user A's quota.

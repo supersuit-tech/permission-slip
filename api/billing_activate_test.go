@@ -22,7 +22,7 @@ func TestActivate_MissingSessionID(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/billing/activate", uid, `{}`)
@@ -50,7 +50,7 @@ func TestActivate_AlreadyOnPaidPlan(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/billing/activate", uid, `{"session_id":"cs_test_123"}`)
@@ -82,7 +82,7 @@ func TestActivate_NoStripeClient(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// No Stripe client → 503.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/billing/activate", uid, `{"session_id":"cs_test_123"}`)
@@ -103,7 +103,7 @@ func TestActivate_NoSubscription(t *testing.T) {
 	// No subscription at all — should hit the Stripe call which will fail,
 	// but the nil subscription check for customer mismatch should catch it.
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/billing/activate", uid, `{"session_id":"cs_test_123"}`)
@@ -136,7 +136,7 @@ func TestActivate_CustomerMismatch(t *testing.T) {
 	// The test for NoStripeClient above validates the error path instead.
 	// A full integration test would use Stripe's test mode.
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/billing/activate", uid, `{"session_id":"cs_test_fake"}`)

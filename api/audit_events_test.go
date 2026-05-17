@@ -28,7 +28,7 @@ func TestListAuditEvents_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-events", uid)
@@ -58,7 +58,7 @@ func TestListAuditEvents_ReturnsEvents(t *testing.T) {
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-events", uid)
@@ -94,7 +94,7 @@ func TestListAuditEvents_WithFilters(t *testing.T) {
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Filter by outcome
@@ -125,7 +125,7 @@ func TestListAuditEvents_FilterByEventType(t *testing.T) {
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-events?event_type=approval.denied", uid)
@@ -158,7 +158,7 @@ func TestListAuditEvents_FilterByAgentID(t *testing.T) {
 	testhelper.InsertAuditEvent(t, tx, uid, agent1, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 	testhelper.InsertAuditEvent(t, tx, uid, agent2, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-events?agent_id="+itoa64(agent1), uid)
@@ -193,7 +193,7 @@ func TestListAuditEvents_Pagination(t *testing.T) {
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), ts)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Page 1
@@ -257,7 +257,7 @@ func TestListAuditEvents_InvalidLimit(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	for _, limit := range []string{"abc", "0", "-1", "101"} {
@@ -277,7 +277,7 @@ func TestListAuditEvents_InvalidFilters(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	tests := []struct {
@@ -308,7 +308,7 @@ func TestListAuditEvents_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/audit-events", nil)
@@ -329,7 +329,7 @@ func TestListAuditEvents_ResponseStructure(t *testing.T) {
 
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-events", uid)
@@ -393,7 +393,7 @@ func TestExportAuditLogs_RequiresSince(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs", uid)
@@ -411,7 +411,7 @@ func TestExportAuditLogs_InvalidSince(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=not-a-timestamp", uid)
@@ -429,7 +429,7 @@ func TestExportAuditLogs_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-01-01T00:00:00Z", uid)
@@ -461,7 +461,7 @@ func TestExportAuditLogs_FiltersBySince(t *testing.T) {
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), old)
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"), recent)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// since=2026-02-01 should only return the recent event.
@@ -494,7 +494,7 @@ func TestExportAuditLogs_ChronologicalOrder(t *testing.T) {
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), ts)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-01-01T00:00:00Z", uid)
@@ -533,7 +533,7 @@ func TestExportAuditLogs_Pagination(t *testing.T) {
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), ts)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Page 1
@@ -597,7 +597,7 @@ func TestExportAuditLogs_InvalidLimit(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	for _, limit := range []string{"abc", "0", "-1", "1001"} {
@@ -615,7 +615,7 @@ func TestExportAuditLogs_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/audit-logs?since=2026-01-01T00:00:00Z", nil)
@@ -638,7 +638,7 @@ func TestExportAuditLogs_DoesNotLeakOtherUsers(t *testing.T) {
 	testhelper.InsertAuditEvent(t, tx, uid1, agentID1, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 	testhelper.InsertAuditEvent(t, tx, uid2, agentID2, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2020-01-01T00:00:00Z", uid1)
@@ -666,7 +666,7 @@ func TestExportAuditLogs_IncludesIDAndSourceID(t *testing.T) {
 
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2020-01-01T00:00:00Z", uid)
@@ -708,7 +708,7 @@ func TestExportAuditLogs_UntilFilter(t *testing.T) {
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"), feb)
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.cancelled", "cancelled", testhelper.GenerateID(t, "appr_"), mar)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// since=jan, until=mar should return jan and feb events
@@ -732,7 +732,7 @@ func TestExportAuditLogs_UntilBeforeSince(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-03-01T00:00:00Z&until=2026-01-01T00:00:00Z", uid)
@@ -754,7 +754,7 @@ func TestExportAuditLogs_EventTypeFilter(t *testing.T) {
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"))
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "agent.registered", "registered", "ar:"+itoa64(agentID))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2020-01-01T00:00:00Z&event_type=approval.approved,approval.denied", uid)
@@ -782,7 +782,7 @@ func TestExportAuditLogs_InvalidEventType(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2020-01-01T00:00:00Z&event_type=bogus.type", uid)
@@ -802,7 +802,7 @@ func TestExportAuditLogs_ActivityFeedOmitsID(t *testing.T) {
 
 	testhelper.InsertAuditEvent(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// The activity feed (GET /audit-events) should NOT include id but SHOULD

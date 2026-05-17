@@ -36,7 +36,7 @@ func TestGetBillingPlan_ReturnsPlanSubscriptionUsage(t *testing.T) {
 		}
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -102,7 +102,7 @@ func TestGetBillingPlan_CouponRedemptionEnabled(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, CouponSecret: "x"}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, CouponSecret: "x"}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -128,7 +128,7 @@ func TestGetBillingPlan_NoSubscription(t *testing.T) {
 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -148,7 +148,7 @@ func TestGetBillingPlan_ZeroUsage(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -191,7 +191,7 @@ func TestGetBillingPlan_QuotaGraceEffectiveLimits(t *testing.T) {
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
 		uid, paid, db.TimestampForSQLite(future))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -234,7 +234,7 @@ func TestGetBillingPlan_PaidPlan(t *testing.T) {
 	// Insert a payment method to verify has_payment_method.
 	testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{IsDefault: true})
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -281,7 +281,7 @@ func TestGetBillingPlan_FreePlan_IncludesPricing(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -321,7 +321,7 @@ func TestGetBillingPlan_HasPaymentMethodTrueViaStripeSubscription(t *testing.T) 
 		t.Fatalf("UpdateSubscriptionStripe: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -357,7 +357,7 @@ func TestGetBillingPlan_HasPaymentMethodFalseAfterDowngrade(t *testing.T) {
 		t.Fatalf("UpdateSubscriptionStripe: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/plan", uid)
@@ -388,7 +388,7 @@ func TestGetSubscription_ReturnsSubscription(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/subscription", uid)
@@ -431,7 +431,7 @@ func TestGetSubscription_NoSubscription(t *testing.T) {
 	// Create profile but no subscription.
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/subscription", uid)
@@ -460,7 +460,7 @@ func TestGetSubscription_WithUsage(t *testing.T) {
 		}
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/subscription", uid)
@@ -495,7 +495,7 @@ func TestCreateCheckout_RequiresStripeClient(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// No Stripe client configured → should return 503.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/checkout", uid)
@@ -517,7 +517,7 @@ func TestCreateCheckout_AlreadyPaid(t *testing.T) {
 
 	// Business logic (already-paid) is checked before Stripe dependency,
 	// so even with nil Stripe the user gets the correct 409 error.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/checkout", uid)
@@ -548,7 +548,7 @@ func TestGetSubscription_HasPaymentMethodWhenPaymentMethodExists(t *testing.T) {
 	// Insert a payment method.
 	testhelper.InsertPaymentMethod(t, tx, uid, testhelper.PaymentMethodOpts{IsDefault: true})
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/subscription", uid)
@@ -598,7 +598,7 @@ func TestGetUsage_ReturnsUsage(t *testing.T) {
 		}
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/usage", uid)
@@ -640,7 +640,7 @@ func TestGetUsage_NoSubscription(t *testing.T) {
 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/usage", uid)
@@ -660,7 +660,7 @@ func TestGetUsage_ZeroUsage(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/usage", uid)
@@ -698,7 +698,7 @@ func TestGetUsage_WithOverage(t *testing.T) {
 		 VALUES ($1, $2, $3, 1050)`,
 		uid, periodStart, periodEnd)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/usage", uid)
@@ -741,7 +741,7 @@ func TestGetUsage_HistoricalPeriod(t *testing.T) {
 		 VALUES ($1, $2, $3, 800, 2)`,
 		uid, periodStart, periodEnd)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/usage?period_start=2026-02-01T00:00:00Z", uid)
@@ -776,7 +776,7 @@ func TestGetUsage_InvalidPeriodStart(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/usage?period_start=not-a-date", uid)
@@ -799,7 +799,7 @@ func TestUpgrade_RequiresStripeClient(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// No Stripe client → 503.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/upgrade", uid)
@@ -821,7 +821,7 @@ func TestDowngrade_AlreadyFree(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
@@ -854,7 +854,7 @@ func TestDowngrade_EndQuotaGraceNow_ClearsPaidQuotas(t *testing.T) {
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE user_id = $1`,
 		uid, db.PlanPayAsYouGo, db.TimestampForSQLite(future))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
@@ -899,7 +899,7 @@ func TestDowngrade_EndQuotaGraceNow_PastEntitlementsReturnsAlreadyDowngraded(t *
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3 WHERE user_id = $1`,
 		uid, db.PlanPayAsYouGo, db.TimestampForSQLite(past))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
@@ -935,7 +935,7 @@ func TestDowngrade_EndQuotaGraceNow_DoubleCallReturns409(t *testing.T) {
 		`UPDATE subscriptions SET quota_plan_id = $2, quota_entitlements_until = $3, downgraded_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE user_id = $1`,
 		uid, db.PlanPayAsYouGo, db.TimestampForSQLite(future))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	// First request succeeds — clears quota grace.
@@ -971,7 +971,7 @@ func TestDowngrade_NoSubscription(t *testing.T) {
 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
@@ -992,7 +992,7 @@ func TestDowngrade_Success_NoStripe(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
 	// No Stripe client — downgrade should still succeed locally.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
@@ -1045,7 +1045,7 @@ func TestDowngrade_WarnsWhenOverFreeAgentLimit(t *testing.T) {
 		testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
@@ -1080,7 +1080,7 @@ func TestDowngrade_WarnsWhenOverFreeStandingApprovalLimit(t *testing.T) {
 		testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
@@ -1121,7 +1121,7 @@ func TestDowngrade_WarnsWhenOverFreeCredentialLimit(t *testing.T) {
 		testhelper.InsertCredential(t, tx, credID, uid, service)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/downgrade", uid)
@@ -1157,7 +1157,7 @@ func TestListInvoices_RequiresStripeClient(t *testing.T) {
 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/invoices", uid)
@@ -1178,7 +1178,7 @@ func TestListInvoices_NoStripeCustomer(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// Stripe is configured but user has no Stripe customer ID → empty list.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/invoices", uid)
@@ -1285,7 +1285,7 @@ func TestListInvoices_NoSubscription(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	// No subscription → empty list (not an error).
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/billing/invoices", uid)
@@ -1316,7 +1316,7 @@ func TestBillingPortal_RequiresStripeClient(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// No Stripe client → 503.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: nil}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/portal", uid)
@@ -1337,7 +1337,7 @@ func TestBillingPortal_NoCustomerID_Returns404(t *testing.T) {
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	// Stripe client present but user has no stripe_customer_id → 404.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true, Stripe: pstripe.New(pstripe.Config{})}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/billing/portal", uid)

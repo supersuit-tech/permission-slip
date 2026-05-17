@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/supersuit-tech/permission-slip/auth"
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/vault"
 )
@@ -156,7 +157,7 @@ func TestIntegration_VaultStoreAndReadRoundTrip(t *testing.T) {
 	uid := setupIntegrationUser(t, pool)
 
 	// Store credential via API.
-	deps := &Deps{DB: pool, Vault: v, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, Vault: v, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	creds := map[string]any{"api_key": "ghp_roundtrip_test", "org": "testorg"}
@@ -213,7 +214,7 @@ func TestIntegration_VaultStoreAndDeleteRoundTrip(t *testing.T) {
 	v := vault.NewSupabaseVaultStore()
 	uid := setupIntegrationUser(t, pool)
 
-	deps := &Deps{DB: pool, Vault: v, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, Vault: v, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Store.
@@ -305,7 +306,7 @@ func TestIntegration_GetDecryptedCredentials(t *testing.T) {
 	uid := setupIntegrationUser(t, pool)
 
 	// Store credential via API so both credential row and vault secret exist.
-	deps := &Deps{DB: pool, Vault: v, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, Vault: v, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "stripe", "credentials": {"api_key": "sk_test_e2e", "account_id": "acct_123"}}`
@@ -336,7 +337,7 @@ func TestIntegration_CredentialList_WithRealVault(t *testing.T) {
 	v := vault.NewSupabaseVaultStore()
 	uid := setupIntegrationUser(t, pool)
 
-	deps := &Deps{DB: pool, Vault: v, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, Vault: v, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Store multiple credentials for different services.
@@ -415,7 +416,7 @@ func TestIntegration_DuplicateCredential_NoOrphanedVaultSecret(t *testing.T) {
 	v := vault.NewSupabaseVaultStore()
 	uid := setupIntegrationUser(t, pool)
 
-	deps := &Deps{DB: pool, Vault: v, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, Vault: v, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Store a credential for "github".
@@ -476,7 +477,7 @@ func TestIntegration_LargeCredentialPayload_RoundTrip(t *testing.T) {
 	v := vault.NewSupabaseVaultStore()
 	uid := setupIntegrationUser(t, pool)
 
-	deps := &Deps{DB: pool, Vault: v, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, Vault: v, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Build a ~10KB credentials payload.
@@ -533,7 +534,7 @@ func TestIntegration_LargeCredentialPayload_RoundTrip(t *testing.T) {
 func TestIntegration_FullE2E_GoTrueAuth_VaultCredentials(t *testing.T) {
 	// This test exercises the ENTIRE stack with no mocks:
 	// 1. Sign up via real GoTrue (creates auth.users row)
-	// 2. Get a real ES256 JWT validated via real JWKS
+	// 2. Issue an HS256 access JWT with the same secret as the API (self-hosted auth)
 	// 3. Create a profile via POST /onboarding
 	// 4. Store a credential (encrypted in real Supabase Vault)
 	// 5. List credentials (verify metadata, no secret leakage)
@@ -570,16 +571,21 @@ func TestIntegration_FullE2E_GoTrueAuth_VaultCredentials(t *testing.T) {
 	}
 
 	var signup struct {
-		AccessToken string `json:"access_token"`
-		User        struct {
+		User struct {
 			ID string `json:"id"`
 		} `json:"user"`
 	}
 	if err := json.NewDecoder(signupResp.Body).Decode(&signup); err != nil {
 		t.Fatalf("decode signup: %v", err)
 	}
-	if signup.AccessToken == "" || signup.User.ID == "" {
-		t.Fatal("signup did not return access_token or user ID")
+	if signup.User.ID == "" {
+		t.Fatal("signup did not return user ID")
+	}
+
+	jwtSecret := testJWTSecret
+	sessionJWT, _, err := auth.IssueAccessToken([]byte(jwtSecret), signup.User.ID, email, time.Now().UTC())
+	if err != nil {
+		t.Fatalf("issue access token: %v", err)
 	}
 
 	t.Cleanup(func() {
@@ -610,23 +616,18 @@ func TestIntegration_FullE2E_GoTrueAuth_VaultCredentials(t *testing.T) {
 		}
 	})
 
-	// Step 2: Set up router with real JWKS + real Vault.
-	// Include both HS256 and ES256 auth paths since the local Supabase token
-	// algorithm depends on the GoTrue version (v1 uses HS256, v2+ uses ES256).
-	jwksURL := "http://127.0.0.1:54321/auth/v1/.well-known/jwks.json"
-	cache := NewJWKSCache(jwksURL)
+	// Step 2: Set up router with HS256 session auth + real Vault.
 	deps := &Deps{
-		DB:                pool,
-		Vault:             v,
-		JWKSCache:         cache,
-		SupabaseJWTSecret: supabaseLocalJWTSecret(),
+		DB:               pool,
+		Vault:            v,
+		JWTSigningSecret: jwtSecret,
 	}
 	router := NewRouter(deps)
 
-	// Helper to create authenticated requests using the real GoTrue token.
+	// Helper to create authenticated requests using our HS256 access JWT.
 	authReq := func(method, path string) *http.Request {
 		r := httptest.NewRequest(method, path, nil)
-		r.Header.Set("Authorization", "Bearer "+signup.AccessToken)
+		r.Header.Set("Authorization", "Bearer "+sessionJWT)
 		return r
 	}
 	authJSONReq := func(method, path, body string) *http.Request {

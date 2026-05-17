@@ -83,7 +83,7 @@ func TestAgentRegistrationTTLBoundary_HTTP(t *testing.T) {
 	testhelper.MustExec(t, tx,
 		`UPDATE agents SET expires_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '-1 second') WHERE agent_id = $1`, reg.AgentID)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	r, _ := signedVerifyRequest(t, reg, reg.ConfirmCode, "verify-exp")
 	w := httptest.NewRecorder()
@@ -120,7 +120,7 @@ func TestLockoutVsExpirationPrecedence_HTTP(t *testing.T) {
 
 	reg := registerViaInvite(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	// Submit 5 wrong codes to trigger lockout.
 	submitWrongVerifyCodes(t, router, reg, 5)
@@ -184,7 +184,7 @@ func TestCrossUserInviteIsolation(t *testing.T) {
 	// User A creates an invite and an agent registers via it.
 	reg := registerViaInvite(t, tx, uidA)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	// Verify the agent belongs to user A.
 	agent, err := db.GetAgentByIDUnscoped(context.Background(), tx, reg.AgentID)
@@ -276,7 +276,7 @@ func TestConfirmationCodeIsolation_HTTP(t *testing.T) {
 		t.Fatalf("expected different confirmation codes, both got %q", regA.ConfirmCode)
 	}
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	// Try to verify agent B using agent A's code — should fail with 401.
 	r, _ := signedVerifyRequest(t, regB, regA.ConfirmCode, "iso-b-with-a")

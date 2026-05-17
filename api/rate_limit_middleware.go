@@ -9,6 +9,17 @@ import (
 	"strings"
 )
 
+// AuthRateLimiterConfig returns conservative per-IP limits for unauthenticated
+// /api/auth/signup and /api/auth/login traffic (credential stuffing defense).
+func AuthRateLimiterConfig() RateLimiterConfig {
+	return RateLimiterConfig{
+		PerKeyRate:  1.0 / 30,
+		PerKeyBurst: 8,
+		GlobalRate:  50,
+		GlobalBurst: 200,
+	}
+}
+
 // DefaultRateLimiterConfig returns rate limit settings suitable for production
 // pre-auth middleware. Keys are client IPs (more generous than per-agent since
 // multiple clients may share an IP via NAT).

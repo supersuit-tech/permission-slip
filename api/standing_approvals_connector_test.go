@@ -90,7 +90,7 @@ func TestExecuteStandingApproval_ConnectorExecution(t *testing.T) {
 		actions: map[string]connectors.Action{"testconn.do_thing": action},
 	})
 
-	deps := &Deps{DB: tx, Vault: mockVault, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{"parameters":{"repo":"test"}}`)
@@ -150,7 +150,7 @@ func TestExecuteStandingApproval_NoConnectorRegistered(t *testing.T) {
 
 	// Empty registry — no connector for "test.action".
 	registry := connectors.NewRegistry()
-	deps := &Deps{DB: tx, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -179,7 +179,7 @@ func TestExecuteStandingApproval_NilRegistry(t *testing.T) {
 	testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)
 
 	// No Connectors field set at all.
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -212,7 +212,7 @@ func TestExecuteStandingApproval_CredentialValidationFails(t *testing.T) {
 		validateCredsErr: &connectors.ValidationError{Message: "bot_token must start with \"xoxb-\""},
 	})
 
-	deps := &Deps{DB: tx, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -251,7 +251,7 @@ func TestExecuteStandingApproval_ConnectorValidationError(t *testing.T) {
 		actions: map[string]connectors.Action{"testconn.validate_err": action},
 	})
 
-	deps := &Deps{DB: tx, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -283,7 +283,7 @@ func TestExecuteStandingApproval_ConnectorExternalError(t *testing.T) {
 		actions: map[string]connectors.Action{"testconn.ext_err": action},
 	})
 
-	deps := &Deps{DB: tx, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -315,7 +315,7 @@ func TestExecuteStandingApproval_ConnectorAuthError(t *testing.T) {
 		actions: map[string]connectors.Action{"testconn.auth_err": action},
 	})
 
-	deps := &Deps{DB: tx, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -347,7 +347,7 @@ func TestExecuteStandingApproval_ConnectorRateLimitError(t *testing.T) {
 		actions: map[string]connectors.Action{"testconn.rate_err": action},
 	})
 
-	deps := &Deps{DB: tx, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -388,7 +388,7 @@ func TestExecuteStandingApproval_ConnectorTimeoutError(t *testing.T) {
 		actions: map[string]connectors.Action{"testconn.timeout_err": action},
 	})
 
-	deps := &Deps{DB: tx, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -423,7 +423,7 @@ func TestExecuteStandingApproval_MissingCredentials(t *testing.T) {
 	})
 
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)
@@ -463,7 +463,7 @@ func TestExecuteStandingApproval_NoRequiredCredentials(t *testing.T) {
 		actions: map[string]connectors.Action{"testconn.no_creds": action},
 	})
 
-	deps := &Deps{DB: tx, Connectors: registry, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{}`)

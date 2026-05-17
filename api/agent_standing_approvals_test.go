@@ -38,7 +38,7 @@ func TestAgentListStandingApprovals_Success(t *testing.T) {
 	testhelper.InsertStandingApproval(t, tx, saID1, agentID, uid)
 	testhelper.InsertStandingApproval(t, tx, saID2, agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	path := fmt.Sprintf("/agents/%d/standing-approvals", agentID)
@@ -80,7 +80,7 @@ func TestAgentListStandingApprovals_OnlyActiveReturned(t *testing.T) {
 	testhelper.InsertStandingApprovalWithStatus(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, "revoked")
 	testhelper.InsertStandingApprovalWithStatus(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, "expired")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	path := fmt.Sprintf("/agents/%d/standing-approvals", agentID)
@@ -113,7 +113,7 @@ func TestAgentListStandingApprovals_Empty(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	path := fmt.Sprintf("/agents/%d/standing-approvals", agentID)
@@ -157,7 +157,7 @@ func TestAgentListStandingApprovals_AgentCanOnlySeeOwnApprovals(t *testing.T) {
 	}
 	agent2 := testhelper.InsertAgentWithPublicKey(t, tx, uid2, "registered", pubKey2)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Agent2 should see zero standing approvals (agent1's approvals are not visible).
@@ -188,7 +188,7 @@ func TestAgentListStandingApprovals_DeactivatedAgentRejected(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "deactivated", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	path := fmt.Sprintf("/agents/%d/standing-approvals", agentID)
@@ -214,7 +214,7 @@ func TestAgentListStandingApprovals_MissingSigHeader(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Request without signature header.
@@ -240,7 +240,7 @@ func TestAgentListStandingApprovals_AgentIDMismatch(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Request with correct path agent_id but sign with a different agent_id in header.
@@ -278,7 +278,7 @@ func TestAgentListStandingApprovals_ResponseShape(t *testing.T) {
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	path := fmt.Sprintf("/agents/%d/standing-approvals", agentID)
@@ -348,7 +348,7 @@ func TestAgentListStandingApprovals_Pagination(t *testing.T) {
 		testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Request first page with limit=2.
@@ -414,7 +414,7 @@ func TestAgentListStandingApprovals_InvalidLimit(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// limit=0 should be rejected.
@@ -450,7 +450,7 @@ func TestAgentListStandingApprovals_InvalidCursor(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	path := fmt.Sprintf("/agents/%d/standing-approvals?after=invalid-cursor", agentID)

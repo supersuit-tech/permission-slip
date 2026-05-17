@@ -281,7 +281,7 @@ func TestVerifyRegistration_Success(t *testing.T) {
 
 	reg := registerViaInvite(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	r, _ := signedVerifyRequest(t, reg, reg.ConfirmCode, "verify-1")
 	w := httptest.NewRecorder()
@@ -318,7 +318,7 @@ func TestVerifyRegistration_WrongCode(t *testing.T) {
 
 	reg := registerViaInvite(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	r, _ := signedVerifyRequest(t, reg, "AAABB-CDEFG", "verify-wrong")
 	w := httptest.NewRecorder()
@@ -345,7 +345,7 @@ func TestVerifyRegistration_Lockout(t *testing.T) {
 
 	reg := registerViaInvite(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	// Submit 5 wrong codes to trigger lockout.
 	submitWrongVerifyCodes(t, router, reg, 5)
@@ -394,7 +394,7 @@ func TestVerifyRegistration_EmitsAuditEvent(t *testing.T) {
 
 	reg := registerViaInvite(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	r, _ := signedVerifyRequest(t, reg, reg.ConfirmCode, "verify-audit")
 	w := httptest.NewRecorder()

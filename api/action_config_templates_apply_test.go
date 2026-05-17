@@ -37,7 +37,7 @@ func TestApplyActionConfigTemplate_Plain(t *testing.T) {
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"agent_id": %d}`, agentID)
@@ -75,7 +75,7 @@ func TestApplyActionConfigTemplate_WithStandingApproval(t *testing.T) {
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"agent_id": %d}`, agentID)
@@ -114,7 +114,7 @@ func TestApplyActionConfigTemplate_WithStandingApproval_NonWildcardConstraints(t
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"agent_id": %d}`, agentID)
@@ -140,7 +140,7 @@ func TestApplyActionConfigTemplate_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"agent_id": %d}`, agentID)
@@ -157,7 +157,7 @@ func TestApplyActionConfigTemplate_Unauthorized(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/action-config-templates/tpl_x/apply", bytes.NewReader([]byte(`{"agent_id":1}`)))
@@ -187,7 +187,7 @@ func TestApplyActionConfigTemplate_ApprovalModeAutoApprove_OverridesPlainTemplat
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"agent_id": %d, "approval_mode": "auto_approve"}`, agentID)
@@ -225,7 +225,7 @@ func TestApplyActionConfigTemplate_ApprovalModeRequiresApproval_OverridesStandin
 
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"agent_id": %d, "approval_mode": "requires_approval"}`, agentID)
@@ -260,7 +260,7 @@ func TestApplyActionConfigTemplate_ApprovalModeInvalid(t *testing.T) {
 		Parameters: []byte(`{"x":"*"}`),
 	})
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"agent_id": %d, "approval_mode": "bogus"}`, agentID)

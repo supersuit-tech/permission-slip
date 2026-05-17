@@ -60,7 +60,7 @@ func TestListCredentials_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/credentials", uid)
@@ -88,7 +88,7 @@ func TestListCredentials_ReturnsUserCredentials(t *testing.T) {
 	testhelper.InsertCredential(t, tx, cred1, uid, "github")
 	testhelper.InsertCredentialWithLabel(t, tx, cred2, uid, "slack", "Work Slack")
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/credentials", uid)
@@ -116,7 +116,7 @@ func TestListCredentials_IsolatedPerUser(t *testing.T) {
 	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid1, "github")
 	testhelper.InsertCredential(t, tx, testhelper.GenerateID(t, "cred_"), uid2, "slack")
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// User 1 should only see their credential
@@ -141,7 +141,7 @@ func TestListCredentials_RequiresAuth(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/credentials", nil)
@@ -163,7 +163,7 @@ func TestStoreCredential_Success(t *testing.T) {
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
 
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "github", "credentials": {"api_key": "ghp_test123"}, "label": "Personal"}`
@@ -202,7 +202,7 @@ func TestStoreCredential_WithoutLabel(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "stripe", "stripe", "api_key", nil)
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "stripe", "credentials": {"api_key": "sk_test_123"}}`
@@ -226,7 +226,7 @@ func TestStoreCredential_MissingService(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"credentials": {"api_key": "test"}}`
@@ -245,7 +245,7 @@ func TestStoreCredential_UnknownService_LegacyPermissive(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// No connector_required_credentials row: store still succeeds (settings / arbitrary services).
@@ -266,7 +266,7 @@ func TestStoreCredential_ExtraKeyRejected(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "github", "credentials": {"api_key": "ghp_x", "org": "nope"}}`
@@ -287,7 +287,7 @@ func TestStoreCredential_MultiFieldCustom(t *testing.T) {
 	fields := []byte(`[{"key":"a","label":"A","secret":true,"required":true},{"key":"b","label":"B","secret":false,"required":true}]`)
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "twofield", "twofield", "custom", fields)
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "twofield", "credentials": {"a": "secretval", "b": "plain"}}`
@@ -306,7 +306,7 @@ func TestStoreCredential_MissingCredentials(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "github"}`
@@ -325,7 +325,7 @@ func TestStoreCredential_InvalidServiceFormat(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "GitHub", "credentials": {"api_key": "test"}}`
@@ -345,7 +345,7 @@ func TestStoreCredential_DuplicateConflict(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "github", "credentials": {"api_key": "ghp_test1"}, "label": "work"}`
@@ -378,7 +378,7 @@ func TestStoreCredential_RequiresAuth(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/credentials", strings.NewReader(`{"service": "x", "credentials": {"api_key": "v"}}`))
@@ -397,7 +397,7 @@ func TestStoreCredential_ServiceTooLong(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	longService := "a" + strings.Repeat("b", 128) // 129 chars
@@ -422,7 +422,7 @@ func TestDeleteCredential_Success(t *testing.T) {
 
 	// Store a credential via the API so the vault also gets a secret.
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	storeBody := `{"service": "github", "credentials": {"api_key": "ghp_test"}}`
@@ -466,7 +466,7 @@ func TestDeleteCredential_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/credentials/cred_nonexistent", uid)
@@ -489,7 +489,7 @@ func TestDeleteCredential_OtherUserSeesNotFound(t *testing.T) {
 
 	// Store credential for uid1.
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	storeBody := `{"service": "github", "credentials": {"api_key": "ghp_test"}}`
@@ -521,7 +521,7 @@ func TestDeleteCredential_RequiresAuth(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodDelete, "/credentials/cred_abc", nil)
@@ -541,7 +541,7 @@ func TestDeleteCredential_VerifyActuallyDeleted(t *testing.T) {
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
 
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Store
@@ -590,7 +590,7 @@ func TestStoreAndListCredentials(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Store a credential
@@ -634,7 +634,7 @@ func TestStoreCredential_VaultSecretContainsSerializedCredentials(t *testing.T) 
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
 
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "github", "credentials": {"api_key": "ghp_secret_value"}}`
@@ -658,7 +658,7 @@ func TestStoreCredential_VaultErrorReturns500(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
 
-	deps := &Deps{DB: tx, Vault: &failingVaultStore{}, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: &failingVaultStore{}, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "github", "credentials": {"api_key": "ghp_test"}}`
@@ -684,7 +684,7 @@ func TestStoreCredential_NilVaultReturns503(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
 
-	deps := &Deps{DB: tx, Vault: nil, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: nil, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "github", "credentials": {"api_key": "ghp_test"}}`
@@ -703,7 +703,7 @@ func TestDeleteCredential_NilVaultReturns503(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, Vault: nil, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: nil, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/credentials/cred_abc123", uid)

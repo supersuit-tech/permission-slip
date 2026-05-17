@@ -24,7 +24,7 @@ func TestRedeemFreeProCoupon_Success(t *testing.T) {
 
 	deps := &Deps{
 		DB:                tx,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		BillingEnabled:    true,
 		CouponSecret:      secret,
 	}
@@ -56,7 +56,7 @@ func TestRedeemFreeProCoupon_Invalid(t *testing.T) {
 
 	deps := &Deps{
 		DB:                tx,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		BillingEnabled:    true,
 		CouponSecret:      "secret",
 	}
@@ -84,7 +84,7 @@ func TestRedeemFreeProCoupon_Idempotent(t *testing.T) {
 
 	deps := &Deps{
 		DB:                tx,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		BillingEnabled:    true,
 		CouponSecret:      secret,
 	}

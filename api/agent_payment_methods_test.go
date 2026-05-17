@@ -19,7 +19,7 @@ func TestGetAgentPaymentMethod_NoAssignment(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "apmapi_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/payment-method", agentID), uid)
@@ -58,7 +58,7 @@ func TestAssignAgentPaymentMethod(t *testing.T) {
 		t.Fatalf("CreatePaymentMethod: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body, _ := json.Marshal(map[string]string{"payment_method_id": pm.ID})
@@ -103,7 +103,7 @@ func TestAssignAgentPaymentMethod_OtherUserPM(t *testing.T) {
 		t.Fatalf("CreatePaymentMethod: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body, _ := json.Marshal(map[string]string{"payment_method_id": pm.ID})
@@ -140,7 +140,7 @@ func TestRemoveAgentPaymentMethod(t *testing.T) {
 		t.Fatalf("AssignAgentPaymentMethod: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, fmt.Sprintf("/agents/%d/payment-method", agentID), uid)
@@ -167,7 +167,7 @@ func TestRemoveAgentPaymentMethod_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "apmnf_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, fmt.Sprintf("/agents/%d/payment-method", agentID), uid)
@@ -203,7 +203,7 @@ func TestDeletePaymentMethod_ReturnsAffectedAgents(t *testing.T) {
 	_, _ = db.AssignAgentPaymentMethod(ctx, tx, agentID1, pm.ID)
 	_, _ = db.AssignAgentPaymentMethod(ctx, tx, agentID2, pm.ID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, fmt.Sprintf("/payment-methods/%s", pm.ID), uid)

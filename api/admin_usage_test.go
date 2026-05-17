@@ -28,7 +28,7 @@ func TestAdminGetUsage_ReturnsAuthenticatedUserData(t *testing.T) {
 		}
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/admin/usage", uid)
@@ -69,7 +69,7 @@ func TestAdminGetUsage_IgnoresUserIDParam(t *testing.T) {
 		}
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Try to view uid2's data while authenticated as uid1 — should return uid1's data (0), not uid2's.
@@ -108,7 +108,7 @@ func TestAdminGetUsage_WithBreakdown(t *testing.T) {
 		t.Fatalf("IncrementRequestCountWithBreakdown: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/admin/usage", uid)
@@ -140,7 +140,7 @@ func TestAdminGetUsage_ZeroUsage(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/admin/usage", uid)
@@ -169,7 +169,7 @@ func TestAdminGetUsage_InvalidPeriod(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/admin/usage?period=not-a-date", uid)
@@ -187,7 +187,7 @@ func TestAdminGetUsage_FlexiblePeriodFormats(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	formats := []string{
@@ -231,7 +231,7 @@ func TestAdminUsageByConnector_ScopedToAuthenticatedUser(t *testing.T) {
 		t.Fatalf("increment stripe: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/admin/usage/by-connector", uid)
@@ -280,7 +280,7 @@ func TestAdminUsageByConnector_DoesNotLeakCrossUserData(t *testing.T) {
 		}
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// uid1 should see 0 connectors (no usage of their own).
@@ -319,7 +319,7 @@ func TestAdminUsageByAgent_ScopedToAuthenticatedUser(t *testing.T) {
 		}
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/admin/usage/by-agent", uid)
@@ -354,7 +354,7 @@ func TestAdminUsageByAgent_EmptyResult(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/admin/usage/by-agent", uid)
@@ -379,7 +379,7 @@ func TestAdminUsageByAgent_EmptyResult(t *testing.T) {
 func TestAdminEndpoints_RequireAuth(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	endpoints := []string{

@@ -127,7 +127,7 @@ func TestAuditEventStructure_InviteRegistration(t *testing.T) {
 	}
 
 	// Now verify the agent to produce a "registered" audit event.
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	body := fmt.Sprintf(`{"request_id":"verify-audit-struct","confirmation_code":%q}`, reg.ConfirmCode)
 	bodyBytes := []byte(body)
@@ -156,7 +156,7 @@ func TestAuditEventStructure_DashboardRegistration(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/register", agentID), uid)
@@ -243,7 +243,7 @@ func TestResponseFields_PendingAgent(t *testing.T) {
 	testhelper.MustExec(t, tx,
 		`UPDATE agents SET confirmation_code = 'AB3CD-4EFGH' WHERE agent_id = $1`, agentID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d", agentID), uid)
@@ -287,7 +287,7 @@ func TestResponseFields_RegisteredAgent(t *testing.T) {
 	testhelper.MustExec(t, tx,
 		`UPDATE agents SET registered_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`, agentID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d", agentID), uid)
@@ -329,7 +329,7 @@ func TestResponseFields_DeactivatedAgent(t *testing.T) {
 	testhelper.MustExec(t, tx,
 		`UPDATE agents SET deactivated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE agent_id = $1`, agentID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d", agentID), uid)
@@ -479,7 +479,7 @@ func TestConcurrentRateLimitEnforcement(t *testing.T) {
 	pool := testhelper.SetupPool(t)
 	uid := setupPoolUser(t, pool)
 
-	deps := &Deps{DB: pool, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Pre-fill the full quota sequentially.
@@ -570,7 +570,7 @@ func TestConcurrentRateLimitLastSlotContention(t *testing.T) {
 	uid := setupPoolUser(t, pool)
 
 	// Pre-fill to one below the limit so there is exactly one slot remaining.
-	deps := &Deps{DB: pool, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	for i := 0; i < inviteRateLimit-1; i++ {

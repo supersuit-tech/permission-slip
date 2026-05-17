@@ -34,7 +34,7 @@ func TestAssignCredential_StaticCredential(t *testing.T) {
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredential(t, tx, credID, uid, connID) // service matches connector
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"credential_id":"%s"}`, credID)
@@ -66,7 +66,7 @@ func TestAssignCredential_OAuthConnection(t *testing.T) {
 	oauthID := testhelper.GenerateID(t, "oac_")
 	testhelper.InsertOAuthConnection(t, tx, oauthID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"oauth_connection_id":"%s"}`, oauthID)
@@ -91,7 +91,7 @@ func TestAssignCredential_BothProvided(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"credential_id":"cred_1","oauth_connection_id":"oac_1"}`
@@ -111,7 +111,7 @@ func TestAssignCredential_NeitherProvided(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{}`
@@ -141,7 +141,7 @@ func TestAssignCredential_CredentialBelongsToOtherUser(t *testing.T) {
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredential(t, tx, credID, uid2, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"credential_id":"%s"}`, credID)
@@ -170,7 +170,7 @@ func TestAssignCredential_OAuthBelongsToOtherUser(t *testing.T) {
 	oauthID := testhelper.GenerateID(t, "oac_")
 	testhelper.InsertOAuthConnection(t, tx, oauthID, uid2, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"oauth_connection_id":"%s"}`, oauthID)
@@ -198,7 +198,7 @@ func TestAssignCredential_ServiceMismatch(t *testing.T) {
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredential(t, tx, credID, uid, "other_service")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"credential_id":"%s"}`, credID)
@@ -226,7 +226,7 @@ func TestAssignCredential_OAuthProviderMismatch(t *testing.T) {
 	oauthID := testhelper.GenerateID(t, "oac_")
 	testhelper.InsertOAuthConnection(t, tx, oauthID, uid, "other_provider")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"oauth_connection_id":"%s"}`, oauthID)
@@ -249,7 +249,7 @@ func TestAssignCredential_WrongOwner(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"credential_id":"cred_1"}`
@@ -271,7 +271,7 @@ func TestGetCredentialBinding_NoBinding(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet,
@@ -306,7 +306,7 @@ func TestGetCredentialBinding_WithBinding(t *testing.T) {
 	testhelper.InsertCredential(t, tx, credID, uid, connID)
 
 	// First assign
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{"credential_id":"%s"}`, credID)
@@ -343,7 +343,7 @@ func TestGetCredentialBinding_WrongOwner(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet,
@@ -371,7 +371,7 @@ func TestRemoveCredentialBinding_Success(t *testing.T) {
 	credID := testhelper.GenerateID(t, "cred_")
 	testhelper.InsertCredential(t, tx, credID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Assign first
@@ -401,7 +401,7 @@ func TestRemoveCredentialBinding_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete,
@@ -423,7 +423,7 @@ func TestRemoveCredentialBinding_WrongOwner(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete,

@@ -127,12 +127,12 @@ func RegisterOAuthRoutes(mux *http.ServeMux, deps *Deps) {
 // --- CSRF state helpers ---
 
 // oauthStateSecret returns the HMAC key to sign/verify OAuth state JWTs.
-// Prefers OAuthStateSecret; falls back to SupabaseJWTSecret.
+// Prefers OAuthStateSecret; falls back to JWTSigningSecret.
 func oauthStateSecret(deps *Deps) string {
 	if deps.OAuthStateSecret != "" {
 		return deps.OAuthStateSecret
 	}
-	return deps.SupabaseJWTSecret
+	return deps.JWTSigningSecret
 }
 
 // createOAuthState produces a short-lived signed JWT encoding the user ID,

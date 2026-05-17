@@ -30,7 +30,7 @@ func TestCreateStandingApproval_FreePlan_AtLimit_Returns403(t *testing.T) {
 	}
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{
@@ -82,7 +82,7 @@ func TestCreateStandingApproval_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 	}
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{
@@ -116,7 +116,7 @@ func TestCreateStandingApproval_PaidPlan_NoLimit(t *testing.T) {
 	}
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{
@@ -145,7 +145,7 @@ func TestCreateStandingApproval_NoSubscription_NoLimit(t *testing.T) {
 	// Intentionally no subscription — should bypass limits.
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{
@@ -184,7 +184,7 @@ func TestStoreCredential_FreePlan_AtLimit_Returns403(t *testing.T) {
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "planlim_nsvc", "newservice", "api_key", nil)
 
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "newservice", "credentials": {"api_key": "test123"}}`
@@ -226,7 +226,7 @@ func TestStoreCredential_FreePlan_UnderLimit_Succeeds(t *testing.T) {
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "planlim_nsvc2", "newservice", "api_key", nil)
 
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "newservice", "credentials": {"api_key": "test123"}}`
@@ -254,7 +254,7 @@ func TestStoreCredential_PaidPlan_NoLimit(t *testing.T) {
 	testhelper.InsertConnectorWithStaticCredential(t, tx, "planlim_nsvc3", "newservice", "api_key", nil)
 
 	mockVault := vault.NewMockVaultStore()
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"service": "newservice", "credentials": {"api_key": "test123"}}`
@@ -410,7 +410,7 @@ func TestCreateInvite_FreePlan_AtAgentLimit_Returns403(t *testing.T) {
 		testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/registration-invites", uid, `{}`)
@@ -442,7 +442,7 @@ func TestCreateInvite_PaidPlan_Succeeds(t *testing.T) {
 		testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, InviteHMACKey: "testkey"}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, InviteHMACKey: "testkey"}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/registration-invites", uid, `{}`)
@@ -472,7 +472,7 @@ func TestCreateStandingApproval_RevokedDoNotCountTowardLimit(t *testing.T) {
 	}
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, planLimitsStandingApprovalActionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{

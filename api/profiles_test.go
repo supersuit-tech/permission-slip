@@ -13,7 +13,7 @@ import (
 
 func TestGetProfile_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/profile", nil)
@@ -38,7 +38,7 @@ func TestGetProfile_TraceIDPresent(t *testing.T) {
 	t.Parallel()
 	// Verify trace ID middleware runs before session auth. NewRouter omits
 	// TraceIDMiddleware (main.go wraps the full mux); mirror production here.
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := TraceIDMiddleware(NewRouter(deps))
 
 	r := httptest.NewRequest(http.MethodGet, "/profile", nil)
@@ -61,7 +61,7 @@ func TestGetProfile_Success(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile", uid)
@@ -94,7 +94,7 @@ func TestGetProfile_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	// No profile inserted for this user
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile", uid)
@@ -117,7 +117,7 @@ func TestGetProfile_NotFound(t *testing.T) {
 
 func TestGetProfile_NilDB(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret} // DB is nil
+	deps := &Deps{JWTSigningSecret: testJWTSecret} // DB is nil
 	router := NewRouter(deps)
 
 	uid := testhelper.GenerateUID(t)
@@ -148,7 +148,7 @@ func TestUpdateProfile_SetEmailAndPhone(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, "/profile", uid,
@@ -184,7 +184,7 @@ func TestUpdateProfile_PartialUpdate_OnlyEmail(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Only send email — phone should remain unchanged
@@ -221,7 +221,7 @@ func TestUpdateProfile_ClearField_WithNull(t *testing.T) {
 		t.Fatalf("setup: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Send null to clear email
@@ -249,7 +249,7 @@ func TestUpdateProfile_InvalidEmail(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, "/profile", uid,
@@ -268,7 +268,7 @@ func TestUpdateProfile_InvalidPhone(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, "/profile", uid,
@@ -287,7 +287,7 @@ func TestUpdateProfile_WrongType_RejectsNumber(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Send a number instead of a string — should get a 400, not silently ignored.
@@ -310,7 +310,7 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled=false
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret} // SMSEnabled=false
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile/notification-preferences", uid)
@@ -367,7 +367,7 @@ func TestUpdateNotificationPreferences_Toggle(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Disable email
@@ -405,7 +405,7 @@ func TestUpdateNotificationPreferences_InvalidChannel(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -424,7 +424,7 @@ func TestUpdateNotificationPreferences_EmptyPreferences(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -443,7 +443,7 @@ func TestUpdateNotificationPreferences_DuplicateChannel(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -464,7 +464,7 @@ func TestUpdateProfile_SetMarketingOptIn(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, "/profile", uid,
@@ -491,7 +491,7 @@ func TestUpdateProfile_MarketingOptIn_NullRejected(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, "/profile", uid,
@@ -510,7 +510,7 @@ func TestGetProfile_IncludesMarketingOptIn(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile", uid)
