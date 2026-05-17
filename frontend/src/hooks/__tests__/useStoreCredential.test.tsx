@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockPost, resetClientMocks } from "../../api/__mocks__/client";
 import { useStoreCredential } from "../useStoreCredential";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 describe("useStoreCredential", () => {
@@ -30,6 +29,7 @@ describe("useStoreCredential", () => {
 
     const { result } = renderHook(() => useStoreCredential(), { wrapper });
 
+    await settleAuthHydration();
     let response: unknown;
     await act(async () => {
       response = await result.current.storeCredential({
@@ -40,7 +40,7 @@ describe("useStoreCredential", () => {
     });
 
     expect(mockPost).toHaveBeenCalledWith("/v1/credentials", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       body: {
         service: "github",
         credentials: { api_key: "ghp_abc123" },
@@ -61,6 +61,7 @@ describe("useStoreCredential", () => {
 
     const { result } = renderHook(() => useStoreCredential(), { wrapper });
 
+    await settleAuthHydration();
     await expect(
       result.current.storeCredential({
         service: "github",
@@ -83,6 +84,7 @@ describe("useStoreCredential", () => {
 
     const { result } = renderHook(() => useStoreCredential(), { wrapper });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {
@@ -107,6 +109,7 @@ describe("useStoreCredential", () => {
 
     const { result } = renderHook(() => useStoreCredential(), { wrapper });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {

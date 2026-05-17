@@ -1,29 +1,32 @@
-import type { AuthError } from "@supabase/supabase-js";
+import type { AuthError } from "./types";
 
-// Maps known Supabase error codes to user-facing messages. Raw Supabase errors
-// can expose internal details (provider names, rate-limit specifics, etc.), so
-// we only surface messages from this allowlist and fall back to a generic
-// message for anything unexpected.
 const SAFE_ERROR_MESSAGES: Record<string, string> = {
   invalid_credentials: "Invalid email or password. Please try again.",
-  otp_expired: "Your code has expired. Please request a new one.",
-  otp_disabled: "Something went wrong. Please try again.",
+  invalid_token: "Invalid email or password. Please try again.",
   over_request_rate_limit:
     "Too many attempts. Please wait a moment and try again.",
-  over_email_send_rate_limit:
-    "Too many requests. Please wait a moment and try again.",
-  mfa_factor_not_found: "No authenticator found. Please re-enroll.",
-  mfa_verification_failed:
-    "Invalid code. Please check your authenticator app and try again.",
-  mfa_challenge_expired: "Verification timed out. Please try again.",
+  request_failed: "Something went wrong. Please try again.",
+  logout_failed: "Sign out failed. Please try again.",
+  invalid_response: "Something went wrong. Please try again.",
 };
 
-/** Returns a user-safe message for a Supabase AuthError by matching its code
- *  against a known allowlist. Unknown codes get a generic fallback. */
 export function safeErrorMessage(error: AuthError): string {
   if (error.code) {
     const message = SAFE_ERROR_MESSAGES[error.code];
     if (message) return message;
   }
   return "Something went wrong. Please try again.";
+}
+
+export function createAuthError(
+  code: string,
+  message: string,
+  status: number,
+): AuthError {
+  return {
+    message,
+    name: "AuthApiError",
+    status,
+    code,
+  };
 }

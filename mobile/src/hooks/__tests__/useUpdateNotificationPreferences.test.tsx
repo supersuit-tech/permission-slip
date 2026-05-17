@@ -3,8 +3,16 @@ import { create, act, type ReactTestRenderer } from "react-test-renderer";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "../../auth/AuthContext";
 import { useUpdateNotificationPreferences } from "../useUpdateNotificationPreferences";
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
 import { mockSession, createQueryClient, waitFor } from "../../__test-utils__";
+
+jest.mock("../../lib/authStorage");
+jest.mock("../../lib/authApi");
+
+import * as authStorage from "../../lib/authStorage";
+import * as authApi from "../../lib/authApi";
+
+const mockAuthStorage = jest.mocked(authStorage);
+const mockAuthApi = jest.mocked(authApi);
 
 // --- Mocks ---
 
@@ -15,36 +23,22 @@ jest.mock("../../api/client", () => ({
   default: { PUT: (...args: unknown[]) => mockPut(...args) },
 }));
 
-const authMocks = {
-  authChangeCallback: null as
-    | ((event: AuthChangeEvent, session: Session | null) => void)
-    | null,
-};
-
-jest.mock("../../lib/supabaseClient", () => ({
-  supabase: {
-    auth: {
-      onAuthStateChange: jest.fn(
-        (cb: (event: AuthChangeEvent, session: Session | null) => void) => {
-          authMocks.authChangeCallback = cb;
-          Promise.resolve().then(() =>
-            cb("INITIAL_SESSION" as AuthChangeEvent, null),
-          );
-          return { data: { subscription: { unsubscribe: jest.fn() } } };
+function bootstrapAuthenticated(session: ReturnType<typeof mockSession>) {
+  mockAuthStorage.getStoredRefreshToken.mockResolvedValue("mock-refresh");
+  mockAuthApi.postAuth.mockImplementation(async (path: string) => {
+    if (path === "refresh") {
+      return {
+        data: {
+          access_token: session.access_token,
+          refresh_token: "mock-refresh-2",
+          expires_at: session.expires_at,
         },
-      ),
-      signInWithOtp: jest.fn(),
-      verifyOtp: jest.fn(),
-      signOut: jest.fn(),
-      mfa: {
-        getAuthenticatorAssuranceLevel: jest.fn().mockResolvedValue({
-          data: { currentLevel: "aal1", nextLevel: "aal1" },
-          error: null,
-        }),
-      },
-    },
-  },
-}));
+        error: null,
+      };
+    }
+    return { data: null, error: null };
+  });
+}
 
 // --- Helpers ---
 
@@ -92,6 +86,8 @@ let currentQueryClient: QueryClient | null = null;
 describe("useUpdateNotificationPreferences", () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockAuthStorage.getStoredRefreshToken.mockResolvedValue(null);
+    mockAuthApi.postAuth.mockResolvedValue({ data: null, error: null });
   });
 
   afterEach(async () => {
@@ -118,6 +114,9 @@ describe("useUpdateNotificationPreferences", () => {
       error: undefined,
     });
 
+    const session = mockSession();
+    bootstrapAuthenticated(session);
+
     const { capture, Consumer } = createHookCapture();
     currentQueryClient = createQueryClient();
 
@@ -125,13 +124,6 @@ describe("useUpdateNotificationPreferences", () => {
       currentRenderer = renderWithProviders(Consumer, currentQueryClient!);
     });
 
-    // Authenticate
-    const session = mockSession();
-    await act(async () => {
-      authMocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
-    });
-
-    // Call updatePreferences
     await act(async () => {
       await capture.updatePreferences([
         { channel: "mobile-push", enabled: false },
@@ -183,16 +175,14 @@ describe("useUpdateNotificationPreferences", () => {
       },
     });
 
+    const session = mockSession();
+    bootstrapAuthenticated(session);
+
     const { capture, Consumer } = createHookCapture();
     currentQueryClient = createQueryClient();
 
     await act(async () => {
       currentRenderer = renderWithProviders(Consumer, currentQueryClient!);
-    });
-
-    const session = mockSession();
-    await act(async () => {
-      authMocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
     });
 
     let thrownError: Error | null = null;

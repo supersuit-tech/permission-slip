@@ -1,127 +1,110 @@
-import { screen, waitFor } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { AuthError } from "@supabase/supabase-js";
 import { renderWithProviders } from "../../test-helpers";
-import { mockAuth, mockUser, mockSession, setupAuthMocks } from "./fixtures";
+import { makeTestAccessToken, setupAuthMocks } from "./fixtures";
 import LoginPage from "../LoginPage";
-
-vi.mock("../../lib/supabaseClient");
-vi.mock("../dev", () => ({
-  fetchOtpFromMailpit: vi.fn().mockResolvedValue(null),
-}));
 
 describe("LoginPage", () => {
   beforeEach(() => {
-    setupAuthMocks();
+    setupAuthMocks({ authenticated: false });
   });
 
-  it("shows email step initially", async () => {
+  it("shows email and password fields in sign-in mode", async () => {
     renderWithProviders(<LoginPage />);
     await waitFor(() => {
       expect(screen.getByLabelText("Email")).toBeInTheDocument();
     });
-    expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Password")).toBeInTheDocument();
+    const form = screen.getByRole("form");
+    expect(within(form).getByRole("button", { name: "Sign in" })).toBeInTheDocument();
   });
 
-  it("transitions to OTP step after successful code send", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: null,
-    });
-
+  it("switches to create account mode", async () => {
     renderWithProviders(<LoginPage />);
-
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
-
     await waitFor(() => {
-      expect(screen.getByLabelText("Code")).toBeInTheDocument();
+      expect(screen.getByText("Create account")).toBeInTheDocument();
     });
-    expect(screen.getByText("test@example.com")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Create account" }));
+    expect(
+      screen.getByText("Create an account with your email and password.")
+    ).toBeInTheDocument();
+    const createAccountButtons = screen.getAllByRole("button", {
+      name: "Create account",
+    });
+    expect(createAccountButtons.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("transitions to OTP step even on email rate limit", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: new AuthError("Rate limit", 429, "over_email_send_rate_limit"),
+  it("submits sign-in and calls login endpoint", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/auth/login")) {
+        return new Response(
+          JSON.stringify({
+            access_token: makeTestAccessToken("u1", "test@example.com"),
+            refresh_token: "rt-new",
+            expires_at: new Date(Date.now() + 900_000).toISOString(),
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("{}", { status: 404 });
     });
+    globalThis.fetch = fetchMock as typeof fetch;
 
     renderWithProviders(<LoginPage />);
-
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Code")).toBeInTheDocument();
-    });
-  });
-
-  it("returns to email step when back is clicked", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: null,
-    });
-
-    renderWithProviders(<LoginPage />);
-
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
-
-    await waitFor(() => {
-      expect(screen.getByLabelText("Code")).toBeInTheDocument();
-    });
-
-    await userEvent.click(screen.getByText("Back"));
-
     await waitFor(() => {
       expect(screen.getByLabelText("Email")).toBeInTheDocument();
     });
-    expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
-  });
-
-  it("calls verifyOtp with correct email and code", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: null,
-    });
-    mockAuth.verifyOtp.mockResolvedValue({
-      data: { session: mockSession, user: mockUser },
-      error: null,
-    });
-
-    renderWithProviders(<LoginPage />);
-
     await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
+    await userEvent.type(screen.getByLabelText("Password"), "password12345");
+    await userEvent.click(
+      within(screen.getByRole("form")).getByRole("button", { name: "Sign in" }),
+    );
 
     await waitFor(() => {
-      expect(screen.getByLabelText("Code")).toBeInTheDocument();
-    });
-    await userEvent.type(screen.getByLabelText("Code"), "12345678");
-    await userEvent.click(screen.getByText("Verify"));
-
-    expect(mockAuth.verifyOtp).toHaveBeenCalledWith({
-      email: "test@example.com",
-      token: "12345678",
-      type: "email",
+      expect(fetchMock).toHaveBeenCalledWith(
+        expect.stringContaining("/auth/login"),
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            email: "test@example.com",
+            password: "password12345",
+          }),
+        })
+      );
     });
   });
 
-  it("stays on email step when send fails with non-rate-limit error", async () => {
-    mockAuth.signInWithOtp.mockResolvedValue({
-      data: { user: null, session: null },
-      error: new AuthError("Server error", 500, "unexpected_failure"),
+  it("shows a safe message when login fails", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/auth/login")) {
+        return new Response(
+          JSON.stringify({
+            error: { code: "invalid_credentials", message: "bad" },
+          }),
+          { status: 401, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("{}", { status: 404 });
     });
+    globalThis.fetch = fetchMock as typeof fetch;
 
     renderWithProviders(<LoginPage />);
-
-    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
-    await userEvent.click(screen.getByText("Continue"));
-
     await waitFor(() => {
       expect(screen.getByLabelText("Email")).toBeInTheDocument();
     });
-    expect(screen.queryByLabelText("Code")).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Email"), "test@example.com");
+    await userEvent.type(screen.getByLabelText("Password"), "wrongwrongwrong");
+    await userEvent.click(
+      within(screen.getByRole("form")).getByRole("button", { name: "Sign in" }),
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByText("Invalid email or password. Please try again.")
+      ).toBeInTheDocument();
+    });
   });
 });

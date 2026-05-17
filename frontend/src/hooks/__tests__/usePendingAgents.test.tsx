@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { usePendingAgents } from "../usePendingAgents";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockAgentsResponse = {
@@ -51,11 +50,12 @@ describe("usePendingAgents", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("returns empty array when not authenticated", () => {
+  it("returns empty array when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => usePendingAgents(), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.pendingAgents).toEqual([]);
     expect(result.current.isLoading).toBe(false);
   });
@@ -66,6 +66,7 @@ describe("usePendingAgents", () => {
 
     const { result } = renderHook(() => usePendingAgents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.pendingAgents).toHaveLength(2);
     });
@@ -92,6 +93,7 @@ describe("usePendingAgents", () => {
 
     const { result } = renderHook(() => usePendingAgents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -127,6 +129,7 @@ describe("usePendingAgents", () => {
 
     const { result } = renderHook(() => usePendingAgents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.pendingAgents).toHaveLength(1);
     });
@@ -154,6 +157,7 @@ describe("usePendingAgents", () => {
 
     const { result } = renderHook(() => usePendingAgents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.pendingAgents).toHaveLength(1);
     });
@@ -166,6 +170,7 @@ describe("usePendingAgents", () => {
 
     const { result } = renderHook(() => usePendingAgents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });

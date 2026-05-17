@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useAgent } from "../useAgent";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockAgentResponse = {
@@ -26,11 +25,12 @@ describe("useAgent", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("returns null when not authenticated", () => {
+  it("returns null when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useAgent(42), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.agent).toBeNull();
     expect(result.current.isLoading).toBe(false);
   });
@@ -41,12 +41,13 @@ describe("useAgent", () => {
 
     const { result } = renderHook(() => useAgent(42), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.agent).toEqual(mockAgentResponse);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/agents/{agent_id}", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { path: { agent_id: 42 } },
     });
     expect(result.current.isLoading).toBe(false);
@@ -59,6 +60,7 @@ describe("useAgent", () => {
 
     const { result } = renderHook(() => useAgent(42), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -69,11 +71,12 @@ describe("useAgent", () => {
     );
   });
 
-  it("does not fetch for invalid agent ID", () => {
+  it("does not fetch for invalid agent ID", async () => {
     setupAuthMocks({ authenticated: true });
 
     const { result } = renderHook(() => useAgent(0), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.isLoading).toBe(false);
     expect(mockGet).not.toHaveBeenCalled();
   });

@@ -155,8 +155,8 @@ export default function App() {
     return () => sub.remove();
   }, []);
 
-  // Incrementing the key re-mounts AuthProvider, which re-triggers
-  // Supabase's onAuthStateChange and retries the initial session check.
+  // Incrementing the key re-mounts AuthProvider, which re-runs bootstrap
+  // from secure-stored refresh token (useful after a connection timeout).
   const [authKey, setAuthKey] = useState(0);
   const handleRetry = useCallback(() => setAuthKey((k) => k + 1), []);
 

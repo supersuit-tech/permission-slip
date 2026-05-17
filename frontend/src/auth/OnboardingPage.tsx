@@ -8,7 +8,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { FormError } from "@/components/FormError";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/lib/supabaseClient";
 import client from "@/api/client";
 import validation from "@/lib/validation";
 
@@ -16,7 +15,6 @@ export default function OnboardingPage() {
   const { session, signOut } = useAuth();
   const queryClient = useQueryClient();
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [marketingOptIn, setMarketingOptIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -41,22 +39,6 @@ export default function OnboardingPage() {
         return;
       }
 
-      // Set the user's password via Supabase after profile creation.
-      const { error: pwError } = await supabase.auth.updateUser({
-        password,
-      });
-      if (pwError) {
-        // Profile was created but password failed — warn the user but
-        // don't block onboarding. They can set a password later in settings.
-        console.error("Failed to set password during onboarding:", pwError.message);
-        setError(
-          "Your account was created, but we couldn't set your password. " +
-          "You can set a password later in Settings."
-        );
-        // Still proceed — invalidate profile so user reaches the dashboard.
-      }
-
-      // Invalidate the profile query so App.tsx re-fetches and routes to dashboard
       await queryClient.invalidateQueries({ queryKey: ["profile"] });
     } catch {
       setError("Something went wrong. Please try again.");
@@ -86,21 +68,6 @@ export default function OnboardingPage() {
           />
           <p className="text-xs text-muted-foreground">
             3–32 characters. Letters, digits, underscores, and hyphens only.
-          </p>
-        </div>
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <Input
-            id="password"
-            type="password"
-            autoComplete="new-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={validation.password.minLength}
-            required
-          />
-          <p className="text-xs text-muted-foreground">
-            At least {validation.password.minLength} characters.
           </p>
         </div>
         <div className="flex items-start gap-2">
@@ -154,9 +121,9 @@ export default function OnboardingPage() {
           <Button
             type="submit"
             className="flex-1"
-            disabled={isSubmitting || !agreedToTerms || password.length < validation.password.minLength}
+            disabled={isSubmitting || !agreedToTerms}
           >
-            {isSubmitting ? "Creating account…" : "Create account"}
+            {isSubmitting ? "Saving…" : "Continue"}
           </Button>
           <Button
             type="button"

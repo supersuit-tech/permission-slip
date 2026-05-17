@@ -27,20 +27,6 @@ jest.mock("../../../hooks/useDenyApproval", () => ({
   }),
 }));
 
-jest.mock("../../../lib/supabaseClient", () => ({
-  supabase: {
-    auth: {
-      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: jest.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      }),
-      signInWithOtp: jest.fn(),
-      verifyOtp: jest.fn(),
-      signOut: jest.fn(),
-    },
-  },
-}));
-
 jest.mock("../../../hooks/useAgents", () => ({
   useAgents: () => ({
     agents: MOCK_AGENTS,

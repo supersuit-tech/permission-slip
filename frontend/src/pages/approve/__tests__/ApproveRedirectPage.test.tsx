@@ -9,7 +9,6 @@ import { setupAuthMocks } from "@/auth/__tests__/fixtures";
 import { mockGet, resetClientMocks } from "@/api/__mocks__/client";
 import { ApproveRedirectPage } from "../ApproveRedirectPage";
 
-vi.mock("@/lib/supabaseClient");
 vi.mock("@/api/client");
 
 const futureDate = new Date(Date.now() + 600_000).toISOString();

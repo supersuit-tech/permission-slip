@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { AuthError } from "@supabase/supabase-js";
+import type { AuthError } from "./types";
 import { safeErrorMessage } from "./errors";
 
 interface UseFormSubmitResult {
@@ -17,12 +17,12 @@ interface UseFormSubmitResult {
 
 /**
  * Manages form submission state (loading, error) for auth screens.
- * Wraps Supabase auth calls and converts errors to safe user-facing messages.
+ * Wraps async auth actions and converts errors to safe user-facing messages.
  *
  * @example
  * ```tsx
  * const { error, isSubmitting, handleSubmit } = useFormSubmit();
- * const submit = () => handleSubmit(() => sendOtp(email));
+ * const submit = () => handleSubmit(() => signInWithPassword(email, password));
  * ```
  */
 export function useFormSubmit(): UseFormSubmitResult {

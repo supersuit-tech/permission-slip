@@ -1,12 +1,11 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useUnconfiguredAgent } from "../useUnconfiguredAgent";
 import type { Agent } from "../useAgents";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 function makeAgent(overrides: Partial<Agent> = {}): Agent {
@@ -29,24 +28,26 @@ describe("useUnconfiguredAgent", () => {
     setupAuthMocks({ authenticated: true });
   });
 
-  it("returns isUnconfigured false when agents are still loading", () => {
+  it("returns isUnconfigured false when agents are still loading", async () => {
     const { result } = renderHook(
       () => useUnconfiguredAgent([], true),
       { wrapper },
     );
 
+    await settleAuthHydration();
     expect(result.current.isUnconfigured).toBe(false);
     // isLoading is false because the hook only tracks connector loading,
     // not the agents loading state (Dashboard handles that separately).
     expect(result.current.isLoading).toBe(false);
   });
 
-  it("returns isUnconfigured false when no agents exist", () => {
+  it("returns isUnconfigured false when no agents exist", async () => {
     const { result } = renderHook(
       () => useUnconfiguredAgent([], false),
       { wrapper },
     );
 
+    await settleAuthHydration();
     expect(result.current.isUnconfigured).toBe(false);
     expect(result.current.isLoading).toBe(false);
   });
@@ -60,6 +61,7 @@ describe("useUnconfiguredAgent", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isUnconfigured).toBe(true);
     });
@@ -88,13 +90,14 @@ describe("useUnconfiguredAgent", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
     expect(result.current.isUnconfigured).toBe(false);
   });
 
-  it("returns isUnconfigured false when multiple registered agents exist", () => {
+  it("returns isUnconfigured false when multiple registered agents exist", async () => {
     const agents = [
       makeAgent({ agent_id: 1 }),
       makeAgent({ agent_id: 2 }),
@@ -104,16 +107,18 @@ describe("useUnconfiguredAgent", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     expect(result.current.isUnconfigured).toBe(false);
   });
 
-  it("returns isUnconfigured false when single agent is pending", () => {
+  it("returns isUnconfigured false when single agent is pending", async () => {
     const agents = [makeAgent({ status: "pending" })];
     const { result } = renderHook(
       () => useUnconfiguredAgent(agents, false),
       { wrapper },
     );
 
+    await settleAuthHydration();
     expect(result.current.isUnconfigured).toBe(false);
     // Should not attempt to fetch connectors (agentId is 0)
     expect(mockGet).not.toHaveBeenCalled();
@@ -128,6 +133,7 @@ describe("useUnconfiguredAgent", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });

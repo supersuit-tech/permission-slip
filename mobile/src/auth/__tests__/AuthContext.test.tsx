@@ -1,89 +1,26 @@
 /**
- * Tests for AuthProvider logic. Since react-test-renderer has peer dep
- * conflicts with React 19.2.0 in Expo SDK 55, these tests validate
- * the auth state machine via createElement + act rather than renderHook.
+ * Tests for AuthProvider. Uses mocked auth storage + auth API (same pattern as hook tests).
  */
-import { createElement, useEffect, type ReactNode } from "react";
-import { create, act, type ReactTestRenderer } from "react-test-renderer";
-import type { AuthChangeEvent, Session } from "@supabase/supabase-js";
+import { createElement } from "react";
+import { create, act } from "react-test-renderer";
 import { AuthProvider, useAuth } from "../AuthContext";
+import { mockSession } from "../../__test-utils__";
 
-// --- Mocks ---
+jest.mock("../../lib/authStorage");
+jest.mock("../../lib/authApi");
 
-// Module-level state shared between mock factory and tests.
-// Using an object so references remain stable after jest.mock hoisting.
-const mocks = {
-  authChangeCallback: null as
-    | ((event: AuthChangeEvent, session: Session | null) => void)
-    | null,
-  signInWithOtp: jest.fn(),
-  verifyOtp: jest.fn(),
-  signOut: jest.fn(),
-  challengeAndVerify: jest.fn(),
-};
+import * as authStorage from "../../lib/authStorage";
+import * as authApi from "../../lib/authApi";
 
-jest.mock("../../lib/supabaseClient", () => ({
-  supabase: {
-    auth: {
-      onAuthStateChange: jest.fn(
-        (cb: (event: AuthChangeEvent, session: Session | null) => void) => {
-          mocks.authChangeCallback = cb;
-          // Fire INITIAL_SESSION with null (no session) asynchronously.
-          setTimeout(() => cb("INITIAL_SESSION" as AuthChangeEvent, null), 0);
-          return {
-            data: { subscription: { unsubscribe: jest.fn() } },
-          };
-        }
-      ),
-      signInWithOtp: (...args: unknown[]) => mocks.signInWithOtp(...args),
-      verifyOtp: (...args: unknown[]) => mocks.verifyOtp(...args),
-      signOut: (...args: unknown[]) => mocks.signOut(...args),
-      mfa: {
-        getAuthenticatorAssuranceLevel: jest.fn().mockResolvedValue({
-          data: { currentLevel: "aal1", nextLevel: "aal1" },
-          error: null,
-        }),
-        challengeAndVerify: (...args: unknown[]) =>
-          mocks.challengeAndVerify(...args),
-      },
-    },
-  },
-}));
+const mockAuthStorage = jest.mocked(authStorage);
+const mockAuthApi = jest.mocked(authApi);
 
-// --- Helpers ---
-
-/** Builds a minimal mock session for testing. */
-function mockSession(overrides?: Partial<Session>): Session {
-  const aal1Payload = btoa(JSON.stringify({ aal: "aal1" }));
-  const defaultToken = `header.${aal1Payload}.signature`;
-
-  return {
-    access_token: defaultToken,
-    refresh_token: "mock-refresh",
-    expires_in: 3600,
-    expires_at: Date.now() / 1000 + 3600,
-    token_type: "bearer",
-    user: {
-      id: "user-1",
-      email: "test@example.com",
-      app_metadata: {},
-      user_metadata: {},
-      aud: "authenticated",
-      created_at: new Date().toISOString(),
-      factors: [],
-    },
-    ...overrides,
-  } as Session;
-}
-
-/**
- * Captures the useAuth() return value via a child component.
- * We track the latest value via a shared ref object.
- */
 interface AuthCapture {
   authStatus: string;
   email: string | undefined;
   session: unknown;
+  signInWithPassword: ((e: string, p: string) => Promise<{ error: unknown }>) | null;
+  signOut: (() => Promise<{ error: unknown }>) | null;
 }
 
 function createAuthCapture() {
@@ -91,299 +28,182 @@ function createAuthCapture() {
     authStatus: "unknown",
     email: undefined,
     session: null,
+    signInWithPassword: null,
+    signOut: null,
   };
 
   function Consumer() {
     const auth = useAuth();
-    // Update capture on every render.
     capture.authStatus = auth.authStatus;
     capture.email = auth.user?.email ?? undefined;
     capture.session = auth.session;
+    capture.signInWithPassword = auth.signInWithPassword;
+    capture.signOut = auth.signOut;
     return null;
   }
 
   return { capture, Consumer };
 }
 
-// --- Tests ---
+function bootstrapAuthenticated(session: ReturnType<typeof mockSession>) {
+  mockAuthStorage.getStoredRefreshToken.mockResolvedValue("mock-refresh");
+  mockAuthApi.postAuth.mockImplementation(async (path: string) => {
+    if (path === "refresh") {
+      return {
+        data: {
+          access_token: session.access_token,
+          refresh_token: "mock-refresh-2",
+          expires_at: session.expires_at,
+        },
+        error: null,
+      };
+    }
+    return { data: null, error: null };
+  });
+}
 
 describe("AuthProvider", () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    jest.useFakeTimers();
+    mockAuthStorage.getStoredRefreshToken.mockResolvedValue(null);
+    mockAuthStorage.setStoredRefreshToken.mockResolvedValue(undefined);
+    mockAuthStorage.clearStoredRefreshToken.mockResolvedValue(undefined);
+    mockAuthApi.postAuth.mockResolvedValue({ data: null, error: null });
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  it("starts in loading state then transitions to unauthenticated", async () => {
+  it("transitions to unauthenticated when no refresh token", async () => {
     const { capture, Consumer } = createAuthCapture();
 
     await act(async () => {
-      create(
-        createElement(AuthProvider, null, createElement(Consumer))
-      );
+      create(createElement(AuthProvider, null, createElement(Consumer)));
     });
 
-    // Initially loading before the INITIAL_SESSION callback fires.
-    // After the setTimeout(0) fires, should transition.
     await act(async () => {
-      jest.runAllTimers();
+      await new Promise((r) => setTimeout(r, 0));
     });
 
     expect(capture.authStatus).toBe("unauthenticated");
     expect(capture.session).toBeNull();
   });
 
-  it("transitions to authenticated when session event fires", async () => {
+  it("bootstraps authenticated session from refresh token", async () => {
+    const session = mockSession();
+    bootstrapAuthenticated(session);
+
     const { capture, Consumer } = createAuthCapture();
 
-    let renderer: ReactTestRenderer;
     await act(async () => {
-      renderer = create(
-        createElement(AuthProvider, null, createElement(Consumer))
-      );
+      create(createElement(AuthProvider, null, createElement(Consumer)));
     });
 
     await act(async () => {
-      jest.runAllTimers();
-    });
-
-    expect(capture.authStatus).toBe("unauthenticated");
-
-    const session = mockSession();
-    await act(async () => {
-      mocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
+      await new Promise((r) => setTimeout(r, 0));
     });
 
     expect(capture.authStatus).toBe("authenticated");
     expect(capture.email).toBe("test@example.com");
+    expect(capture.session).not.toBeNull();
   });
 
-  it("detects mfa_required when user has verified TOTP factor at AAL1", async () => {
-    const { capture, Consumer } = createAuthCapture();
-
-    await act(async () => {
-      create(
-        createElement(AuthProvider, null, createElement(Consumer))
-      );
-    });
-
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    const session = mockSession({
-      user: {
-        id: "user-mfa",
-        email: "mfa@example.com",
-        app_metadata: {},
-        user_metadata: {},
-        aud: "authenticated",
-        created_at: new Date().toISOString(),
-        factors: [
-          {
-            id: "factor-1",
-            friendly_name: "TOTP",
-            factor_type: "totp",
-            status: "verified",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ],
-      } as Session["user"],
-    });
-
-    await act(async () => {
-      mocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
-    });
-
-    expect(capture.authStatus).toBe("mfa_required");
-  });
-
-  it("transitions to unauthenticated on sign-out event", async () => {
-    const { capture, Consumer } = createAuthCapture();
-
-    await act(async () => {
-      create(
-        createElement(AuthProvider, null, createElement(Consumer))
-      );
-    });
-
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    // Sign in first.
+  it("signInWithPassword calls login endpoint", async () => {
     const session = mockSession();
+    mockAuthApi.postAuth.mockImplementation(async (path: string, body: Record<string, string>) => {
+      if (path === "login") {
+        expect(body.email).toBe("a@b.co");
+        expect(body.password).toBe("secret12345");
+        return {
+          data: {
+            access_token: session.access_token,
+            refresh_token: "rt",
+            expires_at: session.expires_at,
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    const { capture, Consumer } = createAuthCapture();
+
     await act(async () => {
-      mocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
+      create(createElement(AuthProvider, null, createElement(Consumer)));
+    });
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    await act(async () => {
+      const r = await capture.signInWithPassword!("a@b.co", "secret12345");
+      expect(r.error).toBeNull();
+    });
+
+    expect(mockAuthApi.postAuth).toHaveBeenCalledWith("login", {
+      email: "a@b.co",
+      password: "secret12345",
     });
     expect(capture.authStatus).toBe("authenticated");
+  });
 
-    // Fire sign out.
-    await act(async () => {
-      mocks.authChangeCallback!("SIGNED_OUT" as AuthChangeEvent, null);
+  it("signOut clears session and calls logout", async () => {
+    let storedRt = "mock-refresh";
+    mockAuthStorage.getStoredRefreshToken.mockImplementation(() => Promise.resolve(storedRt));
+    mockAuthStorage.setStoredRefreshToken.mockImplementation(async (t: string) => {
+      storedRt = t;
     });
 
+    const session = mockSession();
+    mockAuthApi.postAuth.mockImplementation(async (path: string) => {
+      if (path === "refresh") {
+        return {
+          data: {
+            access_token: session.access_token,
+            refresh_token: "post-refresh-rt",
+            expires_at: session.expires_at,
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    const { capture, Consumer } = createAuthCapture();
+
+    await act(async () => {
+      create(createElement(AuthProvider, null, createElement(Consumer)));
+    });
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0));
+    });
+
+    expect(capture.authStatus).toBe("authenticated");
+
+    mockAuthApi.postAuth.mockImplementation(async (path: string) => {
+      if (path === "logout") {
+        return { data: null, error: null };
+      }
+      if (path === "refresh") {
+        return {
+          data: {
+            access_token: session.access_token,
+            refresh_token: "post-refresh-rt",
+            expires_at: session.expires_at,
+          },
+          error: null,
+        };
+      }
+      return { data: null, error: null };
+    });
+
+    await act(async () => {
+      await capture.signOut!();
+    });
+
+    expect(mockAuthApi.postAuth).toHaveBeenCalledWith("logout", {
+      refresh_token: "post-refresh-rt",
+    });
     expect(capture.authStatus).toBe("unauthenticated");
     expect(capture.session).toBeNull();
-  });
-
-  it("sendOtp calls supabase.auth.signInWithOtp", async () => {
-    mocks.signInWithOtp.mockResolvedValue({ error: null });
-
-    let sendOtp: ((email: string) => Promise<unknown>) | undefined;
-
-    function CaptureSendOtp() {
-      const auth = useAuth();
-      sendOtp = auth.sendOtp;
-      return null;
-    }
-
-    await act(async () => {
-      create(
-        createElement(AuthProvider, null, createElement(CaptureSendOtp))
-      );
-    });
-
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    expect(sendOtp).toBeDefined();
-
-    let response: unknown;
-    await act(async () => {
-      response = await sendOtp!("test@example.com");
-    });
-
-    expect(mocks.signInWithOtp).toHaveBeenCalledWith({
-      email: "test@example.com",
-    });
-    expect(response).toEqual({ error: null });
-  });
-
-  it("signOut calls supabase.auth.signOut with local scope", async () => {
-    mocks.signOut.mockResolvedValue({ error: null });
-
-    let signOut: (() => Promise<unknown>) | undefined;
-
-    function CaptureSignOut() {
-      const auth = useAuth();
-      signOut = auth.signOut;
-      return null;
-    }
-
-    await act(async () => {
-      create(
-        createElement(AuthProvider, null, createElement(CaptureSignOut))
-      );
-    });
-
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    await act(async () => {
-      await signOut!();
-    });
-
-    expect(mocks.signOut).toHaveBeenCalledWith({ scope: "local" });
-  });
-
-  it("verifyMfa calls challengeAndVerify with the correct factor ID", async () => {
-    mocks.challengeAndVerify.mockResolvedValue({ data: {}, error: null });
-
-    let verifyMfa: ((code: string) => Promise<unknown>) | undefined;
-
-    function CaptureVerifyMfa() {
-      const auth = useAuth();
-      verifyMfa = auth.verifyMfa;
-      return null;
-    }
-
-    await act(async () => {
-      create(
-        createElement(AuthProvider, null, createElement(CaptureVerifyMfa))
-      );
-    });
-
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    // Sign in with a session that has a verified TOTP factor.
-    const session = mockSession({
-      user: {
-        id: "user-mfa",
-        email: "mfa@example.com",
-        app_metadata: {},
-        user_metadata: {},
-        aud: "authenticated",
-        created_at: new Date().toISOString(),
-        factors: [
-          {
-            id: "factor-123",
-            friendly_name: "TOTP",
-            factor_type: "totp",
-            status: "verified",
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ],
-      } as Session["user"],
-    });
-
-    await act(async () => {
-      mocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
-    });
-
-    let result: unknown;
-    await act(async () => {
-      result = await verifyMfa!("654321");
-    });
-
-    expect(mocks.challengeAndVerify).toHaveBeenCalledWith({
-      factorId: "factor-123",
-      code: "654321",
-    });
-    expect(result).toEqual({ error: null });
-  });
-
-  it("verifyMfa returns error when no TOTP factor exists", async () => {
-    let verifyMfa: ((code: string) => Promise<unknown>) | undefined;
-
-    function CaptureVerifyMfa() {
-      const auth = useAuth();
-      verifyMfa = auth.verifyMfa;
-      return null;
-    }
-
-    await act(async () => {
-      create(
-        createElement(AuthProvider, null, createElement(CaptureVerifyMfa))
-      );
-    });
-
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    // Sign in with no TOTP factors.
-    const session = mockSession();
-    await act(async () => {
-      mocks.authChangeCallback!("SIGNED_IN" as AuthChangeEvent, session);
-    });
-
-    let result: { error: { code: string } | null };
-    await act(async () => {
-      result = (await verifyMfa!("123456")) as typeof result;
-    });
-
-    expect(result!.error).not.toBeNull();
-    expect(result!.error!.code).toBe("mfa_factor_not_found");
-    expect(mocks.challengeAndVerify).not.toHaveBeenCalled();
   });
 });

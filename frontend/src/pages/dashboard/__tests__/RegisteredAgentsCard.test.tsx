@@ -1,12 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
 import { RegisteredAgentsCard } from "../RegisteredAgentsCard";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 const mockAgentsResponse = {
@@ -163,6 +162,7 @@ describe("RegisteredAgentsCard", () => {
 
     render(<RegisteredAgentsCard />, { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(screen.getByText("Openclaw not connected yet")).toBeInTheDocument();
     });
@@ -279,6 +279,7 @@ describe("RegisteredAgentsCard", () => {
     const user = userEvent.setup();
     render(<RegisteredAgentsCard />, { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(
         screen.getByRole("button", { name: "Add an Openclaw machine" })

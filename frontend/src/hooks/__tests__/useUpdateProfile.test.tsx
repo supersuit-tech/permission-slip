@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockPatch, resetClientMocks } from "../../api/__mocks__/client";
 import { useUpdateProfile } from "../useUpdateProfile";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockUpdatedProfile = {
@@ -32,6 +31,7 @@ describe("useUpdateProfile", () => {
 
     const { result } = renderHook(() => useUpdateProfile(), { wrapper });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.updateProfile({
         email: "new@example.com",
@@ -40,7 +40,7 @@ describe("useUpdateProfile", () => {
     });
 
     expect(mockPatch).toHaveBeenCalledWith("/v1/profile", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       body: { email: "new@example.com", phone: "+15551234567" },
     });
   });
@@ -53,12 +53,13 @@ describe("useUpdateProfile", () => {
 
     const { result } = renderHook(() => useUpdateProfile(), { wrapper });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.updateProfile({ email: "new@example.com" });
     });
 
     expect(mockPatch).toHaveBeenCalledWith("/v1/profile", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       body: { email: "new@example.com" },
     });
   });
@@ -74,6 +75,7 @@ describe("useUpdateProfile", () => {
 
     const { result } = renderHook(() => useUpdateProfile(), { wrapper });
 
+    await settleAuthHydration();
     await expect(
       act(async () => {
         await result.current.updateProfile({ email: "new@example.com" });
@@ -86,6 +88,7 @@ describe("useUpdateProfile", () => {
 
     const { result } = renderHook(() => useUpdateProfile(), { wrapper });
 
+    await settleAuthHydration();
     await expect(
       act(async () => {
         await result.current.updateProfile({ email: "new@example.com" });

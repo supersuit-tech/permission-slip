@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useNotificationPreferences } from "../useNotificationPreferences";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockPreferencesResponse = {
@@ -25,13 +24,14 @@ describe("useNotificationPreferences", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("returns empty preferences when not authenticated", () => {
+  it("returns empty preferences when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useNotificationPreferences(), {
       wrapper,
     });
 
+    await settleAuthHydration();
     expect(result.current.preferences).toEqual([]);
     expect(result.current.isLoading).toBe(false);
   });
@@ -44,6 +44,7 @@ describe("useNotificationPreferences", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.preferences).toEqual(
         mockPreferencesResponse.preferences,
@@ -52,7 +53,7 @@ describe("useNotificationPreferences", () => {
 
     expect(mockGet).toHaveBeenCalledWith(
       "/v1/profile/notification-preferences",
-      { headers: { Authorization: "Bearer token" } },
+      { headers: { Authorization: expect.stringMatching(/^Bearer /) } },
     );
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
@@ -69,6 +70,7 @@ describe("useNotificationPreferences", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });

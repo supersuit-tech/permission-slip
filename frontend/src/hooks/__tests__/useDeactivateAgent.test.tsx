@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockPost, resetClientMocks } from "../../api/__mocks__/client";
 import { useDeactivateAgent } from "../useDeactivateAgent";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 describe("useDeactivateAgent", () => {
@@ -27,6 +26,7 @@ describe("useDeactivateAgent", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.deactivateAgent(42);
     });
@@ -34,7 +34,7 @@ describe("useDeactivateAgent", () => {
     expect(mockPost).toHaveBeenCalledWith(
       "/v1/agents/{agent_id}/deactivate",
       {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         params: { path: { agent_id: 42 } },
       },
     );
@@ -48,6 +48,7 @@ describe("useDeactivateAgent", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await expect(result.current.deactivateAgent(42)).rejects.toThrow(
       "Not authenticated"
     );
@@ -64,6 +65,7 @@ describe("useDeactivateAgent", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {
@@ -84,6 +86,7 @@ describe("useDeactivateAgent", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.deactivateAgent(999);
     });

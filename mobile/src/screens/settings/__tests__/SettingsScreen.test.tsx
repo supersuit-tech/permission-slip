@@ -5,22 +5,6 @@ import type { NotificationPreference } from "../../../hooks/useNotificationPrefe
 
 // --- Mocks ---
 
-jest.mock("../../../lib/supabaseClient", () => ({
-  supabase: {
-    auth: {
-      getSession: jest
-        .fn()
-        .mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: jest.fn().mockReturnValue({
-        data: { subscription: { unsubscribe: jest.fn() } },
-      }),
-      signInWithOtp: jest.fn(),
-      verifyOtp: jest.fn(),
-      signOut: jest.fn(),
-    },
-  },
-}));
-
 const mockSignOut = jest.fn();
 jest.mock("../../../auth/AuthContext", () => ({
   useAuth: () => ({

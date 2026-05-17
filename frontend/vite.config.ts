@@ -50,11 +50,6 @@ export default defineConfig({
     proxy: {
       "/api": "http://localhost:8080",
       "/invite": "http://localhost:8080",
-      "/supabase": {
-        target: "http://127.0.0.1:54321",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/supabase/, ""),
-      },
       "/mailpit": {
         target: "http://127.0.0.1:54324",
         changeOrigin: true,

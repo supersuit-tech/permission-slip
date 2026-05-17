@@ -10,7 +10,6 @@ import {
 } from "../../../api/__mocks__/client";
 import { PendingApprovalsBanner } from "../PendingApprovalsBanner";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 const NOW = new Date("2026-02-21T10:00:00Z");

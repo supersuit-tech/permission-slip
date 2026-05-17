@@ -2,14 +2,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { Route, Routes, MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks, mockMfa } from "../../../auth/__tests__/fixtures";
+import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
 import { AuthProvider } from "../../../auth/AuthContext";
 import { CookieConsentProvider } from "../../../components/CookieConsentContext";
 import { ThemeProvider } from "../../../components/ThemeContext";
 import { SettingsLayout } from "../SettingsLayout";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 const mockProfile = {
@@ -23,10 +22,6 @@ const mockProfile = {
 
 function mockApiFetch() {
   setupAuthMocks({ authenticated: true });
-  mockMfa.listFactors.mockResolvedValue({
-    data: { all: [], totp: [] },
-    error: null,
-  });
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/profile") {
       return Promise.resolve({ data: mockProfile, response: { status: 200 } });

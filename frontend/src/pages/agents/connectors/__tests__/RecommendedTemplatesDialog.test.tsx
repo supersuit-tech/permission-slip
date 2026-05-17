@@ -12,7 +12,6 @@ import { RecommendedTemplatesDialog } from "../RecommendedTemplatesDialog";
 import type { ConnectorAction } from "../../../../hooks/useConnectorDetail";
 import type { ActionConfiguration } from "../../../../hooks/useActionConfigs";
 
-vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
 const actions: ConnectorAction[] = [
@@ -238,7 +237,7 @@ describe("RecommendedTemplatesDialog", () => {
     });
   });
 
-  it("shows loading state while templates load", () => {
+  it("shows loading state while templates load", async () => {
     mockGet.mockImplementation((url: string) => {
       if (url === "/v1/action-config-templates") {
         return new Promise(() => {});
@@ -248,7 +247,9 @@ describe("RecommendedTemplatesDialog", () => {
 
     renderDialog();
 
-    expect(screen.getByText("Loading templates...")).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText("Loading templates...")).toBeInTheDocument();
+    });
   });
 
   it("shows error state when template fetch fails", async () => {

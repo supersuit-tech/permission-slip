@@ -13,7 +13,6 @@ import {
 import { ActionConfigurationsSection } from "../ActionConfigurationsSection";
 import type { ActionConfiguration } from "../../../../hooks/useActionConfigs";
 import type { ConnectorAction } from "../../../../hooks/useConnectorDetail";
-vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
 const mockActions: ConnectorAction[] = [
@@ -216,7 +215,7 @@ describe("ActionConfigurationsSection", () => {
 
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalledWith("/v1/action-configurations", {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         body: {
           agent_id: 42,
           connector_id: "github",
@@ -261,7 +260,7 @@ describe("ActionConfigurationsSection", () => {
       expect(mockPut).toHaveBeenCalledWith(
         "/v1/action-configurations/{config_id}",
         expect.objectContaining({
-          headers: { Authorization: "Bearer token" },
+          headers: { Authorization: expect.stringMatching(/^Bearer /) },
           params: { path: { config_id: "ac_001" } },
           body: expect.objectContaining({
             name: "Updated name",
@@ -298,7 +297,7 @@ describe("ActionConfigurationsSection", () => {
       expect(mockDelete).toHaveBeenCalledWith(
         "/v1/action-configurations/{config_id}",
         {
-          headers: { Authorization: "Bearer token" },
+          headers: { Authorization: expect.stringMatching(/^Bearer /) },
           params: { path: { config_id: "ac_001" } },
         },
       );

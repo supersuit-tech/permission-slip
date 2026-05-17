@@ -4,7 +4,6 @@ import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useConnectorDetail } from "../useConnectorDetail";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockDetailResponse = {

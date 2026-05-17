@@ -5,7 +5,6 @@ import { createAuthWrapper } from "../../../test-helpers";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
 import { StandingApprovalsCard } from "../StandingApprovalsCard";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 const mockStandingApprovals = [

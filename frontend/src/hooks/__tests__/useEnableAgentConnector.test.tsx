@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockPut, resetClientMocks } from "../../api/__mocks__/client";
 import { useEnableAgentConnector } from "../useEnableAgentConnector";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 describe("useEnableAgentConnector", () => {
@@ -31,6 +30,7 @@ describe("useEnableAgentConnector", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.enableConnector({
         agentId: 42,
@@ -41,7 +41,7 @@ describe("useEnableAgentConnector", () => {
     expect(mockPut).toHaveBeenCalledWith(
       "/v1/agents/{agent_id}/connectors/{connector_id}",
       {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         params: {
           path: { agent_id: 42, connector_id: "gmail" },
         },
@@ -57,6 +57,7 @@ describe("useEnableAgentConnector", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await expect(
       result.current.enableConnector({ agentId: 42, connectorId: "gmail" }),
     ).rejects.toThrow("Not authenticated");
@@ -78,6 +79,7 @@ describe("useEnableAgentConnector", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {

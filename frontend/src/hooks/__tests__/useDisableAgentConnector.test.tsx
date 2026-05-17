@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockDelete, resetClientMocks } from "../../api/__mocks__/client";
 import { useDisableAgentConnector } from "../useDisableAgentConnector";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 describe("useDisableAgentConnector", () => {
@@ -32,6 +31,7 @@ describe("useDisableAgentConnector", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     let response: unknown;
     await act(async () => {
       response = await result.current.disableConnector({
@@ -43,7 +43,7 @@ describe("useDisableAgentConnector", () => {
     expect(mockDelete).toHaveBeenCalledWith(
       "/v1/agents/{agent_id}/connectors/{connector_id}",
       {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         params: {
           path: { agent_id: 42, connector_id: "gmail" },
           query: {},
@@ -74,6 +74,7 @@ describe("useDisableAgentConnector", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.disableConnector({
         agentId: 42,
@@ -85,7 +86,7 @@ describe("useDisableAgentConnector", () => {
     expect(mockDelete).toHaveBeenCalledWith(
       "/v1/agents/{agent_id}/connectors/{connector_id}",
       {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         params: {
           path: { agent_id: 42, connector_id: "github" },
           query: { delete_credentials: true },
@@ -101,6 +102,7 @@ describe("useDisableAgentConnector", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await expect(
       result.current.disableConnector({ agentId: 42, connectorId: "gmail" }),
     ).rejects.toThrow("Not authenticated");
@@ -122,6 +124,7 @@ describe("useDisableAgentConnector", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {

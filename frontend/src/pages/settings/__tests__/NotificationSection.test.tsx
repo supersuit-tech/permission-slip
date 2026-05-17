@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import {
   mockGet,
@@ -11,7 +11,6 @@ import {
 } from "../../../api/__mocks__/client";
 import { NotificationSection } from "../NotificationSection";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 // Default fixture: SMS not configured on server, so excluded from response.
@@ -119,12 +118,13 @@ describe("NotificationSection", () => {
     expect(screen.getByText("Email")).toBeInTheDocument();
   });
 
-  it("shows loading state", () => {
+  it("shows loading state", async () => {
     setupAuthMocks({ authenticated: true });
     mockGet.mockReturnValue(new Promise(() => {}));
 
     render(<NotificationSection />, { wrapper });
 
+    await settleAuthHydration();
     expect(
       screen.getByRole("status", {
         name: "Loading notification preferences",
@@ -304,6 +304,7 @@ describe("NotificationSection", () => {
 
     render(<NotificationSection />, { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(screen.getByText("Product updates")).toBeInTheDocument();
     });
@@ -321,6 +322,7 @@ describe("NotificationSection", () => {
 
     render(<NotificationSection />, { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(screen.getByText("Product updates")).toBeInTheDocument();
     });
@@ -372,6 +374,7 @@ describe("NotificationSection", () => {
 
     render(<NotificationSection />, { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(screen.getByText("Notify me about")).toBeInTheDocument();
     });
@@ -398,6 +401,7 @@ describe("NotificationSection", () => {
 
     render(<NotificationSection />, { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(
         screen.getByRole("switch", { name: /auto-approval execution notifications/i }),

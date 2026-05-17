@@ -6,7 +6,6 @@ import { ActionConfigParameterFields } from "../ActionConfigParameterFields";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 import type { ParamMode } from "../ActionConfigFormFields";
 
-vi.mock("../../../../lib/supabaseClient");
 
 function renderFields(
   schema: ParametersSchema | null,

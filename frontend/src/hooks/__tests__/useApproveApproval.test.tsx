@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockPost, resetClientMocks } from "../../api/__mocks__/client";
 import { useApproveApproval } from "../useApproveApproval";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockApproveResponse = {
@@ -33,6 +32,8 @@ describe("useApproveApproval", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
+
     await act(async () => {
       await result.current.approveApproval("approval-abc");
     });
@@ -40,7 +41,7 @@ describe("useApproveApproval", () => {
     expect(mockPost).toHaveBeenCalledWith(
       "/v1/approvals/{approval_id}/approve",
       {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         params: { path: { approval_id: "approval-abc" } },
       },
     );
@@ -54,6 +55,8 @@ describe("useApproveApproval", () => {
     const { result } = renderHook(() => useApproveApproval(), {
       wrapper,
     });
+
+    await settleAuthHydration();
 
     let response: Awaited<ReturnType<typeof result.current.approveApproval>>;
     await act(async () => {
@@ -89,6 +92,8 @@ describe("useApproveApproval", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
+
     let error: Error | undefined;
     await act(async () => {
       try {
@@ -108,6 +113,8 @@ describe("useApproveApproval", () => {
     const { result } = renderHook(() => useApproveApproval(), {
       wrapper,
     });
+
+    await settleAuthHydration();
 
     await act(async () => {
       await result.current.approveApproval("some-other-id");

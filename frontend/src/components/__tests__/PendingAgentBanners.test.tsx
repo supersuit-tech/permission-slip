@@ -6,7 +6,6 @@ import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { PendingAgentBanners } from "../PendingAgentBanners";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 // Use a large buffer (1 hour) to prevent flaky tests in slow CI environments

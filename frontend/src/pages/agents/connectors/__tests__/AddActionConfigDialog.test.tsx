@@ -6,7 +6,6 @@ import { mockGet, resetClientMocks } from "../../../../api/__mocks__/client";
 import { AddActionConfigDialog } from "../AddActionConfigDialog";
 import type { ConnectorAction } from "../../../../hooks/useConnectorDetail";
 
-vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
 const actions: ConnectorAction[] = [
