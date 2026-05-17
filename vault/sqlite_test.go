@@ -2,7 +2,6 @@ package vault
 
 import (
 	"bytes"
-	"context"
 	"crypto/rand"
 	"encoding/base64"
 	"path/filepath"
