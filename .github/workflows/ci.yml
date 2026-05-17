@@ -28,17 +28,19 @@ jobs:
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
       - name: Run backend tests
-        id: gotest
         run: |
           set -o pipefail
-          go test ./... 2>&1 | tee /tmp/backend-tests.log
-
-      - name: Upload backend test log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: backend-tests-log
-          path: /tmp/backend-tests.log
+          if ! go test ./... 2>&1 | tee /tmp/backend-tests.log; then
+            RC=${PIPESTATUS[0]}
+            echo ""
+            echo "=== BACKEND TESTS FAILED — emitting last 80 lines as annotations ==="
+            tail -n 80 /tmp/backend-tests.log | while IFS= read -r line; do
+              # Sanitize for ::error:: format
+              clean=$(echo "$line" | tr -d '\r' | head -c 800)
+              [ -n "$clean" ] && echo "::error::$clean"
+            done
+            exit $RC
+          fi
 
   frontend:
     name: Frontend Tests
@@ -109,17 +111,18 @@ jobs:
           fi
 
       - name: Build server (frontend + Go)
-        id: gobuild
         run: |
           set -o pipefail
-          make build-ci 2>&1 | tee /tmp/build.log
-
-      - name: Upload build log
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: build-log
-          path: /tmp/build.log
+          if ! make build-ci 2>&1 | tee /tmp/build.log; then
+            RC=${PIPESTATUS[0]}
+            echo ""
+            echo "=== BUILD FAILED — emitting last 80 lines as annotations ==="
+            tail -n 80 /tmp/build.log | while IFS= read -r line; do
+              clean=$(echo "$line" | tr -d '\r' | head -c 800)
+              [ -n "$clean" ] && echo "::error::$clean"
+            done
+            exit $RC
+          fi
 
   notify-failure:
     name: Notify on Failure
