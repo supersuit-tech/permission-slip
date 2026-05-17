@@ -26,7 +26,7 @@ func TestListAgents_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/agents", uid)
@@ -56,7 +56,7 @@ func TestListAgents_ReturnsOwnAgents(t *testing.T) {
 	// Create a second agent for the same user
 	testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/agents", uid)
@@ -87,7 +87,7 @@ func TestListAgents_DoesNotReturnOtherUsersAgents(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUserWithAgent(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/agents", uid1)
@@ -110,7 +110,7 @@ func TestListAgents_DoesNotReturnOtherUsersAgents(t *testing.T) {
 
 func TestListAgents_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/agents", nil)
@@ -137,7 +137,7 @@ func TestListAgents_Pagination(t *testing.T) {
 			testhelper.InsertAgentWithCreatedAt(t, tx, uid, time.Date(2026, 1, 1+i, 0, 0, 0, 0, time.UTC))
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/agents?limit=2", uid)
@@ -172,7 +172,7 @@ func TestListAgents_Pagination(t *testing.T) {
 			agentIDs[i] = testhelper.InsertAgentWithCreatedAt(t, tx, uid, time.Date(2026, 1, 1+i, 0, 0, 0, 0, time.UTC))
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		// First page: limit=2
@@ -260,7 +260,7 @@ func TestListAgents_Pagination(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		for _, limit := range []string{"0", "-1", "abc", "101"} {
@@ -282,7 +282,7 @@ func TestListAgents_Pagination(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		for _, cursor := range []string{
@@ -314,7 +314,7 @@ func TestListAgents_Pagination(t *testing.T) {
 			testhelper.InsertAgentWithStatus(t, tx, uid, "pending")
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/agents", uid)
@@ -344,7 +344,7 @@ func TestListAgents_LastActiveAt(t *testing.T) {
 	lastActive := time.Date(2026, 2, 19, 8, 45, 0, 0, time.UTC)
 	testhelper.SetAgentLastActiveAt(t, tx, agentID, uid, lastActive)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/agents", uid)
@@ -384,7 +384,7 @@ func TestGetAgent_Found(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d", agentID), uid)
@@ -406,7 +406,7 @@ func TestGetAgent_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/agents/999999", uid)
@@ -427,7 +427,7 @@ func TestGetAgent_WrongOwner(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d", agentID), uid2)
@@ -445,7 +445,7 @@ func TestGetAgent_InvalidID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	for _, id := range []string{"abc", "0", "-1"} {
@@ -469,7 +469,7 @@ func TestUpdateAgent_ValidMetadata(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, fmt.Sprintf("/agents/%d", agentID), uid,
@@ -499,7 +499,7 @@ func TestUpdateAgent_ShallowMerge(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Set initial metadata
@@ -539,7 +539,7 @@ func TestUpdateAgent_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, "/agents/999999", uid,
@@ -561,7 +561,7 @@ func TestUpdateAgent_WrongOwner(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, fmt.Sprintf("/agents/%d", agentID), uid2,
@@ -580,7 +580,7 @@ func TestUpdateAgent_InvalidID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	for _, id := range []string{"abc", "0", "-1"} {
@@ -603,7 +603,7 @@ func TestUpdateAgent_MissingMetadata(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPatch, fmt.Sprintf("/agents/%d", agentID), uid, `{}`)
@@ -621,7 +621,7 @@ func TestUpdateAgent_NonObjectMetadata(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	for _, tc := range []struct {
@@ -660,7 +660,7 @@ func TestListAgents_RequestCount30d(t *testing.T) {
 			testhelper.InsertApproval(t, tx, aid, agentID, uid)
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/agents", uid)
@@ -698,7 +698,7 @@ func TestListAgents_RequestCount30d(t *testing.T) {
 			testhelper.InsertApprovalWithCreatedAt(t, tx, testhelper.GenerateID(t, "appr_"), agentID, uid, old.Add(time.Duration(i)*time.Second))
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/agents", uid)
@@ -727,7 +727,7 @@ func TestListAgents_RequestCount30d(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/agents", uid)

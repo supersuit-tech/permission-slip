@@ -15,7 +15,7 @@ func TestGetConfig_BillingDisabled(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "cfg_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: false}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: false}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/config", uid)
@@ -41,7 +41,7 @@ func TestGetConfig_BillingEnabled(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "cfg_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/config", uid)
@@ -64,7 +64,7 @@ func TestGetConfig_BillingEnabled(t *testing.T) {
 func TestGetConfig_Unauthenticated(t *testing.T) {
 	t.Parallel()
 
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/config", nil)

@@ -35,7 +35,7 @@ func slackCallbackDeps(tx db.DBTX, tokenURL string) *Deps {
 	return &Deps{
 		DB:                tx,
 		Vault:             vault.NewMockVaultStore(),
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		OAuthProviders:    reg,
 		OAuthStateSecret:  testOAuthStateSecret,
 		BaseURL:           "http://localhost:3000",

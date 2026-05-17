@@ -34,13 +34,11 @@ func setEnvForTest(t *testing.T, vars map[string]string) {
 
 func TestValidateConfig_DevelopmentModeSkipsErrors(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                "development",
-		"DATABASE_PATH": "",
-		"SUPABASE_URL":        "",
-		"SUPABASE_JWT_SECRET": "",
-		"SUPABASE_JWKS_URL":   "",
-		"INVITE_HMAC_KEY":     "",
-		"BASE_URL":            "",
+		"MODE":               "development",
+		"DATABASE_PATH":      "",
+		"JWT_SIGNING_SECRET": "",
+		"INVITE_HMAC_KEY":    "",
+		"BASE_URL":           "",
 	})
 
 	errs, warnings := validateConfig()
@@ -55,24 +53,21 @@ func TestValidateConfig_DevelopmentModeSkipsErrors(t *testing.T) {
 
 func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "development",
-		"DATABASE_PATH": "",
-		"SUPABASE_URL":              "",
-		"SUPABASE_JWT_SECRET":       "",
-		"SUPABASE_JWKS_URL":         "",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":                  "https://example.com",
-		"OAUTH_STATE_SECRET":        "test-oauth-state-secret-32chars!",
-		"GOOGLE_CLIENT_ID":          "test-google-id",
-		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
-		"MICROSOFT_CLIENT_ID":       "test-msft-id",
-		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
-		"SALESFORCE_CLIENT_ID":      "test-sf-id",
-		"SALESFORCE_CLIENT_SECRET":  "test-sf-secret",
-		"AWS_REGION":                "",
-		"AWS_ACCESS_KEY_ID":         "",
-		"AWS_SECRET_ACCESS_KEY":     "",
+		"MODE":                     "development",
+		"DATABASE_PATH":            "",
+		"JWT_SIGNING_SECRET":       "test-jwt-signing-secret-32chars-min!",
+		"INVITE_HMAC_KEY":          "test-invite-hmac-key-at-least-32c!",
+		"BASE_URL":                 "https://example.com",
+		"OAUTH_STATE_SECRET":       "test-oauth-state-secret-32chars!",
+		"GOOGLE_CLIENT_ID":         "test-google-id",
+		"GOOGLE_CLIENT_SECRET":     "test-google-secret",
+		"MICROSOFT_CLIENT_ID":      "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":  "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":     "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET": "test-sf-secret",
+		"AWS_REGION":               "",
+		"AWS_ACCESS_KEY_ID":        "",
+		"AWS_SECRET_ACCESS_KEY":    "",
 	})
 
 	errs, warnings := validateConfig()
@@ -86,13 +81,12 @@ func TestValidateConfig_DevelopmentModeNoWarningsWhenConfigured(t *testing.T) {
 
 func TestValidateConfig_MissingDatabaseURL(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                "",
-		"DATABASE_PATH": "",
-		"SUPABASE_URL":        "http://localhost:54321",
-		"SUPABASE_JWT_SECRET": "",
-		"VAPID_PUBLIC_KEY":    "",
-		"VAPID_PRIVATE_KEY":   "",
-		"VAPID_SUBJECT":       "",
+		"MODE":               "",
+		"DATABASE_PATH":      "",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"VAPID_PUBLIC_KEY":   "",
+		"VAPID_PRIVATE_KEY":  "",
+		"VAPID_SUBJECT":      "",
 	})
 
 	errs, _ := validateConfig()
@@ -109,70 +103,45 @@ func TestValidateConfig_MissingDatabaseURL(t *testing.T) {
 	}
 }
 
-func TestValidateConfig_MissingJWTConfig(t *testing.T) {
+func TestValidateConfig_MissingJWTSigningSecret(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":        "",
-		"SUPABASE_JWT_SECRET": "",
-		"SUPABASE_JWKS_URL":   "",
-		"VAPID_PUBLIC_KEY":    "",
-		"VAPID_PRIVATE_KEY":   "",
-		"VAPID_SUBJECT":       "",
+		"MODE":               "",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "",
+		"VAPID_PUBLIC_KEY":   "",
+		"VAPID_PRIVATE_KEY":  "",
+		"VAPID_SUBJECT":      "",
 	})
 
 	errs, _ := validateConfig()
 
 	found := false
 	for _, e := range errs {
-		if e.envVar == "SUPABASE_URL or SUPABASE_JWT_SECRET or SUPABASE_JWKS_URL" {
+		if e.envVar == "JWT_SIGNING_SECRET" {
 			found = true
 			break
 		}
 	}
 	if !found {
-		t.Error("expected error for missing JWT configuration")
+		t.Error("expected error for missing JWT_SIGNING_SECRET")
 	}
 }
 
-func TestValidateConfig_SupabaseURLSuffices(t *testing.T) {
+func TestValidateConfig_JWTSigningSecretSuffices(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":        "http://localhost:54321",
-		"SUPABASE_JWT_SECRET": "",
-		"SUPABASE_JWKS_URL":   "",
-		"INVITE_HMAC_KEY":     "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":            "https://example.com",
-		"OAUTH_STATE_SECRET":  "test-oauth-state-secret-32chars!",
-		"VAPID_PUBLIC_KEY":    "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":   "examplePrivateKey",
-		"VAPID_SUBJECT":       "mailto:test@example.com",
+		"MODE":               "",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "my-secret-that-is-32-chars-long!",
+		"INVITE_HMAC_KEY":    "test-invite-hmac-key-at-least-32c!",
+		"BASE_URL":           "https://example.com",
+		"VAPID_PUBLIC_KEY":   "BExamplePublicKey",
+		"VAPID_PRIVATE_KEY":  "examplePrivateKey",
+		"VAPID_SUBJECT":      "mailto:test@example.com",
 	})
 
 	errs, _ := validateConfig()
 	if len(errs) != 0 {
-		t.Errorf("expected no errors when SUPABASE_URL is set, got %d: %v", len(errs), errs)
-	}
-}
-
-func TestValidateConfig_JWTSecretSuffices(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":                "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":        "",
-		"SUPABASE_JWT_SECRET": "my-secret-that-is-32-chars-long!",
-		"SUPABASE_JWKS_URL":   "",
-		"INVITE_HMAC_KEY":     "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":            "https://example.com",
-		"VAPID_PUBLIC_KEY":    "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":   "examplePrivateKey",
-		"VAPID_SUBJECT":       "mailto:test@example.com",
-	})
-
-	errs, _ := validateConfig()
-	if len(errs) != 0 {
-		t.Errorf("expected no errors when SUPABASE_JWT_SECRET is set, got %d: %v", len(errs), errs)
+		t.Errorf("expected no errors when JWT_SIGNING_SECRET is set, got %d: %v", len(errs), errs)
 	}
 }
 
@@ -181,14 +150,14 @@ func TestValidateConfig_OptionalWarnings(t *testing.T) {
 	// runs in development mode where it falls back to a warning. BASE_URL
 	// is always optional.
 	setEnvForTest(t, map[string]string{
-		"MODE":              "development",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":      "http://localhost:54321",
-		"INVITE_HMAC_KEY":   "",
-		"BASE_URL":          "",
-		"VAPID_PUBLIC_KEY":  "",
-		"VAPID_PRIVATE_KEY": "",
-		"VAPID_SUBJECT":     "",
+		"MODE":               "development",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"INVITE_HMAC_KEY":    "",
+		"BASE_URL":           "",
+		"VAPID_PUBLIC_KEY":   "",
+		"VAPID_PRIVATE_KEY":  "",
+		"VAPID_SUBJECT":      "",
 	})
 
 	_, warnings := validateConfig()
@@ -211,25 +180,24 @@ func TestValidateConfig_OptionalWarnings(t *testing.T) {
 
 func TestValidateConfig_AllValid(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":              "http://localhost:54321",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-service-role-key",
-		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":                  "https://example.com",
-		"OAUTH_STATE_SECRET":        "test-oauth-state-secret-32chars!",
-		"VAPID_PUBLIC_KEY":          "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":         "examplePrivateKey",
-		"VAPID_SUBJECT":             "mailto:test@example.com",
-		"GOOGLE_CLIENT_ID":          "test-google-id",
-		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
-		"MICROSOFT_CLIENT_ID":       "test-msft-id",
-		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
-		"SALESFORCE_CLIENT_ID":      "test-sf-id",
-		"SALESFORCE_CLIENT_SECRET":  "test-sf-secret",
-		"AWS_REGION":                "",
-		"AWS_ACCESS_KEY_ID":         "",
-		"AWS_SECRET_ACCESS_KEY":     "",
+		"MODE":                     "",
+		"DATABASE_PATH":            "/tmp/test.db",
+		"JWT_SIGNING_SECRET":       "test-jwt-signing-secret-32chars-min!",
+		"INVITE_HMAC_KEY":          "test-invite-hmac-key-at-least-32c!",
+		"BASE_URL":                 "https://example.com",
+		"OAUTH_STATE_SECRET":       "test-oauth-state-secret-32chars!",
+		"VAPID_PUBLIC_KEY":         "BExamplePublicKey",
+		"VAPID_PRIVATE_KEY":        "examplePrivateKey",
+		"VAPID_SUBJECT":            "mailto:test@example.com",
+		"GOOGLE_CLIENT_ID":         "test-google-id",
+		"GOOGLE_CLIENT_SECRET":     "test-google-secret",
+		"MICROSOFT_CLIENT_ID":      "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":  "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":     "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET": "test-sf-secret",
+		"AWS_REGION":               "",
+		"AWS_ACCESS_KEY_ID":        "",
+		"AWS_SECRET_ACCESS_KEY":    "",
 	})
 
 	errs, warnings := validateConfig()
@@ -244,14 +212,14 @@ func TestValidateConfig_AllValid(t *testing.T) {
 func TestValidateConfig_NoVAPIDKeysInProduction_WebPushDisabled(t *testing.T) {
 	// When no VAPID vars are set at all, Web Push is simply disabled — no errors.
 	setEnvForTest(t, map[string]string{
-		"MODE":              "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":      "http://localhost:54321",
-		"INVITE_HMAC_KEY":   "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":          "https://example.com",
-		"VAPID_PUBLIC_KEY":  "",
-		"VAPID_PRIVATE_KEY": "",
-		"VAPID_SUBJECT":     "",
+		"MODE":               "",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"INVITE_HMAC_KEY":    "test-invite-hmac-key-at-least-32c!",
+		"BASE_URL":           "https://example.com",
+		"VAPID_PUBLIC_KEY":   "",
+		"VAPID_PRIVATE_KEY":  "",
+		"VAPID_SUBJECT":      "",
 	})
 
 	errs, _ := validateConfig()
@@ -265,12 +233,12 @@ func TestValidateConfig_NoVAPIDKeysInProduction_WebPushDisabled(t *testing.T) {
 func TestValidateConfig_PartialVAPIDInProduction_SubjectOnly(t *testing.T) {
 	// If only VAPID_SUBJECT is set, the keys are missing — error.
 	setEnvForTest(t, map[string]string{
-		"MODE":              "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":      "http://localhost:54321",
-		"VAPID_PUBLIC_KEY":  "",
-		"VAPID_PRIVATE_KEY": "",
-		"VAPID_SUBJECT":     "mailto:test@example.com",
+		"MODE":               "",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"VAPID_PUBLIC_KEY":   "",
+		"VAPID_PRIVATE_KEY":  "",
+		"VAPID_SUBJECT":      "mailto:test@example.com",
 	})
 
 	errs, _ := validateConfig()
@@ -317,12 +285,12 @@ func TestValidateConfig_VAPIDKeysNotRequiredInDevMode(t *testing.T) {
 
 func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPrivate(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":              "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":      "http://localhost:54321",
-		"VAPID_PUBLIC_KEY":  "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY": "", // missing private key
-		"VAPID_SUBJECT":     "mailto:test@example.com",
+		"MODE":               "",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"VAPID_PUBLIC_KEY":   "BExamplePublicKey",
+		"VAPID_PRIVATE_KEY":  "", // missing private key
+		"VAPID_SUBJECT":      "mailto:test@example.com",
 	})
 
 	errs, _ := validateConfig()
@@ -341,12 +309,12 @@ func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPrivate(t *testing.T
 
 func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPublic(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":              "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":      "http://localhost:54321",
-		"VAPID_PUBLIC_KEY":  "",
-		"VAPID_PRIVATE_KEY": "examplePrivateKey", // missing public key
-		"VAPID_SUBJECT":     "mailto:test@example.com",
+		"MODE":               "",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"VAPID_PUBLIC_KEY":   "",
+		"VAPID_PRIVATE_KEY":  "examplePrivateKey", // missing public key
+		"VAPID_SUBJECT":      "mailto:test@example.com",
 	})
 
 	errs, _ := validateConfig()
@@ -365,12 +333,12 @@ func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPublic(t *testing.T)
 
 func TestValidateConfig_VAPIDSubjectMustBeContactURI(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":              "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":      "http://localhost:54321",
-		"VAPID_PUBLIC_KEY":  "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY": "examplePrivateKey",
-		"VAPID_SUBJECT":     "admin@example.com", // missing mailto: or https:// prefix
+		"MODE":               "",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"VAPID_PUBLIC_KEY":   "BExamplePublicKey",
+		"VAPID_PRIVATE_KEY":  "examplePrivateKey",
+		"VAPID_SUBJECT":      "admin@example.com", // missing mailto: or https:// prefix
 	})
 
 	errs, _ := validateConfig()
@@ -390,8 +358,8 @@ func TestValidateConfig_VAPIDSubjectMustBeContactURI(t *testing.T) {
 func TestValidateConfig_BillingEnabled_RequiresStripeKeysInProd(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                  "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":          "http://localhost:54321",
+		"DATABASE_PATH":         "/tmp/test.db",
+		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
 		"BILLING_ENABLED":       "true",
 		"STRIPE_SECRET_KEY":     "",
 		"STRIPE_WEBHOOK_SECRET": "",
@@ -422,30 +390,29 @@ func TestValidateConfig_BillingEnabled_RequiresStripeKeysInProd(t *testing.T) {
 
 func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":              "http://localhost:54321",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"BILLING_ENABLED":           "true",
-		"COUPON_SECRET":             "",
-		"STRIPE_SECRET_KEY":         "sk_test_xxx",
-		"STRIPE_WEBHOOK_SECRET":     "whsec_xxx",
-		"STRIPE_PRICE_ID_REQUEST":   "price_xxx",
-		"BASE_URL":                  "https://example.com",
-		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
-		"OAUTH_STATE_SECRET":        "test-oauth-state-secret-32chars!",
-		"VAPID_PUBLIC_KEY":          "",
-		"VAPID_PRIVATE_KEY":         "",
-		"VAPID_SUBJECT":             "",
-		"GOOGLE_CLIENT_ID":          "test-google-id",
-		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
-		"MICROSOFT_CLIENT_ID":       "test-msft-id",
-		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
-		"SALESFORCE_CLIENT_ID":      "test-sf-id",
-		"SALESFORCE_CLIENT_SECRET":  "test-sf-secret",
-		"AWS_REGION":                "",
-		"AWS_ACCESS_KEY_ID":         "",
-		"AWS_SECRET_ACCESS_KEY":     "",
+		"MODE":                     "",
+		"DATABASE_PATH":            "/tmp/test.db",
+		"JWT_SIGNING_SECRET":       "test-jwt-signing-secret-32chars-min!",
+		"BILLING_ENABLED":          "true",
+		"COUPON_SECRET":            "",
+		"STRIPE_SECRET_KEY":        "sk_test_xxx",
+		"STRIPE_WEBHOOK_SECRET":    "whsec_xxx",
+		"STRIPE_PRICE_ID_REQUEST":  "price_xxx",
+		"BASE_URL":                 "https://example.com",
+		"INVITE_HMAC_KEY":          "test-invite-hmac-key-at-least-32c!",
+		"OAUTH_STATE_SECRET":       "test-oauth-state-secret-32chars!",
+		"VAPID_PUBLIC_KEY":         "",
+		"VAPID_PRIVATE_KEY":        "",
+		"VAPID_SUBJECT":            "",
+		"GOOGLE_CLIENT_ID":         "test-google-id",
+		"GOOGLE_CLIENT_SECRET":     "test-google-secret",
+		"MICROSOFT_CLIENT_ID":      "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":  "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":     "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET": "test-sf-secret",
+		"AWS_REGION":               "",
+		"AWS_ACCESS_KEY_ID":        "",
+		"AWS_SECRET_ACCESS_KEY":    "",
 	})
 
 	errs, warnings := validateConfig()
@@ -460,8 +427,8 @@ func TestValidateConfig_BillingEnabled_NoErrorsWhenConfigured(t *testing.T) {
 func TestValidateConfig_CouponSecretTooShort_ProdError(t *testing.T) {
 	setEnvForTest(t, map[string]string{
 		"MODE":                  "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":          "http://localhost:54321",
+		"DATABASE_PATH":         "/tmp/test.db",
+		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
 		"BILLING_ENABLED":       "true",
 		"COUPON_SECRET":         "short",
 		"STRIPE_SECRET_KEY":     "sk_test_xxx",
@@ -487,14 +454,13 @@ func TestValidateConfig_CouponSecretTooShort_ProdError(t *testing.T) {
 
 func TestValidateConfig_CouponSecretTooShort_DevWarning(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                "development",
-		"DATABASE_PATH": "",
-		"SUPABASE_URL":        "",
-		"SUPABASE_JWT_SECRET": "",
-		"BILLING_ENABLED":     "true",
-		"COUPON_SECRET":       "short",
-		"INVITE_HMAC_KEY":     "",
-		"BASE_URL":            "",
+		"MODE":               "development",
+		"DATABASE_PATH":      "",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"BILLING_ENABLED":    "true",
+		"COUPON_SECRET":      "short",
+		"INVITE_HMAC_KEY":    "",
+		"BASE_URL":           "",
 	})
 
 	_, warnings := validateConfig()
@@ -512,14 +478,14 @@ func TestValidateConfig_CouponSecretTooShort_DevWarning(t *testing.T) {
 
 func TestValidateConfig_VAPIDSubjectAcceptsHTTPS(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":              "",
-		"DATABASE_PATH": "/tmp/test.db",
-		"SUPABASE_URL":      "http://localhost:54321",
-		"VAPID_PUBLIC_KEY":  "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY": "examplePrivateKey",
-		"VAPID_SUBJECT":     "https://example.com/contact",
-		"INVITE_HMAC_KEY":   "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":          "https://example.com",
+		"MODE":               "",
+		"DATABASE_PATH":      "/tmp/test.db",
+		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
+		"VAPID_PUBLIC_KEY":   "BExamplePublicKey",
+		"VAPID_PRIVATE_KEY":  "examplePrivateKey",
+		"VAPID_SUBJECT":      "https://example.com/contact",
+		"INVITE_HMAC_KEY":    "test-invite-hmac-key-at-least-32c!",
+		"BASE_URL":           "https://example.com",
 	})
 
 	errs, _ := validateConfig()
@@ -532,16 +498,16 @@ func TestValidateConfig_VAPIDSubjectAcceptsHTTPS(t *testing.T) {
 
 func TestValidateConfig_OAuthWarnings_MissingGoogleCredentials(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "development",
-		"GOOGLE_CLIENT_ID":          "",
-		"GOOGLE_CLIENT_SECRET":      "",
-		"MICROSOFT_CLIENT_ID":       "test-msft-id",
-		"MICROSOFT_CLIENT_SECRET":   "test-msft-secret",
-		"SALESFORCE_CLIENT_ID":      "test-sf-id",
-		"SALESFORCE_CLIENT_SECRET":  "test-sf-secret",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":                  "https://example.com",
+		"MODE":                     "development",
+		"GOOGLE_CLIENT_ID":         "",
+		"GOOGLE_CLIENT_SECRET":     "",
+		"MICROSOFT_CLIENT_ID":      "test-msft-id",
+		"MICROSOFT_CLIENT_SECRET":  "test-msft-secret",
+		"SALESFORCE_CLIENT_ID":     "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET": "test-sf-secret",
+		"JWT_SIGNING_SECRET":       "test-jwt-signing-secret-32chars-min!",
+		"INVITE_HMAC_KEY":          "test-invite-hmac-key-at-least-32c!",
+		"BASE_URL":                 "https://example.com",
 	})
 
 	_, warnings := validateConfig()
@@ -567,16 +533,16 @@ func TestValidateConfig_OAuthWarnings_MissingGoogleCredentials(t *testing.T) {
 
 func TestValidateConfig_OAuthWarnings_MissingMicrosoftCredentials(t *testing.T) {
 	setEnvForTest(t, map[string]string{
-		"MODE":                      "development",
-		"GOOGLE_CLIENT_ID":          "test-google-id",
-		"GOOGLE_CLIENT_SECRET":      "test-google-secret",
-		"MICROSOFT_CLIENT_ID":       "",
-		"MICROSOFT_CLIENT_SECRET":   "",
-		"SALESFORCE_CLIENT_ID":      "test-sf-id",
-		"SALESFORCE_CLIENT_SECRET":  "test-sf-secret",
-		"SUPABASE_SERVICE_ROLE_KEY": "test-key",
-		"INVITE_HMAC_KEY":           "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":                  "https://example.com",
+		"MODE":                     "development",
+		"GOOGLE_CLIENT_ID":         "test-google-id",
+		"GOOGLE_CLIENT_SECRET":     "test-google-secret",
+		"MICROSOFT_CLIENT_ID":      "",
+		"MICROSOFT_CLIENT_SECRET":  "",
+		"SALESFORCE_CLIENT_ID":     "test-sf-id",
+		"SALESFORCE_CLIENT_SECRET": "test-sf-secret",
+		"JWT_SIGNING_SECRET":       "test-jwt-signing-secret-32chars-min!",
+		"INVITE_HMAC_KEY":          "test-invite-hmac-key-at-least-32c!",
+		"BASE_URL":                 "https://example.com",
 	})
 
 	_, warnings := validateConfig()

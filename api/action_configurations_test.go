@@ -62,7 +62,7 @@ func TestCreateActionConfig_Success(t *testing.T) {
 	t.Parallel()
 	tx, uid, agentID, connID, actionType := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{
@@ -108,7 +108,7 @@ func TestCreateActionConfig_MissingRequiredFields(t *testing.T) {
 	t.Parallel()
 	tx, uid, _, _, _ := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	cases := []struct {
@@ -137,7 +137,7 @@ func TestCreateActionConfig_InvalidParameters(t *testing.T) {
 	t.Parallel()
 	tx, uid, agentID, connID, actionType := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{
@@ -162,7 +162,7 @@ func TestCreateActionConfig_PatternWithoutStarRejected(t *testing.T) {
 	t.Parallel()
 	tx, uid, agentID, connID, actionType := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{
@@ -194,7 +194,7 @@ func TestCreateActionConfig_AgentNotOwned(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	agentID2 := testhelper.InsertUserWithAgent(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// uid (first user) tries to create config for agent owned by uid2
@@ -222,7 +222,7 @@ func TestCreateActionConfig_InvalidConnectorRef(t *testing.T) {
 	t.Parallel()
 	tx, uid, agentID, _, _ := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := fmt.Sprintf(`{
@@ -246,7 +246,7 @@ func TestCreateActionConfig_Unauthenticated(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/action-configurations", nil)
@@ -268,7 +268,7 @@ func TestListActionConfigs_Success(t *testing.T) {
 	testhelper.InsertActionConfig(t, tx, testhelper.GenerateID(t, "ac_"), agentID, uid, connID, actionType)
 	testhelper.InsertActionConfig(t, tx, testhelper.GenerateID(t, "ac_"), agentID, uid, connID, actionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/action-configurations?agent_id=%d", agentID), uid)
@@ -290,7 +290,7 @@ func TestListActionConfigs_Empty(t *testing.T) {
 	t.Parallel()
 	tx, uid, agentID, _, _ := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/action-configurations?agent_id=%d", agentID), uid)
@@ -312,7 +312,7 @@ func TestListActionConfigs_MissingAgentID(t *testing.T) {
 	t.Parallel()
 	tx, uid, _, _, _ := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/action-configurations", uid)
@@ -329,7 +329,7 @@ func TestListActionConfigs_InvalidAgentID(t *testing.T) {
 	t.Parallel()
 	tx, uid, _, _, _ := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/action-configurations?agent_id=notanumber", uid)
@@ -351,7 +351,7 @@ func TestListActionConfigs_DoesNotReturnOtherUsersConfigs(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/action-configurations?agent_id=%d", agentID1), uid2)
@@ -383,7 +383,7 @@ func TestGetActionConfig_Success(t *testing.T) {
 		Parameters:  []byte(`{"repo": "test/repo", "title": "*"}`),
 	})
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/action-configurations/"+configID, uid)
@@ -411,7 +411,7 @@ func TestGetActionConfig_NotFound(t *testing.T) {
 	t.Parallel()
 	tx, uid, _, _, _ := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/action-configurations/nonexistent", uid)
@@ -434,7 +434,7 @@ func TestGetActionConfig_OtherUserNotVisible(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/action-configurations/"+configID, uid2)
@@ -456,7 +456,7 @@ func TestUpdateActionConfig_Success(t *testing.T) {
 	configID := testhelper.GenerateID(t, "ac_")
 	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"name": "Updated Name", "status": "disabled"}`
@@ -488,7 +488,7 @@ func TestUpdateActionConfig_PartialUpdate(t *testing.T) {
 		Parameters: []byte(`{"key": "value"}`),
 	})
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Only update parameters, name and status should be unchanged
@@ -515,7 +515,7 @@ func TestUpdateActionConfig_NotFound(t *testing.T) {
 	t.Parallel()
 	tx, uid, _, _, _ := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"name": "Updated"}`
@@ -536,7 +536,7 @@ func TestUpdateActionConfig_EmptyBody(t *testing.T) {
 	configID := testhelper.GenerateID(t, "ac_")
 	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{}`
@@ -557,7 +557,7 @@ func TestUpdateActionConfig_InvalidStatus(t *testing.T) {
 	configID := testhelper.GenerateID(t, "ac_")
 	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"status": "invalid_status"}`
@@ -578,7 +578,7 @@ func TestUpdateActionConfig_InvalidCredentialRef(t *testing.T) {
 	configID := testhelper.GenerateID(t, "ac_")
 	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"credential_id": "nonexistent-cred"}`
@@ -602,7 +602,7 @@ func TestUpdateActionConfig_OtherUserNotVisible(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"name": "Hacked"}`
@@ -625,7 +625,7 @@ func TestDeleteActionConfig_Success(t *testing.T) {
 	configID := testhelper.GenerateID(t, "ac_")
 	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/action-configurations/"+configID, uid)
@@ -668,7 +668,7 @@ func TestDeleteActionConfig_DeletesLinkedStandingApprovals(t *testing.T) {
 		SourceActionConfigurationID: &configID,
 	})
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/action-configurations/"+configID, uid)
@@ -694,7 +694,7 @@ func TestDeleteActionConfig_NotFound(t *testing.T) {
 	t.Parallel()
 	tx, uid, _, _, _ := setupActionConfigTest(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/action-configurations/nonexistent", uid)
@@ -717,7 +717,7 @@ func TestDeleteActionConfig_OtherUserNotVisible(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/action-configurations/"+configID, uid2)

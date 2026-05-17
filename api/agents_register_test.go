@@ -18,7 +18,7 @@ func TestRegisterAgent_Success(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8]) // pending status
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/register", agentID), uid)
@@ -51,7 +51,7 @@ func TestRegisterAgent_EmitsAuditEvent(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/register", agentID), uid)
@@ -74,7 +74,7 @@ func TestRegisterAgent_AlreadyRegistered(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/register", agentID), uid)
@@ -102,7 +102,7 @@ func TestRegisterAgent_Deactivated(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "deactivated")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/register", agentID), uid)
@@ -121,7 +121,7 @@ func TestRegisterAgent_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/agents/999999/register", uid)
@@ -144,7 +144,7 @@ func TestRegisterAgent_OtherUsersAgent(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// uid2 tries to verify uid1's agent
@@ -164,7 +164,7 @@ func TestRegisterAgent_InvalidID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	for _, id := range []string{"abc", "0", "-1"} {
@@ -182,7 +182,7 @@ func TestRegisterAgent_InvalidID(t *testing.T) {
 
 func TestRegisterAgent_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/agents/1/register", nil)

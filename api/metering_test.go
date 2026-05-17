@@ -52,7 +52,7 @@ func setupMeteringTest(t *testing.T) meteringTestCtx {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	return meteringTestCtx{
 		DB:      tx,
 		UserID:  uid,
@@ -114,7 +114,7 @@ func TestMetering_StandingApprovalExecutionIncrementsUsage(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertStandingApprovalWithActionType(t, tx, saID, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// No usage before execution.
@@ -266,7 +266,7 @@ func TestMetering_ApproveDoesNotIncrementUsage(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, InviteHMACKey: "test-hmac-key"}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, InviteHMACKey: "test-hmac-key"}
 	router := NewRouter(deps)
 
 	// Submit approval request (this is billable → count = 1).
@@ -368,7 +368,7 @@ func TestMetering_HighVolumeAccuracy(t *testing.T) {
 	}
 	pu := testhelper.SetupPoolUser(t, "load", pubKeySSH)
 
-	deps := &Deps{DB: pu.Pool, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pu.Pool, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	const iterations = 50
@@ -401,7 +401,7 @@ func TestMetering_ConcurrentApprovalsAccurateCount(t *testing.T) {
 	}
 	pu := testhelper.SetupPoolUser(t, "conc", pubKeySSH)
 
-	deps := &Deps{DB: pu.Pool, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pu.Pool, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	const goroutines = 10

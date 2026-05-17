@@ -85,7 +85,7 @@ func TestApprovalFlow_MultiInstance_UsesCorrectCredentialOnApprove(t *testing.T)
 		onExec:  func(c connectors.Credentials) { captured = c },
 	})
 
-	deps := &Deps{DB: tx, Vault: v, Connectors: reg, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: v, Connectors: reg, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	reqBody := `{"request_id":"req_flow_mi","action":{"type":"` + connID + `.ping","parameters":{"connector_instance":"sales"}},"context":{"description":"x"}}`

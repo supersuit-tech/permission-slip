@@ -59,7 +59,7 @@ func oauthDepsWithVault(tx db.DBTX, v *vault.MockVaultStore) *Deps {
 	return &Deps{
 		DB:                tx,
 		Vault:             v,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		OAuthProviders:    oauth.NewRegistry(),
 		OAuthStateSecret:  testOAuthStateSecret,
 		BaseURL:           "http://localhost:3000",
@@ -88,7 +88,7 @@ func oauthDeps(tx db.DBTX) *Deps {
 	return &Deps{
 		DB:                tx,
 		Vault:             vault.NewMockVaultStore(),
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		OAuthProviders:    reg,
 		OAuthStateSecret:  testOAuthStateSecret,
 		BaseURL:           "http://localhost:3000",
@@ -113,7 +113,7 @@ func oauthDepsWithSlack(tx db.DBTX) *Deps {
 	return &Deps{
 		DB:                tx,
 		Vault:             vault.NewMockVaultStore(),
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		OAuthProviders:    reg,
 		OAuthStateSecret:  testOAuthStateSecret,
 		BaseURL:           "http://localhost:3000",
@@ -1351,7 +1351,7 @@ func oauthDepsWithShopify(tx db.DBTX) *Deps {
 	return &Deps{
 		DB:                tx,
 		Vault:             vault.NewMockVaultStore(),
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		OAuthProviders:    reg,
 		OAuthStateSecret:  testOAuthStateSecret,
 		BaseURL:           "http://localhost:3000",
@@ -1873,7 +1873,7 @@ func oauthDepsWithZendesk(tx db.DBTX) *Deps {
 	return &Deps{
 		DB:                tx,
 		Vault:             vault.NewMockVaultStore(),
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 		OAuthProviders:    reg,
 		OAuthStateSecret:  testOAuthStateSecret,
 		BaseURL:           "http://localhost:3000",

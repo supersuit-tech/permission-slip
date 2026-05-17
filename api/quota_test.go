@@ -362,7 +362,7 @@ func TestQuota_DashboardStandingExecution_FreePlan_AtLimit_Returns429(t *testing
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 	testhelper.SetUsageCount(t, tx, uid, 1000)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{"parameters":{}}`)
@@ -387,7 +387,7 @@ func TestQuota_DashboardStandingExecution_FreePlan_UnderLimit_Succeeds(t *testin
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 	testhelper.SetUsageCount(t, tx, uid, 999)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/execute", uid, `{"parameters":{}}`)

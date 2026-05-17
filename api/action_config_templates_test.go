@@ -38,7 +38,7 @@ func TestListActionConfigTemplates_Success(t *testing.T) {
 	})
 	testhelper.InsertActionConfigTemplate(t, tx, "tpl_2", connID, connID+".action_b", "Template 2")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/action-config-templates?connector_id="+connID, uid)
@@ -84,7 +84,7 @@ func TestListActionConfigTemplates_EmptyForUnknownConnector(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "user_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/action-config-templates?connector_id=nonexistent", uid)
@@ -107,7 +107,7 @@ func TestListActionConfigTemplates_MissingConnectorID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "user_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/action-config-templates", uid)
@@ -123,7 +123,7 @@ func TestListActionConfigTemplates_RequiresAuth(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/action-config-templates?connector_id=github", nil)
@@ -151,7 +151,7 @@ func TestListActionConfigTemplates_FiltersToConnector(t *testing.T) {
 	testhelper.InsertActionConfigTemplate(t, tx, "tpl_c1", conn1, conn1+".action", "Conn1 Template")
 	testhelper.InsertActionConfigTemplate(t, tx, "tpl_c2", conn2, conn2+".action", "Conn2 Template")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Request for conn1 only.

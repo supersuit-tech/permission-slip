@@ -48,7 +48,7 @@ func TestListStandingApprovals_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/standing-approvals", uid)
@@ -76,7 +76,7 @@ func TestListStandingApprovals_ReturnsActiveByDefault(t *testing.T) {
 	testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
 	testhelper.InsertStandingApprovalWithStatus(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, "revoked")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/standing-approvals", uid)
@@ -109,7 +109,7 @@ func TestListStandingApprovals_StatusFilterAll(t *testing.T) {
 	testhelper.InsertStandingApprovalWithStatus(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, "revoked")
 	testhelper.InsertStandingApprovalWithStatus(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid, "expired")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/standing-approvals?status=all", uid)
@@ -133,7 +133,7 @@ func TestListStandingApprovals_InvalidStatusFilter(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/standing-approvals?status=invalid", uid)
@@ -157,7 +157,7 @@ func TestListStandingApprovals_DoesNotReturnOtherUsersApprovals(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/standing-approvals", uid2)
@@ -177,7 +177,7 @@ func TestListStandingApprovals_DoesNotReturnOtherUsersApprovals(t *testing.T) {
 
 func TestListStandingApprovals_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/standing-approvals", nil)
@@ -198,7 +198,7 @@ func TestListStandingApprovals_ResponseShape(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/standing-approvals", uid)
@@ -256,7 +256,7 @@ func TestListStandingApprovals_Pagination(t *testing.T) {
 			testhelper.InsertStandingApprovalWithCreatedAt(t, tx, saID, agentID, uid, time.Date(2026, 1, 1+i, 0, 0, 0, 0, time.UTC))
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/standing-approvals?limit=2", uid)
@@ -292,7 +292,7 @@ func TestListStandingApprovals_Pagination(t *testing.T) {
 			testhelper.InsertStandingApprovalWithCreatedAt(t, tx, saIDs[i], agentID, uid, time.Date(2026, 1, 1+i, 0, 0, 0, 0, time.UTC))
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		// First page: limit=2
@@ -380,7 +380,7 @@ func TestListStandingApprovals_Pagination(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		for _, limit := range []string{"0", "-1", "abc", "101"} {
@@ -402,7 +402,7 @@ func TestListStandingApprovals_Pagination(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		for _, cursor := range []string{
@@ -433,7 +433,7 @@ func TestListStandingApprovals_Pagination(t *testing.T) {
 			testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/standing-approvals", uid)
@@ -459,7 +459,7 @@ func TestListStandingApprovals_Pagination(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/standing-approvals?limit=10", uid)
@@ -492,7 +492,7 @@ func TestCreateStandingApproval_Success(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -538,7 +538,7 @@ func TestCreateStandingApproval_MissingAgentID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -560,7 +560,7 @@ func TestCreateStandingApproval_MissingActionType(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -582,7 +582,7 @@ func TestCreateStandingApproval_AgentNotFound(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -607,7 +607,7 @@ func TestCreateStandingApproval_OtherUsersAgent(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid1, "email.send")
@@ -630,7 +630,7 @@ func TestCreateStandingApproval_DurationExceeds90Days(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(91 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -652,7 +652,7 @@ func TestCreateStandingApproval_ActionTypeTooLong(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	longActionType := strings.Repeat("a", 129)
@@ -675,7 +675,7 @@ func TestCreateStandingApproval_ActionVersionTooLong(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	longVersion := strings.Repeat("1", 11)
@@ -698,7 +698,7 @@ func TestCreateStandingApproval_ActionVersionInvalidFormat(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -720,7 +720,7 @@ func TestCreateStandingApproval_ConstraintsNonObject(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -744,7 +744,7 @@ func TestCreateStandingApproval_ConstraintsNull(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -768,7 +768,7 @@ func TestCreateStandingApproval_ConstraintsTooLarge(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Generate a constraints JSON object larger than 16 KB.
@@ -792,7 +792,7 @@ func TestCreateStandingApproval_ConstraintsOmitted(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -816,7 +816,7 @@ func TestCreateStandingApproval_ConstraintsEmptyObject(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -840,7 +840,7 @@ func TestCreateStandingApproval_ConstraintsAllWildcard(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -864,7 +864,7 @@ func TestCreateStandingApproval_ConstraintsMixedWildcardAndFixed(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -888,7 +888,7 @@ func TestCreateStandingApproval_ConstraintsAllNull(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -912,7 +912,7 @@ func TestCreateStandingApproval_ConstraintsNullAndWildcard(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -936,7 +936,7 @@ func TestCreateStandingApproval_ConstraintsNullWithFixed(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -960,7 +960,7 @@ func TestCreateStandingApproval_WithSourceActionConfigurationID(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -997,7 +997,7 @@ func TestCreateStandingApproval_MissingSourceActionConfigurationID(t *testing.T)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -1025,7 +1025,7 @@ func TestCreateStandingApproval_SourceActionConfigWrongAgent(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	agent2 := testhelper.InsertUserWithAgent(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -1050,7 +1050,7 @@ func TestCreateStandingApproval_SourceActionConfigIDEmpty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -1079,7 +1079,7 @@ func TestCreateStandingApproval_SourceActionConfigIDTooLong(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	_ = standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
@@ -1104,7 +1104,7 @@ func TestCreateStandingApproval_SourceActionConfigIDTooLong(t *testing.T) {
 
 func TestCreateStandingApproval_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/standing-approvals/create", nil)
@@ -1127,7 +1127,7 @@ func TestRevokeStandingApproval_Success(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertStandingApproval(t, tx, saID, agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/revoke", uid)
@@ -1172,7 +1172,7 @@ func TestRevokeStandingApproval_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/standing-approvals/sa_nonexistent/revoke", uid)
@@ -1193,7 +1193,7 @@ func TestRevokeStandingApproval_AlreadyRevoked(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertStandingApprovalWithStatus(t, tx, saID, agentID, uid, "revoked")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/revoke", uid)
@@ -1222,7 +1222,7 @@ func TestRevokeStandingApproval_Expired(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertStandingApprovalWithStatus(t, tx, saID, agentID, uid, "expired")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/revoke", uid)
@@ -1247,7 +1247,7 @@ func TestRevokeStandingApproval_OtherUsersApproval(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/revoke", uid2)
@@ -1262,7 +1262,7 @@ func TestRevokeStandingApproval_OtherUsersApproval(t *testing.T) {
 
 func TestRevokeStandingApproval_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/standing-approvals/sa_xyz/revoke", nil)
@@ -1295,7 +1295,7 @@ func TestRevokeStandingApproval_ConcurrentRevokes(t *testing.T) {
 		pool.Exec(ctx, "DELETE FROM profiles WHERE id = $1", uid)
 	})
 
-	deps := &Deps{DB: pool, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: pool, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Create both requests on the main goroutine (authenticatedRequest uses t).
@@ -1327,7 +1327,7 @@ func TestCreateStandingApproval_BareStringPatternAutoWrapped(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "github.create_issue")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Create a standing approval with bare string "[Tracking]*" (not wrapped in $pattern).

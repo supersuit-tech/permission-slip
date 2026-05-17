@@ -83,7 +83,7 @@ func TestListAgentConnectorCalendars_NoCredentialBinding(t *testing.T) {
 		Vault:          v,
 		Connectors:     reg,
 		OAuthProviders: oauthReg,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 	}
 	router := NewRouter(deps)
 
@@ -155,7 +155,7 @@ func TestListAgentConnectorCalendars_Success(t *testing.T) {
 		Vault:          v,
 		Connectors:     reg,
 		OAuthProviders: oauthReg,
-		SupabaseJWTSecret: testJWTSecret,
+		JWTSigningSecret: testJWTSecret,
 	}
 	router := NewRouter(deps)
 

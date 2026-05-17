@@ -28,7 +28,7 @@ func TestListApprovals_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/approvals", uid)
@@ -57,7 +57,7 @@ func TestListApprovals_ReturnsPendingByDefault(t *testing.T) {
 	testhelper.InsertApproval(t, tx, testhelper.GenerateID(t, "appr_"), agentID, uid)
 	testhelper.InsertApprovalWithStatus(t, tx, testhelper.GenerateID(t, "appr_"), agentID, uid, "approved")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/approvals", uid)
@@ -90,7 +90,7 @@ func TestListApprovals_StatusFilterAll(t *testing.T) {
 	testhelper.InsertApprovalWithStatus(t, tx, testhelper.GenerateID(t, "appr_"), agentID, uid, "approved")
 	testhelper.InsertApprovalWithStatus(t, tx, testhelper.GenerateID(t, "appr_"), agentID, uid, "denied")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/approvals?status=all", uid)
@@ -114,7 +114,7 @@ func TestListApprovals_InvalidStatusFilter(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/approvals?status=invalid", uid)
@@ -138,7 +138,7 @@ func TestListApprovals_DoesNotReturnOtherUsersApprovals(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// uid2 should see no approvals
@@ -169,7 +169,7 @@ func TestListApprovals_ExcludesExpiredPending(t *testing.T) {
 	// Insert a non-expired pending approval
 	testhelper.InsertApproval(t, tx, testhelper.GenerateID(t, "appr_"), agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/approvals", uid)
@@ -189,7 +189,7 @@ func TestListApprovals_ExcludesExpiredPending(t *testing.T) {
 
 func TestListApprovals_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/approvals", nil)
@@ -210,7 +210,7 @@ func TestListApprovals_ResponseShape(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertApproval(t, tx, apprID, agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/approvals", uid)
@@ -268,7 +268,7 @@ func TestListApprovals_Pagination(t *testing.T) {
 				time.Date(2026, 6, 1+i, 0, 0, 0, 0, time.UTC))
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/approvals?limit=2", uid)
@@ -303,7 +303,7 @@ func TestListApprovals_Pagination(t *testing.T) {
 				time.Date(2026, 6, 1+i, 0, 0, 0, 0, time.UTC))
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		// First page: limit=2
@@ -391,7 +391,7 @@ func TestListApprovals_Pagination(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		for _, limit := range []string{"0", "-1", "abc", "101"} {
@@ -413,7 +413,7 @@ func TestListApprovals_Pagination(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		for _, cursor := range []string{
@@ -445,7 +445,7 @@ func TestListApprovals_Pagination(t *testing.T) {
 				time.Date(2026, 6, 1+i, 0, 0, 0, 0, time.UTC))
 		}
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/approvals", uid)
@@ -474,7 +474,7 @@ func TestListApprovals_Pagination(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodGet, "/approvals?limit=10", uid)
@@ -508,7 +508,7 @@ func TestApproveApproval_Success(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertApproval(t, tx, apprID, agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/"+apprID+"/approve", uid)
@@ -570,7 +570,7 @@ func TestApproveApproval_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/appr_nonexistent/approve", uid)
@@ -591,7 +591,7 @@ func TestApproveApproval_AlreadyApproved(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertApprovalWithStatus(t, tx, apprID, agentID, uid, "approved")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/"+apprID+"/approve", uid)
@@ -620,7 +620,7 @@ func TestApproveApproval_Expired(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertApprovalWithExpiresAt(t, tx, apprID, agentID, uid, time.Now().Add(-1*time.Hour))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/"+apprID+"/approve", uid)
@@ -645,7 +645,7 @@ func TestApproveApproval_OtherUsersApproval(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// uid2 tries to approve uid1's approval
@@ -661,7 +661,7 @@ func TestApproveApproval_OtherUsersApproval(t *testing.T) {
 
 func TestApproveApproval_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/approvals/appr_xyz/approve", nil)
@@ -684,7 +684,7 @@ func TestDenyApproval_Success(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertApproval(t, tx, apprID, agentID, uid)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/"+apprID+"/deny", uid)
@@ -717,7 +717,7 @@ func TestDenyApproval_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/appr_nonexistent/deny", uid)
@@ -738,7 +738,7 @@ func TestDenyApproval_AlreadyDenied(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertApprovalWithStatus(t, tx, apprID, agentID, uid, "denied")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/"+apprID+"/deny", uid)
@@ -759,7 +759,7 @@ func TestDenyApproval_Expired(t *testing.T) {
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertApprovalWithExpiresAt(t, tx, apprID, agentID, uid, time.Now().Add(-1*time.Hour))
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/"+apprID+"/deny", uid)
@@ -784,7 +784,7 @@ func TestDenyApproval_OtherUsersApproval(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/approvals/"+apprID+"/deny", uid2)
@@ -799,7 +799,7 @@ func TestDenyApproval_OtherUsersApproval(t *testing.T) {
 
 func TestDenyApproval_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/approvals/appr_xyz/deny", nil)

@@ -20,7 +20,7 @@ func TestDeactivateAgent(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 		agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/deactivate", agentID), uid)
@@ -59,7 +59,7 @@ func TestDeactivateAgent(t *testing.T) {
 		testhelper.InsertStandingApproval(t, tx, sa1, agentID, uid)
 		testhelper.InsertStandingApprovalWithStatus(t, tx, sa2, agentID, uid, "expired")
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/deactivate", agentID), uid)
@@ -83,7 +83,7 @@ func TestDeactivateAgent(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8]) // pending status
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/deactivate", agentID), uid)
@@ -111,7 +111,7 @@ func TestDeactivateAgent(t *testing.T) {
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 		agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "deactivated")
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/deactivate", agentID), uid)
@@ -130,7 +130,7 @@ func TestDeactivateAgent(t *testing.T) {
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := authenticatedRequest(t, http.MethodPost, "/agents/999999/deactivate", uid)
@@ -154,7 +154,7 @@ func TestDeactivateAgent(t *testing.T) {
 		uid2 := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-		deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		// uid2 tries to deactivate uid1's agent
@@ -170,7 +170,7 @@ func TestDeactivateAgent(t *testing.T) {
 
 	t.Run("Unauthenticated", func(t *testing.T) {
 		t.Parallel()
-		deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+		deps := &Deps{JWTSigningSecret: testJWTSecret}
 		router := NewRouter(deps)
 
 		r := httptest.NewRequest(http.MethodPost, "/agents/1/deactivate", nil)

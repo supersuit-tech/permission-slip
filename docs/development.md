@@ -60,13 +60,13 @@ The server serves both the API and frontend on a single port (default 8080). The
 
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `SUPABASE_URL` | Yes | Supabase project URL for JWT verification |
+| `DATABASE_PATH` | Yes (production) | SQLite database file path |
+| `JWT_SIGNING_SECRET` | Yes (production) | HMAC secret for HS256 access tokens — `openssl rand -base64 32` (min 32 bytes) |
 | `BASE_URL` | Yes | Public URL (e.g. `https://app.permissionslip.dev`) |
 | `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | For Web Push | Generate with `make generate-vapid-keys` |
 
-For the full environment variable reference, Dockerfile, Fly.io setup, and hardening checklist, see [Self-hosted deployment](deployment-self-hosted.md).
+Bootstrap the first user on a new database with `go run ./cmd/create-user user@example.com 'password'` (see repository README). For the full environment variable reference, Dockerfile, Fly.io setup, and hardening checklist, see [Self-hosted deployment](deployment-self-hosted.md).
 
 ---
 
@@ -93,11 +93,11 @@ See [CONTRIBUTING.md](../CONTRIBUTING.md) for the full testing strategy and deve
 
 | Layer | Technology |
 |---|---|
-| Backend | Go, PostgreSQL (pgx), JWT (ES256/HS256), goose migrations |
+| Backend | Go, SQLite (modernc), HS256 JWTs, goose migrations |
 | Frontend | React 18, TypeScript, Vite, Tailwind CSS v4, shadcn/ui |
 | Mobile | React Native (Expo 55), TypeScript |
 | API Client | openapi-fetch with generated TypeScript types |
-| Auth | Supabase Auth (JWT-based, MFA support) |
-| Credential Vault | Supabase Vault (AES-256-GCM encryption at rest) |
+| Auth | Self-hosted email + password (`/api/auth/*`), Argon2id + opaque refresh tokens |
+| Credential Vault | App-managed encryption (see `vault/` package) |
 | State | React Query (TanStack Query) |
-| Testing | Go test + real Postgres, Vitest + RTL, Jest (mobile) |
+| Testing | Go test + SQLite, Vitest + RTL, Jest (mobile) |

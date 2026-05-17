@@ -24,7 +24,7 @@ func decodeConnectorList(t *testing.T, body []byte) connectorListResponse {
 func TestListConnectors_Empty(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// No auth required for connectors endpoint
@@ -52,7 +52,7 @@ func TestListConnectors_ReturnsAll(t *testing.T) {
 	testhelper.InsertConnectorAction(t, tx, conn1, "test.act1", "Act 1")
 	testhelper.InsertConnectorRequiredCredential(t, tx, conn1, "svc1", "api_key")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/connectors", nil)
@@ -72,7 +72,7 @@ func TestListConnectors_ReturnsAll(t *testing.T) {
 func TestListConnectors_NoAuthRequired(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Request without Authorization header should still work
@@ -104,7 +104,7 @@ func TestGetConnector_Found(t *testing.T) {
 	testhelper.InsertConnectorAction(t, tx, connID, "test.act", "Test Action")
 	testhelper.InsertConnectorRequiredCredential(t, tx, connID, "svc", "api_key")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/connectors/%s", connID), nil)
@@ -139,7 +139,7 @@ func TestGetConnector_Found(t *testing.T) {
 func TestGetConnector_NotFound(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/connectors/nonexistent", nil)
@@ -157,7 +157,7 @@ func TestGetConnector_NoAuthRequired(t *testing.T) {
 	connID := testhelper.GenerateID(t, "conn_")
 	testhelper.InsertConnector(t, tx, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/connectors/%s", connID), nil)

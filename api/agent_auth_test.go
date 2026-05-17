@@ -23,7 +23,7 @@ func TestRequireAgentSignature_Valid(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	handler := RequireAgentSignature(deps)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		agent := AuthenticatedAgent(r.Context())
 		if agent == nil {
@@ -53,7 +53,7 @@ func TestRequireAgentSignature_Valid(t *testing.T) {
 func TestRequireAgentSignature_MissingSigHeader(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	handler := RequireAgentSignature(deps)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
@@ -77,7 +77,7 @@ func TestRequireAgentSignature_MissingSigHeader(t *testing.T) {
 func TestRequireAgentSignature_AgentNotFound(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	handler := RequireAgentSignature(deps)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
@@ -122,7 +122,7 @@ func TestRequireAgentSignature_WrongKey(t *testing.T) {
 		t.Fatalf("generate key: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	handler := RequireAgentSignature(deps)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
@@ -155,7 +155,7 @@ func TestRequireAgentSignature_PendingAgentRejected(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "pending", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	handler := RequireAgentSignature(deps)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
@@ -188,7 +188,7 @@ func TestRequireAgentSignature_DeactivatedAgentRejected(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "deactivated", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	handler := RequireAgentSignature(deps)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
@@ -214,7 +214,7 @@ func TestRequireAgentSignature_ExpiredTimestamp(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	handler := RequireAgentSignature(deps)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))
@@ -251,7 +251,7 @@ func TestGetAgentMe_Success(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := signedJSONRequest(t, http.MethodGet, "/agents/me", "", privKey, agentID)
@@ -300,7 +300,7 @@ func TestGetAgentMe_WithMetadata(t *testing.T) {
 	testhelper.MustExec(t, tx,
 		`UPDATE agents SET metadata = '{"name":"test-agent","version":"1.0"}' WHERE agent_id = $1`, agentID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := signedJSONRequest(t, http.MethodGet, "/agents/me", "", privKey, agentID)
@@ -341,7 +341,7 @@ func TestGetAgentMe_DoesNotExposeApproverID(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := signedJSONRequest(t, http.MethodGet, "/agents/me", "", privKey, agentID)
@@ -369,7 +369,7 @@ func TestGetAgentMe_DoesNotExposeApproverID(t *testing.T) {
 
 func TestRequireSession_AgentSigHeaderGivesBetterError(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	handler := RequireSession(deps)(sessionTestHandler())
 
 	_, privKey, err := GenerateEd25519OpenSSHKey()
@@ -403,7 +403,7 @@ func TestRequireSession_AgentSigHeaderGivesBetterError(t *testing.T) {
 
 func TestRequireSession_NoSigHeaderKeepsOriginalError(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	handler := RequireSession(deps)(sessionTestHandler())
 
 	// Regular request with no auth at all.
@@ -445,7 +445,7 @@ func TestAuthenticatedSignature_NoContext(t *testing.T) {
 
 func TestRequireAgentSignature_NilDB(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{DB: nil, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: nil, JWTSigningSecret: testJWTSecret}
 	handler := RequireAgentSignature(deps)(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		t.Error("handler should not be called")
 	}))

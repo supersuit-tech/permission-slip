@@ -15,7 +15,7 @@ func TestOnboarding_BillingDisabled_AssignsPayAsYouGo(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: false}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: false}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/onboarding", uid,
@@ -45,7 +45,7 @@ func TestOnboarding_BillingEnabled_AssignsFreePlan(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BillingEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/onboarding", uid,

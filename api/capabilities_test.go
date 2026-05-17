@@ -58,7 +58,7 @@ func TestGetCapabilities_HappyPath(t *testing.T) {
 		Constraints: []byte(`{"recipient_pattern":"*@mycompany.com"}`),
 	})
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -129,7 +129,7 @@ func TestGetCapabilities_CredentialsNotReady(t *testing.T) {
 	testhelper.InsertConnectorAction(t, tx, conn, "payment.charge", "Charge")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -168,7 +168,7 @@ func TestGetCapabilities_NoConnectors(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -198,7 +198,7 @@ func TestGetCapabilities_MissingSignature(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID, _ := insertRegisteredAgentWithKey(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	// No signature header.
 	r := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/agents/%d/capabilities", agentID), nil)
 	w := httptest.NewRecorder()
@@ -223,7 +223,7 @@ func TestGetCapabilities_InvalidSignature(t *testing.T) {
 		t.Fatalf("generate key: %v", err)
 	}
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := capabilitiesRequest(t, agentID, wrongPrivKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -241,7 +241,7 @@ func TestGetCapabilities_AgentIDMismatch(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	// Sign with a different agent_id than the path.
 	path := fmt.Sprintf("/agents/%d/capabilities", agentID)
 	r := httptest.NewRequest(http.MethodGet, path, nil)
@@ -274,7 +274,7 @@ func TestGetCapabilities_AgentNotFound(t *testing.T) {
 		t.Fatalf("generate key: %v", err)
 	}
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	// Use a non-existent agent_id.
 	r := capabilitiesRequest(t, 999999, privKey)
 	w := httptest.NewRecorder()
@@ -305,7 +305,7 @@ func TestGetCapabilities_PendingAgent(t *testing.T) {
 		t.Fatalf("insert pending agent: %v", err)
 	}
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -323,7 +323,7 @@ func TestGetCapabilities_ExpiredTimestamp(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	path := fmt.Sprintf("/agents/%d/capabilities", agentID)
 	r := httptest.NewRequest(http.MethodGet, path, nil)
 	// Sign with a timestamp 10 minutes in the past (beyond the 5-minute window).
@@ -373,7 +373,7 @@ func TestGetCapabilities_MultipleConnectorsAndActions(t *testing.T) {
 	testhelper.InsertConnectorAction(t, tx, conn2, "payment.charge", "Charge")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn2)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -451,7 +451,7 @@ func TestGetCapabilities_WithActionConfigurations(t *testing.T) {
 		Name:       "Create issues in webapp",
 	})
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret, BaseURL: "https://app.permissionslip.dev"})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -518,7 +518,7 @@ func TestGetCapabilities_ActionConfigCredentialNotReady(t *testing.T) {
 	cfgID := testhelper.GenerateID(t, "ac_")
 	testhelper.InsertActionConfig(t, tx, cfgID, agentID, uid, conn, "slack.post_message")
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -567,7 +567,7 @@ func TestGetCapabilities_ActionConfigsScopedByConnector(t *testing.T) {
 		Parameters: []byte(`{"source":"a"}`),
 	})
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -629,7 +629,7 @@ func TestGetCapabilities_DisabledConfigExcluded(t *testing.T) {
 		Name:   "Disabled config",
 	})
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -656,7 +656,7 @@ func TestGetCapabilities_InvalidAgentID(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := httptest.NewRequest(http.MethodGet, "/agents/notanumber/capabilities", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -693,7 +693,7 @@ func TestGetCapabilities_MultiInstance_InjectsConnectorInstanceEnum(t *testing.T
 		t.Fatalf("default: %v", defInst)
 	}
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -759,7 +759,7 @@ func TestGetCapabilities_SingleInstance_OmitsConnectorInstanceInjection(t *testi
 	})
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, conn)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := capabilitiesRequest(t, agentID, privKey)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)

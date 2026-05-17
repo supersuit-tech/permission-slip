@@ -14,7 +14,7 @@ func TestOnboarding_Success(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/onboarding", uid,
@@ -48,7 +48,7 @@ func TestOnboarding_Idempotent(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "alice2")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Calling onboarding again for an existing user should return the existing profile
@@ -79,7 +79,7 @@ func TestOnboarding_UsernameTaken(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid1, "taken")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPost, "/onboarding", uid2,
@@ -124,7 +124,7 @@ func TestOnboarding_InvalidUsername(t *testing.T) {
 			tx := testhelper.SetupTestDB(t)
 			uid := testhelper.GenerateUID(t)
 
-			deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+			deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 			router := NewRouter(deps)
 
 			body, _ := json.Marshal(map[string]string{"username": tc.username})
@@ -142,7 +142,7 @@ func TestOnboarding_InvalidUsername(t *testing.T) {
 
 func TestOnboarding_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPost, "/onboarding", nil)
@@ -157,7 +157,7 @@ func TestOnboarding_Unauthenticated(t *testing.T) {
 
 func TestOnboarding_NilDB(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	uid := testhelper.GenerateUID(t)

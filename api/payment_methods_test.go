@@ -17,7 +17,7 @@ func TestListPaymentMethods_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pm_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/payment-methods", uid)
@@ -59,7 +59,7 @@ func TestListPaymentMethods_ReturnsUserMethods(t *testing.T) {
 		t.Fatalf("CreatePaymentMethod: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/payment-methods", uid)
@@ -109,7 +109,7 @@ func TestListPaymentMethods_IsolatedPerUser(t *testing.T) {
 		t.Fatalf("CreatePaymentMethod: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// User2 should see 0 methods.
@@ -150,7 +150,7 @@ func TestUpdatePaymentMethod_Success(t *testing.T) {
 		t.Fatalf("CreatePaymentMethod: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"label":"New Label","per_transaction_limit":5000}`
@@ -180,7 +180,7 @@ func TestUpdatePaymentMethod_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pmup404_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"label":"test"}`
@@ -199,7 +199,7 @@ func TestDeletePaymentMethod_NotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pmdel404_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/payment-methods/00000000-0000-0000-0000-000000000000", uid)
@@ -231,7 +231,7 @@ func TestDeletePaymentMethod_Success(t *testing.T) {
 	}
 
 	// No Stripe client configured = detach is skipped (best-effort).
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, "/payment-methods/"+pm.ID, uid)
@@ -279,7 +279,7 @@ func TestUpdatePaymentMethod_NegativeLimit(t *testing.T) {
 		t.Fatalf("CreatePaymentMethod: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"per_transaction_limit":-100}`
@@ -311,7 +311,7 @@ func TestUpdatePaymentMethod_PerTxExceedsMonthly(t *testing.T) {
 		t.Fatalf("CreatePaymentMethod: %v", err)
 	}
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"per_transaction_limit":10000,"monthly_limit":5000}`
@@ -330,7 +330,7 @@ func TestListPaymentMethods_IncludesMaxAllowed(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pmmax_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/payment-methods", uid)
@@ -356,7 +356,7 @@ func TestConfirmPaymentMethod_InvalidStripeID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pminvid_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{"payment_method_id":"not_a_valid_pm_id"}`
@@ -375,7 +375,7 @@ func TestConfirmPaymentMethod_LabelTooLong(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pmlabel_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	longLabel := make([]byte, 200)
@@ -398,7 +398,7 @@ func TestCreateSetupIntent_NoStripe(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pmsi_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, Stripe: nil}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPost, "/payment-methods/setup-intent", uid)
@@ -416,7 +416,7 @@ func TestConfirmPaymentMethod_NoStripe(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pmconf_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, Stripe: nil}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, Stripe: nil}
 	router := NewRouter(deps)
 
 	body := `{"payment_method_id":"pm_test"}`
@@ -435,7 +435,7 @@ func TestConfirmPaymentMethod_MissingID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "pmconf2_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	body := `{}`

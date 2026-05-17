@@ -29,7 +29,7 @@ func TestListAgentConnectorInstances_Default(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid)
@@ -58,7 +58,7 @@ func TestCreateAgentConnectorInstance_Second(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))
@@ -91,7 +91,7 @@ func TestPatchAgentConnectorInstance_SetDefault(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))
@@ -135,7 +135,7 @@ func TestPatchAgentConnectorInstance_RequiresIsDefault(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r0 := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid)
@@ -169,7 +169,7 @@ func TestGetAgentConnectorInstance_InvalidUUID400(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet,
@@ -191,7 +191,7 @@ func TestDeleteAgentConnectorInstance_SecondInstance204(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))

@@ -28,15 +28,23 @@ func validateConfig() (errs []configError, warnings []configError) {
 		})
 	}
 
-	// Required — JWT authentication won't work without at least one signing method.
-	hasJWTSecret := os.Getenv("SUPABASE_JWT_SECRET") != ""
-	hasJWKSURL := os.Getenv("SUPABASE_JWKS_URL") != ""
-	hasSupabaseURL := os.Getenv("SUPABASE_URL") != ""
-	if !devMode && !hasJWTSecret && !hasJWKSURL && !hasSupabaseURL {
+	jwtSign := strings.TrimSpace(os.Getenv("JWT_SIGNING_SECRET"))
+	if !devMode && jwtSign == "" {
 		errs = append(errs, configError{
-			envVar:  "SUPABASE_URL or SUPABASE_JWT_SECRET or SUPABASE_JWKS_URL",
-			message: "required for JWT authentication (set SUPABASE_URL for ES256, SUPABASE_JWKS_URL for JWKS-based verification, or SUPABASE_JWT_SECRET for HS256)",
+			envVar:  "JWT_SIGNING_SECRET",
+			message: "required for access JWT signing (generate with: openssl rand -base64 32)",
 		})
+	}
+	if jwtSign != "" && len(jwtSign) < 32 {
+		ce := configError{
+			envVar:  "JWT_SIGNING_SECRET",
+			message: "too short; must be at least 32 bytes (generate with: openssl rand -base64 32)",
+		}
+		if devMode {
+			warnings = append(warnings, ce)
+		} else {
+			errs = append(errs, ce)
+		}
 	}
 
 	// Web Push (VAPID) — optional channel, but if partially configured, error.
@@ -150,12 +158,6 @@ func validateConfig() (errs []configError, warnings []configError) {
 	}
 
 	// Optional but recommended — warn in all modes.
-	if os.Getenv("SUPABASE_SERVICE_ROLE_KEY") == "" {
-		warnings = append(warnings, configError{
-			envVar:  "SUPABASE_SERVICE_ROLE_KEY",
-			message: "not set; account deletion will not remove the Supabase auth user (recommended: set for production)",
-		})
-	}
 	// INVITE_HMAC_KEY — required in production. Without it, invite code hashes
 	// stored in the DB are plain SHA-256, which can be reversed via rainbow
 	// tables since the codeword format is public (PS-XXXX-YYYY).
@@ -199,14 +201,13 @@ func validateConfig() (errs []configError, warnings []configError) {
 		})
 	}
 
-	// OAuth state secret — required in production when SUPABASE_JWT_SECRET is
-	// not set (e.g. JWKS-based auth with Supabase CLI v2+). Without either
-	// secret, OAuth CSRF state tokens cannot be signed and all flows will fail.
+	// OAuth state secret — required in production when JWT_SIGNING_SECRET is
+	// not set (OAuth CSRF state falls back to JWT_SIGNING_SECRET).
 	oauthStateSecret := os.Getenv("OAUTH_STATE_SECRET")
-	if oauthStateSecret == "" && !hasJWTSecret {
+	if oauthStateSecret == "" && jwtSign == "" {
 		ce := configError{
 			envVar:  "OAUTH_STATE_SECRET",
-			message: "not set and SUPABASE_JWT_SECRET is empty — OAuth flows will fail (generate with: openssl rand -hex 32)",
+			message: "not set and JWT_SIGNING_SECRET is empty — OAuth flows will fail (generate with: openssl rand -hex 32)",
 		}
 		if devMode {
 			warnings = append(warnings, ce)
@@ -225,22 +226,6 @@ func validateConfig() (errs []configError, warnings []configError) {
 		}
 	}
 
-	// SUPABASE_JWT_SECRET — when set, enforce a 32-char minimum. HS256 JWT
-	// signing with a short secret is trivially brute-forced offline.
-	jwtSecret := os.Getenv("SUPABASE_JWT_SECRET")
-	if jwtSecret != "" && len(jwtSecret) < 32 {
-		ce := configError{
-			envVar:  "SUPABASE_JWT_SECRET",
-			message: "too short; must be at least 32 characters (generate with: openssl rand -hex 32)",
-		}
-		if devMode {
-			warnings = append(warnings, ce)
-		} else {
-			errs = append(errs, ce)
-		}
-	}
-
-	// Notification email — warn if provider is set but required companion vars are missing.
 	emailProvider := os.Getenv("NOTIFICATION_EMAIL_PROVIDER")
 	if emailProvider == "twilio-sendgrid" {
 		if os.Getenv("SENDGRID_API_KEY") == "" {

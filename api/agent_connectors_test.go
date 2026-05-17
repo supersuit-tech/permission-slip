@@ -29,7 +29,7 @@ func TestListAgentConnectors_Empty(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/connectors", agentID), uid)
@@ -57,7 +57,7 @@ func TestListAgentConnectors_ReturnsEnabledConnectors(t *testing.T) {
 	testhelper.InsertConnectorAction(t, tx, connID, "test.act", "Test Act")
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/connectors", agentID), uid)
@@ -82,7 +82,7 @@ func TestListAgentConnectors_ReturnsEnabledConnectors(t *testing.T) {
 
 func TestListAgentConnectors_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodGet, "/agents/1/connectors", nil)
@@ -103,7 +103,7 @@ func TestListAgentConnectors_WrongOwner(t *testing.T) {
 	uid2 := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid2, "u2_"+uid2[:6])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/connectors", agentID), uid2)
@@ -121,7 +121,7 @@ func TestListAgentConnectors_InvalidAgentID(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	for _, id := range []string{"abc", "0", "-1"} {
@@ -157,7 +157,7 @@ func TestEnableAgentConnector_Success(t *testing.T) {
 	connID := testhelper.GenerateID(t, "conn_")
 	testhelper.InsertConnector(t, tx, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPut, fmt.Sprintf("/agents/%d/connectors/%s", agentID, connID), uid)
@@ -186,7 +186,7 @@ func TestEnableAgentConnector_Idempotent(t *testing.T) {
 	connID := testhelper.GenerateID(t, "conn_")
 	testhelper.InsertConnector(t, tx, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// First enable
@@ -218,7 +218,7 @@ func TestEnableAgentConnector_AgentNotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPut, "/agents/999999/connectors/test", uid)
@@ -236,7 +236,7 @@ func TestEnableAgentConnector_ConnectorNotFound(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPut, fmt.Sprintf("/agents/%d/connectors/nonexistent", agentID), uid)
@@ -260,7 +260,7 @@ func TestEnableAgentConnector_WrongOwner(t *testing.T) {
 	connID := testhelper.GenerateID(t, "conn_")
 	testhelper.InsertConnector(t, tx, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodPut, fmt.Sprintf("/agents/%d/connectors/%s", agentID, connID), uid2)
@@ -274,7 +274,7 @@ func TestEnableAgentConnector_WrongOwner(t *testing.T) {
 
 func TestEnableAgentConnector_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodPut, "/agents/1/connectors/test", nil)
@@ -307,7 +307,7 @@ func TestDisableAgentConnector_Success(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, fmt.Sprintf("/agents/%d/connectors/%s", agentID, connID), uid)
@@ -336,7 +336,7 @@ func TestDisableAgentConnector_NotEnabled(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, fmt.Sprintf("/agents/%d/connectors/nonexistent", agentID), uid)
@@ -361,7 +361,7 @@ func TestDisableAgentConnector_WrongOwner(t *testing.T) {
 	testhelper.InsertConnector(t, tx, connID)
 	testhelper.InsertAgentConnector(t, tx, agentID, uid1, connID)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, fmt.Sprintf("/agents/%d/connectors/%s", agentID, connID), uid2)
@@ -375,7 +375,7 @@ func TestDisableAgentConnector_WrongOwner(t *testing.T) {
 
 func TestDisableAgentConnector_Unauthenticated(t *testing.T) {
 	t.Parallel()
-	deps := &Deps{SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := httptest.NewRequest(http.MethodDelete, "/agents/1/connectors/test", nil)
@@ -402,7 +402,7 @@ func TestDisableAgentConnector_RevokesStandingApprovals(t *testing.T) {
 	sa1 := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalWithActionType(t, tx, sa1, agentID, uid, "test.action1")
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete, fmt.Sprintf("/agents/%d/connectors/%s", agentID, connID), uid)
@@ -447,7 +447,7 @@ func TestDisableAgentConnector_DeleteCredentials(t *testing.T) {
 		t.Fatalf("UpsertAgentConnectorCredential: %v", err)
 	}
 
-	deps := &Deps{DB: tx, Vault: mockVault, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete,
@@ -488,7 +488,7 @@ func TestDisableAgentConnector_DeleteCredentials_NoBinding(t *testing.T) {
 	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
 	// No credential binding inserted.
 
-	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodDelete,

@@ -185,7 +185,7 @@ func TestVerifyRegistration_ConfirmationCodeNormalization(t *testing.T) {
 			testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 			reg := registerViaInvite(t, tx, uid)
-			router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+			router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 			submittedCode := tt.transform(reg.ConfirmCode)
 			body := fmt.Sprintf(`{"request_id":"verify-norm","confirmation_code":%q}`, submittedCode)
@@ -271,7 +271,7 @@ func TestMetadataPreservation_ThroughLifecycle(t *testing.T) {
 	// Step 3: Verify the confirmation code (complete registration).
 	confirmCode := *pendingAgent.ConfirmationCode
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	verifyBody := fmt.Sprintf(`{"request_id":"verify-meta","confirmation_code":%q}`, confirmCode)
 	verifyBodyBytes := []byte(verifyBody)
@@ -362,7 +362,7 @@ func TestVerifyRegistration_DeactivatedAgent(t *testing.T) {
 	reg := registerViaInvite(t, tx, uid)
 
 	// Deactivate the pending agent via the dashboard endpoint.
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	deactivateR := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/deactivate", reg.AgentID), uid)
 	deactivateW := httptest.NewRecorder()
@@ -419,7 +419,7 @@ func TestRegisterAgent_DeactivatedCannotReRegister(t *testing.T) {
 	// Step 1: Register via invite and verify.
 	reg := registerViaInvite(t, tx, uid)
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	// Verify the agent.
 	verifyBody := fmt.Sprintf(`{"request_id":"verify-re","confirmation_code":%q}`, reg.ConfirmCode)
@@ -591,7 +591,7 @@ func TestVerifyRegistration_TimestampValidation(t *testing.T) {
 			testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 			reg := registerViaInvite(t, tx, uid)
-			router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+			router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 			body := fmt.Sprintf(`{"request_id":"verify-ts","confirmation_code":%q}`, reg.ConfirmCode)
 			bodyBytes := []byte(body)

@@ -17,7 +17,7 @@ func TestUpdateNotificationPreferences_EnableSMS_WhenNotConfigured_Rejected(t *t
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled defaults to false
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret} // SMSEnabled defaults to false
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -45,7 +45,7 @@ func TestUpdateNotificationPreferences_EnableSMS_WhenConfigured_Allowed(t *testi
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, SMSEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, SMSEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -65,7 +65,7 @@ func TestUpdateNotificationPreferences_DisableSMS_WhenNotConfigured_Rejected(t *
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled=false
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret} // SMSEnabled=false
 	router := NewRouter(deps)
 
 	// Any SMS preference change should be rejected when SMS is not configured,
@@ -87,7 +87,7 @@ func TestUpdateNotificationPreferences_DisableSMS_WhenConfigured_Allowed(t *test
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, SMSEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, SMSEnabled: true}
 	router := NewRouter(deps)
 
 	// Disabling SMS should work when SMS is configured on the server.
@@ -109,7 +109,7 @@ func TestUpdateNotificationPreferences_EnableSMS_NoSubscription_WhenConfigured_A
 	// No subscription row — SMS is no longer plan-gated, so this should succeed
 	// when the server has SMS configured.
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, SMSEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, SMSEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,
@@ -129,7 +129,7 @@ func TestUpdateNotificationPreferences_EnableEmail_FreeTier_Allowed(t *testing.T
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// Non-SMS channels should not be plan-gated.
@@ -150,7 +150,7 @@ func TestUpdateNotificationPreferences_MixedChannels_SMSBlocked_WhenNotConfigure
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled=false
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret} // SMSEnabled=false
 	router := NewRouter(deps)
 
 	// Enabling email (allowed) + SMS (blocked when not configured) in a single request should fail.
@@ -171,7 +171,7 @@ func TestGetNotificationPreferences_SMSExcluded_WhenNotConfigured(t *testing.T) 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret} // SMSEnabled=false
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret} // SMSEnabled=false
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile/notification-preferences", uid)
@@ -205,7 +205,7 @@ func TestGetNotificationPreferences_SMSAvailable_WhenConfigured(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret, SMSEnabled: true}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, SMSEnabled: true}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile/notification-preferences", uid)
@@ -245,7 +245,7 @@ func TestUpdateNotificationPreferences_EnableMobilePush_FreeTier_Allowed(t *test
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	// mobile-push is not plan-gated, so it should work on the free tier.
@@ -266,7 +266,7 @@ func TestGetNotificationPreferences_IncludesMobilePush(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile/notification-preferences", uid)
@@ -306,7 +306,7 @@ func TestUpdateNotificationPreferences_WebPush_Rejected(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	deps := &Deps{DB: tx, SupabaseJWTSecret: testJWTSecret}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedJSONRequest(t, http.MethodPut, "/profile/notification-preferences", uid,

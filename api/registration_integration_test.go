@@ -65,7 +65,7 @@ func TestIntegration_HappyPath_InviteToVerify(t *testing.T) {
 	}
 
 	// Step 3: User sees the confirmation code on the dashboard (GET /agents/{id}).
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	getReq := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d", regResp.AgentID), uid)
 	getW := httptest.NewRecorder()
@@ -180,7 +180,7 @@ func TestIntegration_DashboardRegistration(t *testing.T) {
 	}
 
 	// Step 3: Dashboard user registers the agent (bypasses code verification).
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 	r := authenticatedRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/register", reg.AgentID), uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -225,7 +225,7 @@ func TestIntegration_BothPathsSameOutcome(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	// Path A: Register via /verify (code verification).
 	regA := registerViaInvite(t, tx, uid)
@@ -382,7 +382,7 @@ func TestIntegration_ConcurrentVerification(t *testing.T) {
 	// Register an agent via invite to get a pending agent with a confirmation code.
 	reg := registerViaInvite(t, pool, uid)
 
-	router := NewRouter(&Deps{DB: pool, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: pool, JWTSigningSecret: testJWTSecret})
 	const goroutines = 5
 
 	// Build requests on the main goroutine to avoid calling t.Helper() from
@@ -433,7 +433,7 @@ func TestIntegration_ConcurrentDashboardRegistration(t *testing.T) {
 	// Create a pending agent via invite registration.
 	reg := registerViaInvite(t, pool, uid)
 
-	router := NewRouter(&Deps{DB: pool, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: pool, JWTSigningSecret: testJWTSecret})
 	const goroutines = 2
 
 	// Build requests on the main goroutine to avoid calling t.Helper() from
@@ -478,7 +478,7 @@ func TestIntegration_DeactivationLifecycle(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
-	router := NewRouter(&Deps{DB: tx, SupabaseJWTSecret: testJWTSecret})
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret})
 
 	// Step 1: Register an agent via invite and verify it.
 	reg := registerViaInvite(t, tx, uid)

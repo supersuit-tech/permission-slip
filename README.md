@@ -53,6 +53,8 @@ The **architecture and product direction are designed by humans**; **the codebas
 
 **Want to run, build, or change the code?** Start with the **[Developer guide](docs/development.md)** — local setup, production builds, testing, and tech stack — then [CONTRIBUTING.md](CONTRIBUTING.md) for workflow and standards.
 
+Self-hosted deployments need a **`JWT_SIGNING_SECRET`** (at least 32 bytes; use `openssl rand -base64 32`) so the API can sign HS256 access tokens. To create the first account on a fresh database after running migrations, use **`go run ./cmd/create-user user@example.com 'your-password'`** (optional **`-username`**). See [docs/development.md](docs/development.md) for full environment variable reference.
+
 ---
 
 ## 🔑 Key Features
