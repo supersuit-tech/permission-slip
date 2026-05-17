@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockDelete, resetClientMocks } from "../../api/__mocks__/client";
 import { useDeleteCredential } from "../useDeleteCredential";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 describe("useDeleteCredential", () => {
@@ -28,6 +27,7 @@ describe("useDeleteCredential", () => {
 
     const { result } = renderHook(() => useDeleteCredential(), { wrapper });
 
+    await settleAuthHydration();
     let response: unknown;
     await act(async () => {
       response = await result.current.deleteCredential("cred_abc123");
@@ -36,7 +36,7 @@ describe("useDeleteCredential", () => {
     expect(mockDelete).toHaveBeenCalledWith(
       "/v1/credentials/{credential_id}",
       {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         params: {
           path: { credential_id: "cred_abc123" },
         },
@@ -54,6 +54,7 @@ describe("useDeleteCredential", () => {
 
     const { result } = renderHook(() => useDeleteCredential(), { wrapper });
 
+    await settleAuthHydration();
     await expect(
       result.current.deleteCredential("cred_abc123"),
     ).rejects.toThrow("Not authenticated");
@@ -73,6 +74,7 @@ describe("useDeleteCredential", () => {
 
     const { result } = renderHook(() => useDeleteCredential(), { wrapper });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {
@@ -94,6 +96,7 @@ describe("useDeleteCredential", () => {
 
     const { result } = renderHook(() => useDeleteCredential(), { wrapper });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {

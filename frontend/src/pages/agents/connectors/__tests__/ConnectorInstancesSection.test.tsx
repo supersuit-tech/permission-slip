@@ -14,7 +14,6 @@ import {
 import { ConnectorInstancesSection } from "../ConnectorInstancesSection";
 import type { InstanceCredentialBinding } from "@/hooks/useConnectorInstanceCredentialBindings";
 
-vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
 const mockUseConnectorInstanceCredentialBindings = vi.hoisted(() => vi.fn());

@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockPost, resetClientMocks } from "../../api/__mocks__/client";
 import { useDenyApproval } from "../useDenyApproval";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 describe("useDenyApproval", () => {
@@ -27,6 +26,7 @@ describe("useDenyApproval", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.denyApproval("approval-abc");
     });
@@ -34,7 +34,7 @@ describe("useDenyApproval", () => {
     expect(mockPost).toHaveBeenCalledWith(
       "/v1/approvals/{approval_id}/deny",
       {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         params: { path: { approval_id: "approval-abc" } },
       },
     );
@@ -48,6 +48,7 @@ describe("useDenyApproval", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await expect(
       result.current.denyApproval("approval-abc"),
     ).rejects.toThrow("Not authenticated");
@@ -64,6 +65,7 @@ describe("useDenyApproval", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {
@@ -84,6 +86,7 @@ describe("useDenyApproval", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.denyApproval("other-approval-id");
     });

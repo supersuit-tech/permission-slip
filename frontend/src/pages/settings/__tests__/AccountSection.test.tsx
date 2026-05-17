@@ -10,7 +10,6 @@ import {
 } from "../../../api/__mocks__/client";
 import { AccountSection } from "../AccountSection";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 const mockProfile = {

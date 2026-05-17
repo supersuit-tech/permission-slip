@@ -10,7 +10,6 @@ import {
 } from "../../../lib/__tests__/auditEventFixtures";
 import { ActivityDetailSheet } from "../ActivityDetailSheet";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 /** Build a minimal AuditEvent-like object for the sheet. */

@@ -10,7 +10,6 @@ import {
 } from "../../../api/__mocks__/client";
 import { AddCredentialDialog } from "../AddCredentialDialog";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 function mockApiFetch() {

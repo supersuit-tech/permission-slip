@@ -8,337 +8,195 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Factor, Session, User } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabaseClient";
+import { postAuth, type AuthTokenResponse } from "@/lib/authApi";
+import {
+  clearStoredRefreshToken,
+  getStoredRefreshToken,
+  setStoredRefreshToken,
+} from "@/lib/authStorage";
 import { createAuthError } from "./errors";
-import type { AuthStatus, AuthState } from "./types";
+import type { AppSession, AppUser, AuthState, AuthStatus, AuthError } from "./types";
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
-/**
- * Races `request` against a timeout. The timeout timer is always cleared once
- * the request settles (via `finally`), so it never lingers in the event loop
- * after the request resolves quickly.
- *
- * Rejects with an `AuthError` on timeout; re-throws any other rejection so
- * callers can handle it uniformly.
- */
-async function withTimeout<T>(
-  request: Promise<T>,
-  ms: number
-): Promise<T> {
-  let timerId: ReturnType<typeof setTimeout> | undefined;
-  const timeoutPromise = new Promise<never>((_, reject) => {
-    timerId = setTimeout(
-      () => reject(new Error("Request timed out")),
-      ms
-    );
-  });
-  try {
-    return await Promise.race([request, timeoutPromise]);
-  } finally {
-    clearTimeout(timerId);
-  }
-}
-
-/** Returns the first verified TOTP factor from a factor list, or undefined. */
-function getVerifiedTotpFactor(factors?: Factor[]): Factor | undefined {
-  return factors?.find((f) => f.status === "verified");
-}
-
-/**
- * Decode a JWT payload without verification (we trust the token — it came
- * from the Supabase client). Returns null on any parsing error.
- */
 function decodeJwtPayload(token: string): Record<string, unknown> | null {
   try {
     const seg = token.split(".")[1];
     if (!seg) return null;
-    // Convert base64url → base64: replace URL-safe chars and add padding.
     const base64 = seg.replace(/-/g, "+").replace(/_/g, "/");
     const padded = base64 + "=".repeat((4 - (base64.length % 4)) % 4);
-    return JSON.parse(atob(padded));
+    return JSON.parse(atob(padded)) as Record<string, unknown>;
   } catch {
     return null;
   }
 }
 
+function userFromAccessToken(accessToken: string): AppUser {
+  const payload = decodeJwtPayload(accessToken);
+  const id = typeof payload?.sub === "string" ? payload.sub : "";
+  const email = typeof payload?.email === "string" ? payload.email : undefined;
+  return { id, email };
+}
+
+function toSession(data: AuthTokenResponse): AppSession {
+  return {
+    access_token: data.access_token,
+    expires_at: data.expires_at,
+    user: userFromAccessToken(data.access_token),
+  };
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<AppSession | null>(null);
+  const [user, setUser] = useState<AppUser | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("loading");
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Monotonic counter to discard stale AAL results. Each auth event
-  // increments the version; if a newer event fires while the previous
-  // AAL check is still in-flight, the older callback sees a mismatch
-  // and skips setting state.
-  const authVersionRef = useRef(0);
+  const clearRefreshTimer = useCallback(() => {
+    if (refreshTimerRef.current !== null) {
+      clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = null;
+    }
+  }, []);
 
-  /**
-   * Calls challengeAndVerify and promotes authStatus to "authenticated" on
-   * success. Shared by verifyMfa (login challenge) and confirmMfaEnrollment.
-   *
-   * We eagerly set "authenticated" rather than waiting for onAuthStateChange
-   * because Supabase may not re-fire the event for an AAL promotion within
-   * the same session.
-   */
-  const challengeAndVerifyTotp = useCallback(
-    async (factorId: string, code: string) => {
-      const { error } = await withTimeout(
-        supabase.auth.mfa.challengeAndVerify({ factorId, code }),
-        10000
-      ).catch((err) => ({
-        error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
-      }));
-      if (!error) {
-        setAuthStatus("authenticated");
-      }
-      return { error: error ?? null };
-    },
-    []
-  );
+  const applyAuthBundle = useCallback((data: AuthTokenResponse) => {
+    setStoredRefreshToken(data.refresh_token);
+    const next = toSession(data);
+    setSession(next);
+    setUser(next.user);
+  }, []);
 
+  const refreshAccessToken = useCallback(async () => {
+    const rt = getStoredRefreshToken();
+    if (!rt) {
+      clearStoredRefreshToken();
+      setSession(null);
+      setUser(null);
+      setAuthStatus("unauthenticated");
+      return { error: createAuthError("invalid_token", "Not signed in", 401) };
+    }
+    const { data, error } = await postAuth("refresh", { refresh_token: rt });
+    if (error || !data) {
+      clearStoredRefreshToken();
+      setSession(null);
+      setUser(null);
+      setAuthStatus("unauthenticated");
+      return { error: error ?? createAuthError("invalid_token", "Session expired", 401) };
+    }
+    applyAuthBundle(data);
+    setAuthStatus("authenticated");
+    return { error: null };
+  }, [applyAuthBundle]);
+
+  // Bootstrap session from refresh token in localStorage.
   useEffect(() => {
-    // onAuthStateChange fires INITIAL_SESSION immediately with the current
-    // session, so a separate getSession() call is unnecessary and would
-    // introduce a race condition.
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      const version = ++authVersionRef.current;
-      const isStale = () => version !== authVersionRef.current;
-
-      setSession(session);
-      setUser(session?.user ?? null);
-
-      if (!session) {
+    let cancelled = false;
+    (async () => {
+      const rt = getStoredRefreshToken();
+      if (!rt) {
+        if (!cancelled) setAuthStatus("unauthenticated");
+        return;
+      }
+      const { data, error } = await postAuth("refresh", { refresh_token: rt });
+      if (cancelled) return;
+      if (error || !data) {
+        clearStoredRefreshToken();
         setAuthStatus("unauthenticated");
         return;
       }
+      applyAuthBundle(data);
+      setAuthStatus("authenticated");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [applyAuthBundle]);
 
-      // Try to determine AAL from the JWT first. This avoids calling
-      // getAuthenticatorAssuranceLevel() which acquires the Supabase
-      // internal lock and deadlocks when this callback fires during
-      // challengeAndVerify's lock drain loop.
-      const jwt = decodeJwtPayload(session.access_token);
-      if (jwt && typeof jwt.aal === "string") {
-        const currentAal = jwt.aal;
-        // Check if user has verified TOTP factors requiring AAL2.
-        const hasVerifiedTotp =
-          session.user?.factors?.some(
-            (f) => f.status === "verified" && f.factor_type === "totp"
-          ) ?? false;
+  // Schedule background refresh ~1 minute before access token expiry.
+  useEffect(() => {
+    clearRefreshTimer();
+    if (!session?.expires_at) return;
 
-        if (currentAal === "aal1" && hasVerifiedTotp) {
-          setAuthStatus("mfa_required");
-        } else {
-          setAuthStatus("authenticated");
-        }
-        return;
-      }
+    const expMs = new Date(session.expires_at).getTime();
+    if (Number.isNaN(expMs)) return;
 
-      // Fallback: JWT couldn't be decoded (e.g. mock tokens in tests).
-      // Use the Supabase API which acquires a lock — safe here since
-      // this path only runs outside of challengeAndVerify.
-      const { data: aal, error: aalError } =
-        await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    const delay = Math.max(10_000, expMs - Date.now() - 60_000);
+    refreshTimerRef.current = setTimeout(() => {
+      void refreshAccessToken();
+    }, delay);
 
-      if (isStale()) return;
-
-      if (aalError) {
-        const { data: factors, error: factorsError } =
-          await supabase.auth.mfa.listFactors();
-
-        if (isStale()) return;
-
-        if (factorsError) {
-          setAuthStatus("mfa_required");
-          return;
-        }
-        const hasVerifiedTotp = !!getVerifiedTotpFactor(factors?.totp);
-        setAuthStatus(hasVerifiedTotp ? "mfa_required" : "authenticated");
-        return;
-      }
-
-      if (
-        aal &&
-        aal.currentLevel === "aal1" &&
-        aal.nextLevel === "aal2"
-      ) {
-        setAuthStatus("mfa_required");
-      } else {
-        setAuthStatus("authenticated");
-      }
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // -- Memoized auth operations --------------------------------------------------
-  // All functions below only reference `supabase` (module-level singleton) and
-  // stable React state setters, so they are safe to memoize with empty deps.
-  // Keeping them referentially stable prevents downstream useCallback/useEffect
-  // chains from re-firing on every AuthProvider render (e.g. MfaSettingsDialog's
-  // loadFactors → listMfaFactors dependency).
-
-  const sendOtp = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.signInWithOtp({ email });
-    return { error: error ?? null };
-  }, []);
-
-  const verifyOtp = useCallback(async (email: string, token: string) => {
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token,
-      type: "email",
-    });
-    return { error: error ?? null };
-  }, []);
+    return () => {
+      clearRefreshTimer();
+    };
+  }, [session?.access_token, session?.expires_at, clearRefreshTimer, refreshAccessToken]);
 
   const signInWithPassword = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    return { error: error ?? null };
-  }, []);
-
-  const updateEmail = useCallback(async (newEmail: string) => {
-    const { error } = await supabase.auth.updateUser({ email: newEmail });
-    return { error: error ?? null };
-  }, []);
-
-  const signOut = useCallback(async () => {
-    const { error } = await supabase.auth.signOut({ scope: "global" });
-    return { error: error ?? null };
-  }, []);
-
-  const verifyMfa = useCallback(
-    async (code: string) => {
-      // Read from user.factors (already in React state) instead of calling
-      // supabase.auth.mfa.listFactors(), which internally calls getUser() and
-      // acquires the Supabase internal lock — causing lock contention with the
-      // onAuthStateChange listener that fires during session init.
-      const totpFactor = (user?.factors ?? []).find(
-        (f) => f.factor_type === "totp" && f.status === "verified"
-      );
-      if (!totpFactor) {
-        return {
-          error: createAuthError(
-            "mfa_factor_not_found",
-            "No authenticator found. Please re-enroll.",
-            400
-          ),
-        };
-      }
-
-      return challengeAndVerifyTotp(totpFactor.id, code);
-    },
-    [challengeAndVerifyTotp, user]
-  );
-
-  const enrollMfa = useCallback(async () => {
-    const { data, error } = await withTimeout(
-      supabase.auth.mfa.enroll({
-        factorType: "totp",
-        friendlyName: "Authenticator App",
-      }),
-      10000
-    ).catch((err) => ({
-      data: null,
-      error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
-    }));
-    if (error) return { data: null, error };
-
-    // Guard against partial/unexpected response shapes from GoTrue.
-    const qrCode = data?.totp?.qr_code;
-    const secret = data?.totp?.secret;
-    if (!data || !qrCode || !secret) {
-      console.error("MFA enroll: unexpected response shape", data);
-      return {
-        data: null,
-        error: createAuthError(
-          "mfa_enroll_failed",
-          "Failed to start authenticator setup. Please try again.",
-          500
-        ),
-      };
+    const { data, error } = await postAuth("login", { email, password });
+    if (error || !data) {
+      return { error: error ?? createAuthError("request_failed", "Login failed", 500) };
     }
+    applyAuthBundle(data);
+    setAuthStatus("authenticated");
+    return { error: null };
+  }, [applyAuthBundle]);
+
+  const signUpWithPassword = useCallback(async (email: string, password: string) => {
+    const { data, error } = await postAuth("signup", { email, password });
+    if (error || !data) {
+      return { error: error ?? createAuthError("request_failed", "Signup failed", 500) };
+    }
+    applyAuthBundle(data);
+    setAuthStatus("authenticated");
+    return { error: null };
+  }, [applyAuthBundle]);
+
+  const updateEmail = useCallback(async (_newEmail: string) => {
     return {
-      data: { factorId: data.id, qrCode, secret },
-      error: null,
+      error: createAuthError(
+        "email_change_unavailable",
+        "Email change is not available.",
+        501
+      ),
     };
   }, []);
 
-  const confirmMfaEnrollment = useCallback(
-    async (factorId: string, code: string) => {
-      return challengeAndVerifyTotp(factorId, code);
-    },
-    [challengeAndVerifyTotp]
-  );
-
-  const unenrollMfa = useCallback(async (factorId: string) => {
-    const { error } = await withTimeout(
-      supabase.auth.mfa.unenroll({ factorId }),
-      10000
-    ).catch((err) => ({
-      error: createAuthError("unknown", err instanceof Error ? err.message : String(err), 500),
-    }));
-    return { error: error ?? null };
-  }, []);
-
-  const listMfaFactors = useCallback(async () => {
-    // Read from user.factors (already in React state) instead of calling
-    // supabase.auth.mfa.listFactors(), which internally calls getUser() and
-    // acquires the Supabase internal lock — causing lock contention with the
-    // onAuthStateChange listener that fires during session init, hanging the
-    // UI for up to 10 seconds.
-    //
-    // This mirrors exactly what the Supabase SDK's own _listFactors() does
-    // internally: it reads user.factors from the already-fetched user object.
-    // user.factors includes both verified and unverified factors, so
-    // MfaEnrollmentFlow can still clean up stale abandoned enrollments.
-    const allTotp = (user?.factors ?? []).filter(
-      (f) => f.factor_type === "totp"
-    );
-    return { factors: allTotp, error: null };
-  }, [user]);
+  const signOut = useCallback(async () => {
+    const rt = getStoredRefreshToken();
+    clearRefreshTimer();
+    let logoutErr: AuthError | null = null;
+    if (rt) {
+      const { error } = await postAuth("logout", { refresh_token: rt });
+      logoutErr = error;
+    }
+    clearStoredRefreshToken();
+    setSession(null);
+    setUser(null);
+    setAuthStatus("unauthenticated");
+    return { error: logoutErr };
+  }, [clearRefreshTimer]);
 
   const value = useMemo<AuthState>(
     () => ({
       session,
       user,
       authStatus,
-      sendOtp,
-      verifyOtp,
       signInWithPassword,
+      signUpWithPassword,
       updateEmail,
       signOut,
-      verifyMfa,
-      enrollMfa,
-      confirmMfaEnrollment,
-      unenrollMfa,
-      listMfaFactors,
     }),
     [
       session,
       user,
       authStatus,
-      sendOtp,
-      verifyOtp,
       signInWithPassword,
+      signUpWithPassword,
       updateEmail,
       signOut,
-      verifyMfa,
-      enrollMfa,
-      confirmMfaEnrollment,
-      unenrollMfa,
-      listMfaFactors,
     ]
   );
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {

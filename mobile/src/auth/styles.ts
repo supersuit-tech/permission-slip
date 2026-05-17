@@ -1,7 +1,7 @@
 import { StyleSheet } from "react-native";
 import { colors } from "../theme/colors";
 
-/** Shared styles for auth screens (EmailStep, OtpStep). */
+/** Shared styles for auth screens (e.g. LoginScreen). */
 export const authStyles = StyleSheet.create({
   container: {
     flex: 1,

@@ -2,12 +2,11 @@ import { renderHook, act } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { describe, it, expect, beforeEach, vi, afterEach, afterAll } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { AuthProvider } from "../../auth/AuthContext";
 import { createAuthWrapper } from "../../test-helpers";
 import { useApprovalEvents } from "../useApprovalEvents";
 
-vi.mock("../../lib/supabaseClient");
 
 // Mock EventSource since jsdom doesn't have it
 class MockEventSource {
@@ -82,40 +81,44 @@ describe("useApprovalEvents", () => {
     MockEventSource.reset();
   });
 
-  it("creates an EventSource when authenticated", () => {
+  it("creates an EventSource when authenticated", async () => {
     setupAuthMocks({ authenticated: true });
 
     renderHook(() => useApprovalEvents(), { wrapper });
 
+    await settleAuthHydration();
     expect(MockEventSource.instances).toHaveLength(1);
     expect(MockEventSource.instances[0]!.url).toContain("/api/v1/approvals/events");
     expect(MockEventSource.instances[0]!.url).toContain("token=");
   });
 
-  it("does not create EventSource when unauthenticated", () => {
+  it("does not create EventSource when unauthenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     renderHook(() => useApprovalEvents(), { wrapper });
 
+    await settleAuthHydration();
     expect(MockEventSource.instances).toHaveLength(0);
   });
 
-  it("registers event listeners for approval events", () => {
+  it("registers event listeners for approval events", async () => {
     setupAuthMocks({ authenticated: true });
 
     renderHook(() => useApprovalEvents(), { wrapper });
 
+    await settleAuthHydration();
     const es = MockEventSource.instances[0]!;
     expect(es.listeners.has("approval_created")).toBe(true);
     expect(es.listeners.has("approval_resolved")).toBe(true);
     expect(es.listeners.has("approval_cancelled")).toBe(true);
   });
 
-  it("closes EventSource on unmount", () => {
+  it("closes EventSource on unmount", async () => {
     setupAuthMocks({ authenticated: true });
 
     const { unmount } = renderHook(() => useApprovalEvents(), { wrapper });
 
+    await settleAuthHydration();
     const es = MockEventSource.instances[0]!;
     expect(es.closed).toBe(false);
 
@@ -124,11 +127,12 @@ describe("useApprovalEvents", () => {
     expect(es.closed).toBe(true);
   });
 
-  it("cleans up event listeners on unmount", () => {
+  it("cleans up event listeners on unmount", async () => {
     setupAuthMocks({ authenticated: true });
 
     const { unmount } = renderHook(() => useApprovalEvents(), { wrapper });
 
+    await settleAuthHydration();
     const es = MockEventSource.instances[0]!;
     expect(es.listeners.get("approval_created")?.size).toBe(1);
 
@@ -143,7 +147,7 @@ describe("useApprovalEvents", () => {
     ["approval_created", "appr_123"],
     ["approval_resolved", "appr_456"],
     ["approval_cancelled", "appr_789"],
-  ] as const)("invalidates approvals query on %s event", (eventType, approvalId) => {
+  ] as const)("invalidates approvals query on %s event", async (eventType, approvalId) => {
     setupAuthMocks({ authenticated: true });
     const queryClient = new QueryClient({
       defaultOptions: { queries: { retry: false } },
@@ -161,6 +165,7 @@ describe("useApprovalEvents", () => {
 
     renderHook(() => useApprovalEvents(), { wrapper: SpyWrapper });
 
+    await settleAuthHydration();
     const es = MockEventSource.instances[0]!;
     act(() => {
       es.emit(eventType, `{"approval_id":"${approvalId}"}`);

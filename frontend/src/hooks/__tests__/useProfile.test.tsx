@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { useProfile } from "../useProfile";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 describe("useProfile", () => {
@@ -17,13 +16,14 @@ describe("useProfile", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("returns null profile when not authenticated", () => {
+  it("returns null profile when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useProfile(), {
       wrapper,
     });
 
+    await settleAuthHydration();
     expect(result.current.profile).toBeNull();
     expect(result.current.isLoading).toBe(false);
   });
@@ -47,12 +47,13 @@ describe("useProfile", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.profile).toEqual(mockProfile);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/profile", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
     });
     expect(result.current.needsOnboarding).toBe(false);
   });
@@ -70,6 +71,7 @@ describe("useProfile", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -87,6 +89,7 @@ describe("useProfile", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });

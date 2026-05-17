@@ -1,38 +1,36 @@
-import React from 'react';
-import { act, create, ReactTestRenderer } from 'react-test-renderer';
+import React from "react";
+import { act, create, type ReactTestRenderer } from "react-test-renderer";
 
-jest.mock('../src/lib/supabaseClient', () => ({
-  supabase: {
-    auth: {
-      getSession: jest.fn().mockResolvedValue({ data: { session: null }, error: null }),
-      onAuthStateChange: jest.fn().mockReturnValue({ data: { subscription: { unsubscribe: jest.fn() } } }),
-      signInWithOtp: jest.fn(),
-      verifyOtp: jest.fn(),
-      signOut: jest.fn(),
-    },
-  },
+jest.mock("../src/lib/authStorage", () => ({
+  getStoredRefreshToken: jest.fn(() => Promise.resolve(null)),
+  setStoredRefreshToken: jest.fn(() => Promise.resolve()),
+  clearStoredRefreshToken: jest.fn(() => Promise.resolve()),
 }));
 
-jest.mock('expo-linking', () => ({
-  createURL: jest.fn(() => 'permissionslip://'),
+jest.mock("../src/lib/authApi", () => ({
+  postAuth: jest.fn(() => Promise.resolve({ data: null, error: null })),
 }));
 
-jest.mock('expo-local-authentication', () => ({
+jest.mock("expo-linking", () => ({
+  createURL: jest.fn(() => "permissionslip://"),
+}));
+
+jest.mock("expo-local-authentication", () => ({
   hasHardwareAsync: jest.fn().mockResolvedValue(false),
   isEnrolledAsync: jest.fn().mockResolvedValue(false),
   authenticateAsync: jest.fn().mockResolvedValue({ success: false }),
 }));
 
-jest.mock('expo-haptics', () => ({
+jest.mock("expo-haptics", () => ({
   impactAsync: jest.fn(),
   notificationAsync: jest.fn(),
-  ImpactFeedbackStyle: { Heavy: 'heavy' },
-  NotificationFeedbackType: { Warning: 'warning' },
+  ImpactFeedbackStyle: { Heavy: "heavy" },
+  NotificationFeedbackType: { Warning: "warning" },
 }));
 
-import App from '../App';
+import App from "../App";
 
-describe('App', () => {
+describe("App", () => {
   let tree: ReactTestRenderer;
 
   afterEach(async () => {
@@ -41,7 +39,7 @@ describe('App', () => {
     });
   });
 
-  it('renders without crashing', async () => {
+  it("renders without crashing", async () => {
     await act(async () => {
       tree = create(<App />);
     });

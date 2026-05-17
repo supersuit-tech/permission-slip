@@ -1,42 +1,41 @@
-import { useState, type FormEvent } from "react";
+import { useState } from "react";
 import * as Sentry from "@sentry/react";
-import type { AuthError } from "@supabase/supabase-js";
-import { safeErrorMessage } from "./errors";
+import type { AuthError } from "./types";
 
 interface UseFormSubmitResult {
-  error: string | null;
+  error: AuthError | null;
   isSubmitting: boolean;
-  handleSubmit: (
-    e: FormEvent<HTMLFormElement>,
+  runSubmit: (
     action: () => Promise<{ error: AuthError | null }>
   ) => Promise<void>;
 }
 
 export function useFormSubmit(): UseFormSubmitResult {
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<AuthError | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = async (
-    e: FormEvent<HTMLFormElement>,
+  const runSubmit = async (
     action: () => Promise<{ error: AuthError | null }>
   ) => {
-    e.preventDefault();
     setError(null);
     setIsSubmitting(true);
 
     try {
-      const { error } = await action();
-      if (error) {
-        setError(safeErrorMessage(error));
-      }
+      const { error: actionError } = await action();
+      setError(actionError);
     } catch (err) {
       console.error("[auth] form submit threw:", err);
       Sentry.captureException(err);
-      setError("Something went wrong. Please try again.");
+      setError({
+        message: "Something went wrong. Please try again.",
+        code: "unknown",
+        name: "AuthApiError",
+        status: 500,
+      });
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  return { error, isSubmitting, handleSubmit };
+  return { error, isSubmitting, runSubmit };
 }

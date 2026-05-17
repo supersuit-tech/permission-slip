@@ -10,10 +10,6 @@
       "ios": {
         "simulator": true
       },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "http://127.0.0.1:54321",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_4Db9aiXHjC7JG-K1w3V54g_qLLrDL4o"
-      },
       "channel": "development"
     },
     "preview": {
@@ -21,18 +17,10 @@
       "ios": {
         "simulator": false
       },
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://rixmzguicuihjvzumyxm.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_4Db9aiXHjC7JG-K1w3V54g_qLLrDL4o"
-      },
       "channel": "preview"
     },
     "production": {
       "autoIncrement": true,
-      "env": {
-        "EXPO_PUBLIC_SUPABASE_URL": "https://rixmzguicuihjvzumyxm.supabase.co",
-        "EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY": "sb_publishable_4Db9aiXHjC7JG-K1w3V54g_qLLrDL4o"
-      },
       "channel": "production"
     }
   },

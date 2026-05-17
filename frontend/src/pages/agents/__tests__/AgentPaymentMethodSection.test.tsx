@@ -1,11 +1,10 @@
 import { screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderWithProviders } from "../../../test-helpers";
-import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../../auth/__tests__/fixtures";
 import { mockGet } from "../../../api/__mocks__/client";
 import { AgentPaymentMethodSection } from "../AgentPaymentMethodSection";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 // Helper to set up standard mock responses
@@ -57,9 +56,10 @@ describe("AgentPaymentMethodSection", () => {
     setupAuthMocks({ authenticated: true });
   });
 
-  it("shows loading state", () => {
+  it("shows loading state", async () => {
     mockGet.mockReturnValue(new Promise(() => {})); // never resolves
     renderWithProviders(<AgentPaymentMethodSection agentId={42} />);
+    await settleAuthHydration();
     expect(
       screen.getByRole("status", { name: "Loading payment method" }),
     ).toBeInTheDocument();

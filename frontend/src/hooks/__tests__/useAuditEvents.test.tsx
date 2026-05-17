@@ -1,12 +1,11 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { mockHookAuditResponse } from "../../lib/__tests__/auditEventFixtures";
 import { useAuditEvents } from "../useAuditEvents";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 describe("useAuditEvents", () => {
@@ -23,11 +22,12 @@ describe("useAuditEvents", () => {
     vi.useRealTimers();
   });
 
-  it("returns empty events when not authenticated", () => {
+  it("returns empty events when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.events).toEqual([]);
     expect(result.current.hasMore).toBe(false);
     expect(result.current.isLoading).toBe(false);
@@ -39,12 +39,13 @@ describe("useAuditEvents", () => {
 
     const { result } = renderHook(() => useAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toEqual(mockHookAuditResponse.data);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/audit-events", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { query: { limit: 20 } },
     });
     expect(result.current.hasMore).toBe(true);
@@ -62,12 +63,13 @@ describe("useAuditEvents", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toHaveLength(2);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/audit-events", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { query: { limit: 20, outcome: "denied" } },
     });
   });
@@ -81,12 +83,13 @@ describe("useAuditEvents", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toHaveLength(2);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/audit-events", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { query: { limit: 20, agent_id: 42 } },
     });
   });
@@ -100,12 +103,13 @@ describe("useAuditEvents", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toHaveLength(2);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/audit-events", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { query: { limit: 20, event_type: "approval.approved" } },
     });
   });
@@ -119,12 +123,13 @@ describe("useAuditEvents", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toHaveLength(2);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/audit-events", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { query: { limit: 5 } },
     });
   });
@@ -135,6 +140,7 @@ describe("useAuditEvents", () => {
 
     const { result } = renderHook(() => useAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -154,6 +160,7 @@ describe("useAuditEvents", () => {
 
     const { result } = renderHook(() => useAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -170,6 +177,7 @@ describe("useAuditEvents", () => {
 
     const { result } = renderHook(() => useAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toHaveLength(2);
     });

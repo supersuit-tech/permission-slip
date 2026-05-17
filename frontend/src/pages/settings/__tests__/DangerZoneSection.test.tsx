@@ -6,7 +6,6 @@ import { createAuthWrapper } from "../../../test-helpers";
 import { mockDelete, resetClientMocks } from "../../../api/__mocks__/client";
 import { DangerZoneSection } from "../DangerZoneSection";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 describe("DangerZoneSection", () => {

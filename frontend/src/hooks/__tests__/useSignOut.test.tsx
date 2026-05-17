@@ -1,14 +1,11 @@
 import { renderHook, act } from "@testing-library/react";
-import { AuthError } from "@supabase/supabase-js";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { mockAuth, setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { useSignOut } from "../useSignOut";
-import { MFA_PENDING_ENROLLMENT_KEY } from "../../auth/mfaPendingEnrollment";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("sonner");
 
 describe("useSignOut", () => {
@@ -17,77 +14,33 @@ describe("useSignOut", () => {
   beforeEach(() => {
     setupAuthMocks({ authenticated: true });
     vi.mocked(toast.error).mockClear();
-    sessionStorage.clear();
     wrapper = createAuthWrapper();
-  });
-
-  it("calls signOut on the auth provider", async () => {
-    mockAuth.signOut.mockResolvedValue({ error: null });
-
-    const { result } = renderHook(() => useSignOut(), { wrapper });
-
-    await act(async () => {
-      await result.current();
-    });
-
-    expect(mockAuth.signOut).toHaveBeenCalled();
-  });
-
-  it("shows toast and logs error when signOut fails", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const authError = new AuthError("Sign out failed", 500);
-    mockAuth.signOut.mockResolvedValue({ error: authError });
-
-    const { result } = renderHook(() => useSignOut(), { wrapper });
-
-    await act(async () => {
-      await result.current();
-    });
-
-    expect(consoleSpy).toHaveBeenCalledWith("Sign out failed:", authError);
-    expect(toast.error).toHaveBeenCalledWith(
-      "Sign out failed. Please try again."
-    );
-    consoleSpy.mockRestore();
-  });
-
-  it("clears MFA pending enrollment from sessionStorage", async () => {
-    mockAuth.signOut.mockResolvedValue({ error: null });
-    sessionStorage.setItem(
-      MFA_PENDING_ENROLLMENT_KEY,
-      JSON.stringify({ userId: "user-123" })
-    );
-
-    const { result } = renderHook(() => useSignOut(), { wrapper });
-
-    await act(async () => {
-      await result.current();
-    });
-
-    expect(sessionStorage.getItem(MFA_PENDING_ENROLLMENT_KEY)).toBeNull();
-  });
-
-  it("does not show toast on success", async () => {
-    mockAuth.signOut.mockResolvedValue({ error: null });
-
-    const { result } = renderHook(() => useSignOut(), { wrapper });
-
-    await act(async () => {
-      await result.current();
-    });
-
-    expect(toast.error).not.toHaveBeenCalled();
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/auth/logout")) {
+        return new Response(null, { status: 204 });
+      }
+      if (url.includes("/auth/refresh")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "t",
+            refresh_token: "r",
+            expires_at: new Date(Date.now() + 3600_000).toISOString(),
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("{}", { status: 404 });
+    }) as typeof fetch;
   });
 
   it("clears React Query cache on sign-out", async () => {
-    mockAuth.signOut.mockResolvedValue({ error: null });
-
     const { result } = renderHook(
       () => ({ signOut: useSignOut(), queryClient: useQueryClient() }),
       { wrapper },
     );
 
-    // Seed the cache with data from the current user.
+    await settleAuthHydration();
     result.current.queryClient.setQueryData(["agent", 42], { agent_id: 42 });
     expect(result.current.queryClient.getQueryData(["agent", 42])).toBeDefined();
 
@@ -95,7 +48,55 @@ describe("useSignOut", () => {
       await result.current.signOut();
     });
 
-    // Cache should be empty after sign-out.
     expect(result.current.queryClient.getQueryData(["agent", 42])).toBeUndefined();
+  });
+
+  it("shows toast when logout request fails", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes("/auth/logout")) {
+        return new Response(
+          JSON.stringify({
+            error: { code: "internal", message: "fail" },
+          }),
+          { status: 500, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      if (url.includes("/auth/refresh")) {
+        return new Response(
+          JSON.stringify({
+            access_token: "t",
+            refresh_token: "r",
+            expires_at: new Date(Date.now() + 3600_000).toISOString(),
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } }
+        );
+      }
+      return new Response("{}", { status: 404 });
+    }) as typeof fetch;
+
+    const { result } = renderHook(() => useSignOut(), { wrapper });
+
+    await settleAuthHydration();
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(toast.error).toHaveBeenCalledWith(
+      "Sign out failed. Please try again.",
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("does not show toast on successful logout", async () => {
+    const { result } = renderHook(() => useSignOut(), { wrapper });
+
+    await settleAuthHydration();
+    await act(async () => {
+      await result.current();
+    });
+
+    expect(toast.error).not.toHaveBeenCalled();
   });
 });

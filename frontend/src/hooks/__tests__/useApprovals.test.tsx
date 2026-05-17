@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useApprovals } from "../useApprovals";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockApprovalsResponse = {
@@ -36,11 +35,12 @@ describe("useApprovals", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("returns empty approvals when not authenticated", () => {
+  it("returns empty approvals when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useApprovals(), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.approvals).toEqual([]);
     expect(result.current.isLoading).toBe(false);
   });
@@ -51,12 +51,13 @@ describe("useApprovals", () => {
 
     const { result } = renderHook(() => useApprovals(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.approvals).toEqual(mockApprovalsResponse.data);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/approvals", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { query: { status: "pending" } },
     });
     expect(result.current.isLoading).toBe(false);
@@ -69,6 +70,7 @@ describe("useApprovals", () => {
 
     const { result } = renderHook(() => useApprovals(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -88,6 +90,7 @@ describe("useApprovals", () => {
 
     const { result } = renderHook(() => useApprovals(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -104,6 +107,7 @@ describe("useApprovals", () => {
 
     const { result } = renderHook(() => useApprovals(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.approvals).toHaveLength(1);
     });

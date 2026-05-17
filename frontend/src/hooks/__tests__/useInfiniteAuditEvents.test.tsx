@@ -1,12 +1,11 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { mockHookAuditResponse } from "../../lib/__tests__/auditEventFixtures";
 import { useInfiniteAuditEvents } from "../useInfiniteAuditEvents";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const page1 = {
@@ -43,11 +42,12 @@ describe("useInfiniteAuditEvents", () => {
     vi.useRealTimers();
   });
 
-  it("returns empty events when not authenticated", () => {
+  it("returns empty events when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useInfiniteAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.events).toEqual([]);
     expect(result.current.hasNextPage).toBe(false);
     expect(result.current.isLoading).toBe(false);
@@ -59,12 +59,13 @@ describe("useInfiniteAuditEvents", () => {
 
     const { result } = renderHook(() => useInfiniteAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toEqual(page1.data);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/audit-events", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { query: { limit: 50 } },
     });
     expect(result.current.hasNextPage).toBe(true);
@@ -78,6 +79,7 @@ describe("useInfiniteAuditEvents", () => {
 
     const { result } = renderHook(() => useInfiniteAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toHaveLength(2);
     });
@@ -114,12 +116,13 @@ describe("useInfiniteAuditEvents", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toHaveLength(2);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/audit-events", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: {
         query: {
           limit: 50,
@@ -140,12 +143,13 @@ describe("useInfiniteAuditEvents", () => {
       { wrapper },
     );
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.events).toHaveLength(2);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/audit-events", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { query: { limit: 25 } },
     });
   });
@@ -156,6 +160,7 @@ describe("useInfiniteAuditEvents", () => {
 
     const { result } = renderHook(() => useInfiniteAuditEvents(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });

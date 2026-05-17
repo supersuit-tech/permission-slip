@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useAgentConnectors } from "../useAgentConnectors";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockConnectorsResponse = {
@@ -30,11 +29,12 @@ describe("useAgentConnectors", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("returns empty connectors when not authenticated", () => {
+  it("returns empty connectors when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useAgentConnectors(42), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.connectors).toEqual([]);
     expect(result.current.isLoading).toBe(false);
   });
@@ -45,6 +45,7 @@ describe("useAgentConnectors", () => {
 
     const { result } = renderHook(() => useAgentConnectors(42), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.connectors).toEqual(
         mockConnectorsResponse.data,
@@ -52,7 +53,7 @@ describe("useAgentConnectors", () => {
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/agents/{agent_id}/connectors", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { path: { agent_id: 42 } },
     });
     expect(result.current.isLoading).toBe(false);
@@ -65,6 +66,7 @@ describe("useAgentConnectors", () => {
 
     const { result } = renderHook(() => useAgentConnectors(42), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -75,11 +77,12 @@ describe("useAgentConnectors", () => {
     );
   });
 
-  it("does not fetch for invalid agent ID", () => {
+  it("does not fetch for invalid agent ID", async () => {
     setupAuthMocks({ authenticated: true });
 
     const { result } = renderHook(() => useAgentConnectors(0), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.isLoading).toBe(false);
     expect(mockGet).not.toHaveBeenCalled();
   });

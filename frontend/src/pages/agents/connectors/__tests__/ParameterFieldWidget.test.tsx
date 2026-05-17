@@ -5,7 +5,6 @@ import { renderWithProviders } from "../../../../test-helpers";
 import { ParameterFieldWidget } from "../ParameterFieldWidget";
 import type { SchemaProperty } from "@/lib/parameterSchema";
 
-vi.mock("../../../../lib/supabaseClient");
 
 const mockUseSlackChannels = vi.fn();
 

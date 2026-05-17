@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import {
   mockGet,
@@ -10,7 +10,6 @@ import {
 } from "../../../api/__mocks__/client";
 import { ConnectedAccountsSection } from "../ConnectedAccountsSection";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 function mockApiFetch(
@@ -48,12 +47,13 @@ describe("ConnectedAccountsSection", () => {
     });
   });
 
-  it("shows loading state", () => {
+  it("shows loading state", async () => {
     setupAuthMocks({ authenticated: true });
     mockGet.mockReturnValue(new Promise(() => {}));
 
     render(<ConnectedAccountsSection />, { wrapper });
 
+    await settleAuthHydration();
     expect(
       screen.getByRole("status", { name: "Loading connected accounts" }),
     ).toBeInTheDocument();

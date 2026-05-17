@@ -1,25 +1,21 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AuthError } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderWithProviders } from "../test-helpers";
-import {
-  aalResponse,
-  mockAuth,
-  mockMfa,
-  setupAuthMocks,
-} from "../auth/__tests__/fixtures";
+import { makeTestAccessToken, setupAuthMocks } from "../auth/__tests__/fixtures";
 import App from "../App";
 
-vi.mock("../lib/supabaseClient");
 vi.mock("sonner");
 
-// Mock useProfile so App tests don't need a real API server.
-// When authenticated, simulate a profile existing (no onboarding needed).
 vi.mock("../hooks/useProfile", () => ({
   useProfile: () => ({
-    profile: { id: "user-123", username: "testuser", marketing_opt_in: false, created_at: "2024-01-01" },
+    profile: {
+      id: "user-123",
+      username: "testuser",
+      marketing_opt_in: false,
+      created_at: "2024-01-01",
+    },
     needsOnboarding: false,
     isLoading: false,
   }),
@@ -27,18 +23,34 @@ vi.mock("../hooks/useProfile", () => ({
 
 describe("App", () => {
   beforeEach(() => {
-    setupAuthMocks();
+    setupAuthMocks({ authenticated: false });
   });
 
-  it("shows loading state initially", () => {
-    // Override setupAuthMocks: don't fire callback so auth stays in "loading"
-    mockAuth.onAuthStateChange.mockReturnValue({
-      data: {
-        subscription: { id: "test", callback: vi.fn(), unsubscribe: vi.fn() },
-      },
+  it("shows loading state while session refresh is pending", async () => {
+    localStorage.setItem("ps_refresh_token", "pending-rt");
+    let resolveRefresh!: (r: Response) => void;
+    const refreshPromise = new Promise<Response>((resolve) => {
+      resolveRefresh = resolve;
     });
+    globalThis.fetch = vi.fn(() => refreshPromise) as typeof fetch;
+
     renderWithProviders(<App />);
     expect(screen.getByRole("status", { name: "Loading" })).toBeInTheDocument();
+
+    resolveRefresh!(
+      new Response(
+        JSON.stringify({
+          access_token: makeTestAccessToken("user-123", "t@e.com"),
+          refresh_token: "rt2",
+          expires_at: new Date(Date.now() + 3600_000).toISOString(),
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("status", { name: "Loading" })).not.toBeInTheDocument();
+    });
   });
 
   it("shows login page when not authenticated", async () => {
@@ -46,6 +58,7 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("Permission Slip")).toBeInTheDocument();
     });
+    expect(screen.getByLabelText("Email")).toBeInTheDocument();
   });
 
   it("shows dashboard when authenticated", async () => {
@@ -55,7 +68,6 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("Permission Slip")).toBeInTheDocument();
     });
-    // Without API mocks, agent queries fail so Dashboard shows the agents card
     expect(screen.getByText("Registered Agents")).toBeInTheDocument();
   });
 
@@ -68,9 +80,8 @@ describe("App", () => {
     });
   });
 
-  it("calls signOut via user menu", async () => {
+  it("calls logout via user menu", async () => {
     setupAuthMocks({ authenticated: true });
-    mockAuth.signOut.mockResolvedValue({ error: null });
 
     renderWithProviders(<App />);
     await waitFor(() => {
@@ -79,15 +90,17 @@ describe("App", () => {
 
     await userEvent.click(screen.getByLabelText("User menu"));
     await userEvent.click(screen.getByText("Sign Out"));
-    expect(mockAuth.signOut).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/auth/logout"),
+        expect.objectContaining({ method: "POST" })
+      );
+    });
   });
 
   it("shows toast error when signOut fails via user menu", async () => {
-    setupAuthMocks({ authenticated: true });
+    setupAuthMocks({ authenticated: true, logoutStatus: 500 });
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mockAuth.signOut.mockResolvedValue({
-      error: new AuthError("Sign out failed", 500),
-    });
 
     renderWithProviders(<App />);
     await waitFor(() => {
@@ -103,38 +116,5 @@ describe("App", () => {
       );
     });
     consoleSpy.mockRestore();
-  });
-
-  describe("MFA gating", () => {
-    beforeEach(() => {
-      setupAuthMocks({ authenticated: true });
-      mockMfa.getAuthenticatorAssuranceLevel.mockResolvedValue(
-        aalResponse("aal1", "aal2")
-      );
-    });
-
-    it("shows MfaChallengePage when authStatus is mfa_required", async () => {
-      renderWithProviders(<App />);
-
-      await waitFor(() => {
-        expect(
-          screen.getByLabelText("Authenticator Code")
-        ).toBeInTheDocument();
-      });
-      expect(screen.queryByText("Recent Activity")).not.toBeInTheDocument();
-    });
-
-    it("does not show dashboard content when MFA is required", async () => {
-      renderWithProviders(<App />);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText(
-            "Enter the 6-digit code from your authenticator app to continue."
-          )
-        ).toBeInTheDocument();
-      });
-      expect(screen.queryByLabelText("User menu")).not.toBeInTheDocument();
-    });
   });
 });

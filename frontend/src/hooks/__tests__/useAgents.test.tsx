@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useAgents } from "../useAgents";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockAgentsResponse = {
@@ -36,13 +35,14 @@ describe("useAgents", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("returns empty agents when not authenticated", () => {
+  it("returns empty agents when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useAgents(), {
       wrapper,
     });
 
+    await settleAuthHydration();
     expect(result.current.agents).toEqual([]);
     expect(result.current.isLoading).toBe(false);
   });
@@ -55,12 +55,13 @@ describe("useAgents", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.agents).toEqual(mockAgentsResponse.data);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/agents", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
     });
     expect(result.current.isLoading).toBe(false);
     expect(result.current.error).toBeNull();
@@ -74,6 +75,7 @@ describe("useAgents", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -95,6 +97,7 @@ describe("useAgents", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -113,6 +116,7 @@ describe("useAgents", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.agents).toHaveLength(2);
     });

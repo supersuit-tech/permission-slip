@@ -5,7 +5,6 @@ import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "./auth/AuthContext";
 import { identifyUser, resetPostHogIdentity } from "./lib/posthog";
 import LoginPage from "./auth/LoginPage";
-import MfaChallengePage from "./auth/MfaChallengePage";
 import OnboardingPage from "./auth/OnboardingPage";
 import { AppLayout } from "./components/AppLayout";
 import { PrivacyPolicyPage } from "./pages/policy/PrivacyPolicyPage";
@@ -39,20 +38,17 @@ function LoadingFallback() {
  *
  *  0. /policy/*        → Public policy pages (no auth required)
  *  1. loading          → LoadingFallback (auth session resolving)
- *  2. mfa_required     → MfaChallengePage (TOTP challenge before dashboard)
- *  3. unauthenticated  → LoginPage
- *  4. profile loading  → LoadingFallback (fetching profile after auth)
- *  5. needs onboarding → OnboardingPage (first-time user, no profile yet)
- *  6. authenticated    → Routes inside AppLayout
+ *  2. unauthenticated  → LoginPage
+ *  3. profile loading  → LoadingFallback (fetching profile after auth)
+ *  4. needs onboarding → OnboardingPage (first-time user, no profile yet)
+ *  5. authenticated    → Routes inside AppLayout
  */
 function App() {
   const { pathname } = useLocation();
   const { authStatus, user } = useAuth();
   const { needsOnboarding, isLoading: profileLoading } = useProfile();
 
-  // Set Sentry + PostHog user context so errors and analytics include
-  // the user's identity. Only the opaque Supabase user ID is sent — no
-  // email or PII.
+  // Set Sentry + PostHog user context (opaque user id only).
   useEffect(() => {
     if (authStatus === "authenticated" && user) {
       Sentry.setUser({ id: user.id });
@@ -79,10 +75,6 @@ function App() {
 
   if (authStatus === "loading") {
     return <LoadingFallback />;
-  }
-
-  if (authStatus === "mfa_required") {
-    return <MfaChallengePage />;
   }
 
   if (authStatus !== "authenticated") {

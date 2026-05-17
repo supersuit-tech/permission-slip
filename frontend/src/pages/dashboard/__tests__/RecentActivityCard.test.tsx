@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
 import {
@@ -12,7 +12,6 @@ import {
 } from "../../../lib/__tests__/auditEventFixtures";
 import { RecentActivityCard } from "../RecentActivityCard";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 function mockAuditFetch(response: MockAuditResponse = mockAuditEventsResponse) {
@@ -137,13 +136,14 @@ describe("RecentActivityCard", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
-  it("renders loading state", () => {
+  it("renders loading state", async () => {
     setupAuthMocks({ authenticated: true });
     // Don't resolve the mock so it stays loading
     mockGet.mockReturnValue(new Promise(() => {}));
 
     render(<RecentActivityCard />, { wrapper });
 
+    await settleAuthHydration();
     expect(
       screen.getByRole("status", { name: "Loading activity" }),
     ).toBeInTheDocument();

@@ -1,15 +1,8 @@
 import { createElement } from "react";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
-
-// Mock supabaseClient before importing anything that touches it
-jest.mock("../../lib/supabaseClient", () => ({
-  supabase: { auth: {} },
-}));
-
 import { MockAuthProvider } from "../MockAuthProvider";
 import { useAuth } from "../AuthContext";
 
-/** Tiny component that reads auth state and renders it as JSON. */
 function AuthConsumer() {
   const { authStatus, user, session } = useAuth();
   return createElement("Text", {}, JSON.stringify({ authStatus, userId: user?.id, hasSession: !!session }));
@@ -29,7 +22,7 @@ describe("MockAuthProvider", () => {
       );
     });
 
-    const text = renderer.root.findByType("Text" as any);
+    const text = renderer.root.findByType("Text" as never);
     const state = JSON.parse(text.children[0] as string);
 
     expect(state.authStatus).toBe("authenticated");
@@ -37,7 +30,7 @@ describe("MockAuthProvider", () => {
     expect(state.userId).toContain("mock-user");
   });
 
-  it("provides no-op sendOtp/verifyOtp/signOut", async () => {
+  it("provides no-op signInWithPassword/signUpWithPassword/signOut", async () => {
     let authState: ReturnType<typeof useAuth>;
     function Capture() {
       authState = useAuth();
@@ -50,11 +43,11 @@ describe("MockAuthProvider", () => {
       );
     });
 
-    const sendResult = await authState!.sendOtp("test@example.com");
-    expect(sendResult.error).toBeNull();
+    const signInResult = await authState!.signInWithPassword("test@example.com", "pw");
+    expect(signInResult.error).toBeNull();
 
-    const verifyResult = await authState!.verifyOtp("test@example.com", "123456");
-    expect(verifyResult.error).toBeNull();
+    const signUpResult = await authState!.signUpWithPassword("test@example.com", "pw");
+    expect(signUpResult.error).toBeNull();
 
     const signOutResult = await authState!.signOut();
     expect(signOutResult.error).toBeNull();

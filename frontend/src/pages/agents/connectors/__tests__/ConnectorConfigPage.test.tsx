@@ -6,7 +6,7 @@ import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "../../../../auth/AuthContext";
 import { ThemeProvider } from "../../../../components/ThemeContext";
 import { Toaster } from "../../../../components/ui/sonner";
-import { setupAuthMocks } from "../../../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../../../auth/__tests__/fixtures";
 import {
   mockGet,
   mockPost,
@@ -16,7 +16,6 @@ import {
 } from "../../../../api/__mocks__/client";
 import { ConnectorConfigPage } from "../ConnectorConfigPage";
 
-vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
 const mockDetailResponse = {
@@ -126,9 +125,10 @@ describe("ConnectorConfigPage", () => {
     setupAuthMocks({ authenticated: true });
   });
 
-  it("shows loading state initially", () => {
+  it("shows loading state initially", async () => {
     mockGet.mockReturnValue(new Promise(() => {})); // never resolves
     renderPage();
+    await settleAuthHydration();
     expect(screen.getByRole("status")).toBeInTheDocument();
   });
 

@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockPost, resetClientMocks } from "../../api/__mocks__/client";
 import { useCreateInvite } from "../useCreateInvite";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockInviteResponse = {
@@ -33,6 +32,7 @@ describe("useCreateInvite", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     let invite: Awaited<ReturnType<typeof result.current.createInvite>>;
     await act(async () => {
       invite = await result.current.createInvite();
@@ -49,6 +49,7 @@ describe("useCreateInvite", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await expect(result.current.createInvite()).rejects.toThrow(
       "Not authenticated"
     );
@@ -65,6 +66,7 @@ describe("useCreateInvite", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     let error: Error | undefined;
     await act(async () => {
       try {
@@ -85,12 +87,13 @@ describe("useCreateInvite", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.createInvite();
     });
 
     expect(mockPost).toHaveBeenCalledWith("/v1/registration-invites", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       body: {},
     });
   });

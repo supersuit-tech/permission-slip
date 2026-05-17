@@ -5,7 +5,6 @@ import { renderWithProviders } from "../../../test-helpers";
 import { ReviewPendingAgentDialog } from "../ReviewPendingAgentDialog";
 import type { Agent } from "../../../hooks/useAgents";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 // Use a large buffer (1 hour) to prevent flaky tests in slow CI environments

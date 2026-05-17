@@ -4,7 +4,6 @@ import { describe, it, expect, vi } from "vitest";
 import { renderWithProviders } from "../../../../test-helpers";
 import { CalendarRemoteSelectWidget } from "../CalendarRemoteSelectWidget";
 
-vi.mock("../../../../lib/supabaseClient");
 
 const mockUseCalendars = vi.fn();
 

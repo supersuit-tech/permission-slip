@@ -5,7 +5,6 @@ import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
 import { AgentCredentialsSection } from "../AgentCredentialsSection";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 const mockConnectors = [

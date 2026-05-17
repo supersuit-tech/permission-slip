@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import { mockGet, mockPost, resetClientMocks } from "../../../api/__mocks__/client";
 import { BillingPage } from "../BillingPage";
@@ -18,7 +18,6 @@ import {
   atLimitPaidPlanResponse,
 } from "./fixtures";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 function mockBillingApi(
@@ -81,12 +80,13 @@ describe("BillingPage", () => {
     ).toHaveAttribute("href", "/");
   });
 
-  it("shows loading skeleton", () => {
+  it("shows loading skeleton", async () => {
     setupAuthMocks({ authenticated: true });
     mockGet.mockImplementation(() => new Promise(() => {}));
 
     render(<BillingPage />, { wrapper });
 
+    await settleAuthHydration();
     expect(screen.getByRole("status", { name: "Loading billing information" })).toBeInTheDocument();
   });
 

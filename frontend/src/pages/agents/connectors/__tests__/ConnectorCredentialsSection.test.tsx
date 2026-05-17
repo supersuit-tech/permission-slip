@@ -11,7 +11,6 @@ import {
 } from "../../../../api/__mocks__/client";
 import { ConnectorCredentialsSection } from "../ConnectorCredentialsSection";
 
-vi.mock("../../../../lib/supabaseClient");
 vi.mock("../../../../api/client");
 
 const apiKeyCredentials = [
@@ -85,7 +84,7 @@ async function openManageModal(user: ReturnType<typeof userEvent.setup>) {
 
 describe("ConnectorCredentialsSection", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
+    vi.clearAllMocks();
     resetClientMocks();
     setupAuthMocks({ authenticated: true });
   });
@@ -213,7 +212,7 @@ describe("ConnectorCredentialsSection", () => {
 
     await waitFor(() => {
       expect(mockPost).toHaveBeenCalledWith("/v1/credentials", {
-        headers: { Authorization: "Bearer token" },
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
         body: {
           service: "github_pat",
           credentials: { api_key: "ghp_test_key" },
@@ -284,7 +283,7 @@ describe("ConnectorCredentialsSection", () => {
       expect(mockDelete).toHaveBeenCalledWith(
         "/v1/credentials/{credential_id}",
         {
-          headers: { Authorization: "Bearer token" },
+          headers: { Authorization: expect.stringMatching(/^Bearer /) },
           params: { path: { credential_id: "cred_123" } },
         },
       );

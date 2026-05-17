@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useIsFullyConfigured } from "../useIsFullyConfigured";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 function mockAgentsResponse(agents: object[]) {
@@ -40,11 +39,12 @@ describe("useIsFullyConfigured", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("returns false when not authenticated", () => {
+  it("returns false when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useIsFullyConfigured(), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.isFullyConfigured).toBe(false);
   });
 
@@ -54,6 +54,7 @@ describe("useIsFullyConfigured", () => {
 
     const { result } = renderHook(() => useIsFullyConfigured(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -69,6 +70,7 @@ describe("useIsFullyConfigured", () => {
 
     const { result } = renderHook(() => useIsFullyConfigured(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });
@@ -84,6 +86,7 @@ describe("useIsFullyConfigured", () => {
 
     const { result } = renderHook(() => useIsFullyConfigured(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isFullyConfigured).toBe(true);
     });
@@ -96,6 +99,7 @@ describe("useIsFullyConfigured", () => {
 
     const { result } = renderHook(() => useIsFullyConfigured(), { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });

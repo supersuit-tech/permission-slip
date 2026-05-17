@@ -7,7 +7,6 @@ import { mockGet, mockPost, resetClientMocks } from "../../../api/__mocks__/clie
 import { CreateStandingApprovalDialog } from "../CreateStandingApprovalDialog";
 import type { Agent } from "../../../hooks/useAgents";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 const mockAgents: Agent[] = [

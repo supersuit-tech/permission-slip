@@ -1,11 +1,10 @@
 import { renderHook, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockGet, resetClientMocks } from "../../api/__mocks__/client";
 import { useApprovalDetail } from "../useApprovalDetail";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockApprovalResponse = {
@@ -34,23 +33,25 @@ describe("useApprovalDetail", () => {
     vi.useRealTimers();
   });
 
-  it("does not fetch when approvalId is null", () => {
+  it("does not fetch when approvalId is null", async () => {
     setupAuthMocks({ authenticated: true });
 
     const { result } = renderHook(() => useApprovalDetail(null), { wrapper });
 
+    await settleAuthHydration();
     expect(result.current.approval).toBeNull();
     expect(result.current.isLoading).toBe(false);
     expect(mockGet).not.toHaveBeenCalled();
   });
 
-  it("does not fetch when not authenticated", () => {
+  it("does not fetch when not authenticated", async () => {
     setupAuthMocks({ authenticated: false });
 
     const { result } = renderHook(() => useApprovalDetail("apr_123"), {
       wrapper,
     });
 
+    await settleAuthHydration();
     expect(result.current.approval).toBeNull();
     expect(result.current.isLoading).toBe(false);
     expect(mockGet).not.toHaveBeenCalled();
@@ -64,12 +65,13 @@ describe("useApprovalDetail", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.approval).toEqual(mockApprovalResponse);
     });
 
     expect(mockGet).toHaveBeenCalledWith("/v1/approvals/{approval_id}", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { path: { approval_id: "apr_123" } },
     });
     expect(result.current.isLoading).toBe(false);
@@ -84,6 +86,7 @@ describe("useApprovalDetail", () => {
       wrapper,
     });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(result.current.error).toBe(
         "Unable to load approval details.",

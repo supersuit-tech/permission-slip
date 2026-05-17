@@ -5,7 +5,6 @@ import { renderWithProviders } from "../../../../test-helpers";
 import { TemplatePicker } from "../TemplatePicker";
 import type { ActionConfigTemplate } from "../../../../hooks/useActionConfigTemplates";
 
-vi.mock("../../../../lib/supabaseClient");
 
 const mockTemplates: ActionConfigTemplate[] = [
   {

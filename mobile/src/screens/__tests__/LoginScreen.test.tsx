@@ -1,15 +1,13 @@
 import { createElement } from "react";
 import { create, act, type ReactTestRenderer } from "react-test-renderer";
 
-// --- Mocks ---
-
-const mockSendOtp = jest.fn();
-const mockVerifyOtp = jest.fn();
+const mockSignInWithPassword = jest.fn();
+const mockSignUpWithPassword = jest.fn();
 
 jest.mock("../../auth/AuthContext", () => ({
   useAuth: () => ({
-    sendOtp: mockSendOtp,
-    verifyOtp: mockVerifyOtp,
+    signInWithPassword: mockSignInWithPassword,
+    signUpWithPassword: mockSignUpWithPassword,
     session: null,
     user: null,
     authStatus: "unauthenticated" as const,
@@ -18,131 +16,68 @@ jest.mock("../../auth/AuthContext", () => ({
 
 import LoginScreen from "../LoginScreen";
 
-// --- Helpers ---
-
 function findByTestId(renderer: ReactTestRenderer, testID: string) {
   return renderer.root.findByProps({ testID });
 }
 
-function findByTestIdOptional(renderer: ReactTestRenderer, testID: string) {
-  const results = renderer.root.findAllByProps({ testID });
-  return results.length > 0 ? results[0] : null;
-}
-
-// --- Tests ---
-
 describe("LoginScreen", () => {
   beforeEach(() => {
-    jest.useFakeTimers();
     jest.clearAllMocks();
+    mockSignInWithPassword.mockResolvedValue({ error: null });
+    mockSignUpWithPassword.mockResolvedValue({ error: null });
   });
 
-  afterEach(() => {
-    jest.useRealTimers();
-  });
-
-  it("shows email step initially", async () => {
+  it("shows email and password fields", async () => {
     let renderer: ReactTestRenderer;
     await act(async () => {
       renderer = create(createElement(LoginScreen));
-    });
-    // Flush auto-focus timer
-    await act(async () => {
-      jest.runAllTimers();
     });
     expect(findByTestId(renderer!, "email-input")).toBeTruthy();
-    expect(findByTestIdOptional(renderer!, "otp-input")).toBeNull();
+    expect(findByTestId(renderer!, "password-input")).toBeTruthy();
   });
 
-  it("transitions to OTP step after successful send", async () => {
-    mockSendOtp.mockResolvedValue({ error: null });
+  it("calls signInWithPassword on submit in sign-in mode", async () => {
     let renderer: ReactTestRenderer;
     await act(async () => {
       renderer = create(createElement(LoginScreen));
     });
+
     await act(async () => {
-      jest.runAllTimers();
+      findByTestId(renderer!, "email-input").props.onChangeText("a@b.co");
+    });
+    await act(async () => {
+      findByTestId(renderer!, "password-input").props.onChangeText("password12345");
     });
 
-    const input = findByTestId(renderer!, "email-input");
     await act(async () => {
-      input.props.onChangeText("test@example.com");
+      await findByTestId(renderer!, "login-submit").props.onPress();
     });
 
-    const submit = findByTestId(renderer!, "email-submit");
-    await act(async () => {
-      await submit.props.onPress();
-    });
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    expect(findByTestIdOptional(renderer!, "otp-input")).toBeTruthy();
+    expect(mockSignInWithPassword).toHaveBeenCalledWith("a@b.co", "password12345");
+    expect(mockSignUpWithPassword).not.toHaveBeenCalled();
   });
 
-  it("transitions to OTP step on over_email_send_rate_limit", async () => {
-    mockSendOtp.mockResolvedValue({
-      error: { code: "over_email_send_rate_limit", message: "Rate limit" },
-    });
+  it("calls signUpWithPassword after switching to create account", async () => {
     let renderer: ReactTestRenderer;
     await act(async () => {
       renderer = create(createElement(LoginScreen));
     });
+
     await act(async () => {
-      jest.runAllTimers();
+      findByTestId(renderer!, "mode-signup").props.onPress();
     });
 
-    const input = findByTestId(renderer!, "email-input");
     await act(async () => {
-      input.props.onChangeText("test@example.com");
+      findByTestId(renderer!, "email-input").props.onChangeText("new@b.co");
+    });
+    await act(async () => {
+      findByTestId(renderer!, "password-input").props.onChangeText("password12345");
     });
 
-    const submit = findByTestId(renderer!, "email-submit");
     await act(async () => {
-      await submit.props.onPress();
-    });
-    await act(async () => {
-      jest.runAllTimers();
+      await findByTestId(renderer!, "login-submit").props.onPress();
     });
 
-    // Should advance to OTP step even on rate limit
-    expect(findByTestIdOptional(renderer!, "otp-input")).toBeTruthy();
-    // Should not show error on the email step
-    expect(findByTestIdOptional(renderer!, "email-error")).toBeNull();
-  });
-
-  it("stays on email step on non-rate-limit error", async () => {
-    mockSendOtp.mockResolvedValue({
-      error: {
-        code: "unexpected_failure",
-        message: "Server error",
-        name: "AuthApiError",
-        status: 500,
-      },
-    });
-    let renderer: ReactTestRenderer;
-    await act(async () => {
-      renderer = create(createElement(LoginScreen));
-    });
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    const input = findByTestId(renderer!, "email-input");
-    await act(async () => {
-      input.props.onChangeText("test@example.com");
-    });
-
-    const submit = findByTestId(renderer!, "email-submit");
-    await act(async () => {
-      await submit.props.onPress();
-    });
-    await act(async () => {
-      jest.runAllTimers();
-    });
-
-    // Should stay on email step
-    expect(findByTestId(renderer!, "email-input")).toBeTruthy();
-    expect(findByTestIdOptional(renderer!, "otp-input")).toBeNull();
+    expect(mockSignUpWithPassword).toHaveBeenCalledWith("new@b.co", "password12345");
   });
 });

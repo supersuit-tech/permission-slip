@@ -1,11 +1,10 @@
 import { renderHook, act } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../test-helpers";
 import { mockPatch, resetClientMocks } from "../../api/__mocks__/client";
 import { useUpdateAgent } from "../useUpdateAgent";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 const mockUpdatedAgent = {
@@ -30,6 +29,7 @@ describe("useUpdateAgent", () => {
 
     const { result } = renderHook(() => useUpdateAgent(), { wrapper });
 
+    await settleAuthHydration();
     await act(async () => {
       await result.current.updateAgent({
         agentId: 42,
@@ -38,7 +38,7 @@ describe("useUpdateAgent", () => {
     });
 
     expect(mockPatch).toHaveBeenCalledWith("/v1/agents/{agent_id}", {
-      headers: { Authorization: "Bearer token" },
+      headers: { Authorization: expect.stringMatching(/^Bearer /) },
       params: { path: { agent_id: 42 } },
       body: { metadata: { name: "New Name" } },
     });
@@ -53,6 +53,7 @@ describe("useUpdateAgent", () => {
 
     const { result } = renderHook(() => useUpdateAgent(), { wrapper });
 
+    await settleAuthHydration();
     await expect(
       act(async () => {
         await result.current.updateAgent({
@@ -68,6 +69,7 @@ describe("useUpdateAgent", () => {
 
     const { result } = renderHook(() => useUpdateAgent(), { wrapper });
 
+    await settleAuthHydration();
     await expect(
       act(async () => {
         await result.current.updateAgent({

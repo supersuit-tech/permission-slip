@@ -1,12 +1,11 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
+import { setupAuthMocks, settleAuthHydration } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
 import { Dashboard } from "../Dashboard";
 
-vi.mock("../../../lib/supabaseClient");
 vi.mock("../../../api/client");
 
 /** Mock response that returns agents, approvals, etc. as empty lists. */
@@ -110,6 +109,7 @@ describe("Dashboard", () => {
 
     render(<Dashboard />, { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(
         screen.getByText("Control what Openclaw can do"),
@@ -149,6 +149,7 @@ describe("Dashboard", () => {
     const user = userEvent.setup();
     render(<Dashboard />, { wrapper });
 
+    await settleAuthHydration();
     await waitFor(() => {
       expect(
         screen.getByRole("button", { name: "Connect Openclaw" }),

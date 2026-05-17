@@ -1,13 +1,11 @@
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { AuthError } from "@supabase/supabase-js";
 import { toast } from "sonner";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { renderWithProviders } from "../../test-helpers";
-import { mockAuth, setupAuthMocks } from "../../auth/__tests__/fixtures";
+import { setupAuthMocks } from "../../auth/__tests__/fixtures";
 import { UserMenu } from "../UserMenu";
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("sonner");
 vi.mock("../../hooks/useProfile");
 
@@ -18,7 +16,11 @@ describe("UserMenu", () => {
   beforeEach(() => {
     setupAuthMocks({ authenticated: true });
     vi.mocked(toast.error).mockClear();
-    mockUseProfile.mockReturnValue({ profile: null, needsOnboarding: false, isLoading: false });
+    mockUseProfile.mockReturnValue({
+      profile: null,
+      needsOnboarding: false,
+      isLoading: false,
+    });
     localStorage.removeItem("permission-slip-theme");
     document.documentElement.classList.remove("dark");
   });
@@ -38,27 +40,35 @@ describe("UserMenu", () => {
 
   it("shows username in the nav trigger when profile is loaded", async () => {
     mockUseProfile.mockReturnValue({
-      profile: { id: "user-123", username: "janedoe", marketing_opt_in: false, created_at: "2024-01-01T00:00:00Z" },
+      profile: {
+        id: "user-123",
+        username: "janedoe",
+        marketing_opt_in: false,
+        created_at: "2024-01-01T00:00:00Z",
+      },
       needsOnboarding: false,
       isLoading: false,
     });
 
     renderWithProviders(<UserMenu />);
-    // Username appears in the trigger area (before opening dropdown)
     const trigger = screen.getByLabelText("User menu");
     expect(trigger).toHaveTextContent("janedoe");
   });
 
   it("shows username and email when profile is loaded", async () => {
     mockUseProfile.mockReturnValue({
-      profile: { id: "user-123", username: "janedoe", marketing_opt_in: false, created_at: "2024-01-01T00:00:00Z" },
+      profile: {
+        id: "user-123",
+        username: "janedoe",
+        marketing_opt_in: false,
+        created_at: "2024-01-01T00:00:00Z",
+      },
       needsOnboarding: false,
       isLoading: false,
     });
 
     renderWithProviders(<UserMenu />);
     await userEvent.click(screen.getByLabelText("User menu"));
-    // Username appears in both the trigger and dropdown label
     expect(screen.getAllByText("janedoe").length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText("test@example.com")).toBeInTheDocument();
   });
@@ -85,18 +95,21 @@ describe("UserMenu", () => {
     expect(screen.queryByText(/dark mode/i)).not.toBeInTheDocument();
   });
 
-  it("calls signOut when Sign Out is clicked", async () => {
-    mockAuth.signOut.mockResolvedValue({ error: null });
+  it("calls logout when Sign Out is clicked", async () => {
     renderWithProviders(<UserMenu />);
     await userEvent.click(screen.getByLabelText("User menu"));
     await userEvent.click(screen.getByText("Sign Out"));
-    expect(mockAuth.signOut).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(globalThis.fetch).toHaveBeenCalledWith(
+        expect.stringContaining("/auth/logout"),
+        expect.objectContaining({ method: "POST" })
+      );
+    });
   });
 
   it("shows toast and logs error when signOut fails", async () => {
+    setupAuthMocks({ authenticated: true, logoutStatus: 500 });
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    const authError = new AuthError("Sign out failed", 500);
-    mockAuth.signOut.mockResolvedValue({ error: authError });
 
     renderWithProviders(<UserMenu />);
     await userEvent.click(screen.getByLabelText("User menu"));
@@ -107,8 +120,7 @@ describe("UserMenu", () => {
         "Sign out failed. Please try again."
       );
     });
-    expect(consoleSpy).toHaveBeenCalledWith("Sign out failed:", authError);
+    expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
-
 });

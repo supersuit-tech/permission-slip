@@ -14,7 +14,6 @@ vi.mock("@/lib/saas", () => ({
   },
 }));
 
-vi.mock("../../lib/supabaseClient");
 vi.mock("../../api/client");
 
 function mockConnections(connections: unknown[]) {

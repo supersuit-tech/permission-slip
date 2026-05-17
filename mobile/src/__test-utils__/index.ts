@@ -4,41 +4,44 @@
  * Centralises mock factories, query-client setup, and renderer helpers
  * so each test file stays focused on its own assertions.
  *
- * NOTE: Supabase auth mocks (`jest.mock("../../lib/supabaseClient")`) and the
- * `authMocks` callback tracker must remain in each test file because Jest
- * hoists `jest.mock` calls above imports — the factory function cannot
- * reference values from this module.
+ * Auth hook tests should `jest.mock("../../lib/authStorage")` and
+ * `jest.mock("../../lib/authApi")`, then configure the mocked functions so
+ * `AuthProvider` bootstraps into the desired session state.
  */
 import { act, type ReactTestRenderer } from "react-test-renderer";
 import { QueryClient } from "@tanstack/react-query";
-import type { Session } from "@supabase/supabase-js";
+import type { AppSession } from "../auth/types";
 import type { components } from "../api/schema";
 
 export type ApprovalSummary = components["schemas"]["ApprovalSummary"];
 
-// ---------------------------------------------------------------------------
-// Mock data factories
-// ---------------------------------------------------------------------------
+function makeTestAccessToken(userId: string, email: string): string {
+  const header = btoa(JSON.stringify({ alg: "HS256", typ: "JWT" }))
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  const payload = btoa(
+    JSON.stringify({
+      sub: userId,
+      email,
+      exp: Math.floor(Date.now() / 1000) + 3600,
+    }),
+  )
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=+$/, "");
+  return `${header}.${payload}.sig`;
+}
 
-/** Returns a valid-looking Supabase session for use in auth mocks. */
-export function mockSession(): Session {
-  const payload = btoa(JSON.stringify({ aal: "aal1" }));
+/** Returns a session-shaped object for auth + API hook tests. */
+export function mockSession(): AppSession {
+  const userId = "user-1";
+  const email = "test@example.com";
   return {
-    access_token: `header.${payload}.signature`,
-    refresh_token: "mock-refresh",
-    expires_in: 3600,
-    expires_at: Date.now() / 1000 + 3600,
-    token_type: "bearer",
-    user: {
-      id: "user-1",
-      email: "test@example.com",
-      app_metadata: {},
-      user_metadata: {},
-      aud: "authenticated",
-      created_at: new Date().toISOString(),
-      factors: [],
-    },
-  } as Session;
+    access_token: makeTestAccessToken(userId, email),
+    expires_at: new Date(Date.now() + 3600_000).toISOString(),
+    user: { id: userId, email },
+  };
 }
 
 /** A realistic pending approval object for use in tests. */
