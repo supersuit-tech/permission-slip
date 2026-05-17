@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from "react";
-import * as Sentry from "@sentry/react";
 import type { AuthError } from "@supabase/supabase-js";
 import { safeErrorMessage } from "./errors";
 
@@ -29,9 +28,7 @@ export function useFormSubmit(): UseFormSubmitResult {
       if (error) {
         setError(safeErrorMessage(error));
       }
-    } catch (err) {
-      console.error("[auth] form submit threw:", err);
-      Sentry.captureException(err);
+    } catch {
       setError("Something went wrong. Please try again.");
     } finally {
       setIsSubmitting(false);
