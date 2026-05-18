@@ -84,6 +84,39 @@ Database tests require a running Postgres instance. They use `DATABASE_URL_TEST`
 - **Changed migrations or db/ code:** run `go test ./db/... -v` at minimum
 - **Not sure:** run `make test`
 
+## CI: Wait and Fix After Every Push
+
+After pushing any branch, **always wait for CI to complete and ensure it passes** before considering the task done.
+
+### How to poll CI status
+
+Use the `gh` CLI to watch the checks on your branch:
+
+```bash
+# Check current CI status (replace <branch> with your branch name)
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr checks <branch>
+
+# Or by PR number:
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr checks <pr-number>
+```
+
+Poll every 30 seconds until all checks finish (status is no longer `pending` or `in_progress`):
+
+```bash
+until GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr checks <pr-number> | grep -qv 'pending\|in_progress'; do
+  echo "CI still running, waiting 30s..."; sleep 30
+done
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr checks <pr-number>
+```
+
+### When CI fails
+
+1. **Read the failure logs** — use `gh run view` to find the failing run, then `gh run view <run-id> --log-failed` to get the specific error output.
+2. **Diagnose and fix locally** — apply the fix, run the relevant local tests to confirm, then commit and push.
+3. **Repeat** until all checks are green.
+
+Do not mark a task complete while CI is red. A passing CI is part of the definition of done.
+
 ## Creating Migrations
 
 **ALWAYS use `make migrate-create` to create new migration files.** Never manually create migration files or invent timestamps — this has caused duplicate timestamp collisions that break goose.
