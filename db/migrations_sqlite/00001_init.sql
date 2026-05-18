@@ -86,6 +86,7 @@ CREATE TABLE profiles (
     email TEXT,
     phone TEXT,
     marketing_opt_in INTEGER NOT NULL DEFAULT 0,
+    stripe_customer_id TEXT,
     CONSTRAINT profiles_username_check CHECK (length(username) <= 255),
     CONSTRAINT profiles_email_format CHECK (
         email IS NULL OR (
@@ -105,6 +106,7 @@ CREATE TABLE profiles (
     FOREIGN KEY (id) REFERENCES users(id) ON DELETE CASCADE
 );
 CREATE UNIQUE INDEX profiles_username_key ON profiles(username);
+CREATE UNIQUE INDEX idx_profiles_stripe_customer_id ON profiles(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
 
 CREATE TABLE connectors (
     id TEXT PRIMARY KEY,
@@ -573,39 +575,6 @@ CREATE TABLE agent_payment_methods (
 );
 CREATE INDEX idx_agent_payment_methods_pm ON agent_payment_methods(payment_method_id);
 
-CREATE TABLE subscriptions (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL UNIQUE,
-    plan_id TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'active',
-    stripe_customer_id TEXT,
-    stripe_subscription_id TEXT,
-    current_period_start TEXT NOT NULL DEFAULT (strftime('%Y-%m-01T00:00:00.000Z', 'now')),
-    current_period_end TEXT NOT NULL DEFAULT (strftime('%Y-%m-01T00:00:00.000Z', 'now', '+1 month')),
-    created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    updated_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
-    downgraded_at TEXT,
-    quota_plan_id TEXT,
-    quota_entitlements_until TEXT,
-    CONSTRAINT subscriptions_plan_id_check CHECK (plan_id IN ('free', 'pay_as_you_go', 'free_pro')),
-    CONSTRAINT subscriptions_quota_grace_pair_chk CHECK (
-        (quota_plan_id IS NULL AND quota_entitlements_until IS NULL)
-        OR (quota_plan_id IS NOT NULL AND quota_entitlements_until IS NOT NULL)
-    ),
-    CONSTRAINT subscriptions_status_check CHECK (status IN ('active', 'past_due', 'cancelled')),
-    FOREIGN KEY (user_id) REFERENCES profiles(id) ON UPDATE CASCADE ON DELETE CASCADE
-);
-CREATE INDEX idx_subscriptions_plan_id ON subscriptions(plan_id);
-CREATE UNIQUE INDEX idx_subscriptions_stripe_customer_id ON subscriptions(stripe_customer_id) WHERE stripe_customer_id IS NOT NULL;
-CREATE UNIQUE INDEX idx_subscriptions_stripe_subscription_id ON subscriptions(stripe_subscription_id) WHERE stripe_subscription_id IS NOT NULL;
-
-CREATE TABLE stripe_webhook_events (
-    event_id TEXT PRIMARY KEY,
-    event_type TEXT NOT NULL,
-    processed_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
-);
-CREATE INDEX idx_stripe_webhook_events_processed_at ON stripe_webhook_events(processed_at);
-
 CREATE TABLE usage_periods (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id TEXT NOT NULL,
@@ -691,8 +660,6 @@ END;
 -- +goose Down
 -- +goose StatementBegin
 DROP TABLE IF EXISTS usage_periods;
-DROP TABLE IF EXISTS stripe_webhook_events;
-DROP TABLE IF EXISTS subscriptions;
 DROP TABLE IF EXISTS agent_payment_methods;
 DROP TABLE IF EXISTS payment_method_transactions;
 DROP TABLE IF EXISTS payment_methods;
@@ -718,6 +685,7 @@ DROP TABLE IF EXISTS agents;
 DROP TABLE IF EXISTS connector_required_credentials;
 DROP TABLE IF EXISTS connector_actions;
 DROP TABLE IF EXISTS connectors;
+DROP INDEX IF EXISTS idx_profiles_stripe_customer_id;
 DROP INDEX IF EXISTS profiles_username_key;
 DROP TABLE IF EXISTS profiles;
 DROP TABLE IF EXISTS vault_secrets;

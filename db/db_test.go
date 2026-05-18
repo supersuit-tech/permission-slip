@@ -29,12 +29,12 @@ func TestMigrationsApplied(t *testing.T) {
 	err := tx.QueryRow(context.Background(),
 		`SELECT COUNT(*) FROM sqlite_master
 		 WHERE type = 'table'
-		   AND name IN ('users', 'profiles', 'subscriptions', 'audit_events')`,
+		   AND name IN ('users', 'profiles', 'audit_events')`,
 	).Scan(&n)
 	if err != nil {
 		t.Fatalf("failed to verify core tables: %v", err)
 	}
-	if n != 4 {
-		t.Fatalf("expected consolidated SQLite schema to define 4 core tables, found %d", n)
+	if n != 3 {
+		t.Fatalf("expected consolidated SQLite schema to define 3 core tables, found %d", n)
 	}
 }

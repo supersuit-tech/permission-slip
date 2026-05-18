@@ -138,16 +138,12 @@ func TestRunAuditPurge_InfoLogForDeletedRows(t *testing.T) {
 	if !strings.Contains(output, "INFO") {
 		t.Errorf("expected INFO level for rows deleted, got: %s", output)
 	}
-	// PurgeExpiredAuditEvents calls Exec twice (subscribed + unsubscribed users),
-	// so the mock's 5 rows is counted twice → 10 total.
-	if !strings.Contains(output, "rows_deleted=10") {
-		t.Errorf("expected rows_deleted=10 in output, got: %s", output)
+	if !strings.Contains(output, "rows_deleted=5") {
+		t.Errorf("expected rows_deleted=5 in output, got: %s", output)
 	}
 }
 
 // purgeDBMock implements db.DBTX for audit purge testing.
-// PurgeExpiredAuditEvents calls Exec twice, so the mock returns the
-// configured result/error for each call.
 type purgeDBMock struct {
 	execResult mockResult
 	execErr    error

@@ -9,6 +9,7 @@ import (
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/notify"
 	"github.com/supersuit-tech/permission-slip/oauth"
+	pstripe "github.com/supersuit-tech/permission-slip/stripe"
 	"github.com/supersuit-tech/permission-slip/vault"
 )
 
@@ -21,6 +22,7 @@ type Deps struct {
 	InviteHMACKey          string                  // HMAC key for hashing short codes (invite codes, confirmation codes); if empty, falls back to plain SHA-256
 	Notifier               *notify.Dispatcher      // notification fan-out; nil means notifications are disabled
 	VAPIDPublicKey         string                  // VAPID public key for Web Push; empty if not configured
+	Stripe                 *pstripe.Client         // Stripe API for saved payment methods; nil when STRIPE_SECRET_KEY is unset
 	Connectors             *connectors.Registry    // connector execution registry; nil means no connectors are available
 	OAuthProviders         *oauth.Registry         // OAuth provider registry; nil means OAuth is not available
 	OAuthRedirectBaseURL   string                  // Public base URL for OAuth callbacks; falls back to BaseURL

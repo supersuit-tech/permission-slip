@@ -199,16 +199,6 @@ func handleApplyActionConfigTemplate(deps *Deps) http.HandlerFunc {
 
 		var saOut *db.StandingApproval
 		if wantStanding {
-			if err := db.AcquireStandingApprovalLimitLock(r.Context(), tx, profile.ID); err != nil {
-				log.Printf("[%s] ApplyActionConfigTemplate: advisory lock: %v", TraceID(r.Context()), err)
-				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to apply template"))
-				return
-			}
-			if checkStandingApprovalLimit(r.Context(), w, r, tx, profile.ID) {
-				return
-			}
-
 			var expiresAt *time.Time
 			startsAt := time.Now().UTC()
 			if spec.DurationDays != nil {

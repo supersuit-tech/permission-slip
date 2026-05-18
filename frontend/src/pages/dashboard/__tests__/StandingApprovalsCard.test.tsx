@@ -68,13 +68,13 @@ describe("StandingApprovalsCard", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("shows standing approval count badge", async () => {
+  it("renders linked standing approval in the table", async () => {
     mockApiFetch();
 
     render(<StandingApprovalsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("1 standing approvals")).toBeInTheDocument();
+      expect(screen.getByText("Send company emails")).toBeInTheDocument();
     });
   });
 

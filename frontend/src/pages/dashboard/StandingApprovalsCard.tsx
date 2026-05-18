@@ -1,14 +1,11 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Loader2, ShieldCheck, ExternalLink } from "lucide-react";
-import { LimitBadge } from "@/components/LimitBadge";
-import { UpgradePrompt } from "@/components/UpgradePrompt";
 import {
   Card,
   CardHeader,
   CardTitle,
   CardContent,
-  CardFooter,
 } from "@/components/ui/card";
 import {
   Table,
@@ -25,7 +22,6 @@ import {
 import { useAgents, type Agent } from "@/hooks/useAgents";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import { useActionConfigMap } from "@/hooks/useActionConfigMap";
-import { useResourceLimit } from "@/hooks/useResourceLimit";
 import { getAgentDisplayName } from "@/lib/agents";
 
 function formatExpiresIn(expiresAt: string | null | undefined): string {
@@ -147,25 +143,11 @@ export function StandingApprovalsCard() {
     return map;
   }, [agents]);
 
-  const {
-    max: maxStandingApprovals,
-    current: standingApprovalCount,
-    atLimit,
-    hasData: hasBillingData,
-  } = useResourceLimit("max_standing_approvals", standingApprovals.length);
-
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center gap-2">
           <CardTitle>Standing approvals</CardTitle>
-          {hasBillingData && (
-            <LimitBadge
-              current={standingApprovalCount}
-              max={maxStandingApprovals}
-              resource="standing approvals"
-            />
-          )}
         </div>
         <p className="text-muted-foreground text-sm">
           Action configurations with an active standing approval. Manage expiry and
@@ -225,11 +207,6 @@ export function StandingApprovalsCard() {
           </div>
         )}
       </CardContent>
-      {atLimit ? (
-        <CardFooter>
-          <UpgradePrompt feature="Upgrade to create more standing approvals." />
-        </CardFooter>
-      ) : null}
     </Card>
   );
 }

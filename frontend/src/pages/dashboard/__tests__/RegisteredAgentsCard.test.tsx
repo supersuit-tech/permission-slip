@@ -359,14 +359,15 @@ describe("RegisteredAgentsCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows agent count badge without plan fraction", async () => {
+  it("lists all registered agents in the table", async () => {
     mockAgentsFetch();
 
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("2 agents")).toBeInTheDocument();
+      expect(screen.getByText("My Bot")).toBeInTheDocument();
     });
+    expect(screen.getByText("Agent 2")).toBeInTheDocument();
   });
 
   it("shows 'Awaiting verification' for pending agents without expiry", async () => {

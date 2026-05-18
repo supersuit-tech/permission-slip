@@ -49,7 +49,7 @@ func runAuditPurge(ctx context.Context, pool db.DBTX, logger *slog.Logger) {
 	purgeCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
 
-	deleted, err := db.PurgeExpiredAuditEvents(purgeCtx, pool)
+	deleted, err := db.PurgeExpiredAuditEvents(purgeCtx, pool, db.AuditRetentionDaysFromEnv())
 	if err != nil {
 		if ctx.Err() != nil {
 			logger.Info("audit purge: cancelled", "error", err)

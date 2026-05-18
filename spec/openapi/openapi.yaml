@@ -98,6 +98,8 @@ tags:
     description: Manage standing approvals for pre-authorized agent actions
   - name: Profiles
     description: User profile management (session-authenticated)
+  - name: Payment Methods
+    description: Stored card payment methods for paid connector actions (Stripe)
   - name: Push Subscriptions
     description: Web Push subscription management (session-authenticated)
   - name: Expo Push Tokens
@@ -137,6 +139,9 @@ paths:
 
   /v1/agents/{agent_id}/capabilities:
     $ref: './components/paths/capabilities.yaml#/agentCapabilities'
+
+  /v1/agents/{agent_id}/payment-method:
+    $ref: './components/paths/agent_payment_methods.yaml#/agentPaymentMethod'
 
   /v1/agents/{agent_id}/connectors:
     $ref: './components/paths/agent_connectors.yaml#/agentConnectors'
@@ -227,6 +232,15 @@ paths:
   
   /v1/credentials/{credential_id}:
     $ref: './components/paths/credentials.yaml#/credentialById'
+
+  /v1/payment-methods/setup-intent:
+    $ref: './components/paths/payment_methods.yaml#/setupIntent'
+
+  /v1/payment-methods:
+    $ref: './components/paths/payment_methods.yaml#/paymentMethods'
+
+  /v1/payment-methods/{id}:
+    $ref: './components/paths/payment_methods.yaml#/paymentMethodById'
 
   /v1/agents/{agent_id}/standing-approvals:
     $ref: './components/paths/standing_approvals.yaml#/listStandingApprovals'
@@ -473,6 +487,26 @@ components:
       $ref: './components/schemas/profiles.yaml#/DeleteAccountResponse'
     DataRetentionResponse:
       $ref: './components/schemas/profiles.yaml#/DataRetentionResponse'
+
+    # Payment Methods
+    PaymentMethod:
+      $ref: './components/schemas/payment_methods.yaml#/PaymentMethod'
+    PaymentMethodListResponse:
+      $ref: './components/schemas/payment_methods.yaml#/PaymentMethodListResponse'
+    SetupIntentResponse:
+      $ref: './components/schemas/payment_methods.yaml#/SetupIntentResponse'
+    ConfirmPaymentMethodRequest:
+      $ref: './components/schemas/payment_methods.yaml#/ConfirmPaymentMethodRequest'
+    UpdatePaymentMethodRequest:
+      $ref: './components/schemas/payment_methods.yaml#/UpdatePaymentMethodRequest'
+    DeletePaymentMethodResponse:
+      $ref: './components/schemas/payment_methods.yaml#/DeletePaymentMethodResponse'
+    AgentPaymentMethodResponse:
+      $ref: './components/schemas/agent_payment_methods.yaml#/AgentPaymentMethodResponse'
+    AssignAgentPaymentMethodRequest:
+      $ref: './components/schemas/agent_payment_methods.yaml#/AssignAgentPaymentMethodRequest'
+    RemoveAgentPaymentMethodResponse:
+      $ref: './components/schemas/agent_payment_methods.yaml#/RemoveAgentPaymentMethodResponse'
 
     # Push Subscriptions
     CreatePushSubscriptionRequest:

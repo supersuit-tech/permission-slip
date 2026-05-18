@@ -79,15 +79,6 @@ type PushContent struct {
 // approval data. Used by both webpush and mobilepush senders to ensure
 // consistent messaging across push channels.
 func BuildPushContent(approval Approval) PushContent {
-	if approval.Type == NotificationTypePaymentFailed {
-		return PushContent{
-			Title:      "Payment Failed",
-			Body:       "Your subscription payment could not be processed. Update your payment method to avoid losing access.",
-			URL:        approval.ApprovalURL,
-			ApprovalID: approval.ApprovalID,
-		}
-	}
-
 	if approval.Type == NotificationTypeStandingExecution {
 		return buildStandingExecutionPushContent(approval)
 	}

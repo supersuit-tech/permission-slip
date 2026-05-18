@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useAgent } from "@/hooks/useAgent";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
 import { AgentInfoSection } from "./AgentInfoSection";
+import { AgentPaymentMethodSection } from "./AgentPaymentMethodSection";
 import { AgentConnectorsSection } from "./AgentConnectorsSection";
 import { DeactivateSection } from "./DeactivateSection";
 
@@ -58,6 +59,7 @@ export function AgentConfigPage() {
     <div className="space-y-6">
       <BackLink />
       <AgentInfoSection agent={agent} />
+      <AgentPaymentMethodSection agentId={agentId} />
       <AgentConnectorsSection
         agentId={agentId}
         connectors={connectors}

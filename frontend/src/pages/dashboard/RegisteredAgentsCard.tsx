@@ -4,8 +4,6 @@ import { Loader2, Bot, Settings, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { CopyableCode } from "@/components/CopyableCode";
-import { LimitBadge } from "@/components/LimitBadge";
-import { UpgradePrompt } from "@/components/UpgradePrompt";
 import {
   Card,
   CardHeader,
@@ -24,7 +22,6 @@ import {
 import { AgentStatusBadge } from "@/components/AgentStatusBadge";
 import { formatRelativeTime } from "@/lib/utils";
 import { useAgents, type Agent } from "@/hooks/useAgents";
-import { useResourceLimit } from "@/hooks/useResourceLimit";
 import { getAgentDisplayName } from "@/lib/agents";
 import { InviteCodeDialog } from "./InviteCodeDialog";
 import { ReviewPendingAgentDialog } from "./ReviewPendingAgentDialog";
@@ -173,8 +170,6 @@ export function RegisteredAgentsCard() {
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("active");
   const { agents, isLoading, error, refetch } = useAgents();
-  const { max: maxAgents, current: agentCount, atLimit, hasData: hasBillingData } =
-    useResourceLimit("max_agents", agents.length);
   const { newlyRegistered, clearNewlyRegistered } =
     useRegistrationSuccess(agents);
 
@@ -196,13 +191,6 @@ export function RegisteredAgentsCard() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2">
             <CardTitle>Registered Agents</CardTitle>
-            {hasBillingData && (
-              <LimitBadge
-                current={agentCount}
-                max={maxAgents}
-                resource="agents"
-              />
-            )}
           </div>
           {agents.length > 0 && (
             <StatusFilterTabs value={statusFilter} onChange={setStatusFilter} />
@@ -233,11 +221,7 @@ export function RegisteredAgentsCard() {
           <AgentsTable agents={filteredAgents} />
         )}
       </CardContent>
-      {atLimit ? (
-        <CardFooter>
-          <UpgradePrompt feature="Upgrade to connect more Openclaw instances." />
-        </CardFooter>
-      ) : agents.length > 0 ? (
+      {agents.length > 0 ? (
         <CardFooter>
           <Button
             className="w-full sm:w-auto"

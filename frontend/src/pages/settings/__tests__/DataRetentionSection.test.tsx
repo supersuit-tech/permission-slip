@@ -17,62 +17,13 @@ describe("DataRetentionSection", () => {
     setupAuthMocks({ authenticated: true });
   });
 
-  it("shows free plan retention", async () => {
+  it("shows audit retention from API", async () => {
     mockGet.mockImplementation((url: string) => {
       if (url === "/v1/profile/data-retention") {
         return Promise.resolve({
           data: {
-            plan_id: "free",
-            plan_name: "Free",
-            audit_retention_days: 7,
-          },
-        });
-      }
-      return Promise.resolve({ data: null });
-    });
-
-    render(<DataRetentionSection />, { wrapper });
-
-    await settleAuthHydration();
-    await waitFor(() => {
-      expect(screen.getByText("Free")).toBeInTheDocument();
-    });
-    expect(screen.getByText("7 days")).toBeInTheDocument();
-  });
-
-  it("shows paid plan retention", async () => {
-    mockGet.mockImplementation((url: string) => {
-      if (url === "/v1/profile/data-retention") {
-        return Promise.resolve({
-          data: {
-            plan_id: "pay_as_you_go",
-            plan_name: "Pay As You Go",
             audit_retention_days: 90,
-          },
-        });
-      }
-      return Promise.resolve({ data: null });
-    });
-
-    render(<DataRetentionSection />, { wrapper });
-
-    await settleAuthHydration();
-    await waitFor(() => {
-      expect(screen.getByText("Pay As You Go")).toBeInTheDocument();
-    });
-    expect(screen.getByText("90 days")).toBeInTheDocument();
-  });
-
-  it("shows grace period info when recently downgraded", async () => {
-    mockGet.mockImplementation((url: string) => {
-      if (url === "/v1/profile/data-retention") {
-        return Promise.resolve({
-          data: {
-            plan_id: "free",
-            plan_name: "Free",
-            audit_retention_days: 7,
             effective_retention_days: 90,
-            grace_period_ends_at: "2026-03-08T14:30:00Z",
           },
         });
       }
@@ -83,10 +34,8 @@ describe("DataRetentionSection", () => {
 
     await settleAuthHydration();
     await waitFor(() => {
-      expect(screen.getByText("Free")).toBeInTheDocument();
+      expect(screen.getByText("90 days")).toBeInTheDocument();
     });
-    expect(screen.getByText("90 days")).toBeInTheDocument();
-    expect(screen.getByText(/90-day audit history is temporarily preserved/)).toBeInTheDocument();
   });
 
   it("shows loading state initially", async () => {

@@ -256,43 +256,16 @@ func handleDeleteAccount(deps *Deps) http.HandlerFunc {
 
 // dataRetentionResponse is the JSON shape returned by GET /profile/data-retention.
 type dataRetentionResponse struct {
-	PlanID                 string     `json:"plan_id"`
-	PlanName               string     `json:"plan_name"`
-	AuditRetentionDays     int        `json:"audit_retention_days"`
-	EffectiveRetentionDays int        `json:"effective_retention_days"`
-	GracePeriodEndsAt      *time.Time `json:"grace_period_ends_at,omitempty"`
+	AuditRetentionDays     int `json:"audit_retention_days"`
+	EffectiveRetentionDays int `json:"effective_retention_days"`
 }
 
 func handleGetDataRetention(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		profile := Profile(r.Context())
-
-		sp, err := db.GetSubscriptionWithPlan(r.Context(), deps.DB, profile.ID)
-		if err != nil {
-			log.Printf("[%s] handleGetDataRetention: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to load data retention policy"))
-			return
-		}
-
-		// Fallback for users without a subscription (shouldn't happen, but be safe).
-		// Keep these defaults in sync with the free plan in plans seed data.
-		if sp == nil {
-			RespondJSON(w, http.StatusOK, dataRetentionResponse{
-				PlanID:                 db.PlanFree,
-				PlanName:               "Free",
-				AuditRetentionDays:     7,
-				EffectiveRetentionDays: 7,
-			})
-			return
-		}
-
+		days := db.AuditRetentionDaysFromEnv()
 		RespondJSON(w, http.StatusOK, dataRetentionResponse{
-			PlanID:                 sp.Plan.ID,
-			PlanName:               sp.Plan.Name,
-			AuditRetentionDays:     sp.Plan.AuditRetentionDays,
-			EffectiveRetentionDays: sp.EffectiveRetentionDays(),
-			GracePeriodEndsAt:      sp.GracePeriodEndsAt(),
+			AuditRetentionDays:     days,
+			EffectiveRetentionDays: days,
 		})
 	}
 }
