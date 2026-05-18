@@ -41,7 +41,7 @@ CreateRegistrationInviteResponse:
         JSON body and an `X-Permission-Slip-Signature` header. The invite code
         is embedded in the URL path — the agent does not need to extract it
         or know the user's username.
-      example: "https://app.permissionslip.dev/invite/PS-ABCD-1234"
+      example: "http://localhost:8080/invite/PS-ABCD-1234"
     status:
       type: string
       description: Invite status (always "active" for newly created invites)

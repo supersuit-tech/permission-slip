@@ -310,7 +310,7 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret} // SMSEnabled=false
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/profile/notification-preferences", uid)
@@ -325,10 +325,10 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	// SMS and web-push are excluded when SMSEnabled=false (SMS) and web-push is not exposed in the API.
-	expectedChannels := len(allChannels) - 2
+	// web-push is not exposed in the notification preferences API.
+	expectedChannels := len(allChannels) - 1
 	if len(resp.Preferences) != expectedChannels {
-		t.Fatalf("expected %d preferences (SMS and web-push excluded), got %d", expectedChannels, len(resp.Preferences))
+		t.Fatalf("expected %d preferences (web-push excluded), got %d", expectedChannels, len(resp.Preferences))
 	}
 
 	// Index preferences by channel for explicit assertions.
@@ -337,7 +337,7 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 		prefsByChannel[p.Channel] = p
 	}
 
-	// All returned channels default to enabled. SMS and web-push are excluded when SMSEnabled=false.
+	// All returned channels default to enabled.
 	requiredChannels := []string{"email", "mobile-push"}
 	for _, ch := range requiredChannels {
 		p, ok := prefsByChannel[ch]
@@ -351,9 +351,6 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 		if !p.Available {
 			t.Errorf("expected channel %q to be available", ch)
 		}
-	}
-	if _, ok := prefsByChannel["sms"]; ok {
-		t.Error("expected SMS to be excluded when SMSEnabled=false")
 	}
 	if _, ok := prefsByChannel["web-push"]; ok {
 		t.Error("expected web-push to be excluded from notification preferences API")
@@ -386,15 +383,8 @@ func TestUpdateNotificationPreferences_Toggle(t *testing.T) {
 	}
 
 	for _, p := range resp.Preferences {
-		switch p.Channel {
-		case "email":
-			if p.Enabled {
-				t.Error("expected email to be disabled")
-			}
-		case "sms":
-			if p.Enabled {
-				t.Error("expected SMS to default to disabled during beta")
-			}
+		if p.Channel == "email" && p.Enabled {
+			t.Error("expected email to be disabled")
 		}
 	}
 }

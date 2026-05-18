@@ -63,8 +63,8 @@ NotificationPreference:
   type: object
   description: |
     A single notification channel preference. The `available` field indicates
-    whether the user's plan supports this channel. Channels that require a
-    paid plan (e.g. SMS) return `available: false` for free-tier users.
+    whether the channel can be used on this server (for example, whether email
+    delivery is configured).
   required:
     - channel
     - enabled
@@ -76,7 +76,6 @@ NotificationPreference:
       enum:
         - email
         - web-push
-        - sms
         - mobile-push
       example: "email"
     enabled:
@@ -86,9 +85,8 @@ NotificationPreference:
     available:
       type: boolean
       description: |
-        Whether this channel is available on the user's current plan.
-        When false, the channel is plan-gated and cannot be enabled.
-        SMS requires a paid plan (pay_as_you_go or higher).
+        Whether this channel is available on the server. When false, the UI
+        typically shows a disabled state instead of a toggle.
       example: true
 
 NotificationPreferencesResponse:
@@ -116,7 +114,6 @@ NotificationPreferenceUpdate:
       enum:
         - email
         - web-push
-        - sms
         - mobile-push
       example: "email"
     enabled:

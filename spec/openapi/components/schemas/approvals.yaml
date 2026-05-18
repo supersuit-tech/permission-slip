@@ -138,7 +138,7 @@ ApprovalRequestResponse:
       pattern: '^https://'
       description: |
         Approval URL for the approver to review. Present only when `status` is `pending`.
-      example: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+      example: "http://localhost:8080/permission-slip/approve/appr_xyz789"
 
     alternative_urls:
       $ref: './shared.yaml#/AlternativeUrls'
@@ -180,7 +180,7 @@ ApprovalRequestResponse:
 
   example:
     approval_id: "appr_xyz789"
-    approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+    approval_url: "http://localhost:8080/permission-slip/approve/appr_xyz789"
     status: "pending"
     expires_at: "2026-02-11T13:25:00Z"
 

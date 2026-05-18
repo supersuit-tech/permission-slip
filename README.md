@@ -1,8 +1,6 @@
 # Permission Slip
 
 [![CI](https://github.com/supersuit-tech/permission-slip/actions/workflows/ci.yml/badge.svg)](https://github.com/supersuit-tech/permission-slip/actions/workflows/ci.yml)
-[![Deploy](https://github.com/supersuit-tech/permission-slip/actions/workflows/deploy.yml/badge.svg)](https://github.com/supersuit-tech/permission-slip/actions/workflows/deploy.yml)
-
 **Approve what [Openclaw](https://openclaw.org) does before it does it.**
 
 Permission Slip is an open-source approval layer for [Openclaw](https://openclaw.org). Every action Openclaw wants to take — sending emails, merging PRs, booking flights — goes through you first. Nothing happens without your say-so.
@@ -10,9 +8,8 @@ Permission Slip is an open-source approval layer for [Openclaw](https://openclaw
 ```
 ┌──────────┐         ┌─────────────────┐         ┌──────────────┐
 │ Openclaw │ ──────→ │ Permission Slip │ ──────→ │   Gmail,     │
-│          │ ←────── │   (approval     │ ←────── │   Stripe,    │
-└──────────┘         │    layer)       │         │   GitHub,    │
-                     └─────────────────┘         │   Slack…     │
+│          │ ←────── │   (approval     │ ←────── │   GitHub,    │
+└──────────┘         │    layer)       │         │   Slack…     │
                            │                     └──────────────┘
                            │ push notification
                            ▼
@@ -23,13 +20,15 @@ Permission Slip is an open-source approval layer for [Openclaw](https://openclaw
                      └───────────┘
 ```
 
-## 🚀 Try it now
+## Run it yourself
 
-**[permissionslip.dev](https://www.permissionslip.dev)** — hosted, no setup required.
+Permission Slip is **self-hosted**: you run the API and web UI on your own machine or network.
 
-Get the **[iPhone app](https://apps.apple.com/us/app/permission-slip/id6761718603)** to approve requests on the go.
+Start with **[Raspberry Pi quick start](docs/raspberry-pi-quickstart.md)** or **[Self-hosted deployment](docs/deployment-self-hosted.md)** (Docker or bare metal). You will set `DATABASE_PATH`, `JWT_SIGNING_SECRET`, and `SECRET_ENCRYPTION_KEY` as documented there.
 
-Or **[self-host it](docs/deployment-self-hosted.md)** on Docker, Fly.io, or bare metal. Even runs on a [Raspberry Pi 5](docs/raspberry-pi-quickstart.md) in under 30 minutes.
+Get the **[iPhone app](https://apps.apple.com/us/app/permission-slip/id6761718603)** to approve requests on the go — the app asks for your server URL on first launch.
+
+The **[CLI](cli/README.md)** talks to your server; pass `--server` or set `PS_SERVER` (there is no built-in default host).
 
 ---
 
@@ -151,7 +150,7 @@ Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/p
 **[CONTRIBUTING.md](CONTRIBUTING.md)** — issue workflow, code standards, migrations, and pull request expectations.
 
 ### 📖 Getting Started
-- [Self-Hosted Deployment](docs/deployment-self-hosted.md) — Docker, Fly.io, bare metal
+- [Self-Hosted Deployment](docs/deployment-self-hosted.md) — Docker or bare metal
 - [Raspberry Pi Quickstart](docs/raspberry-pi-quickstart.md) — up and running in 30 minutes
 - [Architecture](docs/architecture.md) — system diagrams and component overview
 - [SPEC.md](SPEC.md) — protocol design, security model, and full spec
@@ -170,7 +169,6 @@ Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/p
 - [OpenAPI Spec](spec/openapi/) — machine-readable API definition
 
 ### 🚀 Deployment
-- [Fly.io Deployment](docs/deployment.md) — Dockerfile, fly.toml, DNS setup
 - [Mobile Builds](docs/mobile-builds.md) — EAS builds, OTA updates, App Store submission
 
 ### 🧪 Contributing & Testing

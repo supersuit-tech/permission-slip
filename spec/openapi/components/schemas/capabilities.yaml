@@ -93,7 +93,7 @@ AgentCapabilitiesResponse:
         name: "Stripe"
         description: "Payment processing via Stripe API"
         credentials_ready: false
-        credentials_setup_url: "https://app.permissionslip.dev/connect/stripe"
+        credentials_setup_url: "http://localhost:8080/connect/stripe"
         actions:
           - action_type: "payment.charge"
             name: "Charge Payment"
@@ -187,7 +187,7 @@ ConnectorCapability:
         link to the provider's API key page). Only included when
         `credentials_ready` is `false`. The agent can present this URL to the
         user to prompt credential setup.
-      example: "https://app.permissionslip.dev/connect/stripe"
+      example: "http://localhost:8080/connect/stripe"
 
     instances:
       type: array

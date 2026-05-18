@@ -10,7 +10,7 @@
 import type { Command } from "commander";
 import { ApiClient, PermissionSlipApiError } from "../api/client.js";
 import { resolveAgentId } from "./status.js";
-import { resolveServerUrl, isBuiltInDefaultServerUrl } from "../config/serverUrl.js";
+import { requireServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
 import {
@@ -33,7 +33,7 @@ export function requestCommand(program: Command): void {
     .option("--risk-level <level>", "Risk level: low, medium, high")
     .option(
       "--server <url>",
-      "Permission Slip server URL (overrides PS_SERVER and config default_server)",
+      "Permission Slip server URL — required unless PS_SERVER or config default_server is set",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
     .option("--request-id <id>", "Idempotency key — reuse across retries to prevent duplicate execution")
@@ -55,7 +55,7 @@ export function requestCommand(program: Command): void {
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
-        const { url: server } = resolveServerUrl({ serverFlag: opts.server });
+        const { url: server } = requireServerUrl({ serverFlag: opts.server });
         let params: unknown;
         try {
           params = JSON.parse(opts.params);
@@ -135,8 +135,7 @@ export function requestCommand(program: Command): void {
               ...result,
               next_step:
                 "Approval requested. To check the result, run: " +
-                `permission-slip status ${shellQuote(result.approval_id ?? "")}` +
-                (!isBuiltInDefaultServerUrl(server) ? ` --server ${shellQuote(server)}` : ""),
+                `permission-slip status ${shellQuote(result.approval_id ?? "")} --server ${shellQuote(server)}`,
             },
             outputOpts,
           );

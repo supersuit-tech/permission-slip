@@ -153,7 +153,7 @@ request:
                 summary: Pending — awaiting human approval
                 value:
                   approval_id: "appr_xyz789"
-                  approval_url: "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+                  approval_url: "http://localhost:8080/permission-slip/approve/appr_xyz789"
                   status: "pending"
                   expires_at: "2026-02-11T13:25:00Z"
                   created_at: "2026-02-11T13:20:00Z"

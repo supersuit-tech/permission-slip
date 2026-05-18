@@ -4,7 +4,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { MemoryRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { AuthProvider } from "@/auth/AuthContext";
-import { CookieConsentProvider } from "@/components/CookieConsentContext";
 import { setupAuthMocks } from "@/auth/__tests__/fixtures";
 import { mockGet, resetClientMocks } from "@/api/__mocks__/client";
 import { ApproveRedirectPage } from "../ApproveRedirectPage";
@@ -48,14 +47,12 @@ function renderPage(approvalId = "appr_abc123") {
   return render(
     <MemoryRouter initialEntries={[`/approve/${approvalId}`]}>
       <QueryClientProvider client={queryClient}>
-        <CookieConsentProvider>
           <AuthProvider>
             <Routes>
               <Route path="/approve/:approvalId" element={<ApproveRedirectPage />} />
               <Route path="/" element={<div data-testid="dashboard">Dashboard</div>} />
             </Routes>
           </AuthProvider>
-        </CookieConsentProvider>
       </QueryClientProvider>
     </MemoryRouter>,
   );

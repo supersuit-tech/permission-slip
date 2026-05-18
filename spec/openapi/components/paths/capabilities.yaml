@@ -179,7 +179,7 @@ agentCapabilities:
                       name: "Stripe"
                       description: "Payment processing via Stripe API"
                       credentials_ready: false
-                      credentials_setup_url: "https://app.permissionslip.dev/connect/stripe"
+                      credentials_setup_url: "http://localhost:8080/connect/stripe"
                       actions:
                         - action_type: "payment.charge"
                           name: "Charge Payment"

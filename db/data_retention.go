@@ -4,8 +4,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-
-	"github.com/supersuit-tech/permission-slip/config"
 )
 
 // PurgeExpiredAuditEvents deletes audit events older than the retention period
@@ -18,17 +16,17 @@ import (
 // Users without a subscription row (shouldn't happen, but defensive) are treated
 // as free-tier and get the default retention.
 //
-// Plan retention days are read from config/plans.json — no plans table join needed.
+// Plan retention days are read from plans_embedded.json — no plans table join needed.
 // The query uses a CASE expression to map plan_id → retention days inline.
 func PurgeExpiredAuditEvents(ctx context.Context, db DBTX) (int64, error) {
-	// Build the retention CASE expression from config.
-	plans := config.AllPlans()
+	// Build the retention CASE expression from embedded plan definitions.
+	plans := AllPlans()
 	if len(plans) == 0 {
 		return 0, fmt.Errorf("no plans found in config")
 	}
 
 	// Default to the free plan's retention for any unknown plan_id.
-	freePlan := config.GetPlan(config.PlanFree)
+	freePlan := GetPlan(PlanFree)
 	defaultRetention := 7
 	if freePlan != nil {
 		defaultRetention = freePlan.AuditRetentionDays

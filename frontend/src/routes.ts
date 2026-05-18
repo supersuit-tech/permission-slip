@@ -4,7 +4,6 @@ import { AgentConfigPage } from "./pages/agents/AgentConfigPage";
 import { ConnectorConfigPage } from "./pages/agents/connectors/ConnectorConfigPage";
 import { ActivityPage } from "./pages/activity/ActivityPage";
 import { SettingsLayout } from "./pages/settings/SettingsLayout";
-import { BillingRedirect } from "./pages/billing/BillingRedirect";
 import { ApproveRedirectPage } from "./pages/approve/ApproveRedirectPage";
 
 export interface RouteConfig {
@@ -26,6 +25,5 @@ export const appRoutes: RouteConfig[] = [
   { path: "/agents/:agentId/connectors/:connectorId", Component: ConnectorConfigPage },
   { path: "/activity", Component: ActivityPage },
   { path: "/settings/*", Component: SettingsLayout },
-  { path: "/billing", Component: BillingRedirect },
   { path: "/approve/:approvalId", Component: ApproveRedirectPage },
 ];

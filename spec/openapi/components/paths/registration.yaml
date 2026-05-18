@@ -14,7 +14,7 @@ register:
       ## Registration Flow
 
       1. **User generates invite**: Clicks "Add Agent" on dashboard, receives
-         invite URL (e.g., `https://app.permissionslip.dev/invite/PS-R7K3-X9M4`)
+         invite URL (e.g., `http://localhost:8080/invite/PS-R7K3-X9M4`)
       2. **User shares URL**: Gives the invite URL to the agent (paste in chat,
          config file, environment variable, etc.)
       3. **Agent POSTs to invite URL**: Sends public key and request ID

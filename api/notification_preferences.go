@@ -11,8 +11,6 @@ import (
 // notificationPreferenceResponse is a single channel preference.
 // The Available field indicates whether the channel can be used;
 // when false, the frontend shows a "coming soon" badge instead of a toggle.
-// Note: SMS is excluded from the response entirely (not just marked unavailable)
-// when the server has no SMS sender configured.
 // Web push is excluded from the response entirely so it is not configurable in the product UI.
 type notificationPreferenceResponse struct {
 	Channel   string `json:"channel"`
@@ -40,7 +38,6 @@ type notificationPreferenceUpdate struct {
 var validChannels = map[string]bool{
 	"email":       true,
 	"web-push":    true,
-	"sms":         true,
 	"mobile-push": true,
 }
 
@@ -50,7 +47,7 @@ var allChannels = func() []string {
 	for ch := range validChannels {
 		channels = append(channels, ch)
 	}
-	sort.Strings(channels) // deterministic order: email, mobile-push, sms, web-push
+	sort.Strings(channels) // deterministic order: email, mobile-push, web-push
 	return channels
 }()
 
@@ -67,7 +64,7 @@ func handleGetNotificationPreferences(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, notificationPreferencesResponse{
-			Preferences: buildPreferencesResponse(prefs, deps.SMSEnabled),
+			Preferences: buildPreferencesResponse(prefs),
 		})
 	}
 }
@@ -109,17 +106,6 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Gate SMS: reject any SMS preference change when the server has no SMS sender configured
-		// or the operator has explicitly hidden SMS (SMS_NOTIFICATIONS_HIDDEN=true).
-		// This prevents stale clients from writing sms=false rows that would override the
-		// "missing rows default to enabled" behaviour when SMS is later configured.
-		for _, p := range req.Preferences {
-			if p.Channel == "sms" && !deps.SMSEnabled {
-				RespondError(w, r, http.StatusForbidden, Forbidden(ErrChannelNotConfigured, "SMS notifications are not configured on this server."))
-				return
-			}
-		}
-
 		for _, p := range req.Preferences {
 			if err := db.UpsertNotificationPreference(r.Context(), deps.DB, profile.ID, p.Channel, p.Enabled); err != nil {
 				log.Printf("[%s] handleUpdateNotificationPreferences: upsert %q: %v", TraceID(r.Context()), p.Channel, err)
@@ -139,15 +125,14 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusOK, notificationPreferencesResponse{
-			Preferences: buildPreferencesResponse(prefs, deps.SMSEnabled),
+			Preferences: buildPreferencesResponse(prefs),
 		})
 	}
 }
 
 // buildPreferencesResponse converts DB preferences into the API response,
-// defaulting missing channels to enabled. SMS is excluded entirely
-// when smsEnabled is false (server has no SMS sender or operator hid it).
-func buildPreferencesResponse(prefs []db.NotificationPreference, smsEnabled bool) []notificationPreferenceResponse {
+// defaulting missing channels to enabled.
+func buildPreferencesResponse(prefs []db.NotificationPreference) []notificationPreferenceResponse {
 	channelMap := make(map[string]bool)
 	for _, p := range prefs {
 		channelMap[p.Channel] = p.Enabled
@@ -155,10 +140,6 @@ func buildPreferencesResponse(prefs []db.NotificationPreference, smsEnabled bool
 
 	result := make([]notificationPreferenceResponse, 0, len(allChannels))
 	for _, ch := range allChannels {
-		// Skip SMS entirely when the server doesn't have it configured.
-		if ch == "sms" && !smsEnabled {
-			continue
-		}
 		// Web push is not user-configurable in the product; omit from the list.
 		if ch == "web-push" {
 			continue

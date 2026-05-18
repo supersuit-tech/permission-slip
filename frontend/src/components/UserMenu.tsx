@@ -3,13 +3,11 @@ import {
   LogOut,
   User,
   Shield,
-  CreditCard,
   LifeBuoy,
 } from "lucide-react";
 import { useAuth } from "@/auth/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { useSignOut } from "@/hooks/useSignOut";
-import { isSaas } from "@/lib/saas";
 import { Avatar } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -62,20 +60,12 @@ export function UserMenu() {
               <Shield />
               <span>Security</span>
             </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => navigate("/settings/billing")}>
-              <CreditCard />
-              <span>Billing</span>
-            </DropdownMenuItem>
           </DropdownMenuGroup>
-          {isSaas && (
-            <>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onSelect={() => navigate("/support")}>
-                <LifeBuoy />
-                <span>Support</span>
-              </DropdownMenuItem>
-            </>
-          )}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => navigate("/support")}>
+            <LifeBuoy />
+            <span>Support</span>
+          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut} variant="destructive">
             <LogOut />

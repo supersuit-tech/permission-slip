@@ -9,13 +9,13 @@ import (
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
-func TestGetConfig_BillingDisabled(t *testing.T) {
+func TestGetConfig_OAuthFlags(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "cfg_"+uid[:8])
 
-	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: false}
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
 	r := authenticatedRequest(t, http.MethodGet, "/config", uid)
@@ -30,34 +30,9 @@ func TestGetConfig_BillingDisabled(t *testing.T) {
 	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
 		t.Fatalf("decode response: %v", err)
 	}
-	if resp.BillingEnabled {
-		t.Error("expected billing_enabled=false when BillingEnabled is false")
-	}
-}
-
-func TestGetConfig_BillingEnabled(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "cfg_"+uid[:8])
-
-	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BillingEnabled: true}
-	router := NewRouter(deps)
-
-	r := authenticatedRequest(t, http.MethodGet, "/config", uid)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
-
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp configResponse
-	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-	if !resp.BillingEnabled {
-		t.Error("expected billing_enabled=true when BillingEnabled is true")
+	if resp.GoogleOAuthConfigured || resp.MicrosoftOAuthConfigured {
+		t.Errorf("expected OAuth flags false without providers, got google=%v microsoft=%v",
+			resp.GoogleOAuthConfigured, resp.MicrosoftOAuthConfigured)
 	}
 }
 

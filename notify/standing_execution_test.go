@@ -150,53 +150,6 @@ func TestBuildEmailHTMLBody_StandingExecution_NoURL(t *testing.T) {
 	}
 }
 
-// ── SMS tests ───────────────────────────────────────────────────────────────
-
-func TestFormatSMSBody_StandingExecution(t *testing.T) {
-	t.Parallel()
-	a := testStandingExecutionApproval()
-	body := formatSMSBody(a)
-
-	checks := []string{
-		"Deploy Bot",
-		"github.issues.create",
-		"View:",
-		"https://app.example.com/activity",
-	}
-	for _, check := range checks {
-		if !strings.Contains(body, check) {
-			t.Errorf("expected SMS body to contain %q, got: %s", check, body)
-		}
-	}
-}
-
-func TestFormatSMSBody_StandingExecution_NoURL(t *testing.T) {
-	t.Parallel()
-	a := Approval{
-		AgentName: "Bot",
-		Action:    json.RawMessage(`{"type":"test"}`),
-		Type:      NotificationTypeStandingExecution,
-	}
-	body := formatSMSBody(a)
-	if strings.Contains(body, "View:") {
-		t.Error("expected no View URL")
-	}
-}
-
-func TestFormatSMSBody_StandingExecution_WithURL(t *testing.T) {
-	t.Parallel()
-	a := Approval{
-		AgentName:   "Bot",
-		Action:      json.RawMessage(`{"type":"test"}`),
-		ApprovalURL: "https://example.com/activity",
-		Type:        NotificationTypeStandingExecution,
-	}
-	body := formatSMSBody(a)
-	if !strings.Contains(body, "View: https://example.com/activity") {
-		t.Errorf("expected View URL in SMS, got: %s", body)
-	}
-}
-
 // ── Push content tests ──────────────────────────────────────────────────────
 
 func TestBuildPushContent_StandingExecution(t *testing.T) {

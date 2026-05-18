@@ -12,33 +12,31 @@ function renderBanner(retention: { days: number; grace_period_ends_at?: string |
 }
 
 describe("RetentionBanner", () => {
-  it("shows retention limit for free plan with plan name", () => {
+  it("shows retention limit with link to account settings", () => {
     renderBanner({ days: 7 });
-    expect(screen.getByText(/Showing last 7 days \(Free plan\)/)).toBeInTheDocument();
-    expect(screen.getByText("Upgrade")).toBeInTheDocument();
+    expect(screen.getByText(/Showing last 7 days/)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /Account/i });
+    expect(link).toHaveAttribute("href", "/settings/account");
   });
 
-  it("links upgrade to billing page", () => {
-    renderBanner({ days: 7 });
-    const link = screen.getByRole("link", { name: "Upgrade" });
-    expect(link).toHaveAttribute("href", "/billing");
-  });
-
-  it("hides banner for paid plan (90-day retention)", () => {
+  it("hides banner for 90-day retention without grace period", () => {
     const { container } = renderBanner({ days: 90 });
     expect(container.firstChild).toBeNull();
   });
 
-  it("shows grace period warning with date", () => {
+  it("shows grace period warning with date and account link", () => {
     renderBanner({
       days: 90,
       grace_period_ends_at: "2026-03-08T14:30:00Z",
     });
     expect(screen.getByText(/90-day audit history is preserved until/)).toBeInTheDocument();
-    expect(screen.getByText("Upgrade")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Account/i })).toHaveAttribute(
+      "href",
+      "/settings/account",
+    );
   });
 
-  it("always shows 7-day retention after grace period ends", () => {
+  it("mentions 7-day retention after grace period in copy", () => {
     renderBanner({
       days: 7,
       grace_period_ends_at: "2026-03-08T14:30:00Z",

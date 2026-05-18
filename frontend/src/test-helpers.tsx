@@ -3,7 +3,6 @@ import type { ReactElement } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "@/auth/AuthContext";
-import { CookieConsentProvider } from "@/components/CookieConsentContext";
 import { ThemeProvider } from "@/components/ThemeContext";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -23,9 +22,7 @@ export function createAuthWrapper(initialEntries?: string[]) {
     return (
       <MemoryRouter initialEntries={initialEntries}>
         <QueryClientProvider client={queryClient}>
-          <CookieConsentProvider>
-            <AuthProvider>{children}</AuthProvider>
-          </CookieConsentProvider>
+          <AuthProvider>{children}</AuthProvider>
         </QueryClientProvider>
       </MemoryRouter>
     );
@@ -50,12 +47,10 @@ export function renderWithProviders(
       <MemoryRouter>
         <QueryClientProvider client={queryClient}>
           <ThemeProvider>
-            <CookieConsentProvider>
-              <AuthProvider>
-                {children}
-                <Toaster />
-              </AuthProvider>
-            </CookieConsentProvider>
+            <AuthProvider>
+              {children}
+              <Toaster />
+            </AuthProvider>
           </ThemeProvider>
         </QueryClientProvider>
       </MemoryRouter>

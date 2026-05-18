@@ -27,7 +27,6 @@ import (
 	_ "github.com/supersuit-tech/permission-slip/notify/all"
 	poauth "github.com/supersuit-tech/permission-slip/oauth"
 	_ "github.com/supersuit-tech/permission-slip/oauth/providers"
-	pstripe "github.com/supersuit-tech/permission-slip/stripe"
 	"github.com/supersuit-tech/permission-slip/vault"
 )
 
@@ -114,37 +113,6 @@ func main() {
 	var deps api.Deps
 	deps.Logger = logger
 	deps.JWTSigningSecret = strings.TrimSpace(os.Getenv("JWT_SIGNING_SECRET"))
-	deps.BillingEnabled = os.Getenv("BILLING_ENABLED") == "true"
-	if deps.BillingEnabled {
-		log.Println("Billing: enabled (new users get free plan, Stripe/metering active)")
-
-		stripeKey := os.Getenv("STRIPE_SECRET_KEY")
-		webhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET")
-		priceID := os.Getenv("STRIPE_PRICE_ID_REQUEST")
-
-		// Initialize Stripe client when billing is enabled and keys are configured.
-		if stripeKey != "" {
-			deps.Stripe = pstripe.New(pstripe.Config{
-				SecretKey:      stripeKey,
-				WebhookSecret:  webhookSecret,
-				PriceIDRequest: priceID,
-			})
-			log.Println("Stripe: client initialized")
-			// Fetch and cache the per-request price from Stripe at startup.
-			deps.Stripe.FetchRequestPrice()
-			if webhookSecret == "" {
-				log.Println("Warning: STRIPE_WEBHOOK_SECRET not set — webhook signature verification will reject all requests")
-			}
-		} else {
-			log.Println("Stripe: STRIPE_SECRET_KEY not set, Stripe API calls will be unavailable")
-		}
-	} else {
-		log.Println("Billing: disabled (all users get unlimited plan, Stripe/metering skipped)")
-	}
-	deps.CouponSecret = strings.TrimSpace(os.Getenv("COUPON_SECRET"))
-	if deps.BillingEnabled && deps.CouponSecret != "" {
-		log.Println("Coupons: COUPON_SECRET set — POST /v1/billing/redeem-coupon enabled")
-	}
 	deps.DevMode = os.Getenv("MODE") == "development"
 	if !deps.DevMode {
 		deps.RateLimiter = api.NewRateLimiter(api.DefaultRateLimiterConfig())
@@ -153,7 +121,7 @@ func main() {
 		deps.VerifyRateLimiter = api.NewRateLimiter(api.DefaultVerifyRateLimiterConfig())
 		deps.TrustedProxyHeader = os.Getenv("TRUSTED_PROXY_HEADER")
 		if deps.TrustedProxyHeader == "" {
-			deps.TrustedProxyHeader = "Fly-Client-IP"
+			deps.TrustedProxyHeader = "X-Forwarded-For"
 		}
 		log.Printf("Rate limiting: enabled (per-IP + per-agent + per-verify + global, proxy header: %s)", deps.TrustedProxyHeader)
 	} else {
@@ -208,11 +176,9 @@ func main() {
 		// Start background audit log purge.
 		auditPurgeDone = startAuditPurge(bgCtx, pool, logger)
 
-		// Ensure all existing users have subscriptions. When billing is disabled,
-		// this assigns the unlimited pay_as_you_go plan so enforcement sees no limits.
-		// When billing is enabled, unsubscribed users get the free plan.
+		// Ensure all existing users have the self-hosted unlimited plan.
 		subCtx, subCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		backfilled, err := db.EnsureAllUsersSubscribed(subCtx, pool, deps.BillingEnabled)
+		backfilled, err := db.EnsureAllUsersSubscribed(subCtx, pool)
 		subCancel()
 		if err != nil {
 			log.Printf("Warning: failed to backfill subscriptions: %v", err)
@@ -248,16 +214,6 @@ func main() {
 
 	notify.LogChannelSummary(senders)
 
-	// SMS is available when a sender named "sms" was built and the server
-	// operator hasn't explicitly hidden it (e.g. on app.permissionslip.dev).
-	smsConfigured := false
-	for _, s := range senders {
-		if s.Name() == "sms" {
-			smsConfigured = true
-			break
-		}
-	}
-	deps.SMSEnabled = smsConfigured && !strings.EqualFold(os.Getenv("SMS_NOTIFICATIONS_HIDDEN"), "true")
 	if deps.DB != nil && len(senders) > 0 {
 		deps.Notifier = notify.NewDispatcher(senders, &notify.DBPreferenceChecker{DB: deps.DB})
 	} else if len(senders) > 0 {
@@ -390,11 +346,6 @@ func main() {
 	mux.Handle("/api/auth/", http.StripPrefix("/api/auth", authMux))
 	mux.Handle("/api/v1/", http.StripPrefix("/api/v1", api.NewRouter(&deps)))
 
-	// Stripe webhook endpoint lives outside /api/v1/ — it must bypass auth
-	// and rate-limiting middleware. Stripe verifies requests via signature
-	// (Stripe-Signature header), not Bearer tokens.
-	api.RegisterBillingWebhookRoutes(mux, &deps)
-
 	// Slack Events API webhook endpoint lives outside /api/v1/ — it must
 	// bypass auth middleware. Slack authenticates via HMAC-SHA256 signature
 	// (X-Slack-Signature header).
@@ -429,8 +380,7 @@ func main() {
 	handler = api.GatewaySecretMiddleware(os.Getenv("GATEWAY_SECRET"))(handler)
 
 	// Wrap all routes with security headers (outermost layer).
-	// Include the Supabase URL in CSP connect-src so the frontend can reach
-	// the auth/API endpoints in production. Sentry's ingest domain is always
+	// Sentry's ingest domain is always
 	// allowed in connect-src; the optional SENTRY_CSP_ENDPOINT enables
 	// report-uri so CSP violations show up as Sentry events.
 	sentryCSPEndpoint := os.Getenv("SENTRY_CSP_ENDPOINT")

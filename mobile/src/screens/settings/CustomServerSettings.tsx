@@ -56,8 +56,8 @@ export default function CustomServerSettings() {
             setHostUrl("");
             setSecret("");
             Alert.alert(
-              "Custom Server Disabled",
-              "The app will use the default server on next restart.",
+              "Custom server cleared",
+              "Set EXPO_PUBLIC_API_BASE_URL for this build, or enter your server URL again when the app prompts you.",
             );
           })
           .catch(() => {
@@ -119,8 +119,8 @@ export default function CustomServerSettings() {
           <View style={styles.toggleLabel}>
             <Text style={styles.toggleTitle}>Custom Server</Text>
             <Text style={styles.toggleDescription}>
-              Connect to a private Permission Slip deployment instead of the
-              default server.
+              Point this app at your self-hosted Permission Slip API (saved on
+              device; restart the app after changing).
             </Text>
           </View>
           <Switch

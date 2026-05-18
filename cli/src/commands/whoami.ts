@@ -7,7 +7,7 @@
 import type { Command } from "commander";
 import { ApiClient } from "../api/client.js";
 import { loadRegistrations, findRegistration } from "../config/store.js";
-import { resolveServerUrl } from "../config/serverUrl.js";
+import { requireServerUrl } from "../config/serverUrl.js";
 import { keyPairExists, readPublicKey } from "../auth/keys.js";
 import { output, type OutputOptions } from "../output.js";
 
@@ -17,7 +17,7 @@ export function whoamiCommand(program: Command): void {
     .description("Show agent identity and registration info")
     .option(
       "--server <url>",
-      "Permission Slip server URL (overrides PS_SERVER and config default_server)",
+      "Permission Slip server URL — required unless PS_SERVER or config default_server is set",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
@@ -28,7 +28,7 @@ export function whoamiCommand(program: Command): void {
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
-        const { url: server } = resolveServerUrl({ serverFlag: opts.server });
+        const { url: server } = requireServerUrl({ serverFlag: opts.server });
         const hasKey = keyPairExists();
         let publicKey: string | null = null;
         if (hasKey) {

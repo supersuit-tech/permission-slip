@@ -106,8 +106,6 @@ func recipientHasContact(channel string, r Recipient) bool {
 	switch channel {
 	case "email":
 		return r.Email != nil && *r.Email != ""
-	case "sms":
-		return r.Phone != nil && *r.Phone != ""
 	default:
 		return true
 	}

@@ -2,7 +2,6 @@ import { Link, useLocation } from "react-router-dom";
 import {
   User,
   Shield,
-  CreditCard,
   Settings,
   Smartphone,
 } from "lucide-react";
@@ -19,7 +18,6 @@ interface SettingsNavItem {
 const settingsNavItems: SettingsNavItem[] = [
   { label: "Profile", path: "/settings/profile", icon: User },
   { label: "Security", path: "/settings/security", icon: Shield },
-  { label: "Billing", path: "/settings/billing", icon: CreditCard },
   { label: "Account", path: "/settings/account", icon: Settings },
 ];
 

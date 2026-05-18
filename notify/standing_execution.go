@@ -183,25 +183,6 @@ func buildStandingExecutionPlainBody(approval Approval) string {
 	return b.String()
 }
 
-// formatStandingExecutionSMS builds a concise SMS for a standing approval
-// execution. Format: "[AgentName] ran [action_type]. View: [url]"
-func formatStandingExecutionSMS(a Approval) string {
-	info := extractStandingExecutionInfo(a)
-
-	actionPart := info.ActionType
-	if actionPart == "" {
-		actionPart = "an action"
-	}
-
-	msg := fmt.Sprintf("[Permission Slip] %s ran %s", info.AgentName, actionPart)
-
-	if a.ApprovalURL != "" {
-		return fmt.Sprintf("%s. View: %s", msg, a.ApprovalURL)
-	}
-
-	return msg
-}
-
 // buildStandingExecutionHTMLBody returns the HTML email body with a blue
 // accent (#2563eb), details table, "View Activity" CTA button, and a footer
 // noting this was an auto-approved action.

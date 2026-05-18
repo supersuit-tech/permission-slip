@@ -4,6 +4,7 @@ import mockClient from "./mockClient";
 import {
   getCustomHost,
   getGatewaySecret,
+  PLACEHOLDER_API_BASE,
 } from "../lib/customHostConfig";
 
 /**
@@ -14,20 +15,15 @@ import {
  * EXPO_PUBLIC_API_BASE_URL env var (set via Expo's env config or .env file),
  * stripping any trailing "/v1" since spec paths already include the prefix.
  *
- * Falls back to the production URL if no env var is set.
+ * When unset, uses an internal placeholder; {@link customHostMiddleware} rewrites
+ * requests to the URL the user saves on first launch (or set EXPO_PUBLIC_API_BASE_URL).
  */
 function resolveDefaultBaseUrl(): string {
-  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-  if (!envUrl) {
-    if (__DEV__) {
-      console.warn(
-        "[api] EXPO_PUBLIC_API_BASE_URL is not set — falling back to production (https://app.permissionslip.dev/api). " +
-          "Set it in your .env or app.config to point at a local/staging server.",
-      );
-    }
-    return "https://app.permissionslip.dev/api";
+  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
   }
-  return envUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
+  return PLACEHOLDER_API_BASE.replace(/\/v1\/?$/, "").replace(/\/$/, "");
 }
 
 /** The default (non-custom) base URL, computed once at module load. */
@@ -96,8 +92,7 @@ export const customHostMiddleware: Middleware = {
 
     if (customHost) {
       // Replace the default base URL prefix with the custom host.
-      // e.g., "https://app.permissionslip.dev/api/v1/approvals"
-      //     → "https://my-server.example.com/api/v1/approvals"
+      // e.g., placeholder or env base + "/v1/..." → the self-hosted API base.
       const customBase = customHost
         .replace(/\/v1\/?$/, "")
         .replace(/\/$/, "");

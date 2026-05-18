@@ -1,12 +1,11 @@
 import { Mail, Github } from "lucide-react";
-import { PolicyLayout } from "../policy/PolicyLayout";
 
 export function SupportPage() {
   return (
-    <PolicyLayout title="Support">
-      <p>
-        Need help with Permission Slip? We&apos;re here for you. Choose the
-        option that works best and we&apos;ll get back to you as soon as we can.
+    <div className="mx-auto max-w-2xl px-6 py-16">
+      <h1 className="mb-6 font-serif text-3xl font-semibold tracking-tight">Support</h1>
+      <p className="text-muted-foreground">
+        Need help with Permission Slip? Choose the option that works best.
       </p>
 
       <div className="not-prose mt-8 grid gap-4 sm:grid-cols-2">
@@ -34,6 +33,6 @@ export function SupportPage() {
           </span>
         </a>
       </div>
-    </PolicyLayout>
+    </div>
   );
 }

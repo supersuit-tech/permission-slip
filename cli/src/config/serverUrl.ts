@@ -1,20 +1,35 @@
 /**
- * Resolves the Permission Slip server URL from flag, env, config file, or built-in default.
- * Precedence: --server > PS_SERVER > config.json default_server > built-in.
+ * Resolves the Permission Slip server URL from flag, env, or config file.
+ * Precedence: --server > PS_SERVER > config.json default_server.
+ * There is no built-in default — self-hosted deployments must supply a host.
  */
 
 import { loadConfig } from "./store.js";
 
-export const BUILT_IN_DEFAULT_SERVER = "https://app.permissionslip.dev";
-
-export type ServerUrlSource = "flag" | "env" | "config" | "built-in";
+export type ServerUrlSource = "flag" | "env" | "config";
 
 export interface ResolvedServerUrl {
   url: string;
   source: ServerUrlSource;
 }
 
-export function resolveServerUrl(opts: { serverFlag?: string }): ResolvedServerUrl {
+export class ServerUrlRequiredError extends Error {
+  constructor() {
+    super(
+      "Permission Slip server URL is required. Set it using one of:\n" +
+        "  --server <url>           (highest precedence)\n" +
+        "  PS_SERVER=<url>          (environment variable)\n" +
+        "  permission-slip config set default_server <url>  (saved to ~/.permission-slip/config.json)",
+    );
+    this.name = "ServerUrlRequiredError";
+  }
+}
+
+/**
+ * Returns the resolved server URL, or null when none of flag, env, or
+ * config default_server is set.
+ */
+export function tryResolveServerUrl(opts: { serverFlag?: string }): ResolvedServerUrl | null {
   if (opts.serverFlag !== undefined && opts.serverFlag !== "") {
     return { url: opts.serverFlag, source: "flag" };
   }
@@ -27,9 +42,14 @@ export function resolveServerUrl(opts: { serverFlag?: string }): ResolvedServerU
   if (fromFile) {
     return { url: fromFile, source: "config" };
   }
-  return { url: BUILT_IN_DEFAULT_SERVER, source: "built-in" };
+  return null;
 }
 
-export function isBuiltInDefaultServerUrl(url: string): boolean {
-  return url.replace(/\/+$/, "") === BUILT_IN_DEFAULT_SERVER;
+/** Same as tryResolveServerUrl but throws ServerUrlRequiredError when unset. */
+export function requireServerUrl(opts: { serverFlag?: string }): ResolvedServerUrl {
+  const r = tryResolveServerUrl(opts);
+  if (!r) {
+    throw new ServerUrlRequiredError();
+  }
+  return r;
 }

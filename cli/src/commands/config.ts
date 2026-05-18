@@ -19,7 +19,7 @@ import {
   PRIVATE_KEY_FILE,
   PUBLIC_KEY_FILE,
 } from "../config/store.js";
-import { resolveServerUrl } from "../config/serverUrl.js";
+import { tryResolveServerUrl } from "../config/serverUrl.js";
 import { keyPairExists } from "../auth/keys.js";
 import { output, type OutputOptions } from "../output.js";
 
@@ -66,7 +66,7 @@ export function configCommand(program: Command): void {
 
   configCmd
     .command("unset")
-    .description("Remove a preference (reverts to built-in defaults / env)")
+    .description("Remove a preference (you must set PS_SERVER or use --server until default_server is set again)")
     .argument("<key>", `Preference key (${CONFIG_KEYS.join(", ")})`)
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action((key: string, cmdOpts: { pretty?: boolean }) => {
@@ -87,16 +87,15 @@ export function configCommand(program: Command): void {
     .action((opts: { server?: string; pretty?: boolean }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
-        const resolved = resolveServerUrl({});
+        const resolved = tryResolveServerUrl({});
         const regForServer = opts.server ? findRegistration(opts.server) : undefined;
         const data = {
           config_dir: CONFIG_DIR,
           preferences_file: CONFIG_FILE,
           preferences: loadConfig(),
-          default_server: {
-            resolved: resolved.url,
-            source: resolved.source,
-          },
+          default_server: resolved
+            ? { resolved: resolved.url, source: resolved.source }
+            : { resolved: null, source: "none" as const },
           registrations_file: REGISTRATIONS_FILE,
           key: {
             private_key_file: PRIVATE_KEY_FILE,
