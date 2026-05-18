@@ -24,7 +24,7 @@ Permission Slip is an open-source approval layer for [Openclaw](https://openclaw
 
 Permission Slip is **self-hosted**: you run the API and web UI on your own machine or network.
 
-Start with **[Raspberry Pi quick start](docs/raspberry-pi-quickstart.md)** or **[Self-hosted deployment](docs/deployment-self-hosted.md)** (Docker or bare metal). You will set `DATABASE_PATH`, `JWT_SIGNING_SECRET`, and `SECRET_ENCRYPTION_KEY` as documented there.
+Start with the **[Self-hosted deployment guide](docs/deployment-self-hosted.md)** — covers bare metal, Docker, Fly.io, and more. A Raspberry Pi is the recommended home-server environment. You will set `DATABASE_PATH`, `JWT_SIGNING_SECRET`, and `SECRET_ENCRYPTION_KEY` as documented there.
 
 Get the **[iPhone app](https://apps.apple.com/us/app/permission-slip/id6761718603)** to approve requests on the go — the app asks for your server URL on first launch.
 
@@ -150,8 +150,7 @@ Have you tested a connector? [Open an issue](https://github.com/supersuit-tech/p
 **[CONTRIBUTING.md](CONTRIBUTING.md)** — issue workflow, code standards, migrations, and pull request expectations.
 
 ### 📖 Getting Started
-- [Self-Hosted Deployment](docs/deployment-self-hosted.md) — Docker or bare metal
-- [Raspberry Pi Quickstart](docs/raspberry-pi-quickstart.md) — up and running in 30 minutes
+- [Self-Hosted Deployment](docs/deployment-self-hosted.md) — Raspberry Pi, bare metal, Docker, and PaaS
 - [Architecture](docs/architecture.md) — system diagrams and component overview
 - [SPEC.md](SPEC.md) — protocol design, security model, and full spec
 
