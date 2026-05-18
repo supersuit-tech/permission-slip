@@ -98,6 +98,30 @@ docker build -t permission-slip .
 
 ## Step 2: Configure Environment Variables
 
+### Find your Pi's address first
+
+You need to know how other devices on your network will reach the Pi. You have two options:
+
+**Option 1 — mDNS hostname (e.g. `raspberrypi.local`)**
+Works out of the box on macOS and most Linux desktops. Windows requires [Bonjour](https://support.apple.com/kb/DL999) or iTunes installed. Check your Pi's current hostname:
+
+```bash
+hostname   # prints e.g. "raspberrypi" → reachable as "raspberrypi.local"
+```
+
+If you've renamed your Pi (common — people use names like `homeserver` or `media`), substitute that name. To change it: `sudo hostnamectl set-hostname <newname>` then reboot.
+
+**Option 2 — Local IP address (e.g. `192.168.1.100`)**
+Always works regardless of mDNS support. The risk is that DHCP can reassign the address after a reboot. To prevent that, set a **static DHCP lease** for the Pi's MAC address in your router's admin UI — most routers call this "DHCP reservation" or "address binding".
+
+```bash
+hostname -I | awk '{print $1}'   # prints the Pi's current IP
+```
+
+Use whichever address you choose consistently in the `BASE_URL` and `ALLOWED_ORIGINS` below — changing it later requires restarting the service.
+
+---
+
 Create a `.env` file with your configuration. All values except `BASE_URL` are required in production.
 
 ```bash
@@ -112,6 +136,8 @@ JWT_SIGNING_SECRET=replace-me
 INVITE_HMAC_KEY=replace-me
 
 # Public URL of this server (used for OAuth callbacks and invite links)
+# Replace with your Pi's mDNS hostname (e.g. http://raspberrypi.local:8080)
+# or its local IP address (e.g. http://192.168.1.100:8080) — see above.
 BASE_URL=http://raspberrypi.local:8080
 ALLOWED_ORIGINS=http://raspberrypi.local:8080
 EOF
@@ -202,7 +228,7 @@ http://raspberrypi.local:8080
 
 Log in with the email and password you just created.
 
-> **Can't reach `raspberrypi.local`?** Not all networks support mDNS. Find your Pi's IP with `hostname -I` and use that instead (e.g., `http://192.168.1.100:8080`).
+> **Can't reach the address?** If you used `raspberrypi.local` and it doesn't resolve, your network may not support mDNS — switch to the Pi's IP address. See [Step 2](#step-2-configure-environment-variables) for how to find it and update `BASE_URL`.
 
 ---
 
