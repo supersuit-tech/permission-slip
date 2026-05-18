@@ -10,8 +10,33 @@ on:
     - cron: "0 9 * * 1"
 
 jobs:
-  audit-frontend:
-    name: NPM Audit
+  # Detect which package manifests changed. Non-PR triggers (push to main,
+  # weekly schedule, manual) always run the full audit regardless.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      frontend: ${{ steps.filter.outputs.frontend }}
+      backend: ${{ steps.filter.outputs.backend }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            frontend:
+              - 'frontend/package.json'
+              - 'frontend/package-lock.json'
+              - '.github/workflows/audit.yml'
+            backend:
+              - 'go.mod'
+              - 'go.sum'
+              - '.github/workflows/audit.yml'
+
+  audit-frontend-work:
+    name: NPM Audit (worker)
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.frontend == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -29,8 +54,10 @@ jobs:
       - name: Run npm audit
         run: cd frontend && npm audit --audit-level=high
 
-  audit-backend:
-    name: Go Vulnerability Check
+  audit-backend-work:
+    name: Go Vulnerability Check (worker)
+    needs: changes
+    if: github.event_name != 'pull_request' || needs.changes.outputs.backend == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -50,3 +77,38 @@ jobs:
 
       - name: Run govulncheck
         run: govulncheck ./...
+
+  # Aggregator jobs emit the check-run names branch protection expects.
+  # Each always runs and passes when the worker either succeeded or was
+  # skipped. Keep `name:` in sync with required-check names.
+  audit-frontend:
+    name: NPM Audit
+    needs: audit-frontend-work
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        env:
+          RESULT: ${{ needs.audit-frontend-work.result }}
+        run: |
+          echo "Worker result: $RESULT"
+          case "$RESULT" in
+            success|skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
+
+  audit-backend:
+    name: Go Vulnerability Check
+    needs: audit-backend-work
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        env:
+          RESULT: ${{ needs.audit-backend-work.result }}
+        run: |
+          echo "Worker result: $RESULT"
+          case "$RESULT" in
+            success|skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
