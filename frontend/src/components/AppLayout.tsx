@@ -7,7 +7,6 @@ import { useOAuthCallbackToast } from "@/hooks/useOAuthCallbackToast";
 import { Footer } from "./Footer";
 import { UserMenu } from "./UserMenu";
 import { PendingAgentBanners } from "./PendingAgentBanners";
-import { BetaBanner } from "./BetaBanner";
 import { GoogleReauthBanner } from "./GoogleReauthBanner";
 
 interface NavItem {
@@ -35,7 +34,6 @@ export function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-background">
-      <BetaBanner />
       <div className="p-3 md:p-5 md:pb-5">
       <nav className="mx-auto mb-6 flex max-w-[1200px] items-center rounded-xl border-b-2 bg-card px-4 py-3 shadow-sm md:mb-8 md:px-10 md:py-4">
         <Link to="/" className="flex items-center gap-2 text-base font-bold md:mr-10 md:gap-2.5 md:text-lg">
