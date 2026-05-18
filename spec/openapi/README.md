@@ -32,6 +32,8 @@ spec/openapi/
     │   ├── credentials.yaml     # Credential vault schemas
     │   ├── onboarding.yaml      # Onboarding workflow schemas
     │   ├── profiles.yaml        # User profile schemas
+    │   ├── payment_methods.yaml # Stored payment method schemas
+    │   ├── agent_payment_methods.yaml # Agent payment method assignment schemas
     │   ├── push_subscriptions.yaml # Web Push subscription schemas
     │   ├── registration_invites.yaml # Registration invite schemas
     │   ├── standing_approvals.yaml   # Standing approval schemas
@@ -49,6 +51,8 @@ spec/openapi/
     │   ├── config.yaml          # Server configuration
     │   ├── connectors.yaml      # GET /v1/connectors, GET /v1/connectors/{id}
     │   ├── credentials.yaml     # Credential vault endpoints
+    │   ├── payment_methods.yaml # User payment method endpoints
+    │   ├── agent_payment_methods.yaml # Agent payment method assignment endpoints
     │   ├── onboarding.yaml      # Onboarding workflow
     │   ├── profiles.yaml        # User profile management
     │   ├── push_subscriptions.yaml # Web Push subscription management
@@ -77,6 +81,7 @@ spec/openapi/
 | **Standing Approvals** | `GET/POST /v1/standing-approvals`, `POST .../revoke`, `POST .../execute` | Session/Signature | Pre-authorized agent actions |
 | **Audit Events** | `GET /v1/audit-events`, `GET /v1/audit-logs` | Session | Activity feed and audit trail |
 | **Profiles** | `GET/PUT /v1/profile`, `GET/PUT .../notification-preferences` | Session | User profile management |
+| **Payment Methods** | `GET/POST/PATCH/DELETE /v1/payment-methods`, `POST .../setup-intent`, `GET/PUT/DELETE /v1/agents/{id}/payment-method` | Session | Stripe saved cards and per-agent assignment |
 | **Config** | `GET /v1/config` | Session | Server configuration and feature flags |
 
 ## Usage

@@ -284,20 +284,6 @@ TooManyRequests:
                 window: "1 minute"
                 reset_at: "2026-02-11T13:26:00Z"
               trace_id: "trace_xyz789"
-        monthly_quota_exceeded:
-          summary: Free tier monthly request quota exhausted
-          value:
-            error:
-              code: "monthly_quota_exceeded"
-              message: "Free tier limit of 1000 requests/month reached. Upgrade to continue."
-              retryable: true
-              retry_after: 86400
-              details:
-                current_usage: 1000
-                limit: 1000
-                plan_id: "free"
-                reset_at: "2026-04-01T00:00:00Z"
-              trace_id: "trace_xyz789"
 
 InternalServerError:
   description: Internal Server Error - Unexpected server error

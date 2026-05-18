@@ -237,13 +237,6 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Check monthly request quota before creating the approval.
-		var blocked bool
-		r, blocked = checkRequestQuota(r.Context(), w, r, deps.DB, agent.ApproverID)
-		if blocked {
-			return
-		}
-
 		// ── Check for matching standing approval (auto-approve) ─────
 		//
 		// Before creating a pending approval, check if an active standing

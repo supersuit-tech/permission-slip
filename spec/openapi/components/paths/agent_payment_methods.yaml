@@ -1,0 +1,78 @@
+agentPaymentMethod:
+  get:
+    operationId: getAgentPaymentMethod
+    summary: Get agent payment method
+    description: |
+      Returns the payment method assigned to this agent, or null if none is assigned.
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+    responses:
+      '200':
+        description: Payment method assignment retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_payment_methods.yaml#/AgentPaymentMethodResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+  put:
+    operationId: assignAgentPaymentMethod
+    summary: Assign payment method to agent
+    description: |
+      Assigns a payment method to this agent. If the agent already has a payment
+      method assigned, it is replaced. The payment method must belong to the
+      authenticated user.
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/agent_payment_methods.yaml#/AssignAgentPaymentMethodRequest'
+    responses:
+      '200':
+        description: Payment method assigned
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_payment_methods.yaml#/AgentPaymentMethodResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+  delete:
+    operationId: removeAgentPaymentMethod
+    summary: Remove payment method from agent
+    description: |
+      Removes the payment method assignment from this agent. Does not delete
+      the payment method itself.
+    tags:
+      - Agents
+    security:
+      - SupabaseSession: []
+    parameters:
+      - $ref: '../parameters/common.yaml#/AgentId'
+    responses:
+      '200':
+        description: Payment method assignment removed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/agent_payment_methods.yaml#/RemoveAgentPaymentMethodResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'

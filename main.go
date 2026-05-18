@@ -27,6 +27,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip/notify/all"
 	poauth "github.com/supersuit-tech/permission-slip/oauth"
 	_ "github.com/supersuit-tech/permission-slip/oauth/providers"
+	pstripe "github.com/supersuit-tech/permission-slip/stripe"
 	"github.com/supersuit-tech/permission-slip/vault"
 )
 
@@ -173,18 +174,15 @@ func main() {
 		log.Println("Connected to database")
 		deps.DB = pool
 
+		if sk := strings.TrimSpace(os.Getenv("STRIPE_SECRET_KEY")); sk != "" {
+			deps.Stripe = pstripe.New(pstripe.Config{SecretKey: sk})
+			log.Println("Stripe: client initialized (saved payment methods)")
+		} else {
+			log.Println("Stripe: STRIPE_SECRET_KEY not set — add-card endpoints return 503")
+		}
+
 		// Start background audit log purge.
 		auditPurgeDone = startAuditPurge(bgCtx, pool, logger)
-
-		// Ensure all existing users have the self-hosted unlimited plan.
-		subCtx, subCancel := context.WithTimeout(context.Background(), 10*time.Second)
-		backfilled, err := db.EnsureAllUsersSubscribed(subCtx, pool)
-		subCancel()
-		if err != nil {
-			log.Printf("Warning: failed to backfill subscriptions: %v", err)
-		} else if backfilled > 0 {
-			log.Printf("Subscriptions: backfilled %d user(s) without subscriptions", backfilled)
-		}
 
 		vaultStore, err := vault.NewSQLiteVaultFromEnv()
 		if err != nil {

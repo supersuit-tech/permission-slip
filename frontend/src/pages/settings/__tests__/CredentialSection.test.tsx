@@ -283,7 +283,7 @@ describe("CredentialSection", () => {
     });
   });
 
-  it("shows credential count badge for unlimited plan", async () => {
+  it("shows credential count badge with total stored", async () => {
     mockApiFetch([
       {
         id: "cred-1",
@@ -302,7 +302,11 @@ describe("CredentialSection", () => {
     render(<CredentialSection />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("2 credentials")).toBeInTheDocument();
+      expect(screen.getByText("GitHub")).toBeInTheDocument();
     });
+    expect(screen.getByText("Slack")).toBeInTheDocument();
+    const badge = screen.getByText("Credential Vault").parentElement?.querySelector('[data-slot="badge"]');
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toBe("2");
   });
 });

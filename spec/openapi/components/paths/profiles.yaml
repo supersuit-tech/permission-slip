@@ -262,15 +262,11 @@ dataRetention:
     operationId: getDataRetention
     summary: Get Data Retention Policy
     description: |
-      Returns the data retention policy for the authenticated user based on
-      their current plan.
+      Returns audit log retention for this deployment. Values come from the
+      server `AUDIT_RETENTION_DAYS` environment variable (default 90 days).
 
-      **Retention periods by plan:**
-      - **Free:** 7-day audit log retention
-      - **Pay As You Go:** 90-day audit log retention
-
-      Account data (profile, credentials) is retained indefinitely until
-      the user explicitly deletes their account via `DELETE /v1/profile`.
+      Account data (profile, credentials) is retained until the user deletes
+      their account via `DELETE /v1/profile`.
 
     tags:
       - Profiles
@@ -286,9 +282,8 @@ dataRetention:
             schema:
               $ref: '../schemas/profiles.yaml#/DataRetentionResponse'
             example:
-              plan_id: "free"
-              plan_name: "Free"
-              audit_retention_days: 7
+              audit_retention_days: 90
+              effective_retention_days: 90
 
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'

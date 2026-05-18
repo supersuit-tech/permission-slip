@@ -42,8 +42,6 @@ type NotificationType string
 const (
 	// NotificationTypeApproval is the default — an approval request from an agent.
 	NotificationTypeApproval NotificationType = ""
-	// NotificationTypePaymentFailed is sent when a subscription payment fails.
-	NotificationTypePaymentFailed NotificationType = "payment_failed"
 	// NotificationTypeCardExpiring is sent when a stored payment method is
 	// expiring soon (within 30 days) or already expired.
 	NotificationTypeCardExpiring NotificationType = "card_expiring"
@@ -62,7 +60,7 @@ type Approval struct {
 	AgentName   string          // human-readable; may be empty
 	Action      json.RawMessage // raw JSONB from the approvals table
 	Context     json.RawMessage // raw JSONB from the approvals table
-	ApprovalURL string          // deep link to the approval UI (or billing settings for payment failures)
+	ApprovalURL string          // deep link to the approval UI
 	ExpiresAt   time.Time
 	CreatedAt   time.Time
 	Type        NotificationType // determines which email/SMS/push template to use; zero value = approval

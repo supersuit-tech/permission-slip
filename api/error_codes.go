@@ -45,9 +45,6 @@ const (
 	ErrConfigActionTypeMismatch     ErrorCode = "configuration_action_type_mismatch"
 	ErrInvalidReference             ErrorCode = "invalid_reference"
 	ErrServiceUnavailable           ErrorCode = "service_unavailable"
-	ErrAgentLimitReached            ErrorCode = "agent_limit_reached"
-	ErrStandingApprovalLimitReached ErrorCode = "standing_approval_limit_reached"
-	ErrCredentialLimitReached       ErrorCode = "credential_limit_reached"
 	// OAuth
 	ErrOAuthProviderNotFound     ErrorCode = "oauth_provider_not_found"
 	ErrOAuthProviderUnconfigured ErrorCode = "oauth_provider_unconfigured"
@@ -66,9 +63,6 @@ const (
 
 	// Standing approval constraint validation
 	ErrInvalidConstraints ErrorCode = "invalid_constraints"
-
-	// 429 Too Many Requests (quota)
-	ErrMonthlyQuotaExceeded ErrorCode = "monthly_quota_exceeded"
 
 	ErrConnectorInstanceRequired  ErrorCode = "connector_instance_required"
 	ErrConnectorInstanceNotFound  ErrorCode = "connector_instance_not_found"

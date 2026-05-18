@@ -102,20 +102,21 @@ func TestBuildMessage(t *testing.T) {
 		}
 	})
 
-	t.Run("payment failed notification", func(t *testing.T) {
+	t.Run("card expiring notification", func(t *testing.T) {
 		t.Parallel()
+		ctx := json.RawMessage(`{"brand":"visa","last4":"4242","exp_month":12,"exp_year":2025}`)
 		approval := notify.Approval{
-			Type:        notify.NotificationTypePaymentFailed,
-			ApprovalURL: "https://app.test/settings/billing",
-			ApprovalID:  "appr_billing",
+			Type:    notify.NotificationTypeCardExpiring,
+			Context: ctx,
+			Action:  json.RawMessage(`{}`),
 		}
 
 		msg := buildMessage(approval)
-		if msg.Title != "Payment Failed" {
-			t.Errorf("expected 'Payment Failed', got %q", msg.Title)
+		if msg.Title == "" {
+			t.Error("expected non-empty title")
 		}
-		if msg.URL != "https://app.test/settings/billing" {
-			t.Errorf("expected billing URL, got %q", msg.URL)
+		if msg.Body == "" {
+			t.Error("expected non-empty body")
 		}
 	})
 }
@@ -380,13 +381,6 @@ func TestCategoryForType_DefaultApproval(t *testing.T) {
 	t.Parallel()
 	if got := categoryForType(notify.NotificationTypeApproval); got != "approval" {
 		t.Errorf("expected 'approval', got %q", got)
-	}
-}
-
-func TestCategoryForType_PaymentFailed(t *testing.T) {
-	t.Parallel()
-	if got := categoryForType(notify.NotificationTypePaymentFailed); got != "approval" {
-		t.Errorf("expected 'approval' for payment_failed, got %q", got)
 	}
 }
 

@@ -308,7 +308,6 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -362,7 +361,6 @@ func TestUpdateNotificationPreferences_Toggle(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)

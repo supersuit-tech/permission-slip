@@ -1,0 +1,36 @@
+AgentPaymentMethodResponse:
+  type: object
+  required:
+    - agent_id
+    - payment_method_id
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+    payment_method_id:
+      type: string
+      format: uuid
+      nullable: true
+      description: The assigned payment method ID, or null if none is assigned
+    created_at:
+      type: string
+      format: date-time
+
+AssignAgentPaymentMethodRequest:
+  type: object
+  required:
+    - payment_method_id
+  properties:
+    payment_method_id:
+      type: string
+      format: uuid
+      description: The payment method to assign to this agent
+
+RemoveAgentPaymentMethodResponse:
+  type: object
+  required:
+    - status
+  properties:
+    status:
+      type: string
+      enum: [removed]

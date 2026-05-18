@@ -299,9 +299,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		// Wrap limit check + insert in a transaction with an advisory lock
-		// to prevent TOCTOU races where concurrent requests could both pass
-		// the limit check and exceed the plan cap.
+		// Wrap insert in a transaction.
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] CreateStandingApproval: begin tx: %v", TraceID(r.Context()), err)
@@ -311,17 +309,6 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 		}
 		if owned {
 			defer db.RollbackTx(r.Context(), tx)
-		}
-
-		if err := db.AcquireStandingApprovalLimitLock(r.Context(), tx, profile.ID); err != nil {
-			log.Printf("[%s] CreateStandingApproval: advisory lock: %v", TraceID(r.Context()), err)
-			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
-			return
-		}
-
-		if checkStandingApprovalLimit(r.Context(), w, r, tx, profile.ID) {
-			return
 		}
 
 		sa, err := db.CreateStandingApproval(r.Context(), tx, db.CreateStandingApprovalParams{
@@ -437,13 +424,6 @@ func handleExecuteStandingApproval(deps *Deps) http.HandlerFunc {
 		}
 		if err := ValidateJSONObject(req.Parameters); err != nil {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "parameters must be a JSON object"))
-			return
-		}
-
-		// Check monthly request quota before executing.
-		var blocked bool
-		r, blocked = checkRequestQuota(r.Context(), w, r, deps.DB, profile.ID)
-		if blocked {
 			return
 		}
 

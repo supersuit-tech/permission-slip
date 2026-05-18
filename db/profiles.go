@@ -55,3 +55,26 @@ func UpdateProfileFields(ctx context.Context, db DBTX, userID string, email, pho
 	)
 	return err
 }
+
+// GetStripeCustomerIDByUser returns the Stripe Customer ID stored on the profile, if any.
+func GetStripeCustomerIDByUser(ctx context.Context, db DBTX, userID string) (*string, error) {
+	var raw sql.NullString
+	err := db.QueryRow(ctx, `SELECT stripe_customer_id FROM profiles WHERE id = $1`, userID).Scan(&raw)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !raw.Valid || raw.String == "" {
+		return nil, nil
+	}
+	s := raw.String
+	return &s, nil
+}
+
+// SetStripeCustomerID persists the Stripe Customer ID for a user profile.
+func SetStripeCustomerID(ctx context.Context, db DBTX, userID, customerID string) error {
+	_, err := db.Exec(ctx, `UPDATE profiles SET stripe_customer_id = $2 WHERE id = $1`, userID, customerID)
+	return err
+}

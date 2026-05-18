@@ -22,6 +22,8 @@ Error:
         - agent_id_mismatch
         - invalid_public_key
         - connector_instance_ambiguous
+        - payment_method_not_found
+        - payment_method_required
         # 401 Unauthorized
         - invalid_signature
         - timestamp_expired
@@ -35,6 +37,7 @@ Error:
         - insufficient_scope
         - invalid_parameters
         - connector_instance_required
+        - payment_limit_exceeded
         # 404 Not Found
         - agent_not_found
         - approver_not_found
@@ -45,10 +48,6 @@ Error:
         - connector_instance_not_found
         - credentials_not_found
         - no_matching_standing_approval
-        # 403 Forbidden (plan limits)
-        - agent_limit_reached
-        - standing_approval_limit_reached
-        - credential_limit_reached
         # 403 Forbidden (standing approval)
         - constraint_violation
         # 410 Gone (standing approval)
@@ -64,7 +63,6 @@ Error:
         - approval_expired
         # 429 Too Many Requests
         - rate_limited
-        - monthly_quota_exceeded
         # 500 Internal Server Error
         - internal_error
         - internal_panic
@@ -115,8 +113,8 @@ Error:
       type: integer
       minimum: 1
       description: |
-        Present for `rate_limited` and `monthly_quota_exceeded` errors. Number of seconds
-        the client should wait before retrying the request.
+        Present for `rate_limited` errors. Number of seconds the client should
+        wait before retrying the request.
       example: 60
 
 ErrorResponse:

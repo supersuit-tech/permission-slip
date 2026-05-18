@@ -6,7 +6,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
@@ -15,8 +14,6 @@ func TestUpdateNotificationPreferences_SMS_InvalidChannel(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
@@ -35,8 +32,6 @@ func TestUpdateNotificationPreferences_EnableEmail_FreeTier_Allowed(t *testing.T
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
@@ -55,8 +50,6 @@ func TestGetNotificationPreferences_ExcludesSMSAndWebPush(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
-
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
@@ -88,8 +81,6 @@ func TestUpdateNotificationPreferences_EnableMobilePush_FreeTier_Allowed(t *test
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
@@ -108,8 +99,6 @@ func TestGetNotificationPreferences_IncludesMobilePush(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
-
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
@@ -148,8 +137,6 @@ func TestUpdateNotificationPreferences_WebPush_Rejected(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
-
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 

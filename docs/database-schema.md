@@ -14,6 +14,7 @@ Bridges Supabase Auth user UUIDs to protocol-level usernames.
 |---|---|---|
 | `id` | uuid | PK, FK → auth.users(id) ON DELETE CASCADE |
 | `username` | text | UNIQUE, NOT NULL, max 255 chars |
+| `stripe_customer_id` | text | Nullable — Stripe Customer ID for saved payment methods; **unique** when set (partial index) |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
 
 ### `connectors`
@@ -301,47 +302,13 @@ Immutable log of significant actions: approval decisions, agent lifecycle events
 - **`payment_method.charged`:** `{"type": "connector.action", "payment_method_id": "pm_...", "brand": "visa", "last4": "4242", "amount_cents": 15000, "currency": "usd", "description": "..."}` — never includes raw card numbers, CVV, or full expiry. Only safe display metadata (brand, last4) and the opaque payment method ID are stored.
 - **Agent lifecycle events:** `null`
 
-### `plans`
+### Audit retention
 
-Defines pricing tiers and resource limits. Seeded with two built-in plans.
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | text | PK |
-| `name` | text | NOT NULL |
-| `max_requests_per_month` | integer | Nullable (NULL = unlimited) |
-| `max_agents` | integer | Nullable (NULL = unlimited) |
-| `max_standing_approvals` | integer | Nullable (NULL = unlimited) |
-| `max_credentials` | integer | Nullable (NULL = unlimited) |
-| `audit_retention_days` | integer | NOT NULL |
-| `price_per_request_millicents` | integer | NOT NULL, DEFAULT 0 |
-| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
-
-**Seed data:** `free` (1000 req/mo, 7-day audit, $0/req), `pay_as_you_go` (unlimited, 90-day audit, $0.005/req). Source of truth for current limits: `config/plans.json`.
-
-### `subscriptions`
-
-Links each user to their current plan. One subscription per user (UNIQUE on `user_id`).
-
-| Column | Type | Constraints |
-|---|---|---|
-| `id` | uuid | PK, DEFAULT gen_random_uuid() |
-| `user_id` | uuid | NOT NULL, UNIQUE, FK → profiles(id) ON DELETE CASCADE |
-| `plan_id` | text | NOT NULL, FK → plans(id) |
-| `status` | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'past_due', 'cancelled') |
-| `stripe_customer_id` | text | Nullable (NULL for free-tier) |
-| `stripe_subscription_id` | text | Nullable (NULL for free-tier) |
-| `current_period_start` | timestamptz | NOT NULL, DEFAULT date_trunc('month', now()) |
-| `current_period_end` | timestamptz | NOT NULL, DEFAULT date_trunc('month', now()) + interval '1 month' |
-| `downgraded_at` | timestamptz | Nullable — set when downgrading from paid to free; triggers 7-day grace period before shorter audit retention applies |
-| `created_at` | timestamptz | NOT NULL, DEFAULT now() |
-| `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
-
-**Indexes:** `idx_subscriptions_plan_id`, `idx_subscriptions_stripe_customer_id` (UNIQUE partial), `idx_subscriptions_stripe_subscription_id` (UNIQUE partial)
+Expired audit events are deleted by `purge_expired_audit_events()` on a single global window (default **90 days**), matching the server `AUDIT_RETENTION_DAYS` environment variable.
 
 ### `usage_periods`
 
-Tracks per-user billable usage for each billing period. Half-open interval: [period_start, period_end).
+Tracks per-user usage for each billing period. Half-open interval: [period_start, period_end).
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -356,19 +323,6 @@ Tracks per-user billable usage for each billing period. Half-open interval: [per
 
 **Constraints:** UNIQUE on `(user_id, period_start)` — one record per user per billing period
 
-### `stripe_webhook_events`
-
-Tracks processed Stripe webhook event IDs for idempotency. When a handler fails,
-the event is NOT recorded so Stripe's retry mechanism can reprocess it.
-
-| Column | Type | Constraints |
-|---|---|---|
-| `event_id` | text | PK — Stripe event ID (e.g. "evt_1234...") |
-| `event_type` | text | NOT NULL — Stripe event type |
-| `processed_at` | timestamptz | NOT NULL, DEFAULT now() |
-
-**Indexes:** `idx_stripe_webhook_events_processed_at` (for periodic purge of events older than 72 hours)
-
 ## Relationships
 
 Most foreign keys use ON DELETE CASCADE. Audit events use ON DELETE RESTRICT to preserve history.
@@ -377,7 +331,6 @@ Most foreign keys use ON DELETE CASCADE. Audit events use ON DELETE RESTRICT to 
 auth.users
   └── profiles
         ├── registration_invites (user_id → profiles, CASCADE)
-        ├── subscriptions (user_id → profiles, CASCADE)
         ├── usage_periods (user_id → profiles, CASCADE)
         ├── agents (approver_id → profiles, CASCADE)
         ├── approvals (approver_id → profiles, CASCADE)
@@ -560,8 +513,4 @@ Tests are split by domain. Each domain file owns its own schema assertions, CASC
 - `standing_approvals_test.go` — schema, cascades, CHECK constraints (status, 90-day max), indexes, standing_approval_executions table
 - `action_configurations_test.go` — schema, cascades, CHECK constraints (status, parameters size), credential SET NULL behavior, CRUD function tests (create, get, list, update, delete), user scoping
 - `audit_events_test.go` — ListAuditEvents query: all event types, filters (agent_id, event_type, outcome), pagination, user isolation, ordering
-- `subscriptions_test.go` — schema, CRUD, UNIQUE constraints
-- `subscriptions_billing_test.go` — EnsureAllUsersSubscribed with billing enabled/disabled
-- `subscriptions_stripe_test.go` — Stripe ID lookups (GetSubscriptionByStripeCustomerID, GetSubscriptionByStripeSubscriptionID)
 - `usage_periods_test.go` — schema, atomic increments, JSONB breakdown, cascade delete
-- `plans_test.go` — plan lookup, seed data verification

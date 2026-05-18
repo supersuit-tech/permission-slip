@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"log"
 	"strings"
-	"time"
 
 	"github.com/supersuit-tech/permission-slip/db"
 )
@@ -18,51 +17,13 @@ import (
 // api package. They are centralised here to avoid duplication and keep the
 // audit infrastructure in one place.
 
-// emitAuditEventWithUsage inserts an audit event and optionally increments the
-// usage meter for billing. Both operations are best-effort: errors are logged
-// but never propagated to the caller (audit and metering should not block the
-// request path).
-//
-// Set billable to true for events that count toward the user's monthly request
-// quota (approval.requested and standing_approval.executed).
+// emitAuditEventWithUsage inserts an audit event. Usage metering for billing
+// has been removed for self-hosted deployments.
 func emitAuditEventWithUsage(ctx context.Context, d db.DBTX, p db.InsertAuditEventParams, billable bool) {
+	_ = billable
 	if err := db.InsertAuditEvent(ctx, d, p); err != nil {
 		log.Printf("audit: failed to insert %s event: %v", p.EventType, err)
 		CaptureError(ctx, err)
-	}
-
-	if !billable {
-		return
-	}
-
-	periodStart, periodEnd := db.BillingPeriodBounds(time.Now())
-	connectorID := ""
-	if p.ConnectorID != nil {
-		connectorID = *p.ConnectorID
-	}
-	actionType := ""
-	if p.Action != nil {
-		actionType = actionTypeFromJSON(p.Action)
-	}
-
-	keys := db.UsageBreakdownKeys{
-		AgentID:     p.AgentID,
-		ConnectorID: connectorID,
-		ActionType:  actionType,
-	}
-
-	if IsQuotaReserved(ctx) {
-		// Count was already atomically incremented by checkRequestQuota.
-		// Only update the breakdown without re-incrementing.
-		if err := db.UpdateUsageBreakdownOnly(ctx, d, p.UserID, periodStart, keys); err != nil {
-			log.Printf("audit: failed to update usage breakdown for %s event: %v", p.EventType, err)
-			CaptureError(ctx, err)
-		}
-	} else {
-		if _, err := db.IncrementRequestCountWithBreakdown(ctx, d, p.UserID, periodStart, periodEnd, keys); err != nil {
-			log.Printf("audit: failed to increment usage for %s event: %v", p.EventType, err)
-			CaptureError(ctx, err)
-		}
 	}
 }
 

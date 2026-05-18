@@ -441,21 +441,6 @@ func seedPushSubscriptions(ctx context.Context, tx db.DBTX) {
 	fmt.Println("  \u2713 push_subscriptions seeded")
 }
 
-// seedSubscriptions creates a free subscription for every seed user and
-// upgrades userHasEverything to pay_as_you_go to exercise both plan tiers.
-func seedSubscriptions(ctx context.Context, tx db.DBTX) {
-	for _, uid := range allUserIDs {
-		plan := "free"
-		if uid == userHasEverything {
-			plan = "pay_as_you_go"
-		}
-		exec(ctx, tx,
-			`INSERT INTO subscriptions (user_id, plan_id) VALUES ($1, $2)`,
-			uid, plan)
-	}
-	fmt.Println("  ✓ subscriptions seeded")
-}
-
 // seedUsagePeriods creates sample usage data for active users.
 func seedUsagePeriods(ctx context.Context, tx db.DBTX) {
 	periodStart := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
@@ -489,7 +474,6 @@ func seed(ctx context.Context, tx db.DBTX, supa *supabaseClient) {
 	seedUserHasPendingApprovals(ctx, tx, supa)
 	seedNotificationPreferences(ctx, tx)
 	seedPushSubscriptions(ctx, tx)
-	seedSubscriptions(ctx, tx)
 	seedUsagePeriods(ctx, tx)
 	seedAuditEvents(ctx, tx)
 }

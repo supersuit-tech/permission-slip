@@ -48,11 +48,9 @@ type auditLogExportEventResponse struct {
 }
 
 // retentionMeta is included in audit event responses so the frontend knows
-// the user's effective retention window and can display contextual UI (e.g.
-// "Showing events from the last 7 days" or an upgrade prompt).
+// the configured audit log retention window.
 type retentionMeta struct {
-	Days              int        `json:"days"`
-	GracePeriodEndsAt *time.Time `json:"grace_period_ends_at,omitempty"`
+	Days int `json:"days"`
 }
 
 // auditEventListResponse is the paginated JSON response for GET /audit-events.
@@ -95,18 +93,15 @@ func RegisterAuditEventRoutes(mux *http.ServeMux, deps *Deps) {
 	mux.Handle("GET /audit-logs", requireProfile(handleExportAuditLogs(deps)))
 }
 
-// defaultFreeRetentionDays is the retention window used when a user has no
-// subscription. Matches the free plan's audit_retention_days.
-const defaultFreeRetentionDays = 7
+// defaultAuditRetentionDays is used only if env parsing fails unexpectedly.
+const defaultAuditRetentionDays = 90
 
-// retentionInfo holds the resolved retention policy for a user, including
-// the effective retention window and any active grace period.
+// retentionInfo holds the resolved retention policy for a user.
 type retentionInfo struct {
-	Days              int
-	GracePeriodEndsAt *time.Time
+	Days int
 }
 
-// retentionDays returns the number of retention days, or 0 if r is nil (billing disabled).
+// retentionDays returns the number of retention days.
 func (r *retentionInfo) retentionDays() int {
 	if r == nil {
 		return 0
@@ -114,31 +109,23 @@ func (r *retentionInfo) retentionDays() int {
 	return r.Days
 }
 
-// toMeta converts the retention info to the API response metadata, or nil if
-// retention is not enforced (billing disabled).
+// toMeta converts the retention info to the API response metadata.
 func (r *retentionInfo) toMeta() *retentionMeta {
 	if r == nil {
 		return nil
 	}
 	return &retentionMeta{
-		Days:              r.Days,
-		GracePeriodEndsAt: r.GracePeriodEndsAt,
+		Days: r.Days,
 	}
 }
 
-// effectiveRetention resolves the full audit log retention policy for the user.
-func effectiveRetention(ctx context.Context, deps *Deps, userID string) (*retentionInfo, error) {
-	sp, err := db.GetSubscriptionWithPlan(ctx, deps.DB, userID)
-	if err != nil {
-		return nil, err
+// effectiveRetention resolves the audit log retention policy from server config.
+func effectiveRetention(_ context.Context, _ *Deps, _ string) (*retentionInfo, error) {
+	days := db.AuditRetentionDaysFromEnv()
+	if days < 1 {
+		days = defaultAuditRetentionDays
 	}
-	if sp == nil {
-		return &retentionInfo{Days: defaultFreeRetentionDays}, nil
-	}
-	return &retentionInfo{
-		Days:              sp.EffectiveRetentionDays(),
-		GracePeriodEndsAt: sp.GracePeriodEndsAt(),
-	}, nil
+	return &retentionInfo{Days: days}, nil
 }
 
 // handleListAuditEvents returns a paginated activity feed for the authenticated
