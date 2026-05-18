@@ -78,22 +78,20 @@ make build
 
 ### Find your Pi's address first
 
-You need to know how other devices on your network will reach the Pi. You have two options:
+You need to know how other devices on your network will reach the Pi. **Use the local IP address — it's the most reliable option.**
 
-**Option 1 — mDNS hostname (e.g. `raspberrypi.local`)**
-Works out of the box on macOS and most Linux desktops. Windows requires [Bonjour](https://support.apple.com/kb/DL999) or iTunes installed. Check your Pi's current hostname:
-
-```bash
-hostname   # prints e.g. "raspberrypi" → reachable as "raspberrypi.local"
-```
-
-If you've renamed your Pi (common — people use names like `homeserver` or `media`), substitute that name. To change it: `sudo hostnamectl set-hostname <newname>` then reboot.
-
-**Option 2 — Local IP address (e.g. `192.168.1.100`)**
-Always works regardless of mDNS support. The risk is that DHCP can reassign the address after a reboot. To prevent that, set a **static DHCP lease** for the Pi's MAC address in your router's admin UI — most routers call this "DHCP reservation" or "address binding".
+**Option 1 — Local IP address (recommended, e.g. `192.168.1.100`)**
+Always works regardless of OS or mDNS support on client devices. The risk is that DHCP can reassign the address after a reboot. To prevent that, set a **static DHCP lease** for the Pi's MAC address in your router's admin UI — most routers call this "DHCP reservation" or "address binding".
 
 ```bash
 hostname -I | awk '{print $1}'   # prints the Pi's current IP
+```
+
+**Option 2 — mDNS hostname (e.g. `raspberrypi.local`)**
+Works out of the box on macOS and most Linux desktops, but **may not be reachable from other devices on your network** — Android and some Windows configurations don't support mDNS without extra software ([Bonjour](https://support.apple.com/kb/DL999) or iTunes). Prefer the IP address unless you know all clients on your network support mDNS.
+
+```bash
+hostname   # prints e.g. "raspberrypi" → reachable as "raspberrypi.local"
 ```
 
 Use whichever address you choose consistently in the `BASE_URL` and `ALLOWED_ORIGINS` below — changing it later requires restarting the service.
@@ -114,10 +112,10 @@ JWT_SIGNING_SECRET=replace-me
 INVITE_HMAC_KEY=replace-me
 
 # Public URL of this server (used for OAuth callbacks and invite links)
-# Replace with your Pi's mDNS hostname (e.g. http://raspberrypi.local:8080)
-# or its local IP address (e.g. http://192.168.1.100:8080) — see above.
-BASE_URL=http://raspberrypi.local:8080
-ALLOWED_ORIGINS=http://raspberrypi.local:8080
+# Use your Pi's local IP address (e.g. http://192.168.1.100:8080) — see above.
+# Hostnames like raspberrypi.local may not be reachable from all devices.
+BASE_URL=http://192.168.1.100:8080
+ALLOWED_ORIGINS=http://192.168.1.100:8080
 EOF
 
 # Replace the placeholders with real secrets
