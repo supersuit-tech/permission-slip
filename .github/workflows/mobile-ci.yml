@@ -7,8 +7,27 @@ on:
   workflow_dispatch:
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      mobile: ${{ steps.filter.outputs.mobile }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            mobile:
+              - 'mobile/**'
+              - 'spec/openapi/**'
+              - 'Makefile'
+              - '.github/workflows/mobile-ci.yml'
+
   mobile:
     name: Mobile Tests & Typecheck
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:

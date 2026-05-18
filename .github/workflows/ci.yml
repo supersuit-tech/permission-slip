@@ -7,8 +7,46 @@ on:
   workflow_dispatch:
 
 jobs:
+  # Detect which areas of the codebase changed so we can skip jobs that have
+  # no work to do on this PR. On pushes to main we always run everything via
+  # the `|| github.event_name == 'push'` fallback in each job's `if:`.
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      build: ${{ steps.filter.outputs.build }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            backend:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'db/migrations/**'
+              - '.github/workflows/ci.yml'
+            frontend:
+              - 'frontend/**'
+              - 'spec/openapi/**'
+              - 'Makefile'
+              - '.github/workflows/ci.yml'
+            build:
+              - '**/*.go'
+              - 'go.mod'
+              - 'go.sum'
+              - 'frontend/**'
+              - 'spec/openapi/**'
+              - 'Makefile'
+              - '.github/workflows/ci.yml'
+
   backend:
     name: Backend Tests
+    needs: changes
+    if: needs.changes.outputs.backend == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
 
     # Tests use modernc.org/sqlite, which is embedded in the Go binary — no
@@ -23,6 +61,17 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Cache Go build & test results
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+          key: go-build-${{ runner.os }}-${{ hashFiles('**/*.go', 'go.sum') }}
+          restore-keys: |
+            go-build-${{ runner.os }}-
 
       - name: Ensure frontend/dist exists for go:embed
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
@@ -44,6 +93,8 @@ jobs:
 
   frontend:
     name: Frontend Tests
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
 
     steps:
@@ -74,8 +125,9 @@ jobs:
 
   build:
     name: Build
+    needs: changes
+    if: needs.changes.outputs.build == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
-    # Runs in parallel with backend and frontend so wall time is max(job), not sum.
     env:
       # Vite inlines these at build time; CI only needs deterministic placeholders.
       VITE_SUPABASE_URL: https://ci-placeholder.local
@@ -87,6 +139,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
 
       - uses: actions/setup-node@v6
         with:
@@ -94,25 +148,20 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
-      - name: Ensure frontend/dist exists for go:embed
-        run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
-
       - name: Install build dependencies
         run: make install-build-deps
 
-      - name: Bundle OpenAPI spec and generate frontend API types
-        run: make bundle generate-frontend-from-bundle
-
-      - name: Verify bundled OpenAPI spec is up-to-date
-        run: |
-          if ! git diff --exit-code spec/openapi/openapi.bundle.yaml; then
-            echo "::error::spec/openapi/openapi.bundle.yaml is out of date. Run 'make bundle' and commit the result."
-            exit 1
-          fi
+      # The bundle file is already committed and verified by the Frontend Tests
+      # job; here we only need to regenerate the TypeScript API client because
+      # frontend/src/api/schema.d.ts is not committed and `npm ci --ignore-scripts`
+      # skipped the postinstall that would normally produce it.
+      - name: Generate frontend API client
+        run: make generate-frontend-from-bundle
 
       - name: Build server (frontend + Go)
         run: |
           set -o pipefail
+          mkdir -p frontend/dist && touch frontend/dist/.gitkeep
           if ! make build-ci 2>&1 | tee /tmp/build.log; then
             RC=${PIPESTATUS[0]}
             echo ""

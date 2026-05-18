@@ -1,0 +1,41 @@
+name: CodeQL
+
+# CodeQL runs weekly only (and on demand via workflow_dispatch). It is no longer
+# wired into the PR critical path — the prior Default Setup added ~4 minutes to
+# every PR while the same coverage on `main` snapshots is sufficient.
+#
+# Requires repo Settings → Code security → CodeQL to be switched from
+# "Default" to "Advanced" so this workflow file is honoured.
+on:
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
+
+jobs:
+  analyze:
+    name: Analyze (go)
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
+
+      - name: Ensure frontend/dist exists for go:embed
+        run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
+
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: go
+
+      - uses: github/codeql-action/autobuild@v3
+
+      - uses: github/codeql-action/analyze@v3
