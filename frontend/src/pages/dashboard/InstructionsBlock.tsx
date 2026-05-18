@@ -26,15 +26,35 @@ export function InstructionsBlock({
   }, []);
 
   function handleCopy() {
-    navigator.clipboard.writeText(instructions).then(
-      () => {
-        setCopied(true);
-        toast.success("Instructions copied to clipboard");
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => setCopied(false), 2000);
-      },
-      () => toast.error("Failed to copy to clipboard"),
-    );
+    const onSuccess = () => {
+      setCopied(true);
+      toast.success("Instructions copied to clipboard");
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    };
+
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(instructions).then(onSuccess, () =>
+        toast.error("Failed to copy to clipboard"),
+      );
+      return;
+    }
+
+    // Fallback for non-secure contexts (HTTP), e.g. local network access
+    try {
+      const textarea = document.createElement("textarea");
+      textarea.value = instructions;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.focus();
+      textarea.select();
+      document.execCommand("copy");
+      document.body.removeChild(textarea);
+      onSuccess();
+    } catch {
+      toast.error("Failed to copy to clipboard");
+    }
   }
 
   return (
