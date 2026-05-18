@@ -37,8 +37,8 @@ program
   .description(
     "Agent-facing CLI for Permission Slip — register, verify, and interact with Permission Slip servers.\n\n" +
     "All commands output compact JSON by default. Pass --pretty for pretty-printed JSON.\n\n" +
-    "Server URL: use --server, or set PS_SERVER, or run: permission-slip config set default_server <url> " +
-    "(stored in ~/.permission-slip/config.json).\n\n" +
+    "Server URL (required): use --server, set PS_SERVER, or run: permission-slip config set default_server <url> " +
+    "(stored in ~/.permission-slip/config.json). There is no default host.\n\n" +
     "Quick start:\n" +
     "  1. Register:  permission-slip register --invite-code <code>\n" +
     "  2. Verify:    permission-slip verify --code <confirmation_code>\n" +

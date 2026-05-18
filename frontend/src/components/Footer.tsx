@@ -1,7 +1,5 @@
 import { Link } from "react-router-dom";
 import { cn } from "@/lib/utils";
-import { useCookieConsent } from "./CookieConsentContext";
-import { isSaas } from "@/lib/saas";
 
 interface FooterProps {
   className?: string;
@@ -9,26 +7,14 @@ interface FooterProps {
 
 const linkClass = "hover:text-foreground transition-colors";
 
-/**
- * Shared site footer used across all layouts (app, auth, policy pages).
- * Renders policy links, support mailto, and a "Manage Cookies" button
- * that re-opens the consent banner.
- */
+/** Shared site footer for auth and marketing-style layouts. */
 export function Footer({ className }: FooterProps) {
-  const { reset: resetConsent } = useCookieConsent();
-
   return (
     <footer className={cn("text-xs text-muted-foreground", className)}>
       <div className="flex flex-wrap gap-x-4 gap-y-2">
-        {isSaas && (
-          <>
-            <Link to="/policy/privacy" className={linkClass}>Privacy Policy</Link>
-            <Link to="/policy/terms" className={linkClass}>Terms of Service</Link>
-            <Link to="/policy/cookies" className={linkClass}>Cookie Policy</Link>
-            <Link to="/support" className={linkClass}>Support</Link>
-            <button type="button" onClick={resetConsent} className={linkClass}>Manage Cookies</button>
-          </>
-        )}
+        <Link to="/support" className={linkClass}>
+          Support
+        </Link>
       </div>
     </footer>
   );

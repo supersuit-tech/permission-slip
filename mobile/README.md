@@ -66,21 +66,21 @@ Contributors need their own Expo project to run device builds:
    APP_BUNDLE_ID=com.yourname.permissionslip
    ```
 
-4. If using your own Supabase instance, update the env vars in the `eas.json` build profiles.
+4. Update the env vars in the `eas.json` build profiles for your API host if you bake in `EXPO_PUBLIC_API_BASE_URL`.
 
 `app.config.ts` reads all of these from environment variables — no need to edit the config file directly.
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-|----------|----------|---------|-------------|
-| `EXPO_PUBLIC_SUPABASE_URL` | Yes | — | Supabase project URL (`http://127.0.0.1:54321` for local) |
-| `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Yes | — | Supabase anon/publishable key |
-| `EXPO_PROJECT_ID` | For builds | — | EAS project ID (from `npx eas-cli init`) |
-| `EXPO_OWNER` | For builds | — | Expo account username or org |
-| `APP_BUNDLE_ID` | For builds | — | iOS bundle ID / Android package (must be unique to your account) |
-| `EXPO_PUBLIC_API_BASE_URL` | No | `https://app.permissionslip.dev/api` | Backend API URL |
-| `EXPO_PUBLIC_MOCK_AUTH` | No | `false` | `true` to test UI without a backend (`__DEV__` only) |
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `EXPO_PROJECT_ID` | For builds | EAS project ID (from `npx eas-cli init`) |
+| `EXPO_OWNER` | For builds | Expo account username or org |
+| `APP_BUNDLE_ID` | For builds | iOS bundle ID / Android package (must be unique to your account) |
+| `EXPO_PUBLIC_API_BASE_URL` | No* | Backend API URL (must end in `/api`). Omit to require the in-app server URL prompt on first launch. |
+| `EXPO_PUBLIC_MOCK_AUTH` | No | `true` to test UI without a backend (`__DEV__` only) |
+
+\*When `EXPO_PUBLIC_MOCK_AUTH` is not `true`, users must either set this at build time or complete the first-launch server URL screen.
 
 ## Testing
 
@@ -97,7 +97,7 @@ src/
 ├── auth/          # Authentication context and screens
 ├── components/    # Shared UI components
 ├── hooks/         # Custom React hooks
-├── lib/           # Supabase client, secure storage
+├── lib/           # Secure storage, server URL helpers
 ├── navigation/    # React Navigation setup and deep linking
 ├── screens/       # Screen components (approvals, settings)
 └── theme/         # Colors and design tokens

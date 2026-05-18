@@ -20,7 +20,11 @@ import { usePushSetup } from "./src/hooks/usePushSetup";
 import { useBiometricAuth } from "./src/hooks/useBiometricAuth";
 import { BiometricLockScreen } from "./src/screens/BiometricLockScreen";
 import { colors } from "./src/theme/colors";
-import { loadCustomHostConfig } from "./src/lib/customHostConfig";
+import {
+  hasConfiguredApiBase,
+  loadCustomHostConfig,
+} from "./src/lib/customHostConfig";
+import ServerUrlSetupScreen from "./src/screens/ServerUrlSetupScreen";
 
 const useMockAuth = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
 const ActiveAuthProvider = useMockAuth ? MockAuthProvider : AuthProvider;
@@ -145,6 +149,7 @@ export default function App() {
   // requests after cold start would bypass the custom host and gateway
   // secret, causing surprising 403s against a gateway-locked server.
   const [hostHydrated, setHostHydrated] = useState(false);
+  const [, setServerSetupBump] = useState(0);
   useEffect(() => {
     loadCustomHostConfig().finally(() => setHostHydrated(true));
   }, []);
@@ -166,6 +171,19 @@ export default function App() {
         <View style={styles.loading}>
           <ActivityIndicator size="large" color={colors.gray900} />
         </View>
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    );
+  }
+
+  if (!useMockAuth && !hasConfiguredApiBase()) {
+    return (
+      <SafeAreaProvider>
+        <ServerUrlSetupScreen
+          onComplete={() => {
+            setServerSetupBump((n) => n + 1);
+          }}
+        />
         <StatusBar style="auto" />
       </SafeAreaProvider>
     );

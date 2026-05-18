@@ -4,19 +4,9 @@ ConfigResponse:
     Server-level configuration and feature flags. The frontend should
     fetch this once at startup to determine which UI features to show.
   required:
-    - billing_enabled
     - google_oauth_configured
     - microsoft_oauth_configured
-    - sms_enabled
   properties:
-    billing_enabled:
-      type: boolean
-      description: |
-        Whether billing features (Stripe integration, request metering, plan
-        limits) are active. When `false` (the default), all users have the
-        unlimited `pay_as_you_go` plan and billing UI should be hidden.
-        Controlled by the `BILLING_ENABLED` server environment variable.
-      example: false
     google_oauth_configured:
       type: boolean
       description: |
@@ -33,14 +23,3 @@ ConfigResponse:
         When `false`, the Microsoft connector will not be usable until credentials
         are set via environment variables.
       example: true
-    sms_enabled:
-      type: boolean
-      description: |
-        Whether SMS notifications are configured and available on this server.
-        When `true`, users can enable SMS notifications in their preferences.
-        SMS is enabled when the server has a working AWS SNS sender configured
-        (`AWS_REGION` is set) and the `SMS_NOTIFICATIONS_HIDDEN` env var is not
-        set to `"true"`. Self-hosted deployments that configure SNS will have
-        this set automatically; the hosted platform (app.permissionslip.dev)
-        sets `SMS_NOTIFICATIONS_HIDDEN=true` to hide SMS from users.
-      example: false

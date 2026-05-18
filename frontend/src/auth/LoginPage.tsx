@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "./AuthContext";
 import AuthLayout from "./AuthLayout";
 import { Button } from "@/components/ui/button";
@@ -104,15 +103,6 @@ export default function LoginPage() {
               : "Create account"}
         </Button>
       </form>
-      <p className="mt-6 text-center text-xs text-muted-foreground">
-        <Link to="/policy/privacy" className="underline underline-offset-2">
-          Privacy
-        </Link>
-        {" · "}
-        <Link to="/policy/terms" className="underline underline-offset-2">
-          Terms
-        </Link>
-      </p>
     </AuthLayout>
   );
 }

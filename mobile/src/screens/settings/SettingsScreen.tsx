@@ -7,7 +7,6 @@ import { useCallback, useMemo } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Linking,
   ScrollView,
   StyleSheet,
   Switch,
@@ -51,9 +50,6 @@ function formatCommitTimestamp(iso: string): string {
     year: "numeric",
   });
 }
-
-const PRIVACY_POLICY_URL = "https://app.permissionslip.dev/policy/privacy";
-const TERMS_OF_SERVICE_URL = "https://app.permissionslip.dev/policy/terms";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
 
@@ -279,41 +275,6 @@ export default function SettingsScreen(_props: Props) {
         <CustomServerSettings />
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Legal</Text>
-        <View style={styles.card}>
-          <TouchableOpacity
-            testID="privacy-policy-link"
-            style={styles.linkRow}
-            accessibilityRole="link"
-            accessibilityLabel="Privacy Policy"
-            onPress={() => {
-              Linking.openURL(PRIVACY_POLICY_URL).catch(() => {
-                Alert.alert("Error", "Could not open Privacy Policy.");
-              });
-            }}
-          >
-            <Text style={styles.linkText}>Privacy Policy</Text>
-            <Text style={styles.linkChevron}>›</Text>
-          </TouchableOpacity>
-          <View style={styles.linkSeparator} />
-          <TouchableOpacity
-            testID="terms-link"
-            style={styles.linkRow}
-            accessibilityRole="link"
-            accessibilityLabel="Terms of Service"
-            onPress={() => {
-              Linking.openURL(TERMS_OF_SERVICE_URL).catch(() => {
-                Alert.alert("Error", "Could not open Terms of Service.");
-              });
-            }}
-          >
-            <Text style={styles.linkText}>Terms of Service</Text>
-            <Text style={styles.linkChevron}>›</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <View style={styles.buildInfo}>
         <Text style={styles.buildInfoText} testID="git-commit-hash">
           Build {GIT_COMMIT_HASH.slice(0, 7)}
@@ -447,26 +408,6 @@ const styles = StyleSheet.create({
     color: colors.error,
     fontSize: 15,
     fontWeight: "600",
-  },
-  linkRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  linkSeparator: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: colors.gray200,
-    marginLeft: 16,
-  },
-  linkText: {
-    fontSize: 15,
-    color: colors.gray900,
-  },
-  linkChevron: {
-    fontSize: 18,
-    color: colors.gray400,
   },
   buildInfo: {
     paddingTop: 24,

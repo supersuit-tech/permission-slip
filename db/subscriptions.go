@@ -303,8 +303,8 @@ func UpdateSubscriptionPeriod(ctx context.Context, db DBTX, userID string, perio
 //     hard-coded the "free" plan) get unlimited access.
 //
 // Returns the total number of rows created or updated.
-func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool) (int64, error) {
-	defaultPlan := DefaultPlanID(billingEnabled)
+func EnsureAllUsersSubscribed(ctx context.Context, db DBTX) (int64, error) {
+	defaultPlan := PlanPayAsYouGo
 	var total int64
 
 	// Step 1: Create subscriptions for users without one.
@@ -319,20 +319,15 @@ func EnsureAllUsersSubscribed(ctx context.Context, db DBTX, billingEnabled bool)
 	}
 	total += RowsAffected(tag)
 
-	// Step 2: When billing is disabled, upgrade free-tier subscriptions to the
-	// unlimited plan. This handles users backfilled by the initial migration
-	// (which always assigns "free") before BILLING_ENABLED existed, and
-	// normalizes comped free_pro rows to pay_as_you_go for a single unlimited plan id.
-	if !billingEnabled {
-		tag, err = db.Exec(ctx,
-			`UPDATE subscriptions SET plan_id = $1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-			 WHERE plan_id IN ('free', 'free_pro')`,
-			PlanPayAsYouGo)
-		if err != nil {
-			return total, err
-		}
-		total += RowsAffected(tag)
+	// Upgrade legacy free-tier subscriptions to the unlimited plan.
+	tag, err = db.Exec(ctx,
+		`UPDATE subscriptions SET plan_id = $1, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		 WHERE plan_id IN ('free', 'free_pro')`,
+		PlanPayAsYouGo)
+	if err != nil {
+		return total, err
 	}
+	total += RowsAffected(tag)
 
 	return total, nil
 }

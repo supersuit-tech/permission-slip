@@ -48,15 +48,6 @@ const (
 	ErrAgentLimitReached            ErrorCode = "agent_limit_reached"
 	ErrStandingApprovalLimitReached ErrorCode = "standing_approval_limit_reached"
 	ErrCredentialLimitReached       ErrorCode = "credential_limit_reached"
-	ErrSubscriptionNotFound         ErrorCode = "subscription_not_found"
-	ErrAlreadySubscribed            ErrorCode = "already_subscribed"
-	ErrInvalidCoupon                ErrorCode = "invalid_coupon"
-	ErrPlanChangeNotAllowed         ErrorCode = "plan_change_not_allowed"
-	ErrAlreadyDowngraded            ErrorCode = "already_downgraded"
-	ErrDowngradeLimitExceeded       ErrorCode = "downgrade_limit_exceeded"
-	ErrBillingNotEnabled            ErrorCode = "billing_not_enabled"
-	ErrSMSRequiresPaidPlan          ErrorCode = "sms_requires_paid_plan"
-	ErrChannelNotConfigured         ErrorCode = "channel_not_configured"
 	// OAuth
 	ErrOAuthProviderNotFound     ErrorCode = "oauth_provider_not_found"
 	ErrOAuthProviderUnconfigured ErrorCode = "oauth_provider_unconfigured"
@@ -82,4 +73,7 @@ const (
 	ErrConnectorInstanceRequired  ErrorCode = "connector_instance_required"
 	ErrConnectorInstanceNotFound  ErrorCode = "connector_instance_not_found"
 	ErrConnectorInstanceAmbiguous ErrorCode = "connector_instance_ambiguous"
+
+	// Notification channels (e.g. web push when not enabled for this deployment)
+	ErrChannelNotConfigured ErrorCode = "channel_not_configured"
 )

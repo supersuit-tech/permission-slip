@@ -8,6 +8,7 @@ package api
 // approval executions (both agent and dashboard paths).
 
 import (
+	"crypto/ed25519"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -18,6 +19,36 @@ import (
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
+
+// meteringTestFixture is used by quota integration tests that POST /approvals/request
+// with an agent-signed body (same shape as former metering_test helpers).
+type meteringTestFixture struct {
+	DB      db.DBTX
+	UserID  string
+	AgentID int64
+	PrivKey ed25519.PrivateKey
+	Router  http.Handler
+}
+
+func setupMeteringTest(t *testing.T) meteringTestFixture {
+	t.Helper()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+	deps := testDepsForDB(t, tx)
+	return meteringTestFixture{
+		DB:      tx,
+		UserID:  uid,
+		AgentID: agentID,
+		PrivKey: privKey,
+		Router:  NewRouter(deps),
+	}
+}
 
 // ── checkRequestQuota unit tests ────────────────────────────────────────────
 

@@ -15,14 +15,14 @@ describe("UpgradePrompt", () => {
     ).toBeInTheDocument();
   });
 
-  it("renders upgrade link to billing page", () => {
+  it("links to account settings", () => {
     render(
       <MemoryRouter>
         <UpgradePrompt feature="Upgrade to add more agents." />
       </MemoryRouter>,
     );
-    const link = screen.getByRole("link", { name: /Upgrade/ });
-    expect(link).toHaveAttribute("href", "/billing");
+    const link = screen.getByRole("link", { name: /Account settings/i });
+    expect(link).toHaveAttribute("href", "/settings/account");
   });
 
   it("has alert role for screen reader announcement", () => {

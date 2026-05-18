@@ -7,13 +7,9 @@ import { identifyUser, resetPostHogIdentity } from "./lib/posthog";
 import LoginPage from "./auth/LoginPage";
 import OnboardingPage from "./auth/OnboardingPage";
 import { AppLayout } from "./components/AppLayout";
-import { PrivacyPolicyPage } from "./pages/policy/PrivacyPolicyPage";
-import { TermsOfServicePage } from "./pages/policy/TermsOfServicePage";
-import { CookiePolicyPage } from "./pages/policy/CookiePolicyPage";
 import { SupportPage } from "./pages/support/SupportPage";
 import { useProfile } from "./hooks/useProfile";
 import { appRoutes } from "./routes";
-import { isSaas } from "./lib/saas";
 
 const SentryRoutes = Sentry.withSentryReactRouterV7Routing(Routes);
 
@@ -36,7 +32,7 @@ function LoadingFallback() {
  * Root routing component. Renders a single page based on the user's
  * authentication and onboarding state, evaluated in this order:
  *
- *  0. /policy/*        → Public policy pages (no auth required)
+ *  0. /support         → Public support page (no auth required)
  *  1. loading          → LoadingFallback (auth session resolving)
  *  2. unauthenticated  → LoginPage
  *  3. profile loading  → LoadingFallback (fetching profile after auth)
@@ -59,18 +55,18 @@ function App() {
     }
   }, [authStatus, user]);
 
-  // Policy and support pages are public — render without auth.
-  // These are SaaS-only: self-hosted deployments have their own legal pages.
-  if (isSaas && (pathname.startsWith("/policy/") || pathname === "/support")) {
+  // Support page is public — render without auth.
+  if (pathname === "/support") {
     return (
       <SentryRoutes>
-        <Route path="/policy/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/policy/terms" element={<TermsOfServicePage />} />
-        <Route path="/policy/cookies" element={<CookiePolicyPage />} />
         <Route path="/support" element={<SupportPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </SentryRoutes>
     );
+  }
+
+  if (pathname.startsWith("/policy/")) {
+    return <Navigate to="/" replace />;
   }
 
   if (authStatus === "loading") {

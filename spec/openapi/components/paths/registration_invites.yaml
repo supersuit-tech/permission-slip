@@ -33,7 +33,7 @@ createRegistrationInvite:
             example:
               id: "ri_abc123def456"
               invite_code: "PS-ABCD-1234"
-              invite_url: "https://app.permissionslip.dev/invite/PS-ABCD-1234"
+              invite_url: "http://localhost:8080/invite/PS-ABCD-1234"
               status: "active"
               expires_at: "2026-02-19T12:15:00Z"
               created_at: "2026-02-19T12:00:00Z"

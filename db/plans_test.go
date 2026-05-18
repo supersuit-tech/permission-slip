@@ -91,10 +91,7 @@ func TestGetPlan_FreePro(t *testing.T) {
 
 func TestDefaultPlanID(t *testing.T) {
 	t.Parallel()
-	if got := db.DefaultPlanID(false); got != db.PlanPayAsYouGo {
-		t.Errorf("DefaultPlanID(false) = %q, want %q", got, db.PlanPayAsYouGo)
-	}
-	if got := db.DefaultPlanID(true); got != db.PlanFree {
-		t.Errorf("DefaultPlanID(true) = %q, want %q", got, db.PlanFree)
+	if got := db.DefaultPlanID(); got != db.PlanPayAsYouGo {
+		t.Errorf("DefaultPlanID() = %q, want %q", got, db.PlanPayAsYouGo)
 	}
 }

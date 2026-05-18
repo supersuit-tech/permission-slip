@@ -26,7 +26,6 @@ spec/openapi/
     │   ├── agents.yaml          # Agent management schemas
     │   ├── agent_connectors.yaml # Agent-connector relationship schemas
     │   ├── audit_events.yaml    # Audit event and log schemas
-    │   ├── billing.yaml         # Billing, plan, subscription, usage, invoice schemas
     │   ├── capabilities.yaml    # Agent capability discovery schemas
     │   ├── config.yaml          # Server configuration schemas
     │   ├── connectors.yaml      # Connector/integration schemas
@@ -46,7 +45,6 @@ spec/openapi/
     │   ├── agent_connectors.yaml # Agent-connector management
     │   ├── approvals.yaml       # Approval lifecycle endpoints
     │   ├── audit_events.yaml    # Audit event listing and export
-    │   ├── billing.yaml         # Billing plan, usage, upgrade, downgrade, invoices
     │   ├── capabilities.yaml    # GET /v1/agents/{id}/capabilities
     │   ├── config.yaml          # Server configuration
     │   ├── connectors.yaml      # GET /v1/connectors, GET /v1/connectors/{id}
@@ -78,7 +76,6 @@ spec/openapi/
 | **Capabilities** | `GET /v1/agents/{id}/capabilities` | Signature | Agent capability discovery |
 | **Standing Approvals** | `GET/POST /v1/standing-approvals`, `POST .../revoke`, `POST .../execute` | Session/Signature | Pre-authorized agent actions |
 | **Audit Events** | `GET /v1/audit-events`, `GET /v1/audit-logs` | Session | Activity feed and audit trail |
-| **Billing** | `GET /v1/billing/plan`, `GET .../usage`, `POST .../upgrade`, `POST .../downgrade`, `GET .../invoices` | Session | Subscription, usage, and invoices |
 | **Profiles** | `GET/PUT /v1/profile`, `GET/PUT .../notification-preferences` | Session | User profile management |
 | **Config** | `GET /v1/config` | Session | Server configuration and feature flags |
 

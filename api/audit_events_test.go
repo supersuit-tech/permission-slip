@@ -187,7 +187,9 @@ func TestListAuditEvents_Pagination(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	// Use recent timestamps so rows stay inside the default 7-day retention window
+	// regardless of when CI runs (fixed historical dates eventually fall outside).
+	base := time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Millisecond)
 	for i := 0; i < 5; i++ {
 		ts := base.Add(time.Duration(i) * time.Minute)
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), ts)
@@ -455,17 +457,17 @@ func TestExportAuditLogs_FiltersBySince(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	// Insert events at different times.
-	old := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
-	recent := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	// Insert events at different times (recent, so default retention keeps both rows).
+	old := time.Now().UTC().Add(-72 * time.Hour).Truncate(time.Millisecond)
+	recent := time.Now().UTC().Add(-1 * time.Hour).Truncate(time.Millisecond)
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), old)
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"), recent)
 
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	// since=2026-02-01 should only return the recent event.
-	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-02-01T00:00:00Z", uid)
+	since := time.Now().UTC().Add(-48 * time.Hour).Format(time.RFC3339Nano)
+	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since="+since, uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -488,7 +490,7 @@ func TestExportAuditLogs_ChronologicalOrder(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	base := time.Now().UTC().Add(-15 * time.Minute).Truncate(time.Millisecond)
 	for i := 0; i < 3; i++ {
 		ts := base.Add(time.Duration(i) * time.Minute)
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), ts)
@@ -497,7 +499,8 @@ func TestExportAuditLogs_ChronologicalOrder(t *testing.T) {
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-01-01T00:00:00Z", uid)
+	since := time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339Nano)
+	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since="+since, uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -527,7 +530,7 @@ func TestExportAuditLogs_Pagination(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	base := time.Date(2026, 3, 1, 12, 0, 0, 0, time.UTC)
+	base := time.Now().UTC().Add(-30 * time.Minute).Truncate(time.Millisecond)
 	for i := 0; i < 5; i++ {
 		ts := base.Add(time.Duration(i) * time.Minute)
 		testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), ts)
@@ -536,8 +539,9 @@ func TestExportAuditLogs_Pagination(t *testing.T) {
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
+	since := time.Now().UTC().Add(-24 * time.Hour).Format(time.RFC3339Nano)
 	// Page 1
-	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-01-01T00:00:00Z&limit=2", uid)
+	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since="+since+"&limit=2", uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -557,7 +561,7 @@ func TestExportAuditLogs_Pagination(t *testing.T) {
 	}
 
 	// Page 2
-	r = authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-01-01T00:00:00Z&limit=2&after="+*page1.NextCursor, uid)
+	r = authenticatedRequest(t, http.MethodGet, "/audit-logs?since="+since+"&limit=2&after="+*page1.NextCursor, uid)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -574,7 +578,7 @@ func TestExportAuditLogs_Pagination(t *testing.T) {
 	}
 
 	// Page 3 (last page)
-	r = authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-01-01T00:00:00Z&limit=2&after="+*page2.NextCursor, uid)
+	r = authenticatedRequest(t, http.MethodGet, "/audit-logs?since="+since+"&limit=2&after="+*page2.NextCursor, uid)
 	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -701,9 +705,10 @@ func TestExportAuditLogs_UntilFilter(t *testing.T) {
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 
-	jan := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
-	feb := time.Date(2026, 2, 15, 12, 0, 0, 0, time.UTC)
-	mar := time.Date(2026, 3, 15, 12, 0, 0, 0, time.UTC)
+	now := time.Now().UTC()
+	jan := now.Add(-120 * time.Hour).Truncate(time.Millisecond)
+	feb := now.Add(-48 * time.Hour).Truncate(time.Millisecond)
+	mar := now.Add(-12 * time.Hour).Truncate(time.Millisecond)
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.approved", "approved", testhelper.GenerateID(t, "appr_"), jan)
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.denied", "denied", testhelper.GenerateID(t, "appr_"), feb)
 	testhelper.InsertAuditEventAt(t, tx, uid, agentID, "approval.cancelled", "cancelled", testhelper.GenerateID(t, "appr_"), mar)
@@ -711,8 +716,10 @@ func TestExportAuditLogs_UntilFilter(t *testing.T) {
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	// since=jan, until=mar should return jan and feb events
-	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since=2026-01-01T00:00:00Z&until=2026-03-01T00:00:00Z", uid)
+	since := now.Add(-200 * time.Hour).Format(time.RFC3339Nano)
+	until := now.Add(-24 * time.Hour).Format(time.RFC3339Nano)
+	// since << until should return the two older events (both strictly before `until`).
+	r := authenticatedRequest(t, http.MethodGet, "/audit-logs?since="+since+"&until="+until, uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 

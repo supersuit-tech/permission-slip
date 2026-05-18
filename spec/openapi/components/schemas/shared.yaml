@@ -258,11 +258,11 @@ AlternativeUrls:
       description: |
         Web-only URL that opens in browser. Useful for separating web authentication flow 
         from mobile app flow, or for services with multiple web domains.
-      example: "https://accounts.permissionslip.dev/permission-slip/approve?token=eyJ..."
+      example: "https://example.com/permission-slip/approve?token=eyJ..."
   
   example:
     deeplink: "permissionslip://permission-slip/approve?token=eyJ..."
-    web: "https://accounts.permissionslip.dev/permission-slip/approve?token=eyJ..."
+    web: "https://example.com/permission-slip/approve?token=eyJ..."
 
 # Shared execution result fields used by ApproveApprovalResponse,
 # ApprovalStatusResponse, and ApprovalSummary.

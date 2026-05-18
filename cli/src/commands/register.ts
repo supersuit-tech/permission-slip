@@ -15,7 +15,7 @@ import { generateKeyPair, keyPairExists, displayPath } from "../auth/keys.js";
 import { ApiClient } from "../api/client.js";
 import { REGISTRATION_AGENT_ID } from "../auth/signing.js";
 import { saveRegistration } from "../config/store.js";
-import { resolveServerUrl, isBuiltInDefaultServerUrl } from "../config/serverUrl.js";
+import { requireServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
 
@@ -26,7 +26,7 @@ export function registerCommand(program: Command): void {
     .requiredOption("--invite-code <code>", "Invite code from the dashboard")
     .option(
       "--server <url>",
-      "Permission Slip server URL (overrides PS_SERVER and config default_server)",
+      "Permission Slip server URL — required unless PS_SERVER or config default_server is set",
     )
     .option("--name <name>", "Agent name shown in the dashboard", "Agent")
     .option("--version <version>", "Agent version metadata", "1.0.0")
@@ -40,7 +40,7 @@ export function registerCommand(program: Command): void {
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
-        const { url: server } = resolveServerUrl({ serverFlag: opts.server });
+        const { url: server } = requireServerUrl({ serverFlag: opts.server });
         // Key generation
         const hadKey = keyPairExists();
         const kp = generateKeyPair(false);
@@ -82,10 +82,7 @@ export function registerCommand(program: Command): void {
             verification_required: result.verification_required,
             key_file: displayPath(kp.privateKeyFile),
             next_step:
-              `Run: permission-slip verify --code <confirmation_code>` +
-              (!isBuiltInDefaultServerUrl(server)
-                ? ` --server ${shellQuote(server)}`
-                : ""),
+              `Run: permission-slip verify --code <confirmation_code> --server ${shellQuote(server)}`,
           },
           outputOpts,
         );

@@ -5,7 +5,6 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setupAuthMocks } from "../../../auth/__tests__/fixtures";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
 import { AuthProvider } from "../../../auth/AuthContext";
-import { CookieConsentProvider } from "../../../components/CookieConsentContext";
 import { ThemeProvider } from "../../../components/ThemeContext";
 import { SettingsLayout } from "../SettingsLayout";
 
@@ -30,8 +29,8 @@ function mockApiFetch() {
       return Promise.resolve({
         data: {
           preferences: [
-            { channel: "email", enabled: true },
-            { channel: "sms", enabled: false },
+            { channel: "email", enabled: true, available: true },
+            { channel: "mobile-push", enabled: false, available: true },
           ],
         },
       });
@@ -70,13 +69,11 @@ function renderSettingsAt(path: string) {
     <MemoryRouter initialEntries={[path]}>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <CookieConsentProvider>
             <AuthProvider>
               <Routes>
                 <Route path="/settings/*" element={<SettingsLayout />} />
               </Routes>
             </AuthProvider>
-          </CookieConsentProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </MemoryRouter>,
@@ -99,7 +96,6 @@ describe("SettingsLayout", () => {
     // Each nav item renders twice (desktop sidebar + mobile tabs)
     expect(screen.getAllByRole("link", { name: /Profile/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /Security/ }).length).toBeGreaterThanOrEqual(1);
-    expect(screen.getAllByRole("link", { name: /Billing/ }).length).toBeGreaterThanOrEqual(1);
     expect(screen.getAllByRole("link", { name: /Account/ }).length).toBeGreaterThanOrEqual(1);
   });
 

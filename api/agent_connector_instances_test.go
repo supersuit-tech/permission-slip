@@ -61,7 +61,7 @@ func TestCreateAgentConnectorInstance_Second(t *testing.T) {
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))
+	r := authenticatedJSONRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, `{}`)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -94,7 +94,7 @@ func TestPatchAgentConnectorInstance_SetDefault(t *testing.T) {
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))
+	r1 := authenticatedJSONRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, `{}`)
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, r1)
 	if w1.Code != http.StatusCreated {
@@ -109,8 +109,8 @@ func TestPatchAgentConnectorInstance_SetDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r2 := authenticatedRequestWithBody(t, http.MethodPatch,
-		fmt.Sprintf("/agents/%d/connectors/%s/instances/%s", agentID, connID, created.ConnectorInstanceID), uid, patchPayload)
+	r2 := authenticatedJSONRequest(t, http.MethodPatch,
+		fmt.Sprintf("/agents/%d/connectors/%s/instances/%s", agentID, connID, created.ConnectorInstanceID), uid, string(patchPayload))
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {
@@ -150,8 +150,8 @@ func TestPatchAgentConnectorInstance_RequiresIsDefault(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	r2 := authenticatedRequestWithBody(t, http.MethodPatch,
-		fmt.Sprintf("/agents/%d/connectors/%s/instances/%s", agentID, connID, list.Data[0].ConnectorInstanceID), uid, patchPayload)
+	r2 := authenticatedJSONRequest(t, http.MethodPatch,
+		fmt.Sprintf("/agents/%d/connectors/%s/instances/%s", agentID, connID, list.Data[0].ConnectorInstanceID), uid, string(patchPayload))
 	w2 := httptest.NewRecorder()
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusBadRequest {
@@ -194,7 +194,7 @@ func TestDeleteAgentConnectorInstance_SecondInstance204(t *testing.T) {
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r1 := authenticatedRequestWithBody(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, []byte(`{}`))
+	r1 := authenticatedJSONRequest(t, http.MethodPost, fmt.Sprintf("/agents/%d/connectors/%s/instances", agentID, connID), uid, `{}`)
 	w1 := httptest.NewRecorder()
 	router.ServeHTTP(w1, r1)
 	if w1.Code != http.StatusCreated {

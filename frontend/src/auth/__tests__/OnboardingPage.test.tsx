@@ -29,7 +29,7 @@ describe("OnboardingPage", () => {
     await waitFor(() => {
       expect(screen.getAllByRole("checkbox")).toHaveLength(2);
     });
-    expect(screen.getByText(/I agree to the/)).toBeInTheDocument();
+    expect(screen.getByText(/I confirm I am authorized/)).toBeInTheDocument();
   });
 
   it("renders the marketing opt-in checkbox", async () => {
@@ -51,7 +51,7 @@ describe("OnboardingPage", () => {
     await userEvent.type(screen.getByLabelText("Username"), "alice");
     expect(continueButton).toBeDisabled();
 
-    await userEvent.click(screen.getByLabelText(/I agree to the/));
+    await userEvent.click(screen.getByLabelText(/I confirm I am authorized/));
     expect(continueButton).toBeEnabled();
   });
 
@@ -82,7 +82,7 @@ describe("OnboardingPage", () => {
       expect(screen.getByLabelText("Username")).toBeInTheDocument();
     });
     await userEvent.type(screen.getByLabelText("Username"), "alice");
-    await userEvent.click(screen.getByLabelText(/I agree to the/));
+    await userEvent.click(screen.getByLabelText(/I confirm I am authorized/));
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {
@@ -106,7 +106,7 @@ describe("OnboardingPage", () => {
       expect(screen.getByLabelText("Username")).toBeInTheDocument();
     });
     await userEvent.type(screen.getByLabelText("Username"), "bob");
-    await userEvent.click(screen.getByLabelText(/I agree to the/));
+    await userEvent.click(screen.getByLabelText(/I confirm I am authorized/));
     await userEvent.click(screen.getByLabelText(/Keep me in the loop/));
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
@@ -131,7 +131,7 @@ describe("OnboardingPage", () => {
       expect(screen.getByLabelText("Username")).toBeInTheDocument();
     });
     await userEvent.type(screen.getByLabelText("Username"), "taken");
-    await userEvent.click(screen.getByLabelText(/I agree to the/));
+    await userEvent.click(screen.getByLabelText(/I confirm I am authorized/));
     await userEvent.click(screen.getByRole("button", { name: "Continue" }));
 
     await waitFor(() => {

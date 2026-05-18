@@ -7,7 +7,7 @@
 
 import type { Command } from "commander";
 import { ApiClient } from "../api/client.js";
-import { resolveServerUrl } from "../config/serverUrl.js";
+import { requireServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
 
 export function connectorsCommand(program: Command): void {
@@ -16,7 +16,7 @@ export function connectorsCommand(program: Command): void {
     .description("List available connectors (public — no registration required)")
     .option(
       "--server <url>",
-      "Permission Slip server URL (overrides PS_SERVER and config default_server)",
+      "Permission Slip server URL — required unless PS_SERVER or config default_server is set",
     )
     .option("--id <connector_id>", "Get details for a specific connector")
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
@@ -27,7 +27,7 @@ export function connectorsCommand(program: Command): void {
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
-        const { url: server } = resolveServerUrl({ serverFlag: opts.server });
+        const { url: server } = requireServerUrl({ serverFlag: opts.server });
         const client = new ApiClient({
           serverUrl: server,
           agentId: 0, // unused for public endpoints

@@ -1,5 +1,4 @@
 import { useState, type FormEvent } from "react";
-import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "./AuthContext";
 import AuthLayout from "./AuthLayout";
@@ -82,24 +81,8 @@ export default function OnboardingPage() {
               htmlFor="agree-tos"
               className="text-sm font-normal leading-snug"
             >
-              I agree to the Terms of Service and Privacy Policy
+              I confirm I am authorized to use this Permission Slip instance.
             </Label>
-            <div className="flex gap-3 text-sm">
-              <Link
-                to="/policy/terms"
-                target="_blank"
-                className="text-primary underline underline-offset-2 hover:text-primary/80"
-              >
-                Terms of Service
-              </Link>
-              <Link
-                to="/policy/privacy"
-                target="_blank"
-                className="text-primary underline underline-offset-2 hover:text-primary/80"
-              >
-                Privacy Policy
-              </Link>
-            </div>
           </div>
         </div>
         <div className="flex items-start gap-2">

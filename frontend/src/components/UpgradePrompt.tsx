@@ -7,8 +7,7 @@ interface UpgradePromptProps {
 }
 
 /**
- * Inline upgrade CTA shown when a user hits a plan limit.
- * Links to the billing page where the user can upgrade.
+ * Inline notice when a user hits a plan limit (legacy UI path; self-hosted is unlimited).
  *
  * @example
  * <UpgradePrompt feature="Upgrade to add more agents." />
@@ -20,10 +19,10 @@ export function UpgradePrompt({ feature }: UpgradePromptProps) {
       <p className="text-sm text-amber-800 dark:text-amber-200">
         {feature}{" "}
         <Link
-          to="/billing"
+          to="/settings/account"
           className="inline-flex items-center gap-0.5 font-medium underline"
         >
-          Upgrade
+          Account settings
           <ArrowUpRight className="size-3.5" />
         </Link>
       </p>

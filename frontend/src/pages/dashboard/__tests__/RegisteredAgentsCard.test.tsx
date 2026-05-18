@@ -30,44 +30,9 @@ const mockAgentsResponse = {
 
 const emptyResponse = { data: [], has_more: false };
 
-const freePlanLimits = {
-  max_requests_per_month: 1000 as number | null,
-  max_agents: 3 as number | null,
-  max_standing_approvals: 5 as number | null,
-  max_credentials: 5 as number | null,
-  audit_retention_days: 7,
-};
-
-const freePlanResponse = {
-  plan: {
-    id: "free",
-    name: "Free",
-    ...freePlanLimits,
-  },
-  effective_limits: freePlanLimits,
-  subscription: {
-    status: "active",
-    can_upgrade: true,
-    can_downgrade: false,
-    can_end_quota_grace_now: false,
-  },
-  usage: { requests: 10, agents: 2, standing_approvals: 1, credentials: 0 },
-};
-
-const paidEffectiveLimits = {
-  max_requests_per_month: null as number | null,
-  max_agents: null as number | null,
-  max_standing_approvals: null as number | null,
-  max_credentials: null as number | null,
-  audit_retention_days: 90,
-};
-
-function mockAgentsFetch(response = mockAgentsResponse, billingPlan = freePlanResponse) {
+function mockAgentsFetch(response = mockAgentsResponse) {
   setupAuthMocks({ authenticated: true });
-  mockGet.mockImplementation((url: string) => {
-    if (url === "/v1/billing/plan") {
-      return Promise.resolve({ data: billingPlan });
-    }
+  mockGet.mockImplementation(() => {
     return Promise.resolve({ data: response });
   });
 }
@@ -394,54 +359,13 @@ describe("RegisteredAgentsCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows limit badge with plan info", async () => {
+  it("shows agent count badge without plan fraction", async () => {
     mockAgentsFetch();
 
     render(<RegisteredAgentsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("2 / 3 agents")).toBeInTheDocument();
-    });
-  });
-
-  it("shows upgrade prompt when at agent limit", async () => {
-    const atLimitPlan = {
-      ...freePlanResponse,
-      usage: { ...freePlanResponse.usage, agents: 3 },
-    };
-    mockAgentsFetch(mockAgentsResponse, atLimitPlan);
-
-    render(<RegisteredAgentsCard />, { wrapper });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Upgrade to connect more Openclaw instances/),
-      ).toBeInTheDocument();
-    });
-    // "Add an Openclaw machine" button should not be present when at limit
-    expect(
-      screen.queryByRole("button", { name: "Add an Openclaw machine" }),
-    ).not.toBeInTheDocument();
-  });
-
-  it("shows no limit badge for paid plan", async () => {
-    const paidPlan = {
-      plan: { ...freePlanResponse.plan, id: "pay_as_you_go", max_agents: null },
-      effective_limits: paidEffectiveLimits,
-      subscription: {
-        status: "active",
-        can_upgrade: false,
-        can_downgrade: true,
-        can_end_quota_grace_now: false,
-      },
-      usage: { requests: 10, agents: 5, standing_approvals: 1, credentials: 0 },
-    };
-    mockAgentsFetch(mockAgentsResponse, paidPlan);
-
-    render(<RegisteredAgentsCard />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText("5 agents")).toBeInTheDocument();
+      expect(screen.getByText("2 agents")).toBeInTheDocument();
     });
   });
 

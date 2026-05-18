@@ -4,6 +4,13 @@ const CUSTOM_HOST_KEY = "custom_host_url";
 const GATEWAY_SECRET_KEY = "gateway_secret";
 
 /**
+ * Placeholder base URL for openapi-fetch when neither EXPO_PUBLIC_API_BASE_URL
+ * nor a saved custom host exists yet. {@link customHostMiddleware} rewrites this
+ * prefix to the configured self-hosted API base after the user saves a URL.
+ */
+export const PLACEHOLDER_API_BASE = "https://__permission_slip_no_host__.invalid/api";
+
+/**
  * In-memory cache so middleware reads are synchronous and fast.
  * Call loadCustomHostConfig() at app startup to hydrate from SecureStore.
  */
@@ -24,7 +31,7 @@ export async function loadCustomHostConfig(): Promise<void> {
   cachedSecret = (await SecureStore.getItemAsync(GATEWAY_SECRET_KEY)) ?? null;
 }
 
-/** Returns the custom host URL, or null if using the default. */
+/** Returns the custom host URL, or null if not configured. */
 export function getCustomHost(): string | null {
   return cachedHost;
 }
@@ -37,6 +44,18 @@ export function getGatewaySecret(): string | null {
 /** Returns true when a custom host is configured and non-empty. */
 export function isCustomHostEnabled(): boolean {
   return cachedHost != null && cachedHost.length > 0;
+}
+
+/**
+ * True when the app has an explicit API base: build-time env or a saved
+ * custom host. Mock-auth dev mode does not need a real host.
+ */
+export function hasConfiguredApiBase(): boolean {
+  const env = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (env && env.length > 0) {
+    return true;
+  }
+  return isCustomHostEnabled();
 }
 
 /**
@@ -64,8 +83,8 @@ export async function setCustomHostConfig(
 }
 
 /**
- * Clear all custom host configuration. Restores the app to using the
- * default production host.
+ * Clear all custom host configuration. The app will require EXPO_PUBLIC_API_BASE_URL
+ * or a newly saved server URL (see first-launch server setup) before API calls work.
  */
 export async function clearCustomHostConfig(): Promise<void> {
   await SecureStore.deleteItemAsync(CUSTOM_HOST_KEY);

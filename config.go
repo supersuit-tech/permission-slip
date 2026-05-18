@@ -110,53 +110,6 @@ func validateConfig() (errs []configError, warnings []configError) {
 		}
 	}
 
-	// Stripe — required when BILLING_ENABLED=true and in production.
-	// If billing is enabled but keys are missing, warn (dev) or error (prod).
-	// In dev, just set STRIPE_SECRET_KEY etc. to your test-mode keys (sk_test_...).
-	billingEnabled := os.Getenv("BILLING_ENABLED") == "true"
-	if billingEnabled {
-		hasStripeKey := os.Getenv("STRIPE_SECRET_KEY") != ""
-		hasWebhookSecret := os.Getenv("STRIPE_WEBHOOK_SECRET") != ""
-		hasPriceID := os.Getenv("STRIPE_PRICE_ID_REQUEST") != ""
-
-		if !devMode {
-			if !hasStripeKey {
-				errs = append(errs, configError{
-					envVar:  "STRIPE_SECRET_KEY",
-					message: "required when BILLING_ENABLED=true (Stripe API key for billing)",
-				})
-			}
-			if !hasWebhookSecret {
-				errs = append(errs, configError{
-					envVar:  "STRIPE_WEBHOOK_SECRET",
-					message: "required when BILLING_ENABLED=true (webhook signature verification prevents spoofed events)",
-				})
-			}
-			if !hasPriceID {
-				warnings = append(warnings, configError{
-					envVar:  "STRIPE_PRICE_ID_REQUEST",
-					message: "not set; checkout session creation will fail without a metered price ID",
-				})
-			}
-			if os.Getenv("BASE_URL") == "" {
-				errs = append(errs, configError{
-					envVar:  "BASE_URL",
-					message: "required when BILLING_ENABLED=true (checkout session success/cancel redirect URLs need a base URL)",
-				})
-			}
-		}
-
-		couponSecret := strings.TrimSpace(os.Getenv("COUPON_SECRET"))
-		if couponSecret != "" && len(couponSecret) < 16 {
-			msg := "when set, must be at least 16 characters (HMAC key for complimentary-pro coupons)"
-			if devMode {
-				warnings = append(warnings, configError{envVar: "COUPON_SECRET", message: msg})
-			} else {
-				errs = append(errs, configError{envVar: "COUPON_SECRET", message: msg})
-			}
-		}
-	}
-
 	// OAuth — warn when built-in provider client credentials are not set.
 	// These are non-fatal but the corresponding connectors won't be usable
 	// without them.
@@ -281,28 +234,6 @@ func validateConfig() (errs []configError, warnings []configError) {
 				message: "not set; required for sending email notifications",
 			})
 		}
-	}
-
-	// SMS (Amazon SNS) — AWS_REGION is required; credentials are optional
-	// (the AWS SDK falls back to IAM roles, shared config, etc.).
-	hasAWSRegion := os.Getenv("AWS_REGION") != ""
-	hasAWSKeyID := os.Getenv("AWS_ACCESS_KEY_ID") != ""
-	hasAWSSecret := os.Getenv("AWS_SECRET_ACCESS_KEY") != ""
-	if !hasAWSRegion && (hasAWSKeyID || hasAWSSecret) {
-		warnings = append(warnings, configError{
-			envVar:  "AWS_REGION",
-			message: "not set; AWS credentials are configured but AWS_REGION is required for SMS (SNS)",
-		})
-	}
-	if hasAWSRegion && (hasAWSKeyID != hasAWSSecret) {
-		missing := "AWS_SECRET_ACCESS_KEY"
-		if !hasAWSKeyID {
-			missing = "AWS_ACCESS_KEY_ID"
-		}
-		warnings = append(warnings, configError{
-			envVar:  missing,
-			message: "not set; AWS credentials are partially configured — set both AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY, or neither (to use IAM roles)",
-		})
 	}
 
 	return errs, warnings

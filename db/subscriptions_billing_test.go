@@ -8,7 +8,7 @@ import (
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
-func TestEnsureAllUsersSubscribed_BillingDisabled(t *testing.T) {
+func TestEnsureAllUsersSubscribed_AssignsPayAsYouGo(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	ctx := context.Background()
@@ -19,8 +19,8 @@ func TestEnsureAllUsersSubscribed_BillingDisabled(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid1, "u_"+uid1[:8])
 	testhelper.InsertUser(t, tx, uid2, "u_"+uid2[:8])
 
-	// Billing disabled → users should get pay_as_you_go.
-	count, err := db.EnsureAllUsersSubscribed(ctx, tx, false)
+	// New users without subscriptions get pay_as_you_go.
+	count, err := db.EnsureAllUsersSubscribed(ctx, tx)
 	if err != nil {
 		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
 	}
@@ -43,35 +43,6 @@ func TestEnsureAllUsersSubscribed_BillingDisabled(t *testing.T) {
 	}
 }
 
-func TestEnsureAllUsersSubscribed_BillingEnabled(t *testing.T) {
-	t.Parallel()
-	tx := testhelper.SetupTestDB(t)
-	ctx := context.Background()
-
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-
-	// Billing enabled → user should get free plan.
-	count, err := db.EnsureAllUsersSubscribed(ctx, tx, true)
-	if err != nil {
-		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
-	}
-	if count < 1 {
-		t.Errorf("expected at least 1 affected, got %d", count)
-	}
-
-	sub, err := db.GetSubscriptionByUserID(ctx, tx, uid)
-	if err != nil {
-		t.Fatalf("GetSubscriptionByUserID: %v", err)
-	}
-	if sub == nil {
-		t.Fatal("expected subscription, got nil")
-	}
-	if sub.PlanID != db.PlanFree {
-		t.Errorf("expected plan_id=%s, got %s", db.PlanFree, sub.PlanID)
-	}
-}
-
 func TestEnsureAllUsersSubscribed_UpgradesFreeWhenBillingDisabled(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
@@ -82,8 +53,8 @@ func TestEnsureAllUsersSubscribed_UpgradesFreeWhenBillingDisabled(t *testing.T) 
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFree)
 
-	// Billing disabled → "free" subscriptions should be upgraded to pay_as_you_go.
-	count, err := db.EnsureAllUsersSubscribed(ctx, tx, false)
+	// Legacy "free" subscriptions should be upgraded to pay_as_you_go.
+	count, err := db.EnsureAllUsersSubscribed(ctx, tx)
 	if err != nil {
 		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
 	}
@@ -112,7 +83,7 @@ func TestEnsureAllUsersSubscribed_UpgradesFreeProWhenBillingDisabled(t *testing.
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanFreePro)
 
-	count, err := db.EnsureAllUsersSubscribed(ctx, tx, false)
+	count, err := db.EnsureAllUsersSubscribed(ctx, tx)
 	if err != nil {
 		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
 	}
@@ -139,8 +110,8 @@ func TestEnsureAllUsersSubscribed_PreservesPayAsYouGo(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertSubscription(t, tx, uid, db.PlanPayAsYouGo)
 
-	// Billing enabled → should NOT downgrade pay_as_you_go to free.
-	_, err := db.EnsureAllUsersSubscribed(ctx, tx, true)
+	// pay_as_you_go rows should stay unchanged when EnsureAllUsersSubscribed runs.
+	_, err := db.EnsureAllUsersSubscribed(ctx, tx)
 	if err != nil {
 		t.Fatalf("EnsureAllUsersSubscribed: %v", err)
 	}
@@ -163,13 +134,13 @@ func TestEnsureAllUsersSubscribed_Idempotent(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	// First call subscribes unsubscribed users.
-	_, err := db.EnsureAllUsersSubscribed(ctx, tx, false)
+	_, err := db.EnsureAllUsersSubscribed(ctx, tx)
 	if err != nil {
 		t.Fatalf("first EnsureAllUsersSubscribed: %v", err)
 	}
 
 	// Second call should find nothing to do.
-	count, err := db.EnsureAllUsersSubscribed(ctx, tx, false)
+	count, err := db.EnsureAllUsersSubscribed(ctx, tx)
 	if err != nil {
 		t.Fatalf("second EnsureAllUsersSubscribed: %v", err)
 	}

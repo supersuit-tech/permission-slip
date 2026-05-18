@@ -42,49 +42,13 @@ const mockActionConfigs = [
   },
 ];
 
-const freePlanLimits = {
-  max_requests_per_month: 1000 as number | null,
-  max_agents: 3 as number | null,
-  max_standing_approvals: 5 as number | null,
-  max_credentials: 5 as number | null,
-  audit_retention_days: 7,
-};
-
-const freePlanResponse = {
-  plan: {
-    id: "free",
-    name: "Free",
-    ...freePlanLimits,
-  },
-  effective_limits: freePlanLimits,
-  subscription: {
-    status: "active",
-    can_upgrade: true,
-    can_downgrade: false,
-    can_end_quota_grace_now: false,
-  },
-  usage: { requests: 10, agents: 2, standing_approvals: 1, credentials: 0 },
-};
-
-const paidEffectiveLimits = {
-  max_requests_per_month: null as number | null,
-  max_agents: null as number | null,
-  max_standing_approvals: null as number | null,
-  max_credentials: null as number | null,
-  audit_retention_days: 90,
-};
-
 function mockApiFetch(
   standingApprovals = mockStandingApprovals,
-  billingPlan = freePlanResponse,
   agents = mockAgents,
   actionConfigs = mockActionConfigs,
 ) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
-    if (url === "/v1/billing/plan") {
-      return Promise.resolve({ data: billingPlan });
-    }
     if (url === "/v1/standing-approvals") {
       return Promise.resolve({ data: { data: standingApprovals } });
     }
@@ -104,47 +68,13 @@ describe("StandingApprovalsCard", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("shows limit badge with plan info", async () => {
+  it("shows standing approval count badge", async () => {
     mockApiFetch();
 
     render(<StandingApprovalsCard />, { wrapper });
 
     await waitFor(() => {
-      expect(
-        screen.getByText("1 / 5 standing approvals"),
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("shows upgrade prompt when at standing approval limit", async () => {
-    const atLimitPlan = {
-      ...freePlanResponse,
-      usage: { ...freePlanResponse.usage, standing_approvals: 5 },
-    };
-    mockApiFetch(mockStandingApprovals, atLimitPlan);
-
-    render(<StandingApprovalsCard />, { wrapper });
-
-    await waitFor(() => {
-      expect(
-        screen.getByText(/Upgrade to create more standing approvals/),
-      ).toBeInTheDocument();
-    });
-  });
-
-  it("shows no limit for paid plan", async () => {
-    const paidPlan = {
-      ...freePlanResponse,
-      plan: { ...freePlanResponse.plan, id: "pay_as_you_go", max_standing_approvals: null },
-      effective_limits: paidEffectiveLimits,
-      usage: { ...freePlanResponse.usage, standing_approvals: 10 },
-    };
-    mockApiFetch(mockStandingApprovals, paidPlan);
-
-    render(<StandingApprovalsCard />, { wrapper });
-
-    await waitFor(() => {
-      expect(screen.getByText("10 standing approvals")).toBeInTheDocument();
+      expect(screen.getByText("1 standing approvals")).toBeInTheDocument();
     });
   });
 
@@ -192,7 +122,7 @@ describe("StandingApprovalsCard", () => {
     const agentsNoName = [
       { agent_id: 1, status: "registered" as const, metadata: null as Record<string, unknown> | null, created_at: "2026-01-01T00:00:00Z" },
     ];
-    mockApiFetch(mockStandingApprovals, freePlanResponse, agentsNoName);
+    mockApiFetch(mockStandingApprovals, agentsNoName);
 
     render(<StandingApprovalsCard />, { wrapper });
 
@@ -202,7 +132,7 @@ describe("StandingApprovalsCard", () => {
   });
 
   it("shows unknown configuration when source config is not found", async () => {
-    mockApiFetch(mockStandingApprovals, freePlanResponse, mockAgents, []);
+    mockApiFetch(mockStandingApprovals, mockAgents, []);
 
     render(<StandingApprovalsCard />, { wrapper });
 

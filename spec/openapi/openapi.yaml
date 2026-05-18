@@ -14,7 +14,7 @@ info:
     - **Action**: Pre-defined, structured request with a type, validated parameters, and execution logic — the core primitive
     - **Agent**: Automated system with a cryptographic key pair that submits actions for approval
     - **Approver**: Human authorized to approve or deny agent actions
-    - **Connector**: Integration with an external service (e.g., Gmail, Stripe, PayPal) that defines available actions
+    - **Connector**: Integration with an external service (e.g., Gmail, PayPal) that defines available actions
     - **Credential**: Encrypted API key or OAuth token for an external service, stored in Permission Slip's vault
     - **Registration**: One-time setup where agent proves identity via public key
     - **Approval Request**: Async request for permission to execute a specific action
@@ -26,8 +26,8 @@ info:
 
     - **Agent-facing endpoints** (registration, approvals, actions) require Ed25519 request signatures.
       See the `PermissionSlipSignature` security scheme.
-    - **User-facing endpoints** (agents, credentials, standing approvals, profiles) use Supabase
-      session JWTs. See the `SupabaseSession` security scheme.
+    - **User-facing endpoints** (agents, credentials, standing approvals, profiles) use
+      session JWTs issued by the server. See the `SupabaseSession` security scheme.
     - **Discovery endpoints** (connectors) are publicly accessible with no authentication required.
     
     ## Workflow
@@ -52,7 +52,7 @@ info:
     ## Architecture
     
     ```
-    Agent ──→ Permission Slip ──→ External Service (Gmail, Stripe, PayPal, etc.)
+    Agent ──→ Permission Slip ──→ External Service (Gmail, PayPal, etc.)
                    │
                    ▼
               User (approve/deny)
@@ -104,14 +104,8 @@ tags:
     description: Expo push token management for mobile push notifications (session-authenticated)
   - name: OAuth
     description: OAuth 2.0 provider authorization and connection management (session-authenticated)
-  - name: Payment Methods
-    description: Stored payment methods for agent-initiated purchases (session-authenticated)
   - name: Config
     description: Server configuration and feature flags (session-authenticated)
-  - name: Billing
-    description: Subscription management, checkout, and usage (session-authenticated)
-  - name: Admin
-    description: Internal admin endpoints for usage analytics and abuse detection (session-authenticated)
 
 paths:
   /v1/connectors:
@@ -282,50 +276,6 @@ paths:
   /v1/expo-push-tokens/{token_id}:
     $ref: './components/paths/expo_push_tokens.yaml#/expoPushTokenById'
 
-  /v1/billing/subscription:
-    $ref: './components/paths/billing.yaml#/subscription'
-
-  /v1/billing/usage:
-    $ref: './components/paths/billing.yaml#/usage'
-
-  /v1/billing/checkout:
-    $ref: './components/paths/billing.yaml#/checkout'
-
-  /v1/billing/upgrade:
-    $ref: './components/paths/billing.yaml#/upgrade'
-
-  /v1/billing/downgrade:
-    $ref: './components/paths/billing.yaml#/downgrade'
-
-  /v1/billing/invoices:
-    $ref: './components/paths/billing.yaml#/invoices'
-
-  # NOTE: The Stripe webhook endpoint lives outside /api/v1/ so it bypasses
-  # auth and rate-limiting middleware. Documented here for completeness.
-  /api/webhooks/stripe:
-    $ref: './components/paths/billing.yaml#/webhook'
-
-  /v1/billing/plan:
-    $ref: './components/paths/billing.yaml#/plan'
-
-  /v1/billing/activate:
-    $ref: './components/paths/billing.yaml#/activate'
-
-  /v1/billing/redeem-coupon:
-    $ref: './components/paths/billing.yaml#/redeemCoupon'
-
-  /v1/billing/portal:
-    $ref: './components/paths/billing.yaml#/portal'
-
-  /v1/admin/usage:
-    $ref: './components/paths/admin_usage.yaml#/adminUsage'
-
-  /v1/admin/usage/by-connector:
-    $ref: './components/paths/admin_usage.yaml#/adminUsageByConnector'
-
-  /v1/admin/usage/by-agent:
-    $ref: './components/paths/admin_usage.yaml#/adminUsageByAgent'
-
   /v1/oauth/providers:
     $ref: './components/paths/oauth.yaml#/oauthProviders'
 
@@ -340,18 +290,6 @@ paths:
 
   /v1/oauth/connections/{connection_id}:
     $ref: './components/paths/oauth.yaml#/oauthDisconnect'
-
-  /v1/agents/{agent_id}/payment-method:
-    $ref: './components/paths/agent_payment_methods.yaml#/agentPaymentMethod'
-
-  /v1/payment-methods:
-    $ref: './components/paths/payment_methods.yaml#/paymentMethods'
-
-  /v1/payment-methods/setup-intent:
-    $ref: './components/paths/payment_methods.yaml#/setupIntent'
-
-  /v1/payment-methods/{id}:
-    $ref: './components/paths/payment_methods.yaml#/paymentMethodById'
 
   /v1/config:
     $ref: './components/paths/config.yaml#/config'
@@ -566,66 +504,6 @@ components:
     DeleteExpoPushTokenResponse:
       $ref: './components/schemas/expo_push_tokens.yaml#/DeleteExpoPushTokenResponse'
 
-    # Billing
-    SubscriptionResponse:
-      $ref: './components/schemas/billing.yaml#/SubscriptionResponse'
-    UsageInfo:
-      $ref: './components/schemas/billing.yaml#/UsageInfo'
-    UsageResponse:
-      $ref: './components/schemas/billing.yaml#/UsageResponse'
-    RequestsUsage:
-      $ref: './components/schemas/billing.yaml#/RequestsUsage'
-    SMSUsage:
-      $ref: './components/schemas/billing.yaml#/SMSUsage'
-    InvoiceSummary:
-      $ref: './components/schemas/billing.yaml#/InvoiceSummary'
-    CheckoutResponse:
-      $ref: './components/schemas/billing.yaml#/CheckoutResponse'
-    Plan:
-      $ref: './components/schemas/billing.yaml#/Plan'
-    Subscription:
-      $ref: './components/schemas/billing.yaml#/Subscription'
-    UsageSummary:
-      $ref: './components/schemas/billing.yaml#/UsageSummary'
-    BillingPlanResponse:
-      $ref: './components/schemas/billing.yaml#/BillingPlanResponse'
-    UsageDetail:
-      $ref: './components/schemas/billing.yaml#/UsageDetail'
-    RequestUsageDetail:
-      $ref: './components/schemas/billing.yaml#/RequestUsageDetail'
-    SMSUsageDetail:
-      $ref: './components/schemas/billing.yaml#/SMSUsageDetail'
-    UsageBreakdown:
-      $ref: './components/schemas/billing.yaml#/UsageBreakdown'
-    UpgradeResponse:
-      $ref: './components/schemas/billing.yaml#/UpgradeResponse'
-    Invoice:
-      $ref: './components/schemas/billing.yaml#/Invoice'
-    QuotaExceededError:
-      $ref: './components/schemas/billing.yaml#/QuotaExceededError'
-    QuotaExceededDetails:
-      $ref: './components/schemas/billing.yaml#/QuotaExceededDetails'
-    ResourceLimitError:
-      $ref: './components/schemas/billing.yaml#/ResourceLimitError'
-    ResourceLimitDetails:
-      $ref: './components/schemas/billing.yaml#/ResourceLimitDetails'
-    ActivateRequest:
-      $ref: './components/schemas/billing.yaml#/ActivateRequest'
-    ActivateResponse:
-      $ref: './components/schemas/billing.yaml#/ActivateResponse'
-
-    # Admin Usage
-    AdminUsageResponse:
-      $ref: './components/schemas/admin_usage.yaml#/AdminUsageResponse'
-    ConnectorUsageResponse:
-      $ref: './components/schemas/admin_usage.yaml#/ConnectorUsageResponse'
-    ConnectorUsageEntry:
-      $ref: './components/schemas/admin_usage.yaml#/ConnectorUsageEntry'
-    AgentUsageResponse:
-      $ref: './components/schemas/admin_usage.yaml#/AgentUsageResponse'
-    AgentUsageEntry:
-      $ref: './components/schemas/admin_usage.yaml#/AgentUsageEntry'
-
     # OAuth
     OAuthProvider:
       $ref: './components/schemas/oauth.yaml#/OAuthProvider'
@@ -637,27 +515,6 @@ components:
       $ref: './components/schemas/oauth.yaml#/OAuthConnectionListResponse'
     OAuthDisconnectResponse:
       $ref: './components/schemas/oauth.yaml#/OAuthDisconnectResponse'
-    # Agent Payment Methods
-    AgentPaymentMethodResponse:
-      $ref: './components/schemas/agent_payment_methods.yaml#/AgentPaymentMethodResponse'
-    AssignAgentPaymentMethodRequest:
-      $ref: './components/schemas/agent_payment_methods.yaml#/AssignAgentPaymentMethodRequest'
-    RemoveAgentPaymentMethodResponse:
-      $ref: './components/schemas/agent_payment_methods.yaml#/RemoveAgentPaymentMethodResponse'
-
-    # Payment Methods
-    PaymentMethod:
-      $ref: './components/schemas/payment_methods.yaml#/PaymentMethod'
-    PaymentMethodListResponse:
-      $ref: './components/schemas/payment_methods.yaml#/PaymentMethodListResponse'
-    SetupIntentResponse:
-      $ref: './components/schemas/payment_methods.yaml#/SetupIntentResponse'
-    ConfirmPaymentMethodRequest:
-      $ref: './components/schemas/payment_methods.yaml#/ConfirmPaymentMethodRequest'
-    UpdatePaymentMethodRequest:
-      $ref: './components/schemas/payment_methods.yaml#/UpdatePaymentMethodRequest'
-    DeletePaymentMethodResponse:
-      $ref: './components/schemas/payment_methods.yaml#/DeletePaymentMethodResponse'
 
     # Config
     ConfigResponse:

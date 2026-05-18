@@ -9,7 +9,6 @@ import (
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/notify"
 	"github.com/supersuit-tech/permission-slip/oauth"
-	pstripe "github.com/supersuit-tech/permission-slip/stripe"
 	"github.com/supersuit-tech/permission-slip/vault"
 )
 
@@ -24,12 +23,8 @@ type Deps struct {
 	VAPIDPublicKey         string                  // VAPID public key for Web Push; empty if not configured
 	Connectors             *connectors.Registry    // connector execution registry; nil means no connectors are available
 	OAuthProviders         *oauth.Registry         // OAuth provider registry; nil means OAuth is not available
-	OAuthRedirectBaseURL   string                  // Public base URL for OAuth callbacks (e.g. "https://app.permissionslip.dev"); falls back to BaseURL
+	OAuthRedirectBaseURL   string                  // Public base URL for OAuth callbacks; falls back to BaseURL
 	OAuthStateSecret       string                  // HMAC-SHA256 secret for signing OAuth CSRF state tokens; if empty, falls back to JWTSigningSecret
-	Stripe                 *pstripe.Client         // Stripe API client; nil when billing is disabled or Stripe keys not set
-	CouponSecret           string                  // HMAC key for free-pro coupons; empty disables POST /billing/redeem-coupon
-	BillingEnabled         bool                    // true when BILLING_ENABLED=true; gates Stripe, metering, and billing endpoints
-	SMSEnabled             bool                    // true when SMS sender is configured AND SMS_NOTIFICATIONS_HIDDEN != "true"; gates SMS preference visibility
 	DevMode                bool                    // true when MODE=development; disables rate limiting
 	RateLimiter            *RateLimiter            // pre-auth rate limiter (per-IP + global); nil disables
 	AuthRateLimiter        *RateLimiter            // rate limiter for /api/auth/* (signup/login); nil disables
@@ -64,9 +59,6 @@ func NewRouter(deps *Deps) http.Handler {
 	for _, register := range routeGroups {
 		register(mux, deps)
 	}
-	// NOTE: Billing webhook routes are registered on the top-level mux in
-	// main.go, NOT here. They must bypass auth and rate-limiting middleware
-	// because Stripe verifies requests via signature, not Bearer tokens.
 
 	var handler http.Handler = mux
 	handler = RateLimitMiddleware(deps.RateLimiter, deps.DevMode, deps.TrustedProxyHeader)(handler)

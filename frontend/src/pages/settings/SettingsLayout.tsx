@@ -2,7 +2,6 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { SettingsNav } from "./SettingsNav";
 import { ProfilePage } from "./ProfilePage";
 import { SecurityPage } from "./SecurityPage";
-import { BillingSettingsPage } from "./BillingSettingsPage";
 import { AccountPage } from "./AccountPage";
 
 export function SettingsLayout() {
@@ -17,7 +16,6 @@ export function SettingsLayout() {
             <Route index element={<Navigate to="/settings/profile" replace />} />
             <Route path="profile" element={<ProfilePage />} />
             <Route path="security" element={<SecurityPage />} />
-            <Route path="billing" element={<BillingSettingsPage />} />
             <Route path="account" element={<AccountPage />} />
             <Route path="*" element={<Navigate to="/settings/profile" replace />} />
           </Routes>

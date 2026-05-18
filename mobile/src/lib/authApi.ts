@@ -1,13 +1,17 @@
 import { createAuthError } from "../auth/errors";
 import type { AuthError } from "../auth/types";
-import { getCustomHost, getGatewaySecret } from "./customHostConfig";
+import {
+  getCustomHost,
+  getGatewaySecret,
+  PLACEHOLDER_API_BASE,
+} from "./customHostConfig";
 
 function defaultApiRoot(): string {
-  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
-  if (!envUrl) {
-    return "https://app.permissionslip.dev/api";
+  const envUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim();
+  if (envUrl) {
+    return envUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
   }
-  return envUrl.replace(/\/v1\/?$/, "").replace(/\/$/, "");
+  return PLACEHOLDER_API_BASE.replace(/\/v1\/?$/, "").replace(/\/$/, "");
 }
 
 export function apiRoot(): string {

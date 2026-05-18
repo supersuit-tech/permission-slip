@@ -127,11 +127,7 @@ func (r *retentionInfo) toMeta() *retentionMeta {
 }
 
 // effectiveRetention resolves the full audit log retention policy for the user.
-// Returns nil when billing is disabled (no retention filtering).
 func effectiveRetention(ctx context.Context, deps *Deps, userID string) (*retentionInfo, error) {
-	if !deps.BillingEnabled {
-		return nil, nil
-	}
 	sp, err := db.GetSubscriptionWithPlan(ctx, deps.DB, userID)
 	if err != nil {
 		return nil, err

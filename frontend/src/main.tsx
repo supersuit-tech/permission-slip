@@ -24,8 +24,6 @@ import {
 } from "@tanstack/react-query";
 import { BrowserRouter } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
-import { CookieConsentBanner } from "./components/CookieConsentBanner";
-import { CookieConsentProvider } from "./components/CookieConsentContext";
 import { PostHogProvider } from "./components/PostHogProvider";
 import { ThemeProvider } from "./components/ThemeContext";
 import { Toaster } from "./components/ui/sonner";
@@ -78,17 +76,14 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <BrowserRouter>
       <QueryClientProvider client={queryClient}>
         <ThemeProvider>
-          <CookieConsentProvider>
-            <PostHogProvider>
-              <AuthProvider>
-                <App />
-                <CookieConsentBanner />
-                <Toaster />
-              </AuthProvider>
-            </PostHogProvider>
-          </CookieConsentProvider>
+          <PostHogProvider>
+            <AuthProvider>
+              <App />
+              <Toaster />
+            </AuthProvider>
+          </PostHogProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </BrowserRouter>
-  </React.StrictMode>
+  </React.StrictMode>,
 );

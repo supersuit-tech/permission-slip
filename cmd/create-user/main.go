@@ -71,8 +71,7 @@ func main() {
 		log.Fatalf("create profile: %v", err)
 	}
 
-	billing := os.Getenv("BILLING_ENABLED") == "true"
-	if _, err := db.CreateSubscription(ctx, tx, profile.ID, db.DefaultPlanID(billing)); err != nil {
+	if _, err := db.CreateSubscription(ctx, tx, profile.ID, db.DefaultPlanID()); err != nil {
 		_ = tx.Rollback()
 		log.Fatalf("create subscription: %v", err)
 	}
