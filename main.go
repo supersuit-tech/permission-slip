@@ -220,9 +220,14 @@ func main() {
 			log.Printf("Subscriptions: backfilled %d user(s) without subscriptions", backfilled)
 		}
 
-		// Initialize credential vault (Phase 4 will swap this for vault/sqlite.go).
-		deps.Vault = vault.NewSupabaseVaultStore()
-		log.Println("Credential vault: using Supabase Vault (encrypted storage)")
+		vaultStore, err := vault.NewSQLiteVaultFromEnv()
+		if err != nil {
+			sentry.CaptureException(err)
+			sentry.Flush(2 * time.Second)
+			log.Fatalf("SECRET_ENCRYPTION_KEY: %v", err)
+		}
+		deps.Vault = vaultStore
+		log.Println("Credential vault: SQLite (AES-256-GCM)")
 	} else {
 		log.Println("DATABASE_PATH not set, running without database")
 	}

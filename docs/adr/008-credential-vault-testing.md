@@ -6,7 +6,9 @@
 
 ## Context
 
-Issue #209 introduces Supabase Vault integration for encrypting credential secrets at rest. The Vault is a Postgres extension (`supabase_vault`) that provides server-side AES-256-GCM encryption, available in Supabase environments (local dev via `supabase start` and hosted projects) but **not in plain Postgres** used by CI.
+Issue #209 introduced Supabase Vault integration for encrypting credential secrets at rest. **Update (SQLite migration):** production deployments that use **`DATABASE_PATH`** now use **`SQLiteVault`** (`vault/sqlite.go`) — AES-256-GCM in the `vault_secrets` table with **`SECRET_ENCRYPTION_KEY`** — while the `VaultStore` interface and **`MockVaultStore`** testing approach below are unchanged.
+
+The original Vault was a Postgres extension (`supabase_vault`) with server-side AES-256-GCM, available in Supabase environments (local dev via `supabase start` and hosted projects) but **not in plain Postgres** used by CI.
 
 This extends the hybrid testing strategy established in [ADR-004](004-local-testing-strategy.md) to cover the Vault.
 
@@ -18,7 +20,7 @@ Define a `VaultStore` interface in Go with three methods (`CreateSecret`, `ReadS
 
 | Implementation | Environment | Behavior |
 |---|---|---|
-| `SupabaseVaultStore` | Production, local dev (with `supabase start`) | Calls `vault.create_secret()`, reads from `vault.decrypted_secrets`, deletes from `vault.secrets` — all via SQL within the caller's transaction |
+| `SQLiteVault` | Production with `DATABASE_PATH` (embedded SQLite) | Inserts AES-256-GCM ciphertext + nonce into `vault_secrets` within the caller's transaction |
 | `MockVaultStore` | CI, unit tests | In-memory `map[string][]byte`, no encryption, generates random UUIDs |
 
 ### Interface Design
@@ -35,7 +37,7 @@ All methods accept `db.DBTX` so vault operations participate in the same databas
 
 ### Injection
 
-`VaultStore` is injected via the `api.Deps` struct, following the existing dependency injection pattern. Tests create a `MockVaultStore` per test; production creates a `SupabaseVaultStore` at startup.
+`VaultStore` is injected via the `api.Deps` struct, following the existing dependency injection pattern. Tests create a `MockVaultStore` per test; production with SQLite creates a `SQLiteVault` at startup when `DATABASE_PATH` is set.
 
 ---
 
@@ -63,6 +65,6 @@ All methods accept `db.DBTX` so vault operations participate in the same databas
 ## Consequences
 
 - **CI does not test actual encryption.** The mock stores plaintext. To verify encryption works, run integration tests locally with `supabase start`.
-- **MockVaultStore must never be used in production.** The application startup initializes `SupabaseVaultStore` when `DATABASE_URL` is set. The mock is only instantiated in test code.
+- **MockVaultStore must never be used in production.** The application startup initializes `SQLiteVault` when `DATABASE_PATH` is set (and `SECRET_ENCRYPTION_KEY` is valid). The mock is only instantiated in test code.
 - **The migration conditionally enables the extension.** The `20260223200000_vault_extension.sql` migration uses a `DO` block to check if `supabase_vault` is available before creating it, so CI migrations don't fail.
 - **Seed data continues to use placeholder UUIDs.** Seed data inserts static `vault_secret_id` values that don't correspond to real vault secrets — this is fine because seed data is for UI development, not vault testing.

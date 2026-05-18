@@ -111,7 +111,11 @@ You need a PostgreSQL 16+ database. Options:
 
 The server runs migrations automatically on startup — no manual migration step needed.
 
-### Supabase Vault (credential encryption)
+### SQLite credential vault (`DATABASE_PATH`)
+
+When the server uses **`DATABASE_PATH`** (embedded SQLite instead of `DATABASE_URL`), credentials are encrypted in the **`vault_secrets`** table with **AES-256-GCM** using the app secret **`SECRET_ENCRYPTION_KEY`** (exactly 32 bytes after base64 decode). Generate with `openssl rand -base64 32`. See the **Credential vault** section in [deployment.md](deployment.md).
+
+### Supabase Vault (legacy PostgreSQL deployments)
 
 Permission Slip uses [Supabase Vault](https://supabase.com/docs/guides/database/vault) for encrypting stored credentials (API keys, OAuth tokens) at rest using AES-256-GCM. This requires:
 

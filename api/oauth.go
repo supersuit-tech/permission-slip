@@ -20,7 +20,7 @@
 //   - Callback derives user identity from the signed state token (no session required)
 //   - PKCE verifiers are AES-256-GCM sealed with the state signing key before embedding
 //     in the JWT payload so they are not exposed in browser history or logs (JWT is only signed)
-//   - Tokens stored server-side in Supabase Vault (AES-256-GCM)
+//   - Tokens stored server-side in the SQLite vault (AES-256-GCM via SECRET_ENCRYPTION_KEY)
 //   - Provider path params validated against ProviderIDPattern
 //   - No tokens or secrets are ever returned in API responses
 package api

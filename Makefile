@@ -113,11 +113,11 @@ test: test-backend test-frontend mobile-test cli-test
 test-backend:
 	go test ./...
 	@if curl -sf http://127.0.0.1:54321/auth/v1/health > /dev/null 2>&1; then \
-		echo "Supabase detected — also running integration tests..."; \
+		echo "Supabase detected — also running integration-tagged Go tests..."; \
 		DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres \
 		go test -tags integration -v ./...; \
 	else \
-		echo "Supabase not detected — skipping integration tests (run 'supabase start' to include them)."; \
+		echo "Supabase not detected — skipping integration-tagged tests (run 'supabase start' to include them)."; \
 	fi
 
 test-frontend:
