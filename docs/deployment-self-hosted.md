@@ -41,28 +41,7 @@ Everything runs in one process on one port. Database migrations apply automatica
 
 ---
 
-## Step 1: Prepare Your System
-
-If your Pi is already running Raspberry Pi OS (64-bit), skip to Step 2.
-
-1. Download and install [Raspberry Pi Imager](https://www.raspberrypi.com/software/)
-2. Flash **Raspberry Pi OS Lite (64-bit)** to your SD card or SSD
-3. In the imager settings, enable SSH and configure Wi-Fi (if not using Ethernet)
-4. Boot and SSH in:
-
-```bash
-ssh pi@raspberrypi.local
-```
-
-Then update the system:
-
-```bash
-sudo apt update && sudo apt upgrade -y
-```
-
----
-
-## Step 2: Get the Binary
+## Step 1: Get the Binary
 
 ### Option A: Build from Source (recommended)
 
@@ -75,9 +54,11 @@ sudo tar -C /usr/local -xzf go1.24.1.linux-arm64.tar.gz
 echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
 source ~/.bashrc
 
-# Install Node.js 22
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt install -y nodejs
+# Install Node.js 22 via nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+nvm install 22
+nvm use 22
 
 # Clone and build
 git clone https://github.com/supersuit-tech/permission-slip.git
@@ -115,7 +96,7 @@ docker build -t permission-slip .
 
 ---
 
-## Step 3: Configure Environment Variables
+## Step 2: Configure Environment Variables
 
 Create a `.env` file with your configuration. All values except `BASE_URL` are required in production.
 
@@ -147,7 +128,7 @@ mkdir -p /home/pi/permission-slip/data
 
 ---
 
-## Step 4: Run on Boot (systemd)
+## Step 3: Run on Boot (systemd)
 
 ### Build from source
 
@@ -200,7 +181,7 @@ curl http://localhost:8080/api/health
 
 ---
 
-## Step 5: Create Your Account
+## Step 4: Create Your Account
 
 Create the first user with the bundled CLI tool:
 
