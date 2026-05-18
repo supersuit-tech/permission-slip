@@ -71,11 +71,6 @@ func main() {
 		log.Fatalf("create profile: %v", err)
 	}
 
-	if _, err := db.CreateSubscription(ctx, tx, profile.ID, db.DefaultPlanID()); err != nil {
-		_ = tx.Rollback()
-		log.Fatalf("create subscription: %v", err)
-	}
-
 	if err := tx.Commit(); err != nil {
 		log.Fatalf("commit: %v", err)
 	}

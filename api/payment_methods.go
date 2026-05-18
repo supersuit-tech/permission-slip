@@ -169,7 +169,7 @@ func handleCreateSetupIntent(deps *Deps) http.HandlerFunc {
 			if err != nil {
 				log.Printf("[%s] CreateSetupIntent: create customer: %v", TraceID(r.Context()), err)
 				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusBadGateway, upstreamError("Failed to create payment customer"))
+				RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "Failed to create payment customer", true))
 				return
 			}
 			stripeCustomerID = cust.ID
@@ -185,7 +185,7 @@ func handleCreateSetupIntent(deps *Deps) http.HandlerFunc {
 		if err != nil {
 			log.Printf("[%s] CreateSetupIntent: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusBadGateway, upstreamError("Failed to create setup intent"))
+			RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "Failed to create setup intent", true))
 			return
 		}
 
@@ -244,7 +244,7 @@ func handleConfirmPaymentMethod(deps *Deps) http.HandlerFunc {
 		if err != nil {
 			log.Printf("[%s] ConfirmPaymentMethod: get stripe PM: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
-			RespondError(w, r, http.StatusBadGateway, upstreamError("Failed to verify payment method"))
+			RespondError(w, r, http.StatusBadGateway, newErrorResponse(ErrUpstreamError, "Failed to verify payment method", true))
 			return
 		}
 

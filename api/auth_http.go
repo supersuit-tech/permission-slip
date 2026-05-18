@@ -211,12 +211,6 @@ func handleAuthSignup(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if _, err := db.CreateSubscription(r.Context(), tx, uid, db.DefaultPlanID()); err != nil {
-			log.Printf("[%s] signup: subscription: %v", TraceID(r.Context()), err)
-			RespondError(w, r, http.StatusInternalServerError, InternalError("Could not create account"))
-			return
-		}
-
 		access, refresh, exp, err := issueTokenPair(r.Context(), tx, deps, uid, email)
 		if err != nil {
 			log.Printf("[%s] signup: tokens: %v", TraceID(r.Context()), err)
