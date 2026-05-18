@@ -126,9 +126,9 @@ Create a `.env` file with your configuration. All values except `BASE_URL` are r
 
 ```bash
 mkdir -p ~/permission-slip
-cat > ~/permission-slip/.env <<'EOF'
+cat > ~/permission-slip/.env <<EOF
 # SQLite database path (created automatically on first run)
-DATABASE_PATH=/home/pi/permission-slip/data/app.db
+DATABASE_PATH=$HOME/permission-slip/data/app.db
 
 # Secrets — generate each with: openssl rand -base64 32
 SECRET_ENCRYPTION_KEY=replace-me
@@ -149,7 +149,7 @@ sed -i "s|INVITE_HMAC_KEY=replace-me|INVITE_HMAC_KEY=$(openssl rand -hex 32)|" ~
 ```
 
 ```bash
-mkdir -p /home/pi/permission-slip/data
+mkdir -p ~/permission-slip/data
 ```
 
 ---
@@ -159,17 +159,17 @@ mkdir -p /home/pi/permission-slip/data
 ### Build from source
 
 ```bash
-sudo tee /etc/systemd/system/permission-slip.service > /dev/null <<'EOF'
+sudo tee /etc/systemd/system/permission-slip.service > /dev/null <<EOF
 [Unit]
 Description=Permission Slip
 After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/permission-slip
-EnvironmentFile=/home/pi/permission-slip/.env
-ExecStart=/home/pi/permission-slip/bin/server
+User=$(whoami)
+WorkingDirectory=$HOME/permission-slip
+EnvironmentFile=$HOME/permission-slip/.env
+ExecStart=$HOME/permission-slip/bin/server
 Restart=on-failure
 RestartSec=5
 
@@ -188,7 +188,7 @@ source ~/permission-slip/.env
 
 docker run -d --name permission-slip \
   -p 8080:8080 \
-  -v /home/pi/permission-slip/data:/data \
+  -v $HOME/permission-slip/data:/data \
   -e DATABASE_PATH=/data/app.db \
   -e SECRET_ENCRYPTION_KEY="$SECRET_ENCRYPTION_KEY" \
   -e JWT_SIGNING_SECRET="$JWT_SIGNING_SECRET" \
@@ -213,7 +213,7 @@ Create the first user with the bundled CLI tool:
 
 ```bash
 # From the permission-slip directory
-DATABASE_PATH=/home/pi/permission-slip/data/app.db \
+DATABASE_PATH=~/permission-slip/data/app.db \
   go run ./cmd/create-user you@example.com 'your-password'
 
 # Or, if running Docker:
