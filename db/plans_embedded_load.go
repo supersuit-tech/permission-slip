@@ -1,6 +1,7 @@
 package db
 
 import (
+	_ "embed"
 	"encoding/json"
 	"fmt"
 	"regexp"
@@ -24,9 +25,9 @@ type planFile struct {
 var validEmbeddedPlanID = regexp.MustCompile(`^[a-zA-Z0-9_]+$`)
 
 var (
-	embeddedOnce   sync.Once
-	embeddedPlans  map[string]*Plan
-	embeddedList   []*Plan
+	embeddedOnce    sync.Once
+	embeddedPlans   map[string]*Plan
+	embeddedList    []*Plan
 	embeddedLoadErr error
 )
 

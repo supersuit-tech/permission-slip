@@ -73,4 +73,7 @@ const (
 	ErrConnectorInstanceRequired  ErrorCode = "connector_instance_required"
 	ErrConnectorInstanceNotFound  ErrorCode = "connector_instance_not_found"
 	ErrConnectorInstanceAmbiguous ErrorCode = "connector_instance_ambiguous"
+
+	// Notification channels (e.g. web push when not enabled for this deployment)
+	ErrChannelNotConfigured ErrorCode = "channel_not_configured"
 )
