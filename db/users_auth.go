@@ -104,6 +104,19 @@ func RevokeAuthSession(ctx context.Context, d DBTX, sessionID string, revokedAt 
 	return err
 }
 
+// UpdatePasswordHash replaces the stored password hash for the user with the given email.
+// Returns true if a row was updated, false if no user with that email exists.
+func UpdatePasswordHash(ctx context.Context, d DBTX, email, passwordHash string) (bool, error) {
+	result, err := d.Exec(ctx,
+		`UPDATE users SET password_hash = $1 WHERE lower(email) = lower($2)`,
+		passwordHash, email,
+	)
+	if err != nil {
+		return false, err
+	}
+	return RowsAffected(result) > 0, nil
+}
+
 // RevokeAuthSessionByRefreshHash revokes the session matching the given refresh token hash.
 func RevokeAuthSessionByRefreshHash(ctx context.Context, d DBTX, refreshTokenHash string, revokedAt time.Time) error {
 	_, err := d.Exec(ctx,
