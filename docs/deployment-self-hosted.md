@@ -94,10 +94,10 @@ Most routers let you bind a fixed IP to the Pi's MAC address — look for "DHCP 
 Set it directly on the Pi so it doesn't rely on the router. The method depends on your OS:
 
 ```bash
-cat /etc/os-release | grep VERSION_CODENAME   # check: bookworm (2023+) or bullseye/older
+cat /etc/os-release | grep VERSION_CODENAME   # bookworm/trixie → NetworkManager; bullseye/older → dhcpcd
 ```
 
-*Bookworm (Raspberry Pi OS 12, 2023+) — NetworkManager:*
+*Bookworm (Raspberry Pi OS 12, 2023+) or Trixie (Raspberry Pi OS 13) — NetworkManager:*
 ```bash
 nmcli connection show   # find your WiFi connection name (often "preconfigured")
 sudo nmcli connection modify "preconfigured" \
