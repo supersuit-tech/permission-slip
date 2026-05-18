@@ -81,11 +81,44 @@ make build
 You need to know how other devices on your network will reach the Pi. **Use the local IP address — it's the most reliable option.**
 
 **Option 1 — Local IP address (recommended, e.g. `192.168.1.100`)**
-Always works regardless of OS or mDNS support on client devices. The risk is that DHCP can reassign the address after a reboot. To prevent that, set a **static DHCP lease** for the Pi's MAC address in your router's admin UI — most routers call this "DHCP reservation" or "address binding".
+Always works regardless of OS or mDNS support on client devices. The risk is that DHCP can reassign the address after a reboot. Fix that with either approach below — pick one.
 
 ```bash
 hostname -I | awk '{print $1}'   # prints the Pi's current IP
 ```
+
+**Option 1a — Static DHCP lease (set it at the router)**
+Most routers let you bind a fixed IP to the Pi's MAC address — look for "DHCP reservation" or "address binding" in your router's admin UI. Nothing to configure on the Pi itself.
+
+**Option 1b — Static IP on the Pi**
+Set it directly on the Pi so it doesn't rely on the router. The method depends on your OS:
+
+```bash
+cat /etc/os-release | grep VERSION_CODENAME   # check: bookworm (2023+) or bullseye/older
+```
+
+*Bookworm (Raspberry Pi OS 12, 2023+) — NetworkManager:*
+```bash
+nmcli connection show   # find your WiFi connection name (often "preconfigured")
+sudo nmcli connection modify "preconfigured" \
+  ipv4.method manual \
+  ipv4.addresses 192.168.1.100/24 \
+  ipv4.gateway 192.168.1.1 \
+  ipv4.dns "8.8.8.8"
+sudo nmcli connection up "preconfigured"
+```
+
+*Bullseye (Raspberry Pi OS 11) and earlier — dhcpcd:*
+```bash
+echo "
+interface wlan0
+static ip_address=192.168.1.100/24
+static routers=192.168.1.1
+static domain_name_servers=8.8.8.8" | sudo tee -a /etc/dhcpcd.conf
+sudo systemctl restart dhcpcd
+```
+
+Replace `192.168.1.100` with your chosen address and `192.168.1.1` with your router's IP (usually ends in `.1`). Verify with `hostname -I` after restarting.
 
 **Option 2 — mDNS hostname (e.g. `raspberrypi.local`)**
 Works out of the box on macOS and most Linux desktops, but **may not be reachable from other devices on your network** — Android and some Windows configurations don't support mDNS without extra software ([Bonjour](https://support.apple.com/kb/DL999) or iTunes). Prefer the IP address unless you know all clients on your network support mDNS.
