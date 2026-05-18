@@ -79,9 +79,13 @@ func TestCreateRegistrationInvite_Success(t *testing.T) {
 		t.Errorf("expires_at not ~15 minutes after created_at: created=%v, expires=%v", resp.CreatedAt, resp.ExpiresAt)
 	}
 
-	// No BaseURL configured, so invite_url should be empty
-	if resp.InviteURL != "" {
-		t.Errorf("expected empty invite_url when BaseURL not configured, got %q", resp.InviteURL)
+	// No BaseURL configured — server falls back to the request's own origin.
+	// httptest.NewRequest uses "example.com" as the default host.
+	if !strings.HasPrefix(resp.InviteURL, "http://example.com/invite/PS-") {
+		t.Errorf("expected invite_url derived from request host, got %q", resp.InviteURL)
+	}
+	if !strings.Contains(resp.InviteURL, resp.InviteCode) {
+		t.Errorf("invite_url %q does not contain invite_code %q", resp.InviteURL, resp.InviteCode)
 	}
 }
 

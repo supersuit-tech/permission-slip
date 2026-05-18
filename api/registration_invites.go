@@ -156,9 +156,17 @@ func handleCreateRegistrationInvite(deps *Deps) http.HandlerFunc {
 			CreatedAt:  invite.CreatedAt,
 		}
 
-		if deps.BaseURL != "" {
-			resp.InviteURL = buildInviteURL(deps.BaseURL, inviteCode)
+		// Fall back to the request's own origin when BASE_URL is not configured,
+		// so invite links work correctly on any network the server is reachable from.
+		baseURL := deps.BaseURL
+		if baseURL == "" {
+			scheme := "http"
+			if r.TLS != nil {
+				scheme = "https"
+			}
+			baseURL = scheme + "://" + r.Host
 		}
+		resp.InviteURL = buildInviteURL(baseURL, inviteCode)
 
 		RespondJSON(w, http.StatusCreated, resp)
 	}
