@@ -7,9 +7,9 @@ on:
   workflow_dispatch:
 
 jobs:
-  # Detect which areas of the codebase changed so we can skip jobs that have
-  # no work to do on this PR. On pushes to main we always run everything via
-  # the `|| github.event_name == 'push'` fallback in each job's `if:`.
+  # Detect which areas of the codebase changed so we can skip the heavy work
+  # on PRs that don't touch a given area. Pushes to main always run everything
+  # via the `|| github.event_name == 'push'` fallback.
   changes:
     name: Detect changes
     runs-on: ubuntu-latest
@@ -43,8 +43,13 @@ jobs:
               - 'Makefile'
               - '.github/workflows/ci.yml'
 
-  backend:
-    name: Backend Tests
+  # Worker jobs do the real work, gated on path filters. Their results feed
+  # the aggregator jobs below, which are the ones referenced by branch
+  # protection. We need this two-job split because branch protection
+  # historically treats "skipped" required checks as "did not pass" — so we
+  # never skip the *named* check, only the *work*.
+  backend-work:
+    name: Backend Tests (worker)
     needs: changes
     if: needs.changes.outputs.backend == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -91,8 +96,8 @@ jobs:
             exit $RC
           fi
 
-  frontend:
-    name: Frontend Tests
+  frontend-work:
+    name: Frontend Tests (worker)
     needs: changes
     if: needs.changes.outputs.frontend == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -123,8 +128,8 @@ jobs:
       - name: Run frontend tests
         run: make test-frontend
 
-  build:
-    name: Build
+  build-work:
+    name: Build (worker)
     needs: changes
     if: needs.changes.outputs.build == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -151,10 +156,10 @@ jobs:
       - name: Install build dependencies
         run: make install-build-deps
 
-      # The bundle file is already committed and verified by the Frontend Tests
-      # job; here we only need to regenerate the TypeScript API client because
-      # frontend/src/api/schema.d.ts is not committed and `npm ci --ignore-scripts`
-      # skipped the postinstall that would normally produce it.
+      # The bundle file is already committed and verified by the frontend
+      # worker job; here we only need to regenerate the TypeScript API client
+      # because frontend/src/api/schema.d.ts is not committed and `npm ci
+      # --ignore-scripts` skipped the postinstall that would normally produce it.
       - name: Generate frontend API client
         run: make generate-frontend-from-bundle
 
@@ -172,6 +177,61 @@ jobs:
             done
             exit $RC
           fi
+
+  # ---------------------------------------------------------------------------
+  # Aggregator jobs: these emit the check-run names that branch protection
+  # expects. Each always runs, regardless of whether its worker was skipped,
+  # and passes when the worker either succeeded or was skipped. Cost: ~10s
+  # per aggregator (no checkout, just a status check). Keep the `name:` of
+  # each one in sync with the branch-protection required-check names.
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend Tests
+    needs: backend-work
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        env:
+          RESULT: ${{ needs.backend-work.result }}
+        run: |
+          echo "Worker result: $RESULT"
+          case "$RESULT" in
+            success|skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
+
+  frontend:
+    name: Frontend Tests
+    needs: frontend-work
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        env:
+          RESULT: ${{ needs.frontend-work.result }}
+        run: |
+          echo "Worker result: $RESULT"
+          case "$RESULT" in
+            success|skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
+
+  build:
+    name: Build
+    needs: build-work
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        env:
+          RESULT: ${{ needs.build-work.result }}
+        run: |
+          echo "Worker result: $RESULT"
+          case "$RESULT" in
+            success|skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
 
   notify-failure:
     name: Notify on Failure

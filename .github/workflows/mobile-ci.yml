@@ -24,8 +24,8 @@ jobs:
               - 'Makefile'
               - '.github/workflows/mobile-ci.yml'
 
-  mobile:
-    name: Mobile Tests & Typecheck
+  mobile-work:
+    name: Mobile Tests & Typecheck (worker)
     needs: changes
     if: needs.changes.outputs.mobile == 'true' || github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -47,3 +47,22 @@ jobs:
 
       - name: Run mobile tests
         run: make mobile-test
+
+  # Aggregator that emits the check-run name branch protection expects.
+  # Passes when the worker either succeeded or was skipped; fails on real
+  # failure. Keep `name:` in sync with the branch-protection required check.
+  mobile:
+    name: Mobile Tests & Typecheck
+    needs: mobile-work
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate
+        env:
+          RESULT: ${{ needs.mobile-work.result }}
+        run: |
+          echo "Worker result: $RESULT"
+          case "$RESULT" in
+            success|skipped) exit 0 ;;
+            *) exit 1 ;;
+          esac
