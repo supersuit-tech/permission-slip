@@ -94,7 +94,7 @@ Works out of the box on macOS and most Linux desktops, but **may not be reachabl
 hostname   # prints e.g. "raspberrypi" → reachable as "raspberrypi.local"
 ```
 
-Use whichever address you choose consistently in the `BASE_URL` and `ALLOWED_ORIGINS` below — changing it later requires restarting the service.
+Use whichever address you choose in `BASE_URL` below. `ALLOWED_ORIGINS` does not need to be set — the server automatically allows requests from whatever address the browser used to reach it, so it works on all your networks without configuration.
 
 ---
 
@@ -111,11 +111,28 @@ SECRET_ENCRYPTION_KEY=replace-me
 JWT_SIGNING_SECRET=replace-me
 INVITE_HMAC_KEY=replace-me
 
-# Public URL of this server (used for OAuth callbacks and invite links)
-# Use your Pi's local IP address (e.g. http://192.168.1.100:8080) — see above.
-# Hostnames like raspberrypi.local may not be reachable from all devices.
-BASE_URL=http://192.168.1.100:8080
-ALLOWED_ORIGINS=http://192.168.1.100:8080
+# Public URL of this server — used for OAuth connector callback URLs and
+# as a fallback base for invite links.
+#
+# If you use OAuth connectors (Google, Slack, etc.), set this to the address
+# you'll register as the redirect URI with each provider. If you access the
+# server from multiple networks (e.g. LAN + Tailscale), register all of them
+# as redirect URIs in your OAuth app and pick any one here — or use a stable
+# hostname (e.g. Tailscale MagicDNS) that works across networks.
+#
+# If you don't use OAuth connectors, you can leave BASE_URL unset — invite
+# links will automatically use the address the request came in on.
+#
+# Examples:
+#   BASE_URL=http://192.168.1.100:8080    # LAN IP
+#   BASE_URL=http://raspberrypi.local:8080 # mDNS (macOS/Linux clients only)
+#   BASE_URL=http://mypi.tailnet.ts.net:8080 # Tailscale MagicDNS
+BASE_URL=
+
+# ALLOWED_ORIGINS — leave unset. The server automatically allows requests from
+# whatever address the browser used to reach it (same-origin mode), so it works
+# on all your networks without listing specific IPs here.
+ALLOWED_ORIGINS=
 EOF
 
 # Replace the placeholders with real secrets
@@ -236,7 +253,7 @@ cloudflared tunnel route dns permission-slip permissions.yourdomain.com
 cloudflared tunnel run --url http://localhost:8080 permission-slip
 ```
 
-After setting up a tunnel, update `BASE_URL` and `ALLOWED_ORIGINS` in your `.env` to your public URL and restart Permission Slip.
+After setting up a tunnel, update `BASE_URL` in your `.env` to your public URL and restart Permission Slip. `ALLOWED_ORIGINS` does not need to be set.
 
 > **Strongly recommended:** Once your Pi is reachable from the internet, set a gateway secret so a leaked hostname alone isn't enough to reach the app. See [Lock Down with a Gateway Secret](#lock-down-the-tunnel-with-a-gateway-secret).
 
@@ -247,7 +264,7 @@ curl -fsSL https://tailscale.com/install.sh | sh
 sudo tailscale up
 ```
 
-Access via your Tailscale IP or MagicDNS hostname. No config changes needed since it's a private network.
+Access via your Tailscale IP or MagicDNS hostname. No CORS config changes needed — the server allows requests from any address automatically. If you use OAuth connectors and want them to work over Tailscale, add your Tailscale address as an additional redirect URI in each OAuth app. Set `BASE_URL` to your Tailscale MagicDNS hostname (e.g. `http://mypi.tailnet.ts.net:8080`) if you primarily access via Tailscale.
 
 ### Lock Down the Tunnel with a Gateway Secret
 
