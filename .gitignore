@@ -32,3 +32,12 @@ storybook-static/
 
 # Custom connectors config (user-specific, not checked in)
 custom-connectors.json
+*.db
+
+# SQLite WAL journal files
+*-wal
+*-shm
+*-journal
+*.db-wal
+*.db-shm
+*.db-journal
