@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
@@ -343,9 +344,13 @@ func TestAgentListStandingApprovals_Pagination(t *testing.T) {
 	}
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	// Create 3 standing approvals.
+	// Create 3 standing approvals with distinct created_at values so cursor
+	// pagination stays stable (tight InsertStandingApproval loops can share the
+	// same SQLite strftime('now') tick, breaking (created_at, id) keyset logic).
+	base := time.Now().UTC().Add(-10 * time.Minute).Truncate(time.Second)
 	for i := 0; i < 3; i++ {
-		testhelper.InsertStandingApproval(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid)
+		testhelper.InsertStandingApprovalWithCreatedAt(t, tx, testhelper.GenerateID(t, "sa_"), agentID, uid,
+			base.Add(time.Duration(i)*time.Second))
 	}
 
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
