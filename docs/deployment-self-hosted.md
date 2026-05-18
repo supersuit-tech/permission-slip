@@ -15,7 +15,7 @@ Permission Slip ships as a **single Go binary** with the React frontend embedded
 
 ### Software prerequisites
 
-To build from source you need **Go 1.24+** and **Node.js 20+** on the machine running the build. If you'd rather skip the build step, see [Option B: Docker](#option-b-docker).
+To build from source you need **Go 1.24+** and **Node.js 20+** on the machine running the build.
 
 ---
 
@@ -42,8 +42,6 @@ Everything runs in one process on one port. Database migrations apply automatica
 ---
 
 ## Step 1: Get the Binary
-
-### Option A: Build from Source (recommended)
 
 **On the Pi itself:**
 
@@ -73,26 +71,6 @@ make build
 > GOOS=linux GOARCH=arm64 CGO_ENABLED=0 make build
 > scp bin/server pi@raspberrypi.local:~/permission-slip/bin/server
 > ```
-
-### Option B: Docker
-
-If you prefer a container-based deployment, install Docker first:
-
-```bash
-curl -fsSL https://get.docker.com | sh
-sudo usermod -aG docker $USER
-exit  # log out and back in
-```
-
-Build the image:
-
-```bash
-git clone https://github.com/supersuit-tech/permission-slip.git
-cd permission-slip
-docker build -t permission-slip .
-```
-
-> Building on-device takes 10–20 minutes on a Pi 5 (Go + Node.js compilation). Cross-compile or pull a pre-built image from CI to avoid this.
 
 ---
 
@@ -126,9 +104,9 @@ Create a `.env` file with your configuration. All values except `BASE_URL` are r
 
 ```bash
 mkdir -p ~/permission-slip
-cat > ~/permission-slip/.env <<'EOF'
+cat > ~/permission-slip/.env <<EOF
 # SQLite database path (created automatically on first run)
-DATABASE_PATH=/home/pi/permission-slip/data/app.db
+DATABASE_PATH=$HOME/permission-slip/data/app.db
 
 # Secrets — generate each with: openssl rand -base64 32
 SECRET_ENCRYPTION_KEY=replace-me
@@ -149,27 +127,25 @@ sed -i "s|INVITE_HMAC_KEY=replace-me|INVITE_HMAC_KEY=$(openssl rand -hex 32)|" ~
 ```
 
 ```bash
-mkdir -p /home/pi/permission-slip/data
+mkdir -p ~/permission-slip/data
 ```
 
 ---
 
 ## Step 3: Run on Boot (systemd)
 
-### Build from source
-
 ```bash
-sudo tee /etc/systemd/system/permission-slip.service > /dev/null <<'EOF'
+sudo tee /etc/systemd/system/permission-slip.service > /dev/null <<EOF
 [Unit]
 Description=Permission Slip
 After=network.target
 
 [Service]
 Type=simple
-User=pi
-WorkingDirectory=/home/pi/permission-slip
-EnvironmentFile=/home/pi/permission-slip/.env
-ExecStart=/home/pi/permission-slip/bin/server
+User=$(whoami)
+WorkingDirectory=$HOME/permission-slip
+EnvironmentFile=$HOME/permission-slip/.env
+ExecStart=$HOME/permission-slip/bin/server
 Restart=on-failure
 RestartSec=5
 
@@ -179,24 +155,6 @@ EOF
 
 sudo systemctl daemon-reload
 sudo systemctl enable --now permission-slip
-```
-
-### Docker
-
-```bash
-source ~/permission-slip/.env
-
-docker run -d --name permission-slip \
-  -p 8080:8080 \
-  -v /home/pi/permission-slip/data:/data \
-  -e DATABASE_PATH=/data/app.db \
-  -e SECRET_ENCRYPTION_KEY="$SECRET_ENCRYPTION_KEY" \
-  -e JWT_SIGNING_SECRET="$JWT_SIGNING_SECRET" \
-  -e INVITE_HMAC_KEY="$INVITE_HMAC_KEY" \
-  -e BASE_URL="$BASE_URL" \
-  -e ALLOWED_ORIGINS="$ALLOWED_ORIGINS" \
-  --restart unless-stopped \
-  permission-slip
 ```
 
 Check that it's running:
@@ -212,12 +170,8 @@ curl http://localhost:8080/api/health
 Create the first user with the bundled CLI tool:
 
 ```bash
-# From the permission-slip directory
-DATABASE_PATH=/home/pi/permission-slip/data/app.db \
+DATABASE_PATH=~/permission-slip/data/app.db \
   go run ./cmd/create-user you@example.com 'your-password'
-
-# Or, if running Docker:
-docker exec permission-slip ./server create-user you@example.com 'your-password'
 ```
 
 Then open your browser:
@@ -304,7 +258,6 @@ When Permission Slip is exposed through a public URL, set `GATEWAY_SECRET` so th
 ```bash
 echo "GATEWAY_SECRET=$(openssl rand -hex 32)" >> ~/permission-slip/.env
 sudo systemctl restart permission-slip
-# Or: docker restart permission-slip
 ```
 
 Configure the **mobile app**: Settings → Server → enable Custom Server → paste the secret into the gateway secret field.
@@ -326,11 +279,6 @@ git pull origin main
 # Rebuild and restart
 make build
 sudo systemctl restart permission-slip
-
-# Or, for Docker:
-docker stop permission-slip && docker rm permission-slip
-docker build -t permission-slip .
-# then re-run your docker run command
 ```
 
 Database migrations run automatically on startup — no manual migration step needed.
@@ -339,7 +287,7 @@ Database migrations run automatically on startup — no manual migration step ne
 
 ## Deployment Options Beyond the Pi
 
-Permission Slip works on any platform that supports Go binaries or Docker:
+Permission Slip works on any platform that supports Go binaries:
 
 ### Fly.io
 
@@ -361,7 +309,7 @@ fly deploy
 
 ### Railway / Render / Other PaaS
 
-1. Connect your repo (or push a Docker image)
+1. Connect your repo
 2. Set the required environment variables in the platform dashboard
 3. Ensure the health check hits `GET /api/health` on port 8080
 
@@ -403,7 +351,7 @@ export GATEWAY_SECRET="$(openssl rand -hex 32)"
 
 Permission Slip ships with built-in GitHub, HubSpot, Slack, and PostgreSQL connectors. To add custom connectors:
 
-**Option A — Inline JSON (recommended for containers):**
+**Option A — Inline JSON:**
 
 ```bash
 export CUSTOM_CONNECTORS_JSON='{"connectors":[{"repo":"https://github.com/acme/ps-jira-connector","ref":"v1.0.0"}]}'
@@ -423,7 +371,7 @@ See [Custom Connectors](custom-connectors.md) for details on building your own.
 - `200 OK` when the server is running
 - `503 Service Unavailable` if the database is unreachable
 
-Use this endpoint for container health checks and uptime monitoring.
+Use this endpoint for uptime monitoring.
 
 ---
 
