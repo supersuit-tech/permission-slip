@@ -40,6 +40,36 @@ npx @permission-slip/cli request --action email.send --params '{"to":"user@examp
 
 Run `npx @permission-slip/cli --help` for all available commands.
 
+### Self-hosted servers
+
+If you're connecting to a self-hosted Permission Slip instance instead of the
+cloud service, pass `--server` with the address of your server:
+
+```bash
+npx @permission-slip/cli register --invite-code <code> --server http://192.168.1.100:8080
+npx @permission-slip/cli verify --code <confirmation_code> --server http://192.168.1.100:8080
+```
+
+To avoid repeating `--server` on every command, save it once:
+
+```bash
+npx @permission-slip/cli config set default_server http://192.168.1.100:8080
+# Then all subsequent commands use it automatically:
+npx @permission-slip/cli register --invite-code <code>
+```
+
+Or set the `PS_SERVER` environment variable for the current shell session:
+
+```bash
+export PS_SERVER=http://192.168.1.100:8080
+npx @permission-slip/cli register --invite-code <code>
+```
+
+> **Can't connect?** Before running the CLI, verify your machine can actually
+> reach the server: `curl http://192.168.1.100:8080/api/health`. If that fails
+> while a browser on the same machine succeeds, see [Troubleshooting](#troubleshooting-self-hosted-cli-connectivity) in the
+> [Self-Hosted Deployment Guide](deployment-self-hosted.md).
+
 ## Manual Quick Start (raw HTTP)
 
 If you can't use Node.js, you can interact with the API directly:
