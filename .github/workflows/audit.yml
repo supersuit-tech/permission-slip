@@ -39,6 +39,8 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version-file: go.mod
+          cache: true
+          cache-dependency-path: go.sum
 
       - name: Ensure frontend/dist exists for go:embed
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
