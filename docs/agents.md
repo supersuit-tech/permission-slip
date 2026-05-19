@@ -65,10 +65,8 @@ export PS_SERVER=http://192.168.1.100:8080
 npx @permission-slip/cli register --invite-code <code>
 ```
 
-> **Can't connect?** Before running the CLI, verify your machine can actually
-> reach the server: `curl http://192.168.1.100:8080/api/health`. If that fails
-> while a browser on the same machine succeeds, see [Troubleshooting](#troubleshooting-self-hosted-cli-connectivity) in the
-> [Self-Hosted Deployment Guide](deployment-self-hosted.md).
+> **Can't connect?** Make sure the machine running the CLI and your Permission
+> Slip server are on the same network. See the [Self-Hosted Deployment Guide](deployment-self-hosted.md) troubleshooting section if you get "No route to host" or "fetch failed".
 
 ## Manual Quick Start (raw HTTP)
 
