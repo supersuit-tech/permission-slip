@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface CopyableCodeProps {
   code: string;
@@ -19,7 +20,7 @@ export function CopyableCode({ code, className }: CopyableCodeProps) {
 
   function handleCopy(e: React.MouseEvent) {
     e.stopPropagation();
-    navigator.clipboard.writeText(code).then(
+    copyToClipboard(code).then(
       () => {
         setCopied(true);
         toast.success("Confirmation code copied");
