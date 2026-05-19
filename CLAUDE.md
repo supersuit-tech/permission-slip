@@ -27,6 +27,7 @@
   2. **Reply** in the thread explaining what you changed and why (or why you disagree).
   This builds context over time and helps the reviewer calibrate their feedback.
 - If a file is getting large enough that splitting it would improve maintainability, just go ahead and split it — don't ask first.
+- **Resolve merge conflicts without being asked.** If a PR develops merge conflicts after main moves forward, rebase from main and push immediately — don't wait for the user to point it out. A PR is not done until it is conflict-free and CI is green.
 - When you need to ask questions, just ask them in regular chat text. Do NOT use the AskUserQuestion tool — it doesn't work reliably.
 
 ## Post-Task Review (before marking complete)
@@ -63,6 +64,25 @@ This codebase is worked on in parallel by multiple agents and developers. Write 
 - **Keep diffs minimal.** Only touch lines directly related to your task. Resist the urge to fix nearby style issues, rename unrelated variables, or "clean up while you're in there" — save those for a dedicated cleanup PR.
 - **Avoid touching shared configuration files unnecessarily.** Files like `package.json`, `go.mod`, `tsconfig.json`, and CI configs are edited by almost every branch. Only modify them when your task genuinely requires it.
 - **When you must edit a hot file, make surgical changes.** If you need to add a route to a central router or a column to a shared type, add it in as few lines as possible and avoid reformatting surrounding code.
+
+### Resolving Conflicts When They Occur
+
+When a PR already has conflicts (i.e. it can't be merged cleanly into main):
+
+```bash
+# Rebase onto the latest main to resolve conflicts
+git fetch origin main
+git rebase origin/main
+
+# Resolve any conflict markers, then:
+git add <resolved-files>
+git rebase --continue
+
+# Force-push the rebased branch
+git push -u origin <branch-name> --force-with-lease
+```
+
+After pushing, wait for CI to pass before considering the PR ready. Both clean merge status and green CI are required — a PR is not done until both conditions hold.
 
 ## Testing
 
