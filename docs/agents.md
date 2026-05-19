@@ -65,10 +65,20 @@ export PS_SERVER=http://192.168.1.100:8080
 npx @permission-slip/cli register --invite-code <code>
 ```
 
-> **Can't connect?** Before running the CLI, verify your machine can actually
-> reach the server: `curl http://192.168.1.100:8080/api/health`. If that fails
-> while a browser on the same machine succeeds, see [Troubleshooting](#troubleshooting-self-hosted-cli-connectivity) in the
-> [Self-Hosted Deployment Guide](deployment-self-hosted.md).
+> ### ⚠️ macOS: Grant Node.js Local Network Access
+>
+> On macOS, Node.js must be explicitly granted permission to reach devices on
+> your local network. Without this the CLI will fail silently.
+>
+> **System Settings → Privacy & Security → Local Network**
+>
+> Find **"node"** in the list and toggle it **on**. If it isn't listed yet, run
+> the CLI once and macOS will prompt you.
+
+> **Can't connect?** Also make sure the machine running the CLI and your
+> Permission Slip server are on the same network. See the
+> [Self-Hosted Deployment Guide](deployment-self-hosted.md) troubleshooting
+> section for more.
 
 ## Manual Quick Start (raw HTTP)
 

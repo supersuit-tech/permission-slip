@@ -504,68 +504,22 @@ If any VAPID variable is set, all three (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`
 **Migrations fail:**
 Check database path permissions. The `data/` directory must be writable by the user running the server.
 
-<a name="troubleshooting-self-hosted-cli-connectivity"></a>
-**CLI or `curl` fails with "No route to host" but the browser can reach the server:**
+**CLI fails with "No route to host" or "fetch failed":**
+Make sure the Raspberry Pi and the machine running the CLI are on the same network without any network isolation between them. For example, if your Pi is on Ethernet and your laptop is on Wi-Fi, they need to be on the same subnet — a direct Ethernet connection or a router that bridges both interfaces. Network isolation features (such as AP client isolation on some routers) will also block this. The simplest setup is both devices connected to the same router.
 
-This is a client-side networking problem — the browser and Node.js/curl use
-different parts of the OS networking stack, and they can behave differently.
-Work through these checks in order:
-
-1. **macOS Application Firewall** — the most common cause on macOS. Open System
-   Settings → Privacy & Security → Firewall → Firewall Options. If Node.js or
-   `curl` (or any terminal in `/usr/bin`) appears in the list and is set to
-   "Block incoming connections", change it to "Allow" or remove the entry. Even
-   a "block incoming" rule can prevent *outbound* connections on some macOS
-   versions due to the way the application-level firewall works.
-
-2. **Verify plain `curl` fails too** — if `curl` also fails but the browser
-   works, the issue is OS-level, not specific to Node.js:
-   ```bash
-   curl -v http://192.168.1.100:8080/api/health
-   ```
-   If this returns `No route to host`, keep reading. If it succeeds, the issue
-   is Node.js-specific — check for Node.js in the macOS Application Firewall as
-   described above.
-
-3. **Check the routing table (macOS/Linux)** — when multiple network interfaces
-   are active (e.g., Wi-Fi and a VPN, or Wi-Fi and Ethernet), traffic for the
-   server's subnet may be routed over the wrong interface:
-   ```bash
-   # macOS
-   route get 192.168.1.100   # shows which interface traffic will use
-
-   # Linux
-   ip route get 192.168.1.100
-   ```
-   If the output shows an interface that isn't on the same network as the server
-   (e.g., a VPN interface when the server is on your LAN), disable the other
-   interface temporarily or add a specific host route:
-   ```bash
-   # macOS — force traffic through en0 (replace with the correct interface)
-   sudo route add -host 192.168.1.100 -interface en0
-   ```
-
-4. **Check the server's firewall** — the Pi or server may block connections on
-   port 8080 from other hosts:
-   ```bash
-   # On the Pi/server
-   sudo ufw status
-   sudo ufw allow 8080/tcp   # open port 8080 if it's not already
-   ```
-   Then retry `curl -v http://192.168.1.100:8080/api/health` from your client
-   machine.
-
-5. **Verify the server is listening on all interfaces** — if the server is bound
-   to `127.0.0.1` only, it won't accept connections from other machines. Check:
-   ```bash
-   # On the Pi/server
-   ss -tlnp | grep 8080   # Linux
-   netstat -an | grep 8080 # macOS/BSD
-   ```
-   The address column should show `0.0.0.0:8080` (all interfaces), not
-   `127.0.0.1:8080` (localhost only). Permission Slip binds to `0.0.0.0` by
-   default; if you see `127.0.0.1`, check your environment for a `HOST` or
-   `BIND_ADDR` variable that may be overriding this.
+> ### ⚠️ macOS: Grant Node.js Local Network Access
+>
+> On macOS, Node.js must be explicitly granted permission to access devices on
+> your local network — without this, the CLI will fail to reach your Pi even if
+> the network is set up correctly.
+>
+> **System Settings → Privacy & Security → Local Network**
+>
+> Find **"node"** in the list and toggle it **on**.
+>
+> If Node.js doesn't appear in the list yet, run the CLI command once — macOS
+> will prompt you for permission. If the prompt never appeared, check here and
+> add it manually.
 
 ---
 
