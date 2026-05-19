@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { copyToClipboard } from "@/lib/clipboard";
 
 interface InstructionsBlockProps {
   instructions: string;
@@ -26,14 +27,15 @@ export function InstructionsBlock({
   }, []);
 
   function handleCopy() {
-    navigator.clipboard.writeText(instructions).then(
-      () => {
-        setCopied(true);
-        toast.success("Instructions copied to clipboard");
-        if (timerRef.current) clearTimeout(timerRef.current);
-        timerRef.current = setTimeout(() => setCopied(false), 2000);
-      },
-      () => toast.error("Failed to copy to clipboard"),
+    const onSuccess = () => {
+      setCopied(true);
+      toast.success("Instructions copied to clipboard");
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(() => setCopied(false), 2000);
+    };
+
+    copyToClipboard(instructions).then(onSuccess, () =>
+      toast.error("Failed to copy to clipboard"),
     );
   }
 
