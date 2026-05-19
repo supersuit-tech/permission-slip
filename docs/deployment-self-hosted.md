@@ -1,22 +1,36 @@
 # Self-Hosted Deployment Guide
 
-Permission Slip ships as a **single Go binary** with the React frontend embedded — no separate web server, database server, or external auth service needed.
+Permission Slip ships as a **single Go binary** with the React frontend embedded. You'll run it on your own machine and expose it to the internet through a free Cloudflare Tunnel — no port forwarding, no manual TLS, your own HTTPS hostname.
 
-> **Recommended hardware: Raspberry Pi 5 (4GB+).** Cheap, silent, always-on, and keeps your approval server on your own network. The steps below use a Pi as the example but work on any Linux machine, VM, or VPS. You need **Go 1.24+** and **Node.js 20+** to build from source.
+> **Recommended hardware: Raspberry Pi 5 (4GB+).** Cheap, silent, always-on. The steps below use a Pi as the example but work on any Linux machine, VM, or VPS. You need **Go 1.24+** and **Node.js 20+** to build from source.
 
 ```
-┌─────────────────────────────────────────────┐
-│           Permission Slip Server            │
-│  ┌──────────────┐  ┌────────────────────┐   │
-│  │  Go API      │  │  Embedded React    │   │
-│  │  (port 8080) │  │  Frontend          │   │
-│  └──────┬───────┘  └────────────────────┘   │
-└─────────┼────────────────────────────────────┘
-          │
-    ┌─────▼─────┐
-    │  SQLite   │
-    └───────────┘
+ ┌──────────────┐
+ │  You, the    │
+ │  mobile app  │
+ └──────┬───────┘
+        │ https://permissions.yourdomain.com
+        ▼
+ ┌──────────────────┐
+ │  Cloudflare      │  TLS termination, DDoS protection
+ │  Tunnel          │
+ └──────┬───────────┘
+        │ encrypted tunnel
+        ▼
+┌──────────────────────────────────────────┐
+│   Permission Slip (single Go binary)     │
+│   API + embedded React UI → port 8080    │
+│              │                            │
+│              ▼                            │
+│         ┌────────┐                        │
+│         │ SQLite │                        │
+│         └────────┘                        │
+└──────────────────────────────────────────┘
 ```
+
+### Before you start
+
+You need a **Cloudflare account** and a **domain managed by Cloudflare** (free if you already own one — just point its nameservers at Cloudflare; ~$10/year if you register a new one through them). All other steps below are scriptable.
 
 ---
 
@@ -49,32 +63,71 @@ make build
 
 ---
 
-## Step 2: Configure
+## Step 2: Set Up Cloudflare Tunnel
 
-Find your Pi's IP address — you'll use it for `BASE_URL` and to access the web UI:
+This is the only step where you make a choice: **pick the hostname you'll use for Permission Slip** (e.g. `permissions.yourdomain.com`). Set it as a shell variable so the rest of the guide is copy-paste:
 
 ```bash
-hostname -I | awk '{print $1}'
+export PS_HOSTNAME=permissions.yourdomain.com   # ← change this
 ```
 
-> **Tip:** Assign a static DHCP lease in your router so the IP doesn't change after reboots (look for "DHCP reservation" in your router's admin UI). On macOS and Linux, `raspberrypi.local` also works as an alternative to the IP address.
+Install `cloudflared` (use `cloudflared-linux-amd64` on x86 servers):
 
-Create a `.env` file:
+```bash
+curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -o cloudflared
+chmod +x cloudflared && sudo mv cloudflared /usr/local/bin/
+```
+
+Authenticate and create the tunnel:
+
+```bash
+# Opens a browser — pick the domain that contains $PS_HOSTNAME
+cloudflared tunnel login
+
+# Create the tunnel and capture its ID
+cloudflared tunnel create permission-slip
+export TUNNEL_ID=$(cloudflared tunnel list | grep permission-slip | awk '{print $1}')
+```
+
+Write the tunnel config and install it as a system service:
+
+```bash
+sudo mkdir -p /etc/cloudflared
+sudo cp ~/.cloudflared/$TUNNEL_ID.json /etc/cloudflared/
+sudo tee /etc/cloudflared/config.yml > /dev/null <<EOF
+tunnel: $TUNNEL_ID
+credentials-file: /etc/cloudflared/$TUNNEL_ID.json
+
+ingress:
+  - hostname: $PS_HOSTNAME
+    service: http://localhost:8080
+  - service: http_status:404
+EOF
+
+# Route DNS for $PS_HOSTNAME to this tunnel
+cloudflared tunnel route dns permission-slip $PS_HOSTNAME
+
+# Install and start the cloudflared service
+sudo cloudflared service install
+sudo systemctl enable --now cloudflared
+```
+
+Your tunnel is now running. Once Permission Slip is up (next steps), it'll be reachable at `https://$PS_HOSTNAME`.
+
+---
+
+## Step 3: Configure Permission Slip
 
 ```bash
 mkdir -p ~/permission-slip/data
 cat > ~/permission-slip/.env <<EOF
-# SQLite database path (created automatically on first run)
 DATABASE_PATH=$HOME/permission-slip/data/app.db
+BASE_URL=https://$PS_HOSTNAME
 
-# Secrets — generate each with: openssl rand -base64 32
+# Generated below — leave as placeholders for now
 SECRET_ENCRYPTION_KEY=replace-me
 JWT_SIGNING_SECRET=replace-me
 INVITE_HMAC_KEY=replace-me
-
-# Public URL — required for OAuth connector callbacks; use your IP or hostname
-# BASE_URL=http://192.168.1.100:8080
-BASE_URL=
 EOF
 
 # Fill in the secrets
@@ -83,17 +136,17 @@ sed -i "s|JWT_SIGNING_SECRET=replace-me|JWT_SIGNING_SECRET=$(openssl rand -base6
 sed -i "s|INVITE_HMAC_KEY=replace-me|INVITE_HMAC_KEY=$(openssl rand -hex 32)|" ~/permission-slip/.env
 ```
 
-> **`ALLOWED_ORIGINS`** does not need to be set. The server automatically allows requests from whatever address the browser used to reach it.
+That's it — `BASE_URL` is your public HTTPS hostname, and `ALLOWED_ORIGINS` doesn't need to be set (the server allows the origin the browser used).
 
 ---
 
-## Step 3: Run on Boot (systemd)
+## Step 4: Run on Boot (systemd)
 
 ```bash
 sudo tee /etc/systemd/system/permission-slip.service > /dev/null <<EOF
 [Unit]
 Description=Permission Slip
-After=network.target
+After=network.target cloudflared.service
 
 [Service]
 Type=simple
@@ -112,24 +165,23 @@ sudo systemctl daemon-reload
 sudo systemctl enable --now permission-slip
 ```
 
-Verify it's running:
+Verify both services are healthy:
 
 ```bash
-curl http://localhost:8080/api/health
+curl http://localhost:8080/api/health           # local check
+curl https://$PS_HOSTNAME/api/health            # through the tunnel
 ```
 
 ---
 
-## Step 4: Create Your Account
+## Step 5: Create Your Account
 
 ```bash
 DATABASE_PATH=~/permission-slip/data/app.db \
   go run ./cmd/create-user you@example.com 'your-password'
 ```
 
-Then open `http://raspberrypi.local:8080` (or your IP) and log in.
-
-> If `raspberrypi.local` doesn't resolve, use the IP address from Step 2. Not all networks support mDNS.
+Open `https://$PS_HOSTNAME` in your browser and log in.
 
 ---
 
@@ -176,39 +228,17 @@ NOTIFICATION_EMAIL_FROM=you@gmail.com
 
 ---
 
-## Internet Access (Optional)
+## Hardening (Optional)
 
-To approve requests when away from home:
+Your tunnel is public — anyone with the hostname can reach the login page. Two ways to add a gate in front:
 
-### Cloudflare Tunnel (recommended — free, no port forwarding)
+### Cloudflare Access (recommended)
 
-```bash
-# Install cloudflared
-curl -fsSL https://pkg.cloudflare.com/cloudflare-main.gpg | sudo tee /usr/share/keyrings/cloudflare-main.gpg > /dev/null
-echo "deb [signed-by=/usr/share/keyrings/cloudflare-main.gpg] https://pkg.cloudflare.com/cloudflared $(lsb_release -cs) main" | sudo tee /etc/apt/sources.list.d/cloudflared.list
-sudo apt update && sudo apt install -y cloudflared
-
-# Create and run a tunnel
-cloudflared tunnel login
-cloudflared tunnel create permission-slip
-cloudflared tunnel route dns permission-slip permissions.yourdomain.com
-cloudflared tunnel run --url http://localhost:8080 permission-slip
-```
-
-Update `BASE_URL` in `.env` to your public URL and restart. `ALLOWED_ORIGINS` does not need to be set.
-
-### Tailscale (good for personal use)
-
-```bash
-curl -fsSL https://tailscale.com/install.sh | sh
-sudo tailscale up
-```
-
-Access via your Tailscale IP or MagicDNS hostname. Set `BASE_URL` to your MagicDNS hostname if you use OAuth connectors over Tailscale.
+Put a Cloudflare Access policy in front of your tunnel hostname. Users authenticate with email, Google, GitHub, etc. before reaching Permission Slip. Works with both the web UI and the mobile app. Configure it in the [Cloudflare Zero Trust dashboard](https://one.dash.cloudflare.com/).
 
 ### Gateway Secret
 
-When your server is reachable from the internet, set `GATEWAY_SECRET` to reject requests without a matching header — so a leaked hostname alone isn't enough to reach the app:
+For mobile-only deployments, set `GATEWAY_SECRET` so the server rejects any request without a matching `X-Gateway-Secret` header:
 
 ```bash
 echo "GATEWAY_SECRET=$(openssl rand -hex 32)" >> ~/permission-slip/.env
@@ -217,9 +247,7 @@ sudo systemctl restart permission-slip
 
 Configure the **mobile app**: Settings → Server → enable Custom Server → paste the secret into the gateway secret field.
 
-> **Note:** With `GATEWAY_SECRET` set, the web UI won't work from a browser (browsers can't inject custom headers). Use the mobile app, or Tailscale instead if you need the web UI.
-
-The comparison is constant-time over SHA-256 digests. Genuine CORS preflights are exempt.
+> **Note:** Browsers can't inject custom headers, so the web UI won't work with `GATEWAY_SECRET` set. Use Cloudflare Access if you need browser access.
 
 ---
 
@@ -236,9 +264,11 @@ Database migrations run automatically on startup.
 
 ---
 
-## Other Deployment Options
+## Alternative Deployments
 
 ### Fly.io
+
+Fly handles TLS itself, so you can skip Cloudflare Tunnel:
 
 ```bash
 fly launch
@@ -254,23 +284,22 @@ fly deploy
 
 See the dedicated [Fly.io deployment guide](deployment.md) for full details.
 
+### Tailscale (personal/VPN-only)
+
+If you only need to reach Permission Slip from your own devices, skip Cloudflare Tunnel and use Tailscale instead:
+
+```bash
+curl -fsSL https://tailscale.com/install.sh | sh
+sudo tailscale up
+```
+
+Set `BASE_URL` to your MagicDNS hostname (e.g. `http://mypi.tailnet.ts.net:8080`). No public hostname, no TLS — the Tailscale network is your security boundary.
+
 ### Railway / Render / Other PaaS
 
 1. Connect your repo
 2. Set the required environment variables in the platform dashboard
 3. Point the health check at `GET /api/health` on port 8080
-
----
-
-## TLS / Reverse Proxy
-
-The server listens on plain HTTP. Terminate TLS in front of it:
-
-- **Fly.io** — handles TLS automatically
-- **nginx / Caddy** — reverse proxy to `localhost:8080`
-- **Cloudflare Tunnel** — TLS handled by Cloudflare
-
-If using a reverse proxy, set `TRUSTED_PROXY_HEADER` to the header your proxy uses for the real client IP (e.g., `X-Forwarded-For` or `X-Real-IP`).
 
 ---
 
@@ -303,11 +332,17 @@ Recommended cadence: every 90 days for `JWT_SIGNING_SECRET` and `INVITE_HMAC_KEY
 **"required configuration value(s) missing" on startup**
 Check that `DATABASE_PATH`, `JWT_SIGNING_SECRET`, and `SECRET_ENCRYPTION_KEY` are all set.
 
-**Health check fails after deploy**
-Check logs. Common causes: missing env vars, bad `DATABASE_PATH`, or the `data/` directory isn't writable.
+**`https://$PS_HOSTNAME` returns 502 or 1033**
+The tunnel is up but Permission Slip isn't. Check `sudo systemctl status permission-slip` and `journalctl -u permission-slip -n 50`.
 
-**Can't reach `raspberrypi.local`**
-Not all networks support mDNS. Use the IP address (`hostname -I`) instead. Consider a static DHCP lease in your router.
+**`https://$PS_HOSTNAME` returns 1016 ("Origin DNS error")**
+The DNS record hasn't propagated yet, or `cloudflared tunnel route dns` wasn't run. Re-run it and wait a minute.
+
+**`cloudflared` won't start**
+Check `sudo systemctl status cloudflared`. Common cause: credentials file path in `/etc/cloudflared/config.yml` doesn't match the file you copied. Run `ls /etc/cloudflared/` to verify.
+
+**Health check fails on localhost**
+Common causes: missing env vars, bad `DATABASE_PATH`, or the `data/` directory isn't writable.
 
 **Out of memory during build**
 On a 4GB Pi, add swap:
@@ -322,9 +357,6 @@ If any VAPID variable is set, all three (`VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`
 
 **Migrations fail**
 The `data/` directory must be writable by the user running the server.
-
-**CLI fails with "No route to host"**
-The Pi and the machine running the CLI must be on the same subnet without network isolation (e.g., AP client isolation). On macOS, grant Node.js local network access: **System Settings → Privacy & Security → Local Network**, find **node** and toggle it on.
 
 ---
 
