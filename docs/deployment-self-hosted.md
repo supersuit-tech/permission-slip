@@ -507,6 +507,20 @@ Check database path permissions. The `data/` directory must be writable by the u
 **CLI fails with "No route to host" or "fetch failed":**
 Make sure the Raspberry Pi and the machine running the CLI are on the same network without any network isolation between them. For example, if your Pi is on Ethernet and your laptop is on Wi-Fi, they need to be on the same subnet — a direct Ethernet connection or a router that bridges both interfaces. Network isolation features (such as AP client isolation on some routers) will also block this. The simplest setup is both devices connected to the same router.
 
+> ### ⚠️ macOS: Grant Node.js Local Network Access
+>
+> On macOS, Node.js must be explicitly granted permission to access devices on
+> your local network — without this, the CLI will fail to reach your Pi even if
+> the network is set up correctly.
+>
+> **System Settings → Privacy & Security → Local Network**
+>
+> Find **"node"** in the list and toggle it **on**.
+>
+> If Node.js doesn't appear in the list yet, run the CLI command once — macOS
+> will prompt you for permission. If the prompt never appeared, check here and
+> add it manually.
+
 ---
 
 ## Complete Environment Variable Reference
