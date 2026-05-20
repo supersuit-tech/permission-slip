@@ -71,6 +71,8 @@ This is the only step where you make a choice: **pick the hostname you'll use fo
 export PS_HOSTNAME=permissions.yourdomain.com   # ← change this
 ```
 
+> These shell variables are **only needed during setup** — they get written into config files and aren't referenced again. No need to add them to `.bashrc`.
+
 Install `cloudflared` (use `cloudflared-linux-amd64` on x86 servers):
 
 ```bash
