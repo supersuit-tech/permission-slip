@@ -110,7 +110,12 @@ cloudflared tunnel route dns permission-slip $PS_HOSTNAME
 # Install and start the cloudflared service
 sudo cloudflared service install
 sudo systemctl enable --now cloudflared
+
+# Remove the broad account credentials — the tunnel only needs its own JSON credentials file
+rm ~/.cloudflared/cert.pem
 ```
+
+> **Why delete `cert.pem`?** `cloudflared tunnel login` creates `~/.cloudflared/cert.pem`, which grants broad access to manage your Cloudflare account. Once the tunnel is created and its credentials file is copied to `/etc/cloudflared/`, the running service only needs that tunnel-scoped JSON file. Deleting `cert.pem` limits the machine's access to this tunnel only.
 
 Your tunnel is now running. Once Permission Slip is up (next steps), it'll be reachable at `https://$PS_HOSTNAME`.
 
