@@ -131,6 +131,11 @@ cat > ~/permission-slip/.env <<EOF
 DATABASE_PATH=$HOME/permission-slip/data/app.db
 BASE_URL=https://$PS_HOSTNAME
 
+# Allow Cloudflare's web analytics beacon through the Content Security Policy.
+# Cloudflare injects this script automatically when serving via a tunnel; without
+# it you'll see CSP errors in the browser console.
+CLOUDFLARE_INSIGHTS=true
+
 # Generated below — leave as placeholders for now
 SECRET_ENCRYPTION_KEY=replace-me
 JWT_SIGNING_SECRET=replace-me
