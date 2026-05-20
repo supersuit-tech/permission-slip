@@ -28,6 +28,13 @@ export type AuthTokenResponse = {
   expires_at: string;
 };
 
+/**
+ * Network timeout for auth requests. Set well below the 10s App-level loading
+ * guard in App.tsx so an unreachable server fails fast and surfaces a
+ * "connection issue" error instead of hanging until the higher-level fallback.
+ */
+const AUTH_REQUEST_TIMEOUT_MS = 8_000;
+
 function parseJsonSafe(text: string): unknown {
   try {
     return JSON.parse(text) as unknown;
@@ -49,11 +56,34 @@ export async function postAuth(
     headers["X-Gateway-Secret"] = secret;
   }
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers,
-    body: JSON.stringify(body),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);
+  let res: Response;
+  try {
+    res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    // AbortError (timeout) or TypeError (DNS/connection failure) — both
+    // indicate the configured server URL is unreachable. Surface a
+    // structured error so callers can show "Connection issue" UI and offer
+    // a "Change server URL" affordance without hanging on the network.
+    const aborted =
+      err instanceof Error &&
+      (err.name === "AbortError" || /aborted/i.test(err.message));
+    const message = aborted
+      ? "Server did not respond. Check the server URL and try again."
+      : "Unable to reach the server. Check the server URL and try again.";
+    return {
+      data: null,
+      error: createAuthError("network_unreachable", message, 0),
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 
   if (path === "logout") {
     if (res.status === 204) {

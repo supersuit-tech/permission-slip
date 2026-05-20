@@ -8,6 +8,8 @@ const SAFE_ERROR_MESSAGES: Record<string, string> = {
   request_failed: "Something went wrong. Please try again.",
   logout_failed: "Sign out failed. Please try again.",
   invalid_response: "Something went wrong. Please try again.",
+  network_unreachable:
+    "Couldn't reach the server. Check the server URL and your connection.",
 };
 
 export function safeErrorMessage(error: AuthError): string {

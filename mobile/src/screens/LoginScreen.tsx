@@ -15,11 +15,13 @@ import { useFormSubmit } from "../auth/useFormSubmit";
 import { authStyles } from "../auth/styles";
 import { colors } from "../theme/colors";
 import validation from "../lib/validation";
+import { useServerSetup } from "../lib/serverSetupContext";
 
 type Mode = "login" | "signup";
 
 export default function LoginScreen() {
   const { signInWithPassword, signUpWithPassword } = useAuth();
+  const { openServerSetup } = useServerSetup();
   const [mode, setMode] = useState<Mode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -167,6 +169,17 @@ export default function LoginScreen() {
         >
           <Text style={authStyles.primaryButtonText}>{submitLabel}</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity
+          testID="login-change-server"
+          accessibilityLabel="Change server URL"
+          accessibilityRole="button"
+          style={localStyles.changeServer}
+          onPress={openServerSetup}
+          disabled={isSubmitting}
+        >
+          <Text style={localStyles.changeServerText}>Change server URL</Text>
+        </TouchableOpacity>
       </Pressable>
     </KeyboardAvoidingView>
   );
@@ -202,5 +215,16 @@ const localStyles = StyleSheet.create({
     marginTop: 6,
     fontSize: 12,
     color: colors.gray500,
+  },
+  changeServer: {
+    marginTop: 20,
+    alignItems: "center",
+    paddingVertical: 8,
+  },
+  changeServerText: {
+    color: colors.gray500,
+    fontSize: 14,
+    fontWeight: "500",
+    textDecorationLine: "underline",
   },
 });
