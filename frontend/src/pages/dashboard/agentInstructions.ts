@@ -32,9 +32,11 @@ export function generateVerificationInstructions(
   confirmationCode: string,
   origin: string,
 ): string {
-  return `npx @permission-slip/cli verify --code ${shellQuote(confirmationCode)} --server ${shellQuote(origin)}
-
-Your agent ID is: ${agentId}`;
+  // Pass --agent-id explicitly so the command works without relying on a
+  // saved registration in ~/.permission-slip/registrations.json. Without
+  // this, verify silently fails locally (never reaches the server) on any
+  // machine that didn't run `register` against this exact --server URL.
+  return `npx @permission-slip/cli verify --agent-id ${agentId} --code ${shellQuote(confirmationCode)} --server ${shellQuote(origin)}`;
 }
 
 // ---------------------------------------------------------------------------
