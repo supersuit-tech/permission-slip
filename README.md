@@ -27,7 +27,7 @@ Permission Slip is an open-source approval layer for [Openclaw](https://openclaw
 
 Permission Slip is **self-hosted**: you run the server on your own machine or network.
 
-- **[Self-hosted deployment guide](docs/deployment-self-hosted.md)** — Raspberry Pi (recommended), bare metal, Docker, Fly.io
+- **[Self-hosted deployment guide](docs/deployment-self-hosted.md)** — Raspberry Pi (recommended) or any Linux machine, with Google + Slack OAuth setup
 - **[iPhone app](https://apps.apple.com/us/app/permission-slip/id6761718603)** — approve requests on the go; enter your server URL on first launch
 - **[CLI](cli/README.md)** — talks to your server; set `PS_SERVER` or pass `--server`
 
@@ -113,7 +113,7 @@ Tested a connector? [Open an issue](https://github.com/supersuit-tech/permission
 ## Documentation
 
 **Setup & deployment**
-- [Self-Hosted Deployment](docs/deployment-self-hosted.md) — Raspberry Pi, bare metal, Docker, Fly.io
+- [Self-Hosted Deployment](docs/deployment-self-hosted.md) — Raspberry Pi or any Linux machine, with Google + Slack OAuth setup
 - [Developer guide](docs/development.md) — local dev servers, builds, testing, tech stack
 
 **Architecture & protocol**

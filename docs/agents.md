@@ -77,8 +77,8 @@ npx @permission-slip/cli register --invite-code <code>
 
 > **Can't connect?** Also make sure the machine running the CLI and your
 > Permission Slip server are on the same network. See the
-> [Self-Hosted Deployment Guide](deployment-self-hosted.md) troubleshooting
-> section for more.
+> [Self-Hosted Deployment Guide](deployment-self-hosted.md) for setup
+> details.
 
 ## Manual Quick Start (raw HTTP)
 
