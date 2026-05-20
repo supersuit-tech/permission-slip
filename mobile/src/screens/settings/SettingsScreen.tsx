@@ -272,7 +272,7 @@ export default function SettingsScreen(_props: Props) {
         <Text style={styles.sectionDescription}>
           Connect to a self-hosted Permission Slip instance.
         </Text>
-        <CustomServerSettings />
+        <CustomServerSettings onSaved={signOut} />
       </View>
 
       <View style={styles.buildInfo}>
