@@ -18,7 +18,7 @@ type Deps struct {
 	DB                     db.DBTX                 // nil when running without a database
 	Vault                  vault.VaultStore        // credential secret encryption; nil returns 503 on credential endpoints
 	JWTSigningSecret       string                  // HMAC-SHA256 secret for HS256 access JWTs (min 32 bytes; set JWT_SIGNING_SECRET)
-	BaseURL                string                  // Public base URL (e.g. "https://app.permissionslip.dev"); used to construct invite URLs
+	BaseURL                string                  // Public base URL (e.g. "https://your-server.example.com"); used to construct invite URLs
 	InviteHMACKey          string                  // HMAC key for hashing short codes (invite codes, confirmation codes); if empty, falls back to plain SHA-256
 	Notifier               *notify.Dispatcher      // notification fan-out; nil means notifications are disabled
 	VAPIDPublicKey         string                  // VAPID public key for Web Push; empty if not configured

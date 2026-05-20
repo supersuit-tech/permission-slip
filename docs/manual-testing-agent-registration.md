@@ -28,8 +28,8 @@ Set your host and API base URLs:
 export PS_HOST="http://localhost:8080"
 export PS_API="${PS_HOST}/api/v1"
 
-# Or staging
-# export PS_HOST="https://staging.app.permissionslip.dev"
+# Or a remote server
+# export PS_HOST="https://your-server.example.com"
 # export PS_API="${PS_HOST}/api/v1"
 ```
 
@@ -216,7 +216,7 @@ bash ps_curl.sh POST /invite/PS-TEST '{"test": true}' "" "$PS_HOST"
 On the Permission Slip dashboard, click **"Add Agent"** to create a registration invite. This calls `POST /api/v1/registration-invites` internally and gives you an invite URL like:
 
 ```
-https://app.permissionslip.dev/invite/PS-ABCD-1234
+https://your-server.example.com/invite/PS-ABCD-1234
 ```
 
 The invite code is the last path segment: `PS-ABCD-1234`
@@ -370,7 +370,7 @@ bash ps_curl.sh POST "/approvals/request" "$BODY" "$AGENT_ID"
 ```json
 {
     "approval_id": "appr_xyz789",
-    "approval_url": "https://app.permissionslip.dev/...",
+    "approval_url": "https://your-server.example.com/...",
     "status": "pending",
     "expires_at": "2026-02-23T12:30:00Z",
     "verification_required": true

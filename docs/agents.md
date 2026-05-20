@@ -2,9 +2,9 @@
 
 How Openclaw connects to Permission Slip.
 
-**Base URL**: `https://app.permissionslip.dev/api/v1`
+**Base URL**: `https://your-server.example.com/api/v1`
 
-> **Note**: The invite endpoint (`POST /invite/{code}`) is served at the host root (`https://app.permissionslip.dev/invite/{code}`), not under the API base. All other endpoints use the API base above.
+> **Note**: The invite endpoint (`POST /invite/{code}`) is served at the host root (`https://your-server.example.com/invite/{code}`), not under the API base. All other endpoints use the API base above.
 
 ---
 
@@ -126,7 +126,7 @@ Only `ssh-ed25519` keys are supported. RSA, ECDSA, and other key types are rejec
 
 ### Step 2a: POST to the Invite URL
 
-The user gives you a URL like `https://app.permissionslip.dev/invite/PS-ABCD-1234`.
+The user gives you a URL like `https://your-server.example.com/invite/PS-ABCD-1234`.
 
 ```http
 POST /invite/PS-ABCD-1234
@@ -358,7 +358,7 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
       "id": "stripe",
       "name": "Stripe",
       "credentials_ready": false,
-      "credentials_setup_url": "https://app.permissionslip.dev/connect/stripe",
+      "credentials_setup_url": "https://your-server.example.com/connect/stripe",
       "actions": [ ... ]
     }
   ]
@@ -439,7 +439,7 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
 ```json
 {
   "approval_id": "appr_xyz789",
-  "approval_url": "https://app.permissionslip.dev/.../approve/appr_xyz789",
+  "approval_url": "https://your-server.example.com/.../approve/appr_xyz789",
   "status": "pending",
   "expires_at": "2026-02-23T12:30:00Z",
   "verification_required": true

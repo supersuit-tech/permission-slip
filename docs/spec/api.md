@@ -34,10 +34,10 @@ For detailed definitions of core terms (Agent, Approver, Service, Action, Token,
 
 ## Base URL
 
-Permission Slip is a hosted SaaS. All API endpoints are served at:
+Permission Slip is a self-hosted service. Each deployment serves all API endpoints at its own base URL, e.g.:
 
 ```
-https://app.permissionslip.dev/permission-slip/v1
+https://your-server.example.com/permission-slip/v1
 ```
 
 Agents interact only with the Permission Slip service — never with external services directly. When an approved action is executed, Permission Slip calls the external service's API using the user's stored credentials and returns the result to the agent.
@@ -45,7 +45,7 @@ Agents interact only with the Permission Slip service — never with external se
 All endpoints in this specification are documented relative to this base URL. For example, `POST /v1/approvals/request` means:
 
 ```
-POST https://app.permissionslip.dev/permission-slip/v1/approvals/request
+POST https://your-server.example.com/permission-slip/v1/approvals/request
 ```
 
 ---
@@ -449,7 +449,7 @@ Services MUST implement replay protection by:
 
 ## Registration Endpoints
 
-> **Design Note:** Agent registration is **user-initiated**. The user generates a registration invite from the Permission Slip dashboard, which produces an invite URL (e.g., `https://app.permissionslip.dev/invite/PS-R7K3-X9M4`). The user shares this URL with the agent, and the agent POSTs directly to it to register. Registration requests without a valid invite code are rejected immediately. See [ADR-005](../adr/005-user-initiated-registration.md) for the rationale behind this design.
+> **Design Note:** Agent registration is **user-initiated**. The user generates a registration invite from the Permission Slip dashboard, which produces an invite URL (e.g., `https://your-server.example.com/invite/PS-R7K3-X9M4`). The user shares this URL with the agent, and the agent POSTs directly to it to register. Registration requests without a valid invite code are rejected immediately. See [ADR-005](../adr/005-user-initiated-registration.md) for the rationale behind this design.
 
 ### POST /invite/{invite_code}
 
@@ -752,7 +752,7 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", timestamp="1707
       "name": "Stripe",
       "description": "Payment processing via Stripe API",
       "credentials_ready": false,
-      "credentials_setup_url": "https://app.permissionslip.dev/connect/stripe",
+      "credentials_setup_url": "https://your-server.example.com/connect/stripe",
       "actions": [
         {
           "action_type": "payment.charge",
@@ -993,10 +993,10 @@ When no matching standing approval exists, a pending approval is created for use
 ```json
 {
   "approval_id": "appr_xyz789",
-  "approval_url": "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789",
+  "approval_url": "https://your-server.example.com/permission-slip/approve/appr_xyz789",
   "alternative_urls": {
     "deeplink": "permissionslip://permission-slip/approve/appr_xyz789",
-    "web": "https://accounts.permissionslip.dev/permission-slip/approve/appr_xyz789"
+    "web": "https://your-server.example.com/permission-slip/approve/appr_xyz789"
   },
   "status": "pending",
   "expires_at": "2026-02-11T13:25:00Z",
@@ -1189,7 +1189,7 @@ After receiving an approval token from the one-off flow, the agent uses it to pe
 ```json
 {
   "sub": "agent_x7K9mP4n...",
-  "aud": "permissionslip.dev",
+  "aud": "your-server.example.com",
   "approver": "alice",
   "approval_id": "appr_xyz789",
   "scope": "email.send",
@@ -1227,7 +1227,7 @@ Permission Slip publishes its token signing public keys at:
 **JWKS Endpoint:**
 
 ```http
-GET https://app.permissionslip.dev/.well-known/permission-slip-jwks.json
+GET https://your-server.example.com/.well-known/permission-slip-jwks.json
 ```
 
 **Response:**
@@ -1894,13 +1894,13 @@ For rate limiting errors, include:
 
 - User "alice" opens Permission Slip dashboard
 - Clicks "Add Agent"
-- Permission Slip generates invite URL: `https://app.permissionslip.dev/invite/PS-R7K3-X9M4`
+- Permission Slip generates invite URL: `https://your-server.example.com/invite/PS-R7K3-X9M4`
 - Alice copies the URL and shares it with the agent (or the agent's operator)
 
 **Step 2: Agent POSTs to the invite URL**
 
 ```http
-POST https://app.permissionslip.dev/invite/PS-R7K3-X9M4
+POST https://your-server.example.com/invite/PS-R7K3-X9M4
 Content-Type: application/json
 X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", timestamp="1707667200", signature="..."
 
@@ -1932,7 +1932,7 @@ X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", times
 **Step 4: Agent verifies registration**
 
 ```http
-POST https://app.permissionslip.dev/permission-slip/v1/agents/agent_abc123/verify
+POST https://your-server.example.com/permission-slip/v1/agents/agent_abc123/verify
 Content-Type: application/json
 X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", timestamp="1707667220", signature="..."
 
@@ -1963,7 +1963,7 @@ X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", times
 **Step 1: Agent requests approval**
 
 ```http
-POST https://app.permissionslip.dev/permission-slip/v1/approvals/request
+POST https://your-server.example.com/permission-slip/v1/approvals/request
 Content-Type: application/json
 X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", timestamp="1707667300", signature="..."
 
@@ -1993,7 +1993,7 @@ X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", times
 ```json
 {
   "approval_id": "appr_abc456",
-  "approval_url": "https://app.permissionslip.dev/permission-slip/approve/appr_abc456",
+  "approval_url": "https://your-server.example.com/permission-slip/approve/appr_abc456",
   "alternative_urls": {
     "deeplink": "permissionslip://permission-slip/approve/appr_abc456"
   },
@@ -2013,7 +2013,7 @@ X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", times
 **Step 3: Agent verifies and retrieves token**
 
 ```http
-POST https://app.permissionslip.dev/permission-slip/v1/approvals/appr_abc456/verify
+POST https://your-server.example.com/permission-slip/v1/approvals/appr_abc456/verify
 Content-Type: application/json
 X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", timestamp="1707667320", signature="..."
 
