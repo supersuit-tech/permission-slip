@@ -152,7 +152,7 @@ export default function CustomServerSettings({ onSaved }: Props) {
           <TextInput
             testID="custom-host-input"
             style={styles.input}
-            placeholder="https://your-server.example.com/api"
+            placeholder="https://permission-slip.example.com"
             placeholderTextColor={colors.gray400}
             value={hostUrl}
             onChangeText={setHostUrl}

@@ -11,6 +11,40 @@ const GATEWAY_SECRET_KEY = "gateway_secret";
 export const PLACEHOLDER_API_BASE = "https://__permission_slip_no_host__.invalid/api";
 
 /**
+ * Canonicalize a user-entered server URL into the form the app needs to talk
+ * to the backend. Users enter the base origin of their deployment (the same
+ * URL they use in the web app, e.g. https://permission-slip.example.com);
+ * the backend mounts the API at `/api`, so we append it automatically when
+ * it's missing. Without this, a user who types only the origin gets HTML
+ * 404s from their reverse proxy on every auth request and the app surfaces
+ * a confusing "Something went wrong" error.
+ *
+ * Behavior:
+ *   - Strips surrounding whitespace, trailing slashes, and a trailing `/v1`
+ *     (which spec paths already include).
+ *   - Returns `null` for empty input so callers can distinguish "not set".
+ *   - Idempotent: a URL already ending in `/api` is left alone, so we never
+ *     produce `…/api/api`.
+ *   - Conservative on custom paths: any non-empty path that doesn't already
+ *     end in `/api` gets `/api` appended, including `https://host.tld/foo`
+ *     → `https://host.tld/foo/api`. Operators with non-standard mounts can
+ *     still enter the full path explicitly.
+ */
+export function normalizeApiBase(input: string | null | undefined): string | null {
+  if (input == null) return null;
+  let url = input.trim();
+  if (!url) return null;
+  url = url.replace(/\/+$/, "");
+  url = url.replace(/\/v1$/, "");
+  url = url.replace(/\/+$/, "");
+  if (!url) return null;
+  if (!/\/api$/.test(url)) {
+    url = `${url}/api`;
+  }
+  return url;
+}
+
+/**
  * In-memory cache so middleware reads are synchronous and fast.
  * Call loadCustomHostConfig() at app startup to hydrate from SecureStore.
  */
@@ -27,7 +61,11 @@ let cachedSecret: string | null = null;
  * from firing before the cache is populated.
  */
 export async function loadCustomHostConfig(): Promise<void> {
-  cachedHost = (await SecureStore.getItemAsync(CUSTOM_HOST_KEY)) ?? null;
+  const storedHost = (await SecureStore.getItemAsync(CUSTOM_HOST_KEY)) ?? null;
+  // Normalize on read so existing saves from older app versions (which
+  // required the user to type `/api` themselves) start working even before
+  // the user re-enters their URL.
+  cachedHost = normalizeApiBase(storedHost);
   cachedSecret = (await SecureStore.getItemAsync(GATEWAY_SECRET_KEY)) ?? null;
 }
 
@@ -66,9 +104,10 @@ export async function setCustomHostConfig(
   host: string | null,
   secret: string | null,
 ): Promise<void> {
-  if (host && host.trim().length > 0) {
-    await SecureStore.setItemAsync(CUSTOM_HOST_KEY, host.trim());
-    cachedHost = host.trim();
+  const normalized = normalizeApiBase(host);
+  if (normalized) {
+    await SecureStore.setItemAsync(CUSTOM_HOST_KEY, normalized);
+    cachedHost = normalized;
   } else {
     await SecureStore.deleteItemAsync(CUSTOM_HOST_KEY);
     cachedHost = null;
