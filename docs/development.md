@@ -31,7 +31,7 @@ make dev-backend   # Go API server → http://localhost:8080
 make dev-frontend  # Vite + HMR   → http://localhost:5173
 ```
 
-For the full walkthrough including PostgreSQL setup and test database configuration, see the [self-hosted deployment guide](deployment-self-hosted.md).
+For the production deployment walkthrough, see the [self-hosted deployment guide](deployment-self-hosted.md).
 
 ---
 
@@ -66,7 +66,7 @@ The server serves both the API and frontend on a single port (default 8080). The
 | `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |
 | `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | For Web Push | Generate with `make generate-vapid-keys` |
 
-Bootstrap the first user on a new database with `go run ./cmd/create-user user@example.com 'password'` (see repository README). For the full environment variable reference, Dockerfile, Fly.io setup, and hardening checklist, see [Self-hosted deployment](deployment-self-hosted.md).
+Bootstrap the first user on a new database with `go run ./cmd/create-user user@example.com 'password'` (see repository README). For the full production deployment walkthrough, see [Self-hosted deployment](deployment-self-hosted.md).
 
 ---
 
