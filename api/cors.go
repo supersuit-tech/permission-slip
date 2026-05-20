@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"slices"
+	"strings"
 )
 
 // CORSMiddleware returns middleware that enforces CORS policy based on an
@@ -25,10 +26,12 @@ func CORSMiddleware(allowedOrigins []string) func(http.Handler) http.Handler {
 
 			// When no explicit allow-list is configured, treat the middleware as
 			// "same-origin only": allow requests where Origin matches this server's
-			// own origin, and reject other (cross-origin) requests.
+			// own origin, and reject other (cross-origin) requests. Honor
+			// X-Forwarded-Proto so deployments behind a TLS-terminating proxy
+			// (e.g. Cloudflare Tunnel) compute the expected origin correctly.
 			if len(allowedOrigins) == 0 {
 				scheme := "http"
-				if r.TLS != nil {
+				if r.TLS != nil || strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
 					scheme = "https"
 				}
 				requestOrigin := scheme + "://" + r.Host

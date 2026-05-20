@@ -130,6 +130,27 @@ func TestCORS_EmptyAllowList_SameOriginAllowed(t *testing.T) {
 	}
 }
 
+func TestCORS_EmptyAllowList_HTTPSViaForwardedProto(t *testing.T) {
+	t.Parallel()
+	handler := CORSMiddleware(nil)(echoHandler)
+
+	// Simulate a request behind a TLS-terminating proxy (e.g. Cloudflare Tunnel):
+	// the browser hit https://example.com, the proxy forwards plain HTTP to the
+	// app, but sets X-Forwarded-Proto: https. The Origin header reflects the
+	// browser's view (https), so the same-origin check must honor the proxy
+	// header — otherwise every Vite asset request (which uses crossorigin) gets
+	// rejected with 403.
+	req := httptest.NewRequest(http.MethodGet, "/assets/index.css", nil)
+	req.Header.Set("Origin", "https://example.com")
+	req.Header.Set("X-Forwarded-Proto", "https")
+	rec := httptest.NewRecorder()
+	handler.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200 for same-origin request via X-Forwarded-Proto, got %d", rec.Code)
+	}
+}
+
 func TestCORS_EmptyAllowList_CrossOriginBlocked(t *testing.T) {
 	t.Parallel()
 	handler := CORSMiddleware(nil)(echoHandler)
