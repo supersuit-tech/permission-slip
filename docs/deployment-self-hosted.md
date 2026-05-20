@@ -115,7 +115,7 @@ sudo systemctl enable --now cloudflared
 rm ~/.cloudflared/cert.pem
 ```
 
-> **Why delete `cert.pem`?** `cloudflared tunnel login` creates `~/.cloudflared/cert.pem`, which grants broad access to manage your Cloudflare account. Once the tunnel is created and its credentials file is copied to `/etc/cloudflared/`, the running service only needs that tunnel-scoped JSON file. Deleting `cert.pem` limits the machine's access to this tunnel only.
+> **Why delete `cert.pem`?** `cloudflared tunnel login` creates `~/.cloudflared/cert.pem`, scoped to the domain you selected. It grants management-level access to that zone — enough to create/delete DNS records and manage tunnels. Once the tunnel is created and its credentials file is copied to `/etc/cloudflared/`, the running service only needs that tunnel-scoped JSON file, which can do nothing except maintain this specific tunnel's connection. Deleting `cert.pem` removes the unnecessary zone management access.
 
 Your tunnel is now running. Once Permission Slip is up (next steps), it'll be reachable at `https://$PS_HOSTNAME`.
 
