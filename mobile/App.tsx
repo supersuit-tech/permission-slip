@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   AppState,
@@ -21,10 +21,13 @@ import { useBiometricAuth } from "./src/hooks/useBiometricAuth";
 import { BiometricLockScreen } from "./src/screens/BiometricLockScreen";
 import { colors } from "./src/theme/colors";
 import {
+  getCustomHost,
+  getGatewaySecret,
   hasConfiguredApiBase,
   loadCustomHostConfig,
 } from "./src/lib/customHostConfig";
 import ServerUrlSetupScreen from "./src/screens/ServerUrlSetupScreen";
+import { ServerSetupContext } from "./src/lib/serverSetupContext";
 
 const useMockAuth = __DEV__ && process.env.EXPO_PUBLIC_MOCK_AUTH === "true";
 const ActiveAuthProvider = useMockAuth ? MockAuthProvider : AuthProvider;
@@ -49,7 +52,13 @@ const queryClient = new QueryClient({
 
 const LOADING_TIMEOUT_MS = 10_000;
 
-function AppContent({ onRetry }: { onRetry: () => void }) {
+function AppContent({
+  onRetry,
+  onOpenServerSetup,
+}: {
+  onRetry: () => void;
+  onOpenServerSetup: () => void;
+}) {
   const { authStatus, session } = useAuth();
   const qc = useQueryClient();
   const [timedOut, setTimedOut] = useState(false);
@@ -119,6 +128,15 @@ function AppContent({ onRetry }: { onRetry: () => void }) {
             >
               <Text style={styles.retryText}>Retry</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              testID="loading-change-server"
+              accessibilityLabel="Change server URL"
+              accessibilityRole="button"
+              style={styles.secondaryButton}
+              onPress={onOpenServerSetup}
+            >
+              <Text style={styles.secondaryButtonText}>Change server URL</Text>
+            </TouchableOpacity>
           </>
         ) : (
           <ActivityIndicator size="large" color={colors.gray900} />
@@ -149,7 +167,7 @@ export default function App() {
   // requests after cold start would bypass the custom host and gateway
   // secret, causing surprising 403s against a gateway-locked server.
   const [hostHydrated, setHostHydrated] = useState(false);
-  const [, setServerSetupBump] = useState(0);
+  const [serverSetupBump, setServerSetupBump] = useState(0);
   useEffect(() => {
     loadCustomHostConfig().finally(() => setHostHydrated(true));
   }, []);
@@ -165,6 +183,19 @@ export default function App() {
   const [authKey, setAuthKey] = useState(0);
   const handleRetry = useCallback(() => setAuthKey((k) => k + 1), []);
 
+  // Overlay state for the in-app "Change server URL" affordance. Reachable
+  // from the Connection issue screen and the Login screen so a user stuck
+  // against a dead/unreachable host can fix it without reinstalling. (On
+  // iOS, expo-secure-store uses Keychain, which persists across uninstalls,
+  // so even a fresh install does not always reset the saved URL.)
+  const [serverSetupOpen, setServerSetupOpen] = useState(false);
+  const openServerSetup = useCallback(() => setServerSetupOpen(true), []);
+  const closeServerSetup = useCallback(() => setServerSetupOpen(false), []);
+  const serverSetupContextValue = useMemo(
+    () => ({ openServerSetup }),
+    [openServerSetup],
+  );
+
   if (!hostHydrated) {
     return (
       <SafeAreaProvider>
@@ -176,6 +207,8 @@ export default function App() {
     );
   }
 
+  // First-launch setup: no env URL and no saved host. Render the setup
+  // screen unconditionally; it owns the entire UI until a host is saved.
   if (!useMockAuth && !hasConfiguredApiBase()) {
     return (
       <SafeAreaProvider>
@@ -189,13 +222,45 @@ export default function App() {
     );
   }
 
+  // "Change server URL" overlay. Pre-fills the current saved values so the
+  // user can see and edit them. Saving re-mounts AuthProvider so the next
+  // request goes to the new host with a fresh bootstrap; Cancel just
+  // dismisses without touching anything.
+  if (serverSetupOpen) {
+    return (
+      <SafeAreaProvider>
+        <ServerUrlSetupScreen
+          initialHostUrl={getCustomHost() ?? ""}
+          initialSecret={getGatewaySecret() ?? ""}
+          onCancel={closeServerSetup}
+          onComplete={() => {
+            closeServerSetup();
+            setServerSetupBump((n) => n + 1);
+            setAuthKey((k) => k + 1);
+          }}
+        />
+        <StatusBar style="auto" />
+      </SafeAreaProvider>
+    );
+  }
+
+  // serverSetupBump is read here so changes to the saved host trigger a
+  // re-render of the tree below — useful when the user saves a new URL or
+  // resets, since the new value must be picked up immediately.
+  void serverSetupBump;
+
   return (
     <QueryClientProvider client={queryClient}>
       <SafeAreaProvider>
-        <ActiveAuthProvider key={authKey}>
-          <AppContent onRetry={handleRetry} />
-          <StatusBar style="auto" />
-        </ActiveAuthProvider>
+        <ServerSetupContext.Provider value={serverSetupContextValue}>
+          <ActiveAuthProvider key={authKey}>
+            <AppContent
+              onRetry={handleRetry}
+              onOpenServerSetup={openServerSetup}
+            />
+            <StatusBar style="auto" />
+          </ActiveAuthProvider>
+        </ServerSetupContext.Provider>
       </SafeAreaProvider>
     </QueryClientProvider>
   );
@@ -232,6 +297,19 @@ const styles = StyleSheet.create({
   retryText: {
     color: colors.white,
     fontSize: 16,
+    fontWeight: "600",
+  },
+  secondaryButton: {
+    marginTop: 12,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 32,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+  },
+  secondaryButtonText: {
+    color: colors.gray900,
+    fontSize: 15,
     fontWeight: "600",
   },
 });

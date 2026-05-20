@@ -12,21 +12,55 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { colors } from "../theme/colors";
-import { setCustomHostConfig } from "../lib/customHostConfig";
+import {
+  clearCustomHostConfig,
+  setCustomHostConfig,
+} from "../lib/customHostConfig";
+import { clearStoredRefreshToken } from "../lib/authStorage";
 
 type Props = {
   onComplete: () => void;
+  /**
+   * Initial value for the server URL field. Pre-fill with the currently
+   * saved host when this screen is used to *change* the URL (vs. first
+   * launch), so the user can see and edit what's there.
+   */
+  initialHostUrl?: string;
+  /** Initial value for the gateway secret field. */
+  initialSecret?: string;
+  /**
+   * When provided, a Cancel button is shown that calls this callback.
+   * Used when the screen is opened as an overlay (e.g. from the
+   * connection-error retry screen or the login screen), so the user can
+   * back out without changing anything.
+   */
+  onCancel?: () => void;
 };
 
 /**
- * First-launch screen when neither EXPO_PUBLIC_API_BASE_URL nor a saved
- * custom server URL is present. Self-hosted Permission Slip has no default host.
+ * Server URL setup. Shown:
+ *   - On first launch when neither EXPO_PUBLIC_API_BASE_URL nor a saved
+ *     custom host exists (App.tsx gates rendering on this).
+ *   - As an overlay from unauthenticated screens (Connection issue, Login)
+ *     so a user pointing at a dead server can fix it without reinstalling.
+ *
+ * Self-hosted Permission Slip has no default host, so this is the only
+ * way to configure connectivity from the device.
  */
-export default function ServerUrlSetupScreen({ onComplete }: Props) {
+export default function ServerUrlSetupScreen({
+  onComplete,
+  initialHostUrl = "",
+  initialSecret = "",
+  onCancel,
+}: Props) {
   const insets = useSafeAreaInsets();
-  const [hostUrl, setHostUrl] = useState("");
-  const [secret, setSecret] = useState("");
+  const [hostUrl, setHostUrl] = useState(initialHostUrl);
+  const [secret, setSecret] = useState(initialSecret);
   const [saving, setSaving] = useState(false);
+  const [resetting, setResetting] = useState(false);
+
+  const isChangeMode = onCancel != null;
+  const busy = saving || resetting;
 
   const handleSave = useCallback(async () => {
     const trimmedHost = hostUrl.trim();
@@ -48,6 +82,10 @@ export default function ServerUrlSetupScreen({ onComplete }: Props) {
     setSaving(true);
     try {
       await setCustomHostConfig(trimmedHost, secret.trim() || null);
+      // Always drop any cached refresh token when the server URL is saved
+      // from this screen — tokens issued by the old host won't work against
+      // the new one. Safe to call even when no token is stored.
+      await clearStoredRefreshToken();
       onComplete();
     } catch {
       Alert.alert("Error", "Could not save server URL. Please try again.");
@@ -56,16 +94,49 @@ export default function ServerUrlSetupScreen({ onComplete }: Props) {
     }
   }, [hostUrl, secret, onComplete]);
 
+  const handleReset = useCallback(() => {
+    Alert.alert(
+      "Reset connection?",
+      "This clears the saved server URL, gateway secret, and signed-in session on this device. You'll need to enter the server URL again.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Reset",
+          style: "destructive",
+          onPress: () => {
+            setResetting(true);
+            void (async () => {
+              try {
+                await clearCustomHostConfig();
+                await clearStoredRefreshToken();
+                setHostUrl("");
+                setSecret("");
+                onComplete();
+              } catch {
+                Alert.alert("Error", "Could not reset connection. Please try again.");
+              } finally {
+                setResetting(false);
+              }
+            })();
+          },
+        },
+      ],
+    );
+  }, [onComplete]);
+
   return (
     <KeyboardAvoidingView
       style={[styles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <View style={styles.inner}>
-        <Text style={styles.title}>Connect to your server</Text>
+        <Text style={styles.title}>
+          {isChangeMode ? "Change server URL" : "Connect to your server"}
+        </Text>
         <Text style={styles.subtitle}>
-          Permission Slip is self-hosted. Enter the API base URL for your instance
-          (the same URL you use in the web app, usually ending in /api).
+          {isChangeMode
+            ? "Update the URL the app talks to. Saving signs you out so the new server takes effect."
+            : "Permission Slip is self-hosted. Enter the API base URL for your instance (the same URL you use in the web app, usually ending in /api)."}
         </Text>
 
         <Text style={styles.label}>Server URL</Text>
@@ -80,6 +151,7 @@ export default function ServerUrlSetupScreen({ onComplete }: Props) {
           autoCorrect={false}
           keyboardType="url"
           textContentType="URL"
+          editable={!busy}
         />
 
         <Text style={[styles.label, styles.labelSpaced]}>Gateway secret</Text>
@@ -93,22 +165,51 @@ export default function ServerUrlSetupScreen({ onComplete }: Props) {
           autoCapitalize="none"
           autoCorrect={false}
           secureTextEntry
+          editable={!busy}
         />
 
         <TouchableOpacity
           testID="server-url-setup-continue"
-          style={[styles.button, saving && styles.buttonDisabled]}
+          style={[styles.button, busy && styles.buttonDisabled]}
           onPress={() => {
             void handleSave();
           }}
-          disabled={saving}
+          disabled={busy}
           accessibilityRole="button"
-          accessibilityLabel="Continue with this server URL"
+          accessibilityLabel={isChangeMode ? "Save server URL" : "Continue with this server URL"}
         >
           {saving ? (
             <ActivityIndicator size="small" color={colors.white} />
           ) : (
-            <Text style={styles.buttonText}>Continue</Text>
+            <Text style={styles.buttonText}>{isChangeMode ? "Save" : "Continue"}</Text>
+          )}
+        </TouchableOpacity>
+
+        {isChangeMode ? (
+          <TouchableOpacity
+            testID="server-url-setup-cancel"
+            style={[styles.secondaryButton, busy && styles.buttonDisabled]}
+            onPress={onCancel}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel="Cancel"
+          >
+            <Text style={styles.secondaryButtonText}>Cancel</Text>
+          </TouchableOpacity>
+        ) : null}
+
+        <TouchableOpacity
+          testID="server-url-setup-reset"
+          style={[styles.resetButton, busy && styles.buttonDisabled]}
+          onPress={handleReset}
+          disabled={busy}
+          accessibilityRole="button"
+          accessibilityLabel="Reset saved connection"
+        >
+          {resetting ? (
+            <ActivityIndicator size="small" color={colors.gray700} />
+          ) : (
+            <Text style={styles.resetButtonText}>Reset saved connection</Text>
           )}
         </TouchableOpacity>
       </View>
@@ -171,5 +272,30 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: 16,
     fontWeight: "600",
+  },
+  secondaryButton: {
+    marginTop: 12,
+    borderRadius: 10,
+    paddingVertical: 14,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    backgroundColor: colors.white,
+  },
+  secondaryButtonText: {
+    color: colors.gray900,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  resetButton: {
+    marginTop: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+  },
+  resetButtonText: {
+    color: colors.gray500,
+    fontSize: 14,
+    fontWeight: "500",
+    textDecorationLine: "underline",
   },
 });

@@ -3,6 +3,7 @@ import { create, act, type ReactTestRenderer } from "react-test-renderer";
 
 const mockSignInWithPassword = jest.fn();
 const mockSignUpWithPassword = jest.fn();
+const mockOpenServerSetup = jest.fn();
 
 jest.mock("../../auth/AuthContext", () => ({
   useAuth: () => ({
@@ -12,6 +13,10 @@ jest.mock("../../auth/AuthContext", () => ({
     user: null,
     authStatus: "unauthenticated" as const,
   }),
+}));
+
+jest.mock("../../lib/serverSetupContext", () => ({
+  useServerSetup: () => ({ openServerSetup: mockOpenServerSetup }),
 }));
 
 import LoginScreen from "../LoginScreen";
@@ -79,5 +84,18 @@ describe("LoginScreen", () => {
     });
 
     expect(mockSignUpWithPassword).toHaveBeenCalledWith("new@b.co", "password12345");
+  });
+
+  it("opens the server setup overlay when the Change server URL link is tapped", async () => {
+    let renderer: ReactTestRenderer;
+    await act(async () => {
+      renderer = create(createElement(LoginScreen));
+    });
+
+    await act(async () => {
+      findByTestId(renderer!, "login-change-server").props.onPress();
+    });
+
+    expect(mockOpenServerSetup).toHaveBeenCalledTimes(1);
   });
 });
