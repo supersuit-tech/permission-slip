@@ -5,7 +5,8 @@
  * When enabled, all API calls are routed to the custom host URL and the
  * gateway secret is sent as the X-Gateway-Secret header on every request.
  *
- * Changes take effect on app restart.
+ * Saving signs the user out so the new server takes effect immediately
+ * without requiring a manual app restart.
  */
 import { useCallback, useEffect, useState } from "react";
 import {
@@ -28,7 +29,11 @@ import {
   setCustomHostConfig,
 } from "../../lib/customHostConfig";
 
-export default function CustomServerSettings() {
+interface Props {
+  onSaved?: () => void;
+}
+
+export default function CustomServerSettings({ onSaved }: Props) {
   const [enabled, setEnabled] = useState(false);
   const [hostUrl, setHostUrl] = useState("");
   const [secret, setSecret] = useState("");
@@ -57,7 +62,8 @@ export default function CustomServerSettings() {
             setSecret("");
             Alert.alert(
               "Custom server cleared",
-              "Set EXPO_PUBLIC_API_BASE_URL for this build, or enter your server URL again when the app prompts you.",
+              "You'll be signed out so the change takes effect.",
+              [{ text: "OK", onPress: () => onSaved?.() }],
             );
           })
           .catch(() => {
@@ -94,8 +100,9 @@ export default function CustomServerSettings() {
     try {
       await setCustomHostConfig(trimmedHost, secret.trim() || null);
       Alert.alert(
-        "Saved",
-        "Custom server settings saved. Restart the app for changes to take effect.",
+        "Server updated",
+        "You'll be signed out so the new server takes effect.",
+        [{ text: "OK", onPress: () => onSaved?.() }],
       );
     } catch {
       Alert.alert("Error", "Failed to save custom server settings.");
@@ -119,8 +126,8 @@ export default function CustomServerSettings() {
           <View style={styles.toggleLabel}>
             <Text style={styles.toggleTitle}>Custom Server</Text>
             <Text style={styles.toggleDescription}>
-              Point this app at your self-hosted Permission Slip API (saved on
-              device; restart the app after changing).
+              Point this app at your self-hosted Permission Slip API. Changes
+              sign you out and take effect immediately.
             </Text>
           </View>
           <Switch
@@ -186,7 +193,7 @@ export default function CustomServerSettings() {
           </TouchableOpacity>
 
           <Text style={styles.hint}>
-            Changes take effect on app restart.
+            Saving will sign you out so the new server takes effect immediately.
           </Text>
         </View>
       ) : null}
