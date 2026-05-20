@@ -371,7 +371,7 @@ Services SHOULD:
 ```nginx
 server {
     listen 443 ssl http2;
-    server_name app.permissionslip.dev;
+    server_name your-server.example.com;
 
     # TLS version
     ssl_protocols TLSv1.3 TLSv1.2;
@@ -440,7 +440,7 @@ Most modern HTTP client libraries (e.g., `requests` in Python, `axios` in Node.j
 **Certificate Requirements:**
 
 - **Issued by a trusted CA** (e.g., Let's Encrypt, DigiCert, AWS Certificate Manager)
-- **Valid for the Permission Slip service domain** (e.g., `app.permissionslip.dev`)
+- **Valid for the Permission Slip service domain** (e.g., `your-server.example.com`)
 - **Not expired** (valid `notBefore` and `notAfter` dates)
 - **Complete certificate chain** provided (intermediate CA certificates included)
 
@@ -515,7 +515,7 @@ const EXPECTED_SPKI_HASHES = [
   "f9e8d7c6..."   // Next key (during rotation)
 ];
 
-const actualHash = await getSPKIHash('app.permissionslip.dev');
+const actualHash = await getSPKIHash('your-server.example.com');
 if (!EXPECTED_SPKI_HASHES.includes(actualHash)) {
   throw new Error("Certificate pinning validation failed!");
 }
@@ -699,8 +699,8 @@ Both agents and services MUST follow these exact rules to ensure signature compa
 **Rule:** URL path component without query string, exactly as it appears in the request URL, including any path prefix from the `base_url` (e.g., `/permission-slip`).
 
 **Example:**
-- `base_url`: `https://app.permissionslip.dev/permission-slip`
-- Request URL: `https://app.permissionslip.dev/permission-slip/v1/agents/register?foo=bar`
+- `base_url`: `https://your-server.example.com/permission-slip`
+- Request URL: `https://your-server.example.com/permission-slip/v1/agents/register?foo=bar`
 - Path (`<PATH>` in the canonical request): `/permission-slip/v1/agents/register` (query string excluded)
 
 **Important:** Do NOT modify the path (no percent-encoding/decoding, no normalization). Use it exactly as transmitted.
@@ -842,7 +842,7 @@ If a request uses a non-JSON content type (rare in this protocol), hash the raw 
 
 ```http
 POST /invite/PS-R7K3-X9M4?debug=true HTTP/1.1
-Host: app.permissionslip.dev
+Host: your-server.example.com
 Content-Type: application/json
 X-Permission-Slip-Signature: agent_id="agent_abc123", algorithm="Ed25519", timestamp="1707667200", signature="..."
 

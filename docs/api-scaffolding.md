@@ -124,7 +124,7 @@ type Deps struct {
     SupabaseJWTSecret string           // HMAC-SHA256 secret for HS256 JWTs (Supabase CLI v1 / test env)
     SupabaseJWKSURL   string           // JWKS endpoint for ES256 JWTs (Supabase CLI v2+)
     JWKSCache         *JWKSCache       // JWKS key cache; initialized once at startup when SupabaseJWKSURL is set
-    BaseURL           string           // Public base URL (e.g. "https://app.permissionslip.dev"); used to construct invite URLs
+    BaseURL           string           // Public base URL (e.g. "https://your-server.example.com"); used to construct invite URLs
     InviteHMACKey     string           // HMAC key for hashing short codes (invite codes, confirmation codes); if empty, falls back to plain SHA-256
     DevMode           bool             // true when MODE=development; disables rate limiting
 }

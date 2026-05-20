@@ -350,7 +350,7 @@ func main() {
 	api.RegisterSlackEventRoutes(mux, &deps)
 
 	// Invite endpoint lives outside /api/v1/ — it's a user-facing onboarding
-	// URL (e.g., https://app.permissionslip.dev/invite/PS-XXXX-XXXX), not a
+	// URL (e.g., https://your-server.example.com/invite/PS-XXXX-XXXX), not a
 	// versioned API resource.
 	mux.Handle("/invite/", api.InviteHandler(&deps))
 

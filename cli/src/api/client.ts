@@ -42,7 +42,7 @@ export class PermissionSlipApiError extends Error {
 }
 
 export interface ClientOptions {
-  /** Base URL of the Permission Slip server, e.g. https://app.permissionslip.dev */
+  /** Base URL of the Permission Slip server, e.g. https://your-server.example.com */
   serverUrl: string;
   /** Agent ID — use REGISTRATION_AGENT_ID during registration */
   agentId: number | string;

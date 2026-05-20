@@ -200,10 +200,10 @@ Sent when a registered agent submits an action for approval.
   },
   "approver": "alice",
   "expires_at": "2026-02-12T09:25:00Z",
-  "approval_url": "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789",
+  "approval_url": "https://your-server.example.com/permission-slip/approve/appr_xyz789",
   "alternative_urls": {
     "deeplink": "permissionslip://approve/appr_xyz789",
-    "web": "https://app.permissionslip.dev/approve/appr_xyz789"
+    "web": "https://your-server.example.com/approve/appr_xyz789"
   },
   "timestamp": "2026-02-12T09:20:00Z"
 }
@@ -284,7 +284,7 @@ When multiple webhooks are configured:
 **Example Configuration (Service UI):**
 
 ```
-Webhook URL: https://notifications.permissionslip.dev/permission-slip
+Webhook URL: https://notifications.example.com/permission-slip
 Secret: wh_sec_**************** [Generate New] [Reveal]
 Events: [x] Agent Registration  [x] Approval Requests
 [Test Webhook]
@@ -300,7 +300,7 @@ Services send webhook notifications as HTTP POST requests with JSON payloads.
 
 ```http
 POST /permission-slip HTTP/1.1
-Host: notifications.permissionslip.dev
+Host: notifications.example.com
 Content-Type: application/json
 User-Agent: ExampleService-PermissionSlip/1.0
 X-Permission-Slip-Version: v1
@@ -318,7 +318,7 @@ X-Permission-Slip-Delivery: 550e8400-e29b-41d4-a716-446655440000
   },
   "approver": "alice",
   "expires_at": "2026-02-12T09:25:00Z",
-  "approval_url": "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789",
+  "approval_url": "https://your-server.example.com/permission-slip/approve/appr_xyz789",
   "timestamp": "2026-02-12T09:20:00Z"
 }
 ```
@@ -812,7 +812,7 @@ Mobile push notifications MUST include only minimal data to alert the approver. 
   "permission_slip": {
     "type": "approval_request",
     "approval_id": "appr_xyz789",
-    "approval_url": "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+    "approval_url": "https://your-server.example.com/permission-slip/approve/appr_xyz789"
   }
 }
 ```
@@ -828,7 +828,7 @@ Mobile push notifications MUST include only minimal data to alert the approver. 
   "data": {
     "type": "approval_request",
     "approval_id": "appr_xyz789",
-    "approval_url": "https://app.permissionslip.dev/permission-slip/approve/appr_xyz789"
+    "approval_url": "https://your-server.example.com/permission-slip/approve/appr_xyz789"
   },
   "priority": "high"
 }
@@ -894,7 +894,7 @@ Notification Preferences
 
 Channels (all enabled channels receive notifications concurrently):
 [x] Webhook
-  URL: https://notifications.permissionslip.dev/permission-slip
+  URL: https://notifications.example.com/permission-slip
   Secret: wh_sec_****************
   [Test Webhook]
 
@@ -929,12 +929,12 @@ Services define their own approval URL structure. The URL MUST:
 
 **For registration:**
 ```
-https://app.permissionslip.dev/permission-slip/approve?token=<jwt_token>
+https://your-server.example.com/permission-slip/approve?token=<jwt_token>
 ```
 
 **For approval requests:**
 ```
-https://app.permissionslip.dev/permission-slip/approve/<approval_id>
+https://your-server.example.com/permission-slip/approve/<approval_id>
 ```
 
 **URL Security:**
@@ -970,11 +970,11 @@ Approval URLs and webhook secrets are sensitive credentials that require explici
 
 ### Mobile deep links (custom URL scheme)
 
-The hosted Permission Slip app does **not** use iOS Universal Links or Android App Links for `app.permissionslip.dev`, so HTTPS approval URLs open in the mobile browser (including OAuth flows). Native deep linking uses the custom scheme only.
+Self-hosted Permission Slip instances can configure iOS Universal Links or Android App Links if desired. By default, HTTPS approval URLs open in the mobile browser (including OAuth flows). Native deep linking uses the custom scheme.
 
 **Primary approval URL (web):**
 ```
-https://app.permissionslip.dev/permission-slip/approve/appr_xyz789
+https://your-server.example.com/permission-slip/approve/appr_xyz789
 ```
 
 **Native deep link (optional `alternative_urls.deeplink`):**
@@ -1051,9 +1051,9 @@ Services SHOULD provide a notification history view for approvers to:
 ```
 Notification History
 ====================================
-Feb 12, 09:20 AM EST  Approval Request   Webhook (notifications.permissionslip.dev)  [Delivered] 200
+Feb 12, 09:20 AM EST  Approval Request   Webhook (notifications.example.com)  [Delivered] 200
 Feb 12, 09:15 AM EST  Agent Registration iOS (John's iPhone)                  [Delivered]
-Feb 12, 09:10 AM EST  Approval Request   Webhook (notifications.permissionslip.dev)  [Failed] timeout, 3 retries
+Feb 12, 09:10 AM EST  Approval Request   Webhook (notifications.example.com)  [Failed] timeout, 3 retries
 ```
 
 **Note:** Timestamps SHOULD be displayed in approver's local timezone with timezone indicator. Use accessible status indicators (not just emoji).

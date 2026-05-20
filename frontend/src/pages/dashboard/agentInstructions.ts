@@ -45,10 +45,7 @@ export function generatePostRegistrationInstructions(
   _agentId: number,
   origin: string,
 ): string {
-  const serverFlag = origin !== "https://app.permissionslip.dev"
-    ? ` --server ${shellQuote(origin)}`
-    : "";
-  return `npx @permission-slip/cli capabilities${serverFlag}
+  return `npx @permission-slip/cli capabilities --server ${shellQuote(origin)}
 
 The CLI handles signing, config storage, and API calls automatically.
 Run \`npx @permission-slip/cli --help\` for all available commands.`;
