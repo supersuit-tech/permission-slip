@@ -65,7 +65,7 @@ export default function ServerUrlSetupScreen({
   const handleSave = useCallback(async () => {
     const trimmedHost = hostUrl.trim();
     if (!trimmedHost) {
-      Alert.alert("Missing URL", "Enter your Permission Slip server URL (e.g. https://your-pi:8080/api).");
+      Alert.alert("Missing URL", "Enter your Permission Slip server URL (e.g. https://permission-slip.example.com).");
       return;
     }
     try {
@@ -136,14 +136,14 @@ export default function ServerUrlSetupScreen({
         <Text style={styles.subtitle}>
           {isChangeMode
             ? "Update the URL the app talks to. Saving signs you out so the new server takes effect."
-            : "Permission Slip is self-hosted. Enter the API base URL for your instance (the same URL you use in the web app, usually ending in /api)."}
+            : "Permission Slip is self-hosted. Enter the URL of your deployment — the same one you use in the web app."}
         </Text>
 
         <Text style={styles.label}>Server URL</Text>
         <TextInput
           testID="server-url-setup-input"
           style={styles.input}
-          placeholder="https://your-server.example.com/api"
+          placeholder="https://permission-slip.example.com"
           placeholderTextColor={colors.gray400}
           value={hostUrl}
           onChangeText={setHostUrl}
