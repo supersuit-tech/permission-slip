@@ -5320,7 +5320,7 @@ paths:
               preferences:
                 - channel: email
                   enabled: true
-                - channel: web-push
+                - channel: mobile-push
                   enabled: false
       responses:
         '200':

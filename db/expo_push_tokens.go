@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+// PushChannelMobilePush is the channel identifier for Expo mobile push tokens.
+const PushChannelMobilePush = "mobile-push"
+
 // ExpoPushToken represents a row from the expo_push_tokens table.
 type ExpoPushToken struct {
 	ID        int64
