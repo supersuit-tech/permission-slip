@@ -96,7 +96,21 @@ export const customHostMiddleware: Middleware = {
       .replace(/\/v1\/?$/, "")
       .replace(/\/$/, "");
     const newUrl = request.url.replace(defaultBaseUrl, customBase);
-    return new Request(newUrl, request);
+    // React Native's Request constructor (whatwg-fetch) only copies the
+    // body from `init.body` — passing a Request as `init` does NOT carry
+    // its body across because Request exposes no public `body` field the
+    // constructor reads. Extracting the body explicitly preserves it for
+    // POST/PUT/PATCH; otherwise self-hosted writes arrive with empty
+    // bodies and the server returns 400.
+    const hasBody = request.method !== "GET" && request.method !== "HEAD";
+    const body = hasBody ? await request.clone().text() : undefined;
+    return new Request(newUrl, {
+      method: request.method,
+      headers: request.headers,
+      body,
+      signal: request.signal,
+      credentials: request.credentials,
+    });
   },
 };
 
