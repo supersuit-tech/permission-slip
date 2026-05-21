@@ -1,6 +1,6 @@
 // Package notify provides the notification dispatch infrastructure for
 // Permission Slip. It defines the Sender interface that individual channels
-// (email, web-push, SMS) implement, a Dispatcher that fans out to all
+// (email, mobile-push, SMS) implement, a Dispatcher that fans out to all
 // configured senders, and the shared types (Approval, Recipient) that
 // senders receive.
 //

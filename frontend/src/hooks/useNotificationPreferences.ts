@@ -7,7 +7,7 @@ export type NotificationPreference = components["schemas"]["NotificationPreferen
 
 /**
  * Fetches the current user's notification preferences for all channels
- * (email, web-push, sms). Channels without explicit preferences default
+ * (email, mobile-push). Channels without explicit preferences default
  * to enabled on the server side.
  */
 export function useNotificationPreferences() {

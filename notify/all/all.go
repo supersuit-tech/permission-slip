@@ -14,5 +14,4 @@ package all
 
 import (
 	_ "github.com/supersuit-tech/permission-slip/notify/mobilepush"
-	_ "github.com/supersuit-tech/permission-slip/notify/webpush"
 )

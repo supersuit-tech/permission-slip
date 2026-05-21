@@ -88,7 +88,7 @@ func TestDispatcher_MultipleSenders(t *testing.T) {
 	t.Parallel()
 	s1 := &stubSender{name: "email"}
 	s2 := &stubSender{name: "sms"}
-	s3 := &stubSender{name: "web-push"}
+	s3 := &stubSender{name: "mobile-push"}
 	d := NewDispatcher([]Sender{s1, s2, s3}, nil)
 
 	d.DispatchSync(context.Background(), testApproval(), testRecipient())
@@ -104,7 +104,7 @@ func TestDispatcher_PartialFailure(t *testing.T) {
 	t.Parallel()
 	s1 := &stubSender{name: "email"}
 	s2 := &stubSender{name: "sms", err: errors.New("SNS throttling")}
-	s3 := &stubSender{name: "web-push"}
+	s3 := &stubSender{name: "mobile-push"}
 	d := NewDispatcher([]Sender{s1, s2, s3}, nil)
 
 	// DispatchSync should not panic; errors are logged per-channel.
@@ -118,7 +118,7 @@ func TestDispatcher_PartialFailure(t *testing.T) {
 		t.Errorf("sms: expected 1 call, got %d", s2.callCount())
 	}
 	if s3.callCount() != 1 {
-		t.Errorf("web-push: expected 1 call, got %d", s3.callCount())
+		t.Errorf("mobile-push: expected 1 call, got %d", s3.callCount())
 	}
 }
 
@@ -184,7 +184,7 @@ func TestDispatcher_PreferenceCheckError_DefaultsToSending(t *testing.T) {
 
 func TestDispatcher_MissingPreferenceDefaultsEnabled(t *testing.T) {
 	t.Parallel()
-	s := &stubSender{name: "web-push"}
+	s := &stubSender{name: "mobile-push"}
 	// Empty disabled map → all channels default to enabled.
 	prefs := &stubPrefs{disabled: map[string]bool{}}
 	d := NewDispatcher([]Sender{s}, prefs)

@@ -64,7 +64,7 @@ The server serves both the API and frontend on a single port (default 8080). The
 | `JWT_SIGNING_SECRET` | Yes (production) | HMAC secret for HS256 access tokens — `openssl rand -base64 32` (min 32 bytes) |
 | `BASE_URL` | Yes | Public URL (e.g. `https://your-server.example.com`) |
 | `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |
-| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | For Web Push | Generate with `make generate-vapid-keys` |
+| `EXPO_ACCESS_TOKEN` | Optional | Expo Push Service token for higher rate limits |
 
 Bootstrap the first user on a new database with `go run ./cmd/create-user user@example.com 'password'` (see repository README). For the full production deployment walkthrough, see [Self-hosted deployment](deployment-self-hosted.md).
 

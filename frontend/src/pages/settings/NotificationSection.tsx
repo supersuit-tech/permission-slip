@@ -139,7 +139,6 @@ export function NotificationSection() {
         ) : (
           <div className="space-y-4">
             {preferences
-              .filter((pref) => pref.channel !== "web-push")
               .map((pref) => {
               const label = CHANNEL_LABELS[pref.channel];
               const warning = missingContact[pref.channel];

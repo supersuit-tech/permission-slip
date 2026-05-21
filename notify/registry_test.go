@@ -131,24 +131,6 @@ func TestBuildSenders_BuildContextPassedToFactory(t *testing.T) {
 	}
 }
 
-func TestBuildSenders_OnVAPIDPublicKey_Callback(t *testing.T) {
-	cleanRegistry(t)
-	var captured string
-	RegisterSenderFactory("web-push", func(_ context.Context, bc BuildContext) ([]Sender, error) {
-		if bc.OnVAPIDPublicKey != nil {
-			bc.OnVAPIDPublicKey("test-vapid-key")
-		}
-		return []Sender{&mockSender{name: "web-push"}}, nil
-	})
-
-	BuildSenders(context.Background(), BuildContext{
-		OnVAPIDPublicKey: func(key string) { captured = key },
-	})
-
-	if captured != "test-vapid-key" {
-		t.Errorf("expected VAPID key to be captured, got %q", captured)
-	}
-}
 
 func TestSenderFactoryCount(t *testing.T) {
 	cleanRegistry(t)

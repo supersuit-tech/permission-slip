@@ -1,59 +1,20 @@
 CreatePushSubscriptionRequest:
   description: |
-    Register a push subscription. Use `type: "web-push"` (or omit type) for
-    browser Web Push subscriptions, or `type: "expo"` / `type: "mobile-push"`
-    for Expo push tokens from the mobile app.
-  oneOf:
-    - $ref: '#/CreateWebPushSubscriptionRequest'
-    - $ref: '#/CreateExpoPushSubscriptionRequest'
-  discriminator:
-    propertyName: type
-    mapping:
-      web-push: '#/CreateWebPushSubscriptionRequest'
-      expo: '#/CreateExpoPushSubscriptionRequest'
-      mobile-push: '#/CreateExpoPushSubscriptionRequest'
-
-CreateWebPushSubscriptionRequest:
-  type: object
-  description: Register a Web Push subscription from a browser PushSubscription.
-  required:
-    - endpoint
-    - p256dh
-    - auth
-  properties:
-    type:
-      type: string
-      description: Subscription type. Defaults to "web-push" when omitted.
-      enum:
-        - web-push
-      default: web-push
-      example: "web-push"
-    endpoint:
-      type: string
-      format: uri
-      description: Push service endpoint URL from the browser PushSubscription
-      example: "https://fcm.googleapis.com/fcm/send/abc123..."
-    p256dh:
-      type: string
-      description: Base64url-encoded P-256 public key from the browser PushSubscription keys
-      example: "BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8p8REqnSw"
-    auth:
-      type: string
-      description: Base64url-encoded auth secret from the browser PushSubscription keys
-      example: "tBHItJI5svbpC7RB5gg6bQ"
+    Register an Expo push token from the mobile app. Use `type: "expo"` or
+    `type: "mobile-push"` — both are accepted.
+  $ref: '#/CreateExpoPushSubscriptionRequest'
 
 CreateExpoPushSubscriptionRequest:
   type: object
   description: Register an Expo push token from the mobile app.
   required:
-    - type
     - expo_token
   properties:
     type:
       type: string
       description: |
         Subscription type. Use "expo" or "mobile-push" — both are accepted
-        and create a mobile-push channel subscription.
+        and create a mobile-push channel subscription. May be omitted.
       enum:
         - expo
         - mobile-push
@@ -65,7 +26,7 @@ CreateExpoPushSubscriptionRequest:
 
 PushSubscriptionResponse:
   type: object
-  description: A registered push subscription (Web Push or Expo).
+  description: A registered push subscription.
   required:
     - id
     - channel
@@ -80,17 +41,11 @@ PushSubscriptionResponse:
       type: string
       description: The push channel type
       enum:
-        - web-push
         - mobile-push
-      example: "web-push"
-    endpoint:
-      type: string
-      format: uri
-      description: Push service endpoint URL (present for web-push subscriptions)
-      example: "https://fcm.googleapis.com/fcm/send/abc123..."
+      example: "mobile-push"
     expo_token:
       type: string
-      description: Expo push token (present for mobile-push subscriptions)
+      description: Expo push token
       example: "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]"
     created_at:
       type: string
@@ -149,14 +104,3 @@ UnregisterExpoPushTokenResponse:
       format: date-time
       description: When the token was unregistered
       example: "2026-02-27T10:05:00Z"
-
-VAPIDPublicKeyResponse:
-  type: object
-  description: The server's VAPID public key for Web Push subscription.
-  required:
-    - public_key
-  properties:
-    public_key:
-      type: string
-      description: Base64url-encoded VAPID public key
-      example: "BNx..."

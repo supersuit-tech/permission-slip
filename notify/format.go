@@ -76,8 +76,8 @@ type PushContent struct {
 }
 
 // BuildPushContent constructs the push notification display content from
-// approval data. Used by both webpush and mobilepush senders to ensure
-// consistent messaging across push channels.
+// approval data. Used by the mobilepush sender to ensure
+// consistent messaging.
 func BuildPushContent(approval Approval) PushContent {
 	if approval.Type == NotificationTypeStandingExecution {
 		return buildStandingExecutionPushContent(approval)

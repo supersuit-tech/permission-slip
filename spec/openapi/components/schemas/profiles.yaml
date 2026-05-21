@@ -75,7 +75,6 @@ NotificationPreference:
       description: Notification channel identifier
       enum:
         - email
-        - web-push
         - mobile-push
       example: "email"
     enabled:
@@ -113,7 +112,6 @@ NotificationPreferenceUpdate:
       description: Notification channel identifier
       enum:
         - email
-        - web-push
         - mobile-push
       example: "email"
     enabled:

@@ -45,7 +45,7 @@ func TestUpdateNotificationPreferences_EnableEmail_FreeTier_Allowed(t *testing.T
 	}
 }
 
-func TestGetNotificationPreferences_ExcludesSMSAndWebPush(t *testing.T) {
+func TestGetNotificationPreferences_ExcludesSMS(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -69,9 +69,6 @@ func TestGetNotificationPreferences_ExcludesSMSAndWebPush(t *testing.T) {
 	for _, p := range resp.Preferences {
 		if p.Channel == "sms" {
 			t.Error("expected SMS to be excluded from notification preferences API")
-		}
-		if p.Channel == "web-push" {
-			t.Error("expected web-push to be excluded from notification preferences API")
 		}
 	}
 }
@@ -132,7 +129,7 @@ func TestGetNotificationPreferences_IncludesMobilePush(t *testing.T) {
 	}
 }
 
-func TestUpdateNotificationPreferences_WebPush_Rejected(t *testing.T) {
+func TestUpdateNotificationPreferences_WebPush_InvalidChannel(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -145,15 +142,7 @@ func TestUpdateNotificationPreferences_WebPush_Rejected(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d: %s", w.Code, w.Body.String())
-	}
-
-	var resp ErrorResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
-		t.Fatalf("unmarshal error response: %v", err)
-	}
-	if resp.Error.Code != ErrChannelNotConfigured {
-		t.Errorf("expected error code %q, got %q", ErrChannelNotConfigured, resp.Error.Code)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 (invalid channel), got %d: %s", w.Code, w.Body.String())
 	}
 }

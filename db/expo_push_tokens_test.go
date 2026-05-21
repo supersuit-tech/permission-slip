@@ -205,3 +205,55 @@ func TestDeleteExpoPushTokenByToken(t *testing.T) {
 		t.Errorf("expected 0 tokens after token delete, got %d", len(tokens))
 	}
 }
+
+func TestDeleteExpoPushTokenForUser(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	ctx := context.Background()
+	_, err := db.UpsertExpoPushToken(ctx, tx, uid, "ExponentPushToken[for_user]")
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	deleted, err := db.DeleteExpoPushTokenForUser(ctx, tx, uid, "ExponentPushToken[for_user]")
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if !deleted {
+		t.Error("expected deleted=true")
+	}
+
+	tokens, err := db.ListExpoPushTokensByUserID(ctx, tx, uid)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(tokens) != 0 {
+		t.Errorf("expected 0 after delete, got %d", len(tokens))
+	}
+}
+
+func TestDeleteExpoPushTokenForUser_WrongUser(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid1 := testhelper.GenerateUID(t)
+	uid2 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid1, "u_"+uid1[:8])
+	testhelper.InsertUser(t, tx, uid2, "u_"+uid2[:8])
+
+	ctx := context.Background()
+	_, err := db.UpsertExpoPushToken(ctx, tx, uid1, "ExponentPushToken[user1_only]")
+	if err != nil {
+		t.Fatalf("upsert: %v", err)
+	}
+
+	deleted, err := db.DeleteExpoPushTokenForUser(ctx, tx, uid2, "ExponentPushToken[user1_only]")
+	if err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+	if deleted {
+		t.Error("expected deleted=false for wrong user")
+	}
+}

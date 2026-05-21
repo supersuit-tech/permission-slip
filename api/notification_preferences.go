@@ -11,7 +11,6 @@ import (
 // notificationPreferenceResponse is a single channel preference.
 // The Available field indicates whether the channel can be used;
 // when false, the frontend shows a "coming soon" badge instead of a toggle.
-// Web push is excluded from the response entirely so it is not configurable in the product UI.
 type notificationPreferenceResponse struct {
 	Channel   string `json:"channel"`
 	Enabled   bool   `json:"enabled"`
@@ -37,7 +36,6 @@ type notificationPreferenceUpdate struct {
 // This is the single source of truth — allChannels is derived from it.
 var validChannels = map[string]bool{
 	"email":       true,
-	"web-push":    true,
 	"mobile-push": true,
 }
 
@@ -97,15 +95,6 @@ func handleUpdateNotificationPreferences(deps *Deps) http.HandlerFunc {
 			seen[p.Channel] = true
 		}
 
-		// Web push preferences are not exposed in the API (no in-product UI). Reject any
-		// update so stale clients cannot write preference rows.
-		for _, p := range req.Preferences {
-			if p.Channel == "web-push" {
-				RespondError(w, r, http.StatusForbidden, Forbidden(ErrChannelNotConfigured, "Web push notification preferences are not available."))
-				return
-			}
-		}
-
 		for _, p := range req.Preferences {
 			if err := db.UpsertNotificationPreference(r.Context(), deps.DB, profile.ID, p.Channel, p.Enabled); err != nil {
 				log.Printf("[%s] handleUpdateNotificationPreferences: upsert %q: %v", TraceID(r.Context()), p.Channel, err)
@@ -140,10 +129,6 @@ func buildPreferencesResponse(prefs []db.NotificationPreference) []notificationP
 
 	result := make([]notificationPreferenceResponse, 0, len(allChannels))
 	for _, ch := range allChannels {
-		// Web push is not user-configurable in the product; omit from the list.
-		if ch == "web-push" {
-			continue
-		}
 		enabled, exists := channelMap[ch]
 		if !exists {
 			enabled = true // missing rows default to enabled

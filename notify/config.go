@@ -9,7 +9,7 @@ import (
 
 // Config holds notification-related configuration loaded from environment
 // variables at startup. Individual channel configs (SendGrid API key, AWS
-// credentials, VAPID keys, etc.) are defined by their respective channel
+// credentials, etc.) are defined by their respective channel
 // packages and added to this struct as they're implemented.
 type Config struct {
 	// Email channel — exactly one provider is used (SendGrid preferred).
@@ -28,11 +28,6 @@ type Config struct {
 	SNSSenderID          string // optional alphanumeric sender ID
 	SNSOriginationNumber string // optional origination number (E.164)
 
-	// Web Push (VAPID) — issue #276
-	// VAPIDSubject is a mailto: URL identifying the server operator, required
-	// by the Web Push spec. Example: "mailto:admin@mycompany.com"
-	VAPIDSubject string
-
 	// Mobile Push (Expo) — issue #9
 	// ExpoAccessToken is an optional Expo access token for authenticated
 	// requests to the Expo Push Service. When empty, unauthenticated
@@ -45,20 +40,19 @@ type Config struct {
 // channel won't be configured.
 func LoadConfig() Config {
 	return Config{
-		EmailProvider:    os.Getenv("NOTIFICATION_EMAIL_PROVIDER"),
-		EmailFrom:        os.Getenv("NOTIFICATION_EMAIL_FROM"),
-		SendGridAPIKey:   os.Getenv("SENDGRID_API_KEY"),
-		SMTPHost:         os.Getenv("SMTP_HOST"),
-		SMTPPort:         EnvOrDefault("SMTP_PORT", "587"),
-		SMTPUsername:     os.Getenv("SMTP_USERNAME"),
-		SMTPPassword:     os.Getenv("SMTP_PASSWORD"),
+		EmailProvider:        os.Getenv("NOTIFICATION_EMAIL_PROVIDER"),
+		EmailFrom:            os.Getenv("NOTIFICATION_EMAIL_FROM"),
+		SendGridAPIKey:       os.Getenv("SENDGRID_API_KEY"),
+		SMTPHost:             os.Getenv("SMTP_HOST"),
+		SMTPPort:             EnvOrDefault("SMTP_PORT", "587"),
+		SMTPUsername:         os.Getenv("SMTP_USERNAME"),
+		SMTPPassword:         os.Getenv("SMTP_PASSWORD"),
 		AWSRegion:            os.Getenv("AWS_REGION"),
 		AWSAccessKeyID:       os.Getenv("AWS_ACCESS_KEY_ID"),
 		AWSSecretAccessKey:   os.Getenv("AWS_SECRET_ACCESS_KEY"),
 		SNSSenderID:          os.Getenv("SNS_SMS_SENDER_ID"),
 		SNSOriginationNumber: os.Getenv("SNS_SMS_ORIGINATION_NUMBER"),
-		VAPIDSubject:     EnvOrDefault("VAPID_SUBJECT", ""),
-		ExpoAccessToken:  os.Getenv("EXPO_ACCESS_TOKEN"),
+		ExpoAccessToken:      os.Getenv("EXPO_ACCESS_TOKEN"),
 	}
 }
 
@@ -68,8 +62,8 @@ func LoadConfig() Config {
 //
 // This method is provided for backward-compatibility and testing convenience.
 // Production code should prefer calling notify.BuildSenders(ctx, BuildContext{...})
-// with the full build context, including the database handle (required for web
-// push, mobile push, and SMS plan gating).
+// with the full build context, including the database handle (required for
+// mobile push and SMS plan gating).
 //
 // Returns nil when no channels are configured.
 func (c Config) BuildSenders() []Sender {

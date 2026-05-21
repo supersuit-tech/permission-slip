@@ -26,17 +26,6 @@ export function useUnsubscribePush() {
         );
       }
 
-      // Also unsubscribe the browser
-      try {
-        const registration = await navigator.serviceWorker.ready;
-        const pushSub = await registration.pushManager.getSubscription();
-        if (pushSub) {
-          await pushSub.unsubscribe();
-        }
-      } catch {
-        // Browser unsubscribe failure is non-critical
-      }
-
       return data;
     },
     onSuccess: () => {
