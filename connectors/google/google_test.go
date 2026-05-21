@@ -50,6 +50,7 @@ func TestGoogleConnector_Actions(t *testing.T) {
 		"google.read_email",
 		"google.archive_email",
 		"google.create_spreadsheet",
+		"google.list_calendars",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
