@@ -22,7 +22,6 @@ import { BiometricLockScreen } from "./src/screens/BiometricLockScreen";
 import { colors } from "./src/theme/colors";
 import {
   getCustomHost,
-  getGatewaySecret,
   hasConfiguredApiBase,
   loadCustomHostConfig,
 } from "./src/lib/customHostConfig";
@@ -164,8 +163,7 @@ function AppContent({
 export default function App() {
   // Hydrate custom host config from SecureStore BEFORE mounting any subtree
   // that can issue API calls. Without this gate, the first one or more
-  // requests after cold start would bypass the custom host and gateway
-  // secret, causing surprising 403s against a gateway-locked server.
+  // requests after cold start would use a stale host URL.
   const [hostHydrated, setHostHydrated] = useState(false);
   const [serverSetupBump, setServerSetupBump] = useState(0);
   useEffect(() => {
@@ -231,7 +229,6 @@ export default function App() {
       <SafeAreaProvider>
         <ServerUrlSetupScreen
           initialHostUrl={getCustomHost() ?? ""}
-          initialSecret={getGatewaySecret() ?? ""}
           onCancel={closeServerSetup}
           onComplete={() => {
             closeServerSetup();

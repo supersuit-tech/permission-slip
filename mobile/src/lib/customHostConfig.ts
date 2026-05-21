@@ -1,7 +1,6 @@
 import * as SecureStore from "expo-secure-store";
 
 const CUSTOM_HOST_KEY = "custom_host_url";
-const GATEWAY_SECRET_KEY = "gateway_secret";
 
 /**
  * Placeholder base URL for openapi-fetch when neither EXPO_PUBLIC_API_BASE_URL
@@ -49,16 +48,15 @@ export function normalizeApiBase(input: string | null | undefined): string | nul
  * Call loadCustomHostConfig() at app startup to hydrate from SecureStore.
  */
 let cachedHost: string | null = null;
-let cachedSecret: string | null = null;
 
 /**
  * Hydrate the in-memory cache from SecureStore during app startup
  * (see `App.tsx`, which gates rendering on this promise). The API client
  * in `client.ts` is constructed at module import — well before `App`
  * runs — so the middleware synchronously reads this in-memory cache via
- * `getCustomHost()` / `getGatewaySecret()` on each request. Blocking UI
- * render until hydration completes is what prevents the first request
- * from firing before the cache is populated.
+ * `getCustomHost()` on each request. Blocking UI render until hydration
+ * completes is what prevents the first request from firing before the
+ * cache is populated.
  */
 export async function loadCustomHostConfig(): Promise<void> {
   const storedHost = (await SecureStore.getItemAsync(CUSTOM_HOST_KEY)) ?? null;
@@ -66,17 +64,11 @@ export async function loadCustomHostConfig(): Promise<void> {
   // required the user to type `/api` themselves) start working even before
   // the user re-enters their URL.
   cachedHost = normalizeApiBase(storedHost);
-  cachedSecret = (await SecureStore.getItemAsync(GATEWAY_SECRET_KEY)) ?? null;
 }
 
 /** Returns the custom host URL, or null if not configured. */
 export function getCustomHost(): string | null {
   return cachedHost;
-}
-
-/** Returns the gateway secret, or null if not configured. */
-export function getGatewaySecret(): string | null {
-  return cachedSecret;
 }
 
 /** Returns true when a custom host is configured and non-empty. */
@@ -98,12 +90,9 @@ export function hasConfiguredApiBase(): boolean {
 
 /**
  * Persist custom host config to SecureStore and update the in-memory cache.
- * Pass null to clear a value.
+ * Pass null to clear.
  */
-export async function setCustomHostConfig(
-  host: string | null,
-  secret: string | null,
-): Promise<void> {
+export async function setCustomHostConfig(host: string | null): Promise<void> {
   const normalized = normalizeApiBase(host);
   if (normalized) {
     await SecureStore.setItemAsync(CUSTOM_HOST_KEY, normalized);
@@ -111,13 +100,6 @@ export async function setCustomHostConfig(
   } else {
     await SecureStore.deleteItemAsync(CUSTOM_HOST_KEY);
     cachedHost = null;
-  }
-  if (secret && secret.trim().length > 0) {
-    await SecureStore.setItemAsync(GATEWAY_SECRET_KEY, secret.trim());
-    cachedSecret = secret.trim();
-  } else {
-    await SecureStore.deleteItemAsync(GATEWAY_SECRET_KEY);
-    cachedSecret = null;
   }
 }
 
@@ -127,7 +109,5 @@ export async function setCustomHostConfig(
  */
 export async function clearCustomHostConfig(): Promise<void> {
   await SecureStore.deleteItemAsync(CUSTOM_HOST_KEY);
-  await SecureStore.deleteItemAsync(GATEWAY_SECRET_KEY);
   cachedHost = null;
-  cachedSecret = null;
 }

@@ -3,7 +3,6 @@ import type { paths } from "./schema";
 import mockClient from "./mockClient";
 import {
   getCustomHost,
-  getGatewaySecret,
   PLACEHOLDER_API_BASE,
 } from "../lib/customHostConfig";
 
@@ -76,8 +75,8 @@ export const jsonSafeMiddleware: Middleware = {
 };
 
 /**
- * Middleware that rewrites the request URL to a custom host and injects
- * the X-Gateway-Secret header when custom host mode is enabled.
+ * Middleware that rewrites the request URL to a custom host when custom
+ * host mode is enabled.
  *
  * Reads from the in-memory cache in customHostConfig (synchronous, fast).
  * The cache is hydrated from SecureStore at app startup via
@@ -86,25 +85,18 @@ export const jsonSafeMiddleware: Middleware = {
 export const customHostMiddleware: Middleware = {
   async onRequest({ request }) {
     const customHost = getCustomHost();
-    const gatewaySecret = getGatewaySecret();
 
-    let modifiedRequest = request;
-
-    if (customHost) {
-      // Replace the default base URL prefix with the custom host.
-      // e.g., placeholder or env base + "/v1/..." → the self-hosted API base.
-      const customBase = customHost
-        .replace(/\/v1\/?$/, "")
-        .replace(/\/$/, "");
-      const newUrl = request.url.replace(defaultBaseUrl, customBase);
-      modifiedRequest = new Request(newUrl, request);
+    if (!customHost) {
+      return request;
     }
 
-    if (gatewaySecret) {
-      modifiedRequest.headers.set("X-Gateway-Secret", gatewaySecret);
-    }
-
-    return modifiedRequest;
+    // Replace the default base URL prefix with the custom host.
+    // e.g., placeholder or env base + "/v1/..." → the self-hosted API base.
+    const customBase = customHost
+      .replace(/\/v1\/?$/, "")
+      .replace(/\/$/, "");
+    const newUrl = request.url.replace(defaultBaseUrl, customBase);
+    return new Request(newUrl, request);
   },
 };
 
@@ -117,8 +109,7 @@ export const customHostMiddleware: Middleware = {
  * so the app works without a running backend.
  *
  * Custom host mode: when a custom host URL is configured via Settings, the
- * customHostMiddleware rewrites request URLs and injects the gateway secret
- * header on every request.
+ * customHostMiddleware rewrites request URLs on every request.
  */
 // Safe: mockClient implements only GET/POST — the subset the mobile app uses.
 // TypeScript enforcement is bypassed because the mock doesn't expose the full

@@ -2,9 +2,6 @@
  * Custom Server settings — allows the user to point the mobile app at a
  * private Permission Slip deployment instead of the default production host.
  *
- * When enabled, all API calls are routed to the custom host URL and the
- * gateway secret is sent as the X-Gateway-Secret header on every request.
- *
  * Saving signs the user out so the new server takes effect immediately
  * without requiring a manual app restart.
  */
@@ -23,7 +20,6 @@ import { colors } from "../../theme/colors";
 import {
   clearCustomHostConfig,
   getCustomHost,
-  getGatewaySecret,
   isCustomHostEnabled,
   loadCustomHostConfig,
   setCustomHostConfig,
@@ -36,7 +32,6 @@ interface Props {
 export default function CustomServerSettings({ onSaved }: Props) {
   const [enabled, setEnabled] = useState(false);
   const [hostUrl, setHostUrl] = useState("");
-  const [secret, setSecret] = useState("");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -45,7 +40,6 @@ export default function CustomServerSettings({ onSaved }: Props) {
     loadCustomHostConfig().then(() => {
       setEnabled(isCustomHostEnabled());
       setHostUrl(getCustomHost() ?? "");
-      setSecret(getGatewaySecret() ?? "");
       setLoaded(true);
     });
   }, []);
@@ -59,7 +53,6 @@ export default function CustomServerSettings({ onSaved }: Props) {
           .then(() => {
             setEnabled(false);
             setHostUrl("");
-            setSecret("");
             Alert.alert(
               "Custom server cleared",
               "You'll be signed out so the change takes effect.",
@@ -98,7 +91,7 @@ export default function CustomServerSettings({ onSaved }: Props) {
 
     setSaving(true);
     try {
-      await setCustomHostConfig(trimmedHost, secret.trim() || null);
+      await setCustomHostConfig(trimmedHost);
       Alert.alert(
         "Server updated",
         "You'll be signed out so the new server takes effect.",
@@ -109,7 +102,7 @@ export default function CustomServerSettings({ onSaved }: Props) {
     } finally {
       setSaving(false);
     }
-  }, [hostUrl, secret]);
+  }, [hostUrl]);
 
   if (!loaded) {
     return (
@@ -160,21 +153,6 @@ export default function CustomServerSettings({ onSaved }: Props) {
             autoCorrect={false}
             keyboardType="url"
             textContentType="URL"
-          />
-
-          <Text style={[styles.inputLabel, styles.inputLabelSpaced]}>
-            Gateway Secret
-          </Text>
-          <TextInput
-            testID="gateway-secret-input"
-            style={styles.input}
-            placeholder="Optional — leave blank if not required"
-            placeholderTextColor={colors.gray400}
-            value={secret}
-            onChangeText={setSecret}
-            autoCapitalize="none"
-            autoCorrect={false}
-            secureTextEntry
           />
 
           <TouchableOpacity
@@ -247,9 +225,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.gray700,
     marginBottom: 6,
-  },
-  inputLabelSpaced: {
-    marginTop: 16,
   },
   input: {
     backgroundColor: colors.primaryBg,

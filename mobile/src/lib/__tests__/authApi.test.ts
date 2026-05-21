@@ -6,7 +6,6 @@ jest.mock("expo-secure-store", () => ({
 
 jest.mock("../customHostConfig", () => ({
   getCustomHost: () => "https://stub.example/api",
-  getGatewaySecret: () => null,
   PLACEHOLDER_API_BASE: "https://__permission_slip_no_host__.invalid/api",
 }));
 
