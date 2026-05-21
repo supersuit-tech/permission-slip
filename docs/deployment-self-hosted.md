@@ -279,3 +279,37 @@ Because your Permission Slip instance is private to your tailnet, **any machine 
 - **Docker / containerized agents:** install Tailscale on the host (and use host networking) or run it as a sidecar — see [Tailscale's Docker guide](https://tailscale.com/kb/1282/docker).
 
 Once Tailscale is up on the agent host, point Openclaw at `https://$PS_HOSTNAME` — the same URL you set as `BASE_URL`. It'll connect like any normal HTTPS endpoint, no proxy config or special headers required.
+
+---
+
+## Mobile Push Notifications
+
+The mobile app delivers approval request notifications via [Expo's push service](https://docs.expo.dev/push-notifications/overview/), which routes through APNs (iOS) or FCM (Android). Two things are required on the server side:
+
+### 1. `BASE_URL` must be set
+
+Push notification dispatch is skipped entirely if `BASE_URL` is empty. Confirm it's in your `.env` and matches the URL the mobile app connects to:
+
+```bash
+BASE_URL=https://your-server-hostname
+```
+
+If you followed Step 3, this is already set to your Tailscale hostname. If you're using Cloudflare Tunnel or another reverse proxy, set it to that public URL instead.
+
+### 2. Outbound internet access on port 443
+
+The server sends push requests to `exp.host` (Expo's push API). Your server needs outbound HTTPS access to reach it — this is typically available by default on any machine with internet access.
+
+### Troubleshooting
+
+**"Failed to update notification preference" error in the app:**
+This was a bug (fixed in build `23c1cb5`) where self-hosted POST/PUT requests arrived with empty bodies due to how React Native's `Request` constructor works. Update to the latest mobile build.
+
+**Notifications aren't arriving:**
+1. Check server logs for `skipping notification` — this means `BASE_URL` was empty or not loaded.
+2. Check server logs for `[mobilepush]` lines showing push dispatch errors.
+3. Confirm the push subscription was registered: look for `POST /api/v1/push-subscriptions` returning `201` in your logs. If you don't see it, sign out and back in to force re-registration.
+4. On the phone, go to **Settings → Permission Slip → Notifications** and confirm notifications are allowed. The app's Settings screen will show a warning and an "Open Settings" link if device-level permission is blocked.
+
+**Using Cloudflare Tunnel instead of Tailscale:**
+Set `BASE_URL` to your Cloudflare Tunnel public URL (e.g. `https://your-subdomain.trycloudflare.com`). Everything else works the same — the server reaches Expo's push API via its own outbound connection, not through a callback to your URL.

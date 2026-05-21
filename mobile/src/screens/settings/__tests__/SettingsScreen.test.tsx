@@ -100,6 +100,10 @@ jest.mock("../../../hooks/useDeleteAccount", () => ({
   }),
 }));
 
+jest.mock("expo-notifications", () => ({
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: "granted" }),
+}));
+
 // Import after mocks
 import SettingsScreen from "../SettingsScreen";
 
