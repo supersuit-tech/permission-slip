@@ -259,3 +259,23 @@ When a user connects Slack from Permission Slip, they'll complete Slack's OAuth 
 Permission Slip ships with 15+ more OAuth providers — Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, PayPal, Stripe, and X (Twitter). See the [OAuth setup guide](oauth-setup.md) for per-provider instructions.
 
 To build your own connector for a service Permission Slip doesn't yet support, see [custom connectors](custom-connectors.md).
+
+---
+
+## Set Up Tailscale on Your Openclaw Machines
+
+Because your Permission Slip instance is private to your tailnet, **any machine that runs Openclaw (or any other tool that calls the Permission Slip API) also needs Tailscale installed** — otherwise it can't reach `https://$PS_HOSTNAME`.
+
+- **Interactive machines (laptop, dev box):**
+  ```bash
+  curl -fsSL https://tailscale.com/install.sh | sh
+  sudo tailscale up
+  ```
+- **Headless machines (cloud VMs, CI runners, etc.):** generate a single-use, non-ephemeral auth key at [login.tailscale.com/admin/settings/keys](https://login.tailscale.com/admin/settings/keys), then run:
+  ```bash
+  sudo tailscale up --authkey=tskey-auth-xxxxx --hostname=my-openclaw-box
+  ```
+  Then [disable key expiry](https://login.tailscale.com/admin/machines) on the machine so it stays online indefinitely (same approach as Step 2).
+- **Docker / containerized agents:** install Tailscale on the host (and use host networking) or run it as a sidecar — see [Tailscale's Docker guide](https://tailscale.com/kb/1282/docker).
+
+Once Tailscale is up on the agent host, point Openclaw at `https://$PS_HOSTNAME` — the same URL you set as `BASE_URL`. It'll connect like any normal HTTPS endpoint, no proxy config or special headers required.
