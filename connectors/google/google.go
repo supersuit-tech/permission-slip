@@ -168,6 +168,7 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.send_email_reply":      &sendEmailReplyAction{conn: c},
 		"google.read_email":            &readEmailAction{conn: c},
 		"google.archive_email":         &archiveEmailAction{conn: c},
+		"google.list_calendars":        &listCalendarsAction{conn: c},
 	}
 }
 

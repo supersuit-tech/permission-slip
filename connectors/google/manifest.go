@@ -956,6 +956,17 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:      "google.list_calendars",
+				Name:            "List Calendars",
+				Description:     "List all Google Calendars accessible to the authenticated user",
+				RiskLevel:       "low",
+				DisplayTemplate: "List all accessible Google Calendars",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {}
+				}`)),
+			},
 		},
 		RequiredCredentials: []connectors.ManifestCredential{
 			{
