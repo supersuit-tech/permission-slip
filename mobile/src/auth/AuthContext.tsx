@@ -75,6 +75,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     const { data, error } = await postAuth("refresh", { refresh_token: rt });
     if (error || !data) {
+      // Network errors are transient — don't sign the user out or clear their
+      // refresh token. The timer will retry before the next expiry window.
+      // Only clear on explicit server rejection (invalid/expired token).
+      if (error?.code === "network_unreachable") {
+        return { error };
+      }
       await clearStoredRefreshToken();
       setSession(null);
       setUser(null);
@@ -97,6 +103,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data, error } = await postAuth("refresh", { refresh_token: rt });
       if (cancelled) return;
       if (error || !data) {
+        // Network error on startup — keep the stored refresh token so the
+        // user can retry once connectivity is restored (e.g. Tailscale connects).
+        // Stay in "loading" so App.tsx's 10-second timeout shows the retry UI.
+        if (error?.code === "network_unreachable") {
+          return;
+        }
         await clearStoredRefreshToken();
         setAuthStatus("unauthenticated");
         return;
