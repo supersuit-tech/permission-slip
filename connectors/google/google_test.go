@@ -117,8 +117,8 @@ func TestGoogleConnector_Manifest(t *testing.T) {
 	if m.Name != "Google" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Google")
 	}
-	if len(m.Actions) != 30 {
-		t.Fatalf("Manifest().Actions has %d items, want 30", len(m.Actions))
+	if len(m.Actions) != 31 {
+		t.Fatalf("Manifest().Actions has %d items, want 31", len(m.Actions))
 	}
 	actionTypes := make(map[string]bool)
 	for _, a := range m.Actions {
@@ -129,6 +129,7 @@ func TestGoogleConnector_Manifest(t *testing.T) {
 		"google.list_emails",
 		"google.create_calendar_event",
 		"google.list_calendar_events",
+		"google.list_calendars",
 		"google.create_presentation",
 		"google.get_presentation",
 		"google.add_slide",
