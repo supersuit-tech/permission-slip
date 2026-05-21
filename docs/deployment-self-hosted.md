@@ -1,21 +1,21 @@
 # Self-Hosted Deployment Guide
 
-Permission Slip ships as a **single Go binary** with the React frontend embedded. You'll run it on your own machine and expose it to the internet through a free Cloudflare Tunnel — no port forwarding, no manual TLS, your own HTTPS hostname.
+Permission Slip ships as a **single Go binary** with the React frontend embedded. You'll run it on your own machine and reach it privately over Tailscale — no port forwarding, no manual TLS, your own HTTPS hostname. Your instance is **only reachable from devices on your tailnet**, never exposed to the public internet.
 
 > **Recommended hardware: Raspberry Pi 5 (4GB+).** Cheap, silent, always-on. The steps below use a Pi as the example but work on any Linux machine, VM, or VPS. You need **Go 1.24+** and **Node.js 20+** to build from source.
 
 ```
  ┌──────────────┐
- │  You, the    │
+ │  You, the    │   on the same tailnet (laptop, phone, etc.)
  │  mobile app  │
  └──────┬───────┘
-        │ https://permissions.yourdomain.com
+        │ https://permissions.your-tailnet.ts.net
         ▼
  ┌──────────────────┐
- │  Cloudflare      │  TLS termination, DDoS protection
- │  Tunnel          │
+ │  Tailscale       │  Private WireGuard mesh + free Let's Encrypt TLS
+ │  (tailnet)       │  Not reachable from the public internet
  └──────┬───────────┘
-        │ encrypted tunnel
+        │ tailscale serve → localhost:8080
         ▼
 ┌──────────────────────────────────────────┐
 │   Permission Slip (single Go binary)     │
@@ -30,7 +30,7 @@ Permission Slip ships as a **single Go binary** with the React frontend embedded
 
 ### Before you start
 
-You need a **Cloudflare account** and a **domain managed by Cloudflare** (free if you already own one — just point its nameservers at Cloudflare; ~$10/year if you register a new one through them). All other steps below are scriptable.
+You need a **[Tailscale account](https://login.tailscale.com/start)** — the free personal plan covers up to 3 users and 100 devices, which is plenty for a personal Permission Slip instance. No domain registration, DNS configuration, or port forwarding required.
 
 ---
 
@@ -63,63 +63,52 @@ make build
 
 ---
 
-## Step 2: Set Up Cloudflare Tunnel
+## Step 2: Set Up Tailscale Serve
 
-This is the only step where you make a choice: **pick the hostname you'll use for Permission Slip** (e.g. `permissions.yourdomain.com`). Set it as a shell variable so the rest of the guide is copy-paste:
+Install Tailscale on the server:
 
 ```bash
-export PS_HOSTNAME=permissions.yourdomain.com   # ← change this
+curl -fsSL https://tailscale.com/install.sh | sh
+```
+
+Sign in and join your tailnet (this prints a browser URL — open it and authenticate):
+
+```bash
+sudo tailscale up
+```
+
+**Enable HTTPS for your tailnet.** In the [Tailscale admin console](https://login.tailscale.com/admin/dns), under **DNS**, click **Enable HTTPS**. This unlocks free Let's Encrypt certificates on your `<tailnet-name>.ts.net` domain.
+
+> (Optional) Give your server a memorable name in the [Machines page](https://login.tailscale.com/admin/machines) — click the machine, then **Edit machine name**. The final hostname will be `<machine-name>.<tailnet-name>.ts.net`.
+
+Capture the hostname so the rest of the guide is copy-paste:
+
+```bash
+export PS_HOSTNAME=$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//')
+echo "Permission Slip will be reachable at: https://$PS_HOSTNAME"
 ```
 
 > These shell variables are **only needed during setup** — they get written into config files and aren't referenced again. No need to add them to `.bashrc`.
 
-Install `cloudflared` (use `cloudflared-linux-amd64` on x86 servers):
+Expose Permission Slip on that hostname over HTTPS:
 
 ```bash
-curl -L https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-arm64 -o cloudflared
-chmod +x cloudflared && sudo mv cloudflared /usr/local/bin/
+sudo tailscale serve --bg --https=443 8080
 ```
 
-Authenticate and create the tunnel:
+This proxies `https://$PS_HOSTNAME` to local port 8080 (where Permission Slip will run in the next step). `--bg` runs it in the background and persists the configuration across reboots. Verify:
 
 ```bash
-# Opens a browser — pick the domain that contains $PS_HOSTNAME
-cloudflared tunnel login
-
-# Create the tunnel and capture its ID
-cloudflared tunnel create permission-slip
-export TUNNEL_ID=$(cloudflared tunnel list | grep permission-slip | awk '{print $1}')
+tailscale serve status
 ```
 
-Write the tunnel config and install it as a system service:
+Finally, install Tailscale on the devices you want to use Permission Slip from:
 
-```bash
-sudo mkdir -p /etc/cloudflared
-sudo cp ~/.cloudflared/$TUNNEL_ID.json /etc/cloudflared/
-sudo tee /etc/cloudflared/config.yml > /dev/null <<EOF
-tunnel: $TUNNEL_ID
-credentials-file: /etc/cloudflared/$TUNNEL_ID.json
+- **iOS** — [Tailscale on the App Store](https://apps.apple.com/app/tailscale/id1470499037)
+- **Android** — [Tailscale on Google Play](https://play.google.com/store/apps/details?id=com.tailscale.ipn)
+- **macOS / Windows / Linux** — [tailscale.com/download](https://tailscale.com/download/)
 
-ingress:
-  - hostname: $PS_HOSTNAME
-    service: http://localhost:8080
-  - service: http_status:404
-EOF
-
-# Route DNS for $PS_HOSTNAME to this tunnel
-cloudflared tunnel route dns permission-slip $PS_HOSTNAME
-
-# Install and start the cloudflared service
-sudo cloudflared service install
-sudo systemctl enable --now cloudflared
-
-# Remove the broad account credentials — the tunnel only needs its own JSON credentials file
-rm ~/.cloudflared/cert.pem
-```
-
-> **Why delete `cert.pem`?** `cloudflared tunnel login` creates `~/.cloudflared/cert.pem`, scoped to the domain you selected. It grants management-level access to that zone — enough to create/delete DNS records and manage tunnels. Once the tunnel is created and its credentials file is copied to `/etc/cloudflared/`, the running service only needs that tunnel-scoped JSON file, which can do nothing except maintain this specific tunnel's connection. Deleting `cert.pem` removes the unnecessary zone management access.
-
-Your tunnel is now running. Once Permission Slip is up (next steps), it'll be reachable at `https://$PS_HOSTNAME`.
+Sign each device into the same tailnet. Any device on the tailnet (and only those devices) can now reach `https://$PS_HOSTNAME`.
 
 ---
 
@@ -130,11 +119,6 @@ mkdir -p ~/permission-slip/data
 cat > ~/permission-slip/.env <<EOF
 DATABASE_PATH=$HOME/permission-slip/data/app.db
 BASE_URL=https://$PS_HOSTNAME
-
-# Allow Cloudflare's web analytics beacon through the Content Security Policy.
-# Cloudflare injects this script automatically when serving via a tunnel; without
-# it you'll see CSP errors in the browser console.
-CLOUDFLARE_INSIGHTS=true
 
 # Generated below — leave as placeholders for now
 SECRET_ENCRYPTION_KEY=replace-me
@@ -148,7 +132,7 @@ sed -i "s|JWT_SIGNING_SECRET=replace-me|JWT_SIGNING_SECRET=$(openssl rand -base6
 sed -i "s|INVITE_HMAC_KEY=replace-me|INVITE_HMAC_KEY=$(openssl rand -hex 32)|" ~/permission-slip/.env
 ```
 
-That's it — `BASE_URL` is your public HTTPS hostname, and `ALLOWED_ORIGINS` doesn't need to be set (the server allows the origin the browser used).
+That's it — `BASE_URL` is your tailnet HTTPS hostname, and `ALLOWED_ORIGINS` doesn't need to be set (the server allows the origin the browser used).
 
 ---
 
@@ -158,7 +142,7 @@ That's it — `BASE_URL` is your public HTTPS hostname, and `ALLOWED_ORIGINS` do
 sudo tee /etc/systemd/system/permission-slip.service > /dev/null <<EOF
 [Unit]
 Description=Permission Slip
-After=network.target cloudflared.service
+After=network.target tailscaled.service
 
 [Service]
 Type=simple
@@ -181,7 +165,7 @@ Verify both services are healthy:
 
 ```bash
 curl http://localhost:8080/api/health           # local check
-curl https://$PS_HOSTNAME/api/health            # through the tunnel
+curl https://$PS_HOSTNAME/api/health            # through Tailscale (run from any tailnet device)
 ```
 
 ---
@@ -195,7 +179,13 @@ Permission Slip's Google connector handles Gmail and Calendar actions. To enable
 3. Under **APIs & Services > OAuth consent screen**, choose **External** (or **Internal** for Google Workspace). Fill in:
    - App name: `Permission Slip`
    - User support email: your email
-   - Authorized domain: your `$PS_HOSTNAME` domain
+   - Authorized domain: leave blank for now (see note below — `ts.net` isn't a domain you own, so Google won't accept it as an authorized domain)
+
+   > **About `ts.net` and Google's verification:** Google requires authorized domains to be ones you own and have verified, which rules out `ts.net`. Two ways to live with this:
+   > 1. **Keep the app in Testing mode** (the default). Add yourself and anyone else who needs access under **Test users**. Testing-mode apps work without domain verification.
+   > 2. **Use Workspace Internal mode** if you have a Google Workspace account — Internal apps skip verification since they're scoped to your organization.
+   >
+   > If you later want a verified, published app, swap to a real domain you own (point it at the same Tailscale machine via [Funnel](https://tailscale.com/kb/1223/funnel) or a reverse proxy, then update `BASE_URL` and the OAuth redirect URI).
 
    Add these scopes:
    - `openid`
