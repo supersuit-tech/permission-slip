@@ -2,7 +2,6 @@ import { createAuthError } from "../auth/errors";
 import type { AuthError } from "../auth/types";
 import {
   getCustomHost,
-  getGatewaySecret,
   PLACEHOLDER_API_BASE,
 } from "./customHostConfig";
 
@@ -51,10 +50,6 @@ export async function postAuth(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  const secret = getGatewaySecret();
-  if (secret) {
-    headers["X-Gateway-Secret"] = secret;
-  }
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), AUTH_REQUEST_TIMEOUT_MS);

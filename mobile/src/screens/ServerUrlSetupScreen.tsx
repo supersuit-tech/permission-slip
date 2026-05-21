@@ -26,8 +26,6 @@ type Props = {
    * launch), so the user can see and edit what's there.
    */
   initialHostUrl?: string;
-  /** Initial value for the gateway secret field. */
-  initialSecret?: string;
   /**
    * When provided, a Cancel button is shown that calls this callback.
    * Used when the screen is opened as an overlay (e.g. from the
@@ -50,12 +48,10 @@ type Props = {
 export default function ServerUrlSetupScreen({
   onComplete,
   initialHostUrl = "",
-  initialSecret = "",
   onCancel,
 }: Props) {
   const insets = useSafeAreaInsets();
   const [hostUrl, setHostUrl] = useState(initialHostUrl);
-  const [secret, setSecret] = useState(initialSecret);
   const [saving, setSaving] = useState(false);
   const [resetting, setResetting] = useState(false);
 
@@ -81,7 +77,7 @@ export default function ServerUrlSetupScreen({
 
     setSaving(true);
     try {
-      await setCustomHostConfig(trimmedHost, secret.trim() || null);
+      await setCustomHostConfig(trimmedHost);
       // Always drop any cached refresh token when the server URL is saved
       // from this screen — tokens issued by the old host won't work against
       // the new one. Safe to call even when no token is stored.
@@ -92,12 +88,12 @@ export default function ServerUrlSetupScreen({
     } finally {
       setSaving(false);
     }
-  }, [hostUrl, secret, onComplete]);
+  }, [hostUrl, onComplete]);
 
   const handleReset = useCallback(() => {
     Alert.alert(
       "Reset connection?",
-      "This clears the saved server URL, gateway secret, and signed-in session on this device. You'll need to enter the server URL again.",
+      "This clears the saved server URL and signed-in session on this device. You'll need to enter the server URL again.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -110,7 +106,6 @@ export default function ServerUrlSetupScreen({
                 await clearCustomHostConfig();
                 await clearStoredRefreshToken();
                 setHostUrl("");
-                setSecret("");
                 onComplete();
               } catch {
                 Alert.alert("Error", "Could not reset connection. Please try again.");
@@ -151,20 +146,6 @@ export default function ServerUrlSetupScreen({
           autoCorrect={false}
           keyboardType="url"
           textContentType="URL"
-          editable={!busy}
-        />
-
-        <Text style={[styles.label, styles.labelSpaced]}>Gateway secret</Text>
-        <TextInput
-          testID="server-url-setup-secret"
-          style={styles.input}
-          placeholder="Optional — only if your server requires X-Gateway-Secret"
-          placeholderTextColor={colors.gray400}
-          value={secret}
-          onChangeText={setSecret}
-          autoCapitalize="none"
-          autoCorrect={false}
-          secureTextEntry
           editable={!busy}
         />
 
@@ -244,9 +225,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.gray700,
     marginBottom: 8,
-  },
-  labelSpaced: {
-    marginTop: 16,
   },
   input: {
     backgroundColor: colors.primaryBg,

@@ -7,8 +7,8 @@ const mockClearCustomHostConfig = jest.fn(() => Promise.resolve());
 const mockClearStoredRefreshToken = jest.fn(() => Promise.resolve());
 
 jest.mock("../../lib/customHostConfig", () => ({
-  setCustomHostConfig: (host: string | null, secret: string | null) =>
-    mockSetCustomHostConfig(host, secret),
+  setCustomHostConfig: (host: string | null) =>
+    mockSetCustomHostConfig(host),
   clearCustomHostConfig: () => mockClearCustomHostConfig(),
 }));
 
@@ -47,17 +47,11 @@ describe("ServerUrlSetupScreen", () => {
       );
     });
     await act(async () => {
-      findByTestId(renderer!, "server-url-setup-secret").props.onChangeText(
-        "shh",
-      );
-    });
-    await act(async () => {
       await findByTestId(renderer!, "server-url-setup-continue").props.onPress();
     });
 
     expect(mockSetCustomHostConfig).toHaveBeenCalledWith(
       "https://my-pi.example.com:8080/api",
-      "shh",
     );
     expect(mockClearStoredRefreshToken).toHaveBeenCalled();
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -134,7 +128,6 @@ describe("ServerUrlSetupScreen", () => {
         createElement(ServerUrlSetupScreen, {
           onComplete,
           initialHostUrl: "https://old.example/api",
-          initialSecret: "old-secret",
           onCancel: () => {},
         }),
       );

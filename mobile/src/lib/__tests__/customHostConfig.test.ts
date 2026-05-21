@@ -84,7 +84,7 @@ describe("setCustomHostConfig", () => {
   });
 
   it("normalizes the URL before persisting", async () => {
-    await setCustomHostConfig("https://permission-slip.example.com", null);
+    await setCustomHostConfig("https://permission-slip.example.com");
     expect(store.get("custom_host_url")).toBe(
       "https://permission-slip.example.com/api",
     );
@@ -92,8 +92,8 @@ describe("setCustomHostConfig", () => {
   });
 
   it("deletes the stored host when given an empty value", async () => {
-    await setCustomHostConfig("https://permission-slip.example.com", null);
-    await setCustomHostConfig("", null);
+    await setCustomHostConfig("https://permission-slip.example.com");
+    await setCustomHostConfig("");
     expect(store.has("custom_host_url")).toBe(false);
     expect(getCustomHost()).toBeNull();
   });

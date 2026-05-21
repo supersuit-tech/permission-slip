@@ -368,15 +368,6 @@ func main() {
 	// handler, including the health check and SPA handler.
 	handler := api.CORSMiddleware(deps.AllowedOrigins)(mux)
 
-	// Gateway secret — optional access gate for private deployments.
-	// When GATEWAY_SECRET is set, every request (except genuine CORS
-	// preflights) must include a matching X-Gateway-Secret header or receive
-	// 403. This wraps CORS and all application logic, so unauthorized
-	// requests are rejected before routing/auth. SecurityHeadersMiddleware
-	// (applied below) wraps this — it only sets response headers and never
-	// blocks, so it does not affect the gate's trust boundary.
-	handler = api.GatewaySecretMiddleware(os.Getenv("GATEWAY_SECRET"))(handler)
-
 	// Wrap all routes with security headers (outermost layer).
 	// Sentry's ingest domain is always
 	// allowed in connect-src; the optional SENTRY_CSP_ENDPOINT enables
