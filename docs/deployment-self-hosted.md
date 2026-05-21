@@ -77,22 +77,13 @@ Sign in and join your tailnet (this prints a browser URL — open it and authent
 sudo tailscale up
 ```
 
-> **Headless server? Use an auth key instead.** If the machine has no browser (or you're scripting the setup), generate a one-time auth key at [login.tailscale.com/admin/settings/keys](https://login.tailscale.com/admin/settings/keys) and pass it directly. Recommended settings:
->
-> - **Reusable: off** — single-use so a leaked key can only onboard one machine.
-> - **Ephemeral: off** — your Permission Slip server should stay registered even when offline.
-> - **Tags: `tag:server`** — tagged machines don't expire every ~180 days and aren't tied to your personal login. You'll need to define the tag in your [tailnet ACLs](https://login.tailscale.com/admin/acls) first (e.g. `"tagOwners": { "tag:server": ["autogroup:admin"] }`) or `--advertise-tags` will be rejected.
->
-> Then on the server:
+> **Headless server? Use an auth key instead.** If the machine has no browser (or you're scripting the setup), generate a one-time auth key at [login.tailscale.com/admin/settings/keys](https://login.tailscale.com/admin/settings/keys) — leave **Reusable** off (single-use), leave **Ephemeral** off (so the server stays registered when offline), then run:
 >
 > ```bash
-> sudo tailscale up \
->   --authkey=tskey-auth-xxxxx \
->   --hostname=permissions \
->   --advertise-tags=tag:server
+> sudo tailscale up --authkey=tskey-auth-xxxxx --hostname=permissions
 > ```
 >
-> The auth key is only needed for this one-time bootstrap — don't bake it into a config file or systemd unit.
+> Once registered, open [Machines](https://login.tailscale.com/admin/machines) → click the machine → **Disable key expiry** so you don't have to re-authenticate every ~180 days. The auth key itself is only needed for this one-time bootstrap — don't bake it into a config file or systemd unit.
 
 **Enable HTTPS for your tailnet.** In the [Tailscale admin console](https://login.tailscale.com/admin/dns), under **DNS**, click **Enable HTTPS**. This unlocks free Let's Encrypt certificates on your `<tailnet-name>.ts.net` domain.
 
