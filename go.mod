@@ -15,8 +15,6 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/sns v1.39.16
 	github.com/aws/smithy-go v1.25.0
 	github.com/coinbase/cdp-sdk/go v0.0.0-20260312193422-ec2866ff0423
-	github.com/emersion/go-imap/v2 v2.0.0-beta.8
-	github.com/emersion/go-message v0.18.2
 	github.com/ethereum/go-ethereum v1.17.1
 	github.com/getsentry/sentry-go v0.43.0
 	github.com/go-playground/validator/v10 v10.30.1
