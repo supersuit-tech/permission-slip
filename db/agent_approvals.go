@@ -5,11 +5,46 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"log/slog"
+	"os"
 	"time"
 )
 
-// DefaultApprovalTTL is the default time-to-live for a new approval request.
-const DefaultApprovalTTL = 10 * time.Minute
+// DefaultApprovalTTL is the default time-to-live for a new approval request
+// when the agent does not supply an `expires_in` override. It is a var rather
+// than a const so it can be reassigned at process startup from the
+// APPROVAL_REQUEST_TTL env var via ApprovalTTLFromEnv.
+var DefaultApprovalTTL = 10 * time.Minute
+
+// ApprovalTTLFromEnv reads APPROVAL_REQUEST_TTL and returns a duration clamped
+// to [1m, 24h]. Unset, unparseable, or out-of-bounds values fall back to 10m
+// and emit a warning via the supplied logger.
+func ApprovalTTLFromEnv(logger *slog.Logger) time.Duration {
+	const def = 10 * time.Minute
+	const minTTL = time.Minute
+	const maxTTL = 24 * time.Hour
+
+	v := os.Getenv("APPROVAL_REQUEST_TTL")
+	if v == "" {
+		return def
+	}
+	d, err := time.ParseDuration(v)
+	if err != nil {
+		if logger != nil {
+			logger.Warn("invalid APPROVAL_REQUEST_TTL, using default 10m",
+				"value", v, "error", err)
+		}
+		return def
+	}
+	if d < minTTL || d > maxTTL {
+		if logger != nil {
+			logger.Warn("APPROVAL_REQUEST_TTL out of bounds, using default 10m",
+				"value", v, "min", minTTL.String(), "max", maxTTL.String())
+		}
+		return def
+	}
+	return d
+}
 
 // InsertApprovalParams holds the parameters for creating a new approval.
 type InsertApprovalParams struct {
