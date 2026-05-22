@@ -24,9 +24,15 @@ import {
 } from "../../hooks/useAgents";
 import { useApproveApproval } from "../../hooks/useApproveApproval";
 import { useDenyApproval } from "../../hooks/useDenyApproval";
-import { useStandingApprovals } from "../../hooks/useStandingApprovals";
+import {
+  useStandingApprovals,
+  type StandingApproval,
+} from "../../hooks/useStandingApprovals";
 import { useCreateStandingApproval } from "../../hooks/useCreateStandingApproval";
-import { useActionConfigs } from "../../hooks/useActionConfigs";
+import {
+  useActionConfigs,
+  type ActionConfiguration,
+} from "../../hooks/useActionConfigs";
 import { buildCreateStandingApprovalFromApproval } from "./standingApprovalFromApproval";
 import { colors } from "../../theme/colors";
 import {
@@ -120,7 +126,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const hasExistingStandingApproval = useMemo(
     () =>
       standingApprovals.some(
-        (sa) =>
+        (sa: StandingApproval) =>
           sa.agent_id === approval.agent_id &&
           sa.action_type === approval.action.type,
       ),
@@ -129,7 +135,8 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const matchingActionConfig = useMemo(
     () =>
       configs.find(
-        (c) => c.status === "active" && c.action_type === approval.action.type,
+        (c: ActionConfiguration) =>
+          c.status === "active" && c.action_type === approval.action.type,
       ) ?? null,
     [configs, approval.action.type],
   );
