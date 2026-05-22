@@ -42,8 +42,19 @@ const mockAgents = [
   },
 ];
 
+const mockActionConfig = {
+  id: "ac_config1",
+  agent_id: 1,
+  connector_id: "email",
+  action_type: "email.send",
+  status: "active" as const,
+  name: "Send email",
+  parameters: {},
+};
+
 function setupMocks({
   standingApprovals = [] as Array<{ agent_id: number; action_type: string }>,
+  actionConfigs = [mockActionConfig],
 } = {}) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
@@ -54,9 +65,8 @@ function setupMocks({
       return Promise.resolve({ data: { data: standingApprovals } });
     }
     if (url === "/v1/action-configurations") {
-      return Promise.resolve({ data: { data: [] } });
+      return Promise.resolve({ data: { data: actionConfigs } });
     }
-    // Connector/schema lookups
     if (url.startsWith("/v1/connectors/")) {
       return Promise.resolve({ data: { id: "email", name: "Email", actions: [] } });
     }
@@ -64,7 +74,20 @@ function setupMocks({
   });
 }
 
-describe("ReviewApprovalDialog — Always Allow This", () => {
+function mockApproveSuccess() {
+  mockPost.mockResolvedValueOnce({
+    data: {
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+      confirmation_code: "ABC12-3DEFG",
+      execution_status: "success",
+      execution_result: null,
+    },
+  });
+}
+
+describe("ReviewApprovalDialog — auto-approve future requests", () => {
   let wrapper: ReturnType<typeof createAuthWrapper>;
 
   beforeEach(() => {
@@ -73,13 +96,11 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("shows 'Always Allow' button on the approval screen when action has parameters", async () => {
+  it("shows checkbox when no matching standing approval exists", async () => {
     setupMocks();
-    const approval = makeApproval();
-
     render(
       <ReviewApprovalDialog
-        approval={approval}
+        approval={makeApproval()}
         agentDisplayName="Test Bot"
         open={true}
         onOpenChange={vi.fn()}
@@ -87,18 +108,25 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       { wrapper },
     );
 
-    // "Always Allow" button should be visible alongside Approve/Deny
     await waitFor(() => {
-      expect(screen.getByText("Always allow this action")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Auto-approve all future requests like this"),
+      ).toBeInTheDocument();
     });
-    expect(screen.getByText("Approve")).toBeInTheDocument();
-    expect(screen.getByText("Deny")).toBeInTheDocument();
   });
 
-  it("does NOT show 'Always Allow' when action has no parameters", () => {
-    setupMocks();
+  it("shows checkbox for parameterless actions", async () => {
+    setupMocks({
+      actionConfigs: [
+        {
+          ...mockActionConfig,
+          id: "ac_list",
+          action_type: "google.list_calendars",
+        },
+      ],
+    });
     const approval = makeApproval({
-      action: { type: "system.noop", version: "1", parameters: {} },
+      action: { type: "google.list_calendars", version: "1", parameters: {} },
     });
 
     render(
@@ -111,20 +139,22 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       { wrapper },
     );
 
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Auto-approve all future requests like this"),
+      ).toBeInTheDocument();
+    });
     expect(screen.queryByText("Always allow this action")).not.toBeInTheDocument();
   });
 
-  it("does NOT show 'Always Allow' when a standing approval already exists for agent+action", async () => {
+  it("hides checkbox when a standing approval already exists for agent+action", async () => {
     setupMocks({
-      standingApprovals: [
-        { agent_id: 1, action_type: "email.send" },
-      ],
+      standingApprovals: [{ agent_id: 1, action_type: "email.send" }],
     });
-    const approval = makeApproval();
 
     render(
       <ReviewApprovalDialog
-        approval={approval}
+        approval={makeApproval()}
         agentDisplayName="Test Bot"
         open={true}
         onOpenChange={vi.fn()}
@@ -132,130 +162,31 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
       { wrapper },
     );
 
-    // Wait for standing approvals to load, then verify button is absent
     await waitFor(() => {
-      // Standing approvals have loaded (no loading state)
       expect(screen.getByText("Approve")).toBeInTheDocument();
     });
 
-    expect(screen.queryByText("Always allow this action")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Auto-approve all future requests like this"),
+    ).not.toBeInTheDocument();
   });
 
-  it("approves request and opens CreateStandingApprovalDialog when 'Always Allow' is clicked", async () => {
+  it("ticking checkbox + Approve calls approve then createStandingApproval with pinned params", async () => {
     setupMocks();
-    const approval = makeApproval();
-
+    mockApproveSuccess();
     mockPost.mockResolvedValueOnce({
       data: {
-        approval_id: approval.approval_id,
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        confirmation_code: "ABC12-3DEFG",
-        execution_status: "success",
-        execution_result: null,
+        standing_approval_id: "sa_new",
+        agent_id: 1,
+        action_type: "email.send",
+        status: "active",
       },
     });
 
     const user = userEvent.setup();
     render(
       <ReviewApprovalDialog
-        approval={approval}
-        agentDisplayName="Test Bot"
-        open={true}
-        onOpenChange={vi.fn()}
-      />,
-      { wrapper },
-    );
-
-    await settleAuthHydration();
-
-    // Click "Always Allow" from the pre-approval screen
-    await waitFor(() => {
-      expect(screen.getByText("Always allow this action")).toBeInTheDocument();
-    });
-
-    await user.click(screen.getByText("Always allow this action"));
-
-    // The CreateStandingApprovalDialog should open (skipping to constraints step)
-    await waitFor(() => {
-      expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
-    });
-
-    // Should show step 1 of 2 (constraints), not step 1 of 4
-    expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
-  });
-
-  it(
-    "does NOT call onOpenChange(false) while the standing-approval wizard is open",
-    async () => {
-      setupMocks();
-      const approval = makeApproval();
-      const onOpenChange = vi.fn();
-
-      mockPost.mockResolvedValueOnce({
-        data: {
-          approval_id: approval.approval_id,
-          status: "approved",
-          approved_at: new Date().toISOString(),
-          confirmation_code: "ABC12-3DEFG",
-          execution_status: "success",
-          execution_result: null,
-        },
-      });
-
-      const user = userEvent.setup();
-
-      render(
-        <ReviewApprovalDialog
-          approval={approval}
-          agentDisplayName="Test Bot"
-          open={true}
-          onOpenChange={onOpenChange}
-        />,
-        { wrapper },
-      );
-
-      await settleAuthHydration();
-
-      await waitFor(() => {
-        expect(screen.getByText("Always allow this action")).toBeInTheDocument();
-      });
-
-      await user.click(screen.getByText("Always allow this action"));
-
-      await waitFor(() => {
-        expect(screen.getByText(/Step 1 of 2/)).toBeInTheDocument();
-      });
-
-      // Parent auto-close is SUCCESS_AUTO_CLOSE_MS (3000); if a regression schedules it
-      // while the wizard is open, this would fire too early. Real timers avoid RTL waitFor
-      // hanging under vi.useFakeTimers().
-      await new Promise((r) => setTimeout(r, 3_100));
-
-      expect(onOpenChange).not.toHaveBeenCalledWith(false);
-    },
-    10_000,
-  );
-
-  it("does NOT open standing approval wizard when execution fails after 'Always Allow'", async () => {
-    setupMocks();
-    const approval = makeApproval();
-
-    mockPost.mockResolvedValueOnce({
-      data: {
-        approval_id: approval.approval_id,
-        status: "approved",
-        approved_at: new Date().toISOString(),
-        confirmation_code: "ABC12-3DEFG",
-        execution_status: "error",
-        execution_result: { execution_error: "Connection failed" },
-      },
-    });
-
-    const user = userEvent.setup();
-    render(
-      <ReviewApprovalDialog
-        approval={approval}
+        approval={makeApproval()}
         agentDisplayName="Test Bot"
         open={true}
         onOpenChange={vi.fn()}
@@ -266,16 +197,77 @@ describe("ReviewApprovalDialog — Always Allow This", () => {
     await settleAuthHydration();
 
     await waitFor(() => {
-      expect(screen.getByText("Always allow this action")).toBeInTheDocument();
+      expect(
+        screen.getByLabelText("Auto-approve all future requests like this"),
+      ).toBeInTheDocument();
     });
 
-    await user.click(screen.getByText("Always allow this action"));
+    await user.click(
+      screen.getByLabelText("Auto-approve all future requests like this"),
+    );
+    await user.click(screen.getByText("Approve"));
 
-    // Should show execution failure, NOT the standing approval wizard
     await waitFor(() => {
-      expect(screen.getByText("Execution Failed")).toBeInTheDocument();
+      expect(screen.getByText("Action Executed Successfully")).toBeInTheDocument();
     });
 
-    expect(screen.queryByText(/Step 1 of 2/)).not.toBeInTheDocument();
+    expect(mockPost).toHaveBeenCalledTimes(2);
+    const createCall = mockPost.mock.calls.find(
+      (call) => call[0] === "/v1/standing-approvals/create",
+    );
+    expect(createCall).toBeDefined();
+    expect(createCall?.[1]?.body).toMatchObject({
+      agent_id: 1,
+      action_type: "email.send",
+      action_version: "1",
+      constraints: {
+        recipient: "user@example.com",
+        subject: "Hello",
+      },
+      source_action_configuration_id: "ac_config1",
+      expires_at: null,
+    });
+
+    expect(
+      screen.getByText("Future matching requests will be auto-approved."),
+    ).toBeInTheDocument();
+  });
+
+  it("standing approval failure does not block approve from succeeding", async () => {
+    setupMocks();
+    mockApproveSuccess();
+    mockPost.mockRejectedValueOnce(new Error("Standing approval failed"));
+
+    const user = userEvent.setup();
+    render(
+      <ReviewApprovalDialog
+        approval={makeApproval()}
+        agentDisplayName="Test Bot"
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await settleAuthHydration();
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Auto-approve all future requests like this"),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(
+      screen.getByLabelText("Auto-approve all future requests like this"),
+    );
+    await user.click(screen.getByText("Approve"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Action Executed Successfully")).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByText("Future matching requests will be auto-approved."),
+    ).not.toBeInTheDocument();
   });
 });

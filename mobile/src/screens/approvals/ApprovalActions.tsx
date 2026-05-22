@@ -6,7 +6,14 @@
  * notification for deny.
  */
 import { useCallback } from "react";
-import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import * as Haptics from "expo-haptics";
 import { colors } from "../../theme/colors";
 
@@ -16,6 +23,10 @@ interface ApprovalActionsProps {
   isApproving: boolean;
   isDenying: boolean;
   disabled: boolean;
+  /** When false, the auto-approve checkbox row is hidden. */
+  showAutoApproveCheckbox?: boolean;
+  autoApproveFuture?: boolean;
+  onAutoApproveFutureChange?: (value: boolean) => void;
 }
 
 export function ApprovalActions({
@@ -24,6 +35,9 @@ export function ApprovalActions({
   isApproving,
   isDenying,
   disabled,
+  showAutoApproveCheckbox = false,
+  autoApproveFuture = false,
+  onAutoApproveFutureChange,
 }: ApprovalActionsProps) {
   const isBusy = isApproving || isDenying;
 
@@ -37,8 +51,43 @@ export function ApprovalActions({
     onDeny();
   }, [onDeny]);
 
+  const handleToggleAutoApprove = useCallback(() => {
+    onAutoApproveFutureChange?.(!autoApproveFuture);
+  }, [autoApproveFuture, onAutoApproveFutureChange]);
+
   return (
-    <View style={styles.container}>
+    <View style={styles.wrapper}>
+      {showAutoApproveCheckbox && (
+        <Pressable
+          style={styles.checkboxRow}
+          onPress={handleToggleAutoApprove}
+          disabled={disabled || isBusy}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: autoApproveFuture, disabled: disabled || isBusy }}
+          accessibilityLabel="Auto-approve all future requests like this"
+          testID="auto-approve-checkbox"
+        >
+          <View
+            style={[
+              styles.checkboxBox,
+              autoApproveFuture && styles.checkboxBoxChecked,
+              (disabled || isBusy) && styles.checkboxBoxDisabled,
+            ]}
+          >
+            {autoApproveFuture && <Text style={styles.checkboxMark}>✓</Text>}
+          </View>
+          <Text
+            style={[
+              styles.checkboxLabel,
+              (disabled || isBusy) && styles.checkboxLabelDisabled,
+            ]}
+          >
+            Auto-approve all future requests like this
+          </Text>
+        </Pressable>
+      )}
+
+      <View style={styles.container}>
       <TouchableOpacity
         style={[styles.denyButton, (disabled || isBusy) && styles.buttonDisabled]}
         onPress={handleDeny}
@@ -72,16 +121,59 @@ export function ApprovalActions({
           </Text>
         )}
       </TouchableOpacity>
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    gap: 12,
+  },
+  checkboxRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    paddingVertical: 4,
+  },
+  checkboxBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: colors.gray400,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxBoxChecked: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  checkboxBoxDisabled: {
+    opacity: 0.5,
+  },
+  checkboxMark: {
+    color: colors.white,
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 16,
+  },
+  checkboxLabel: {
+    flex: 1,
+    fontSize: 14,
+    color: colors.gray900,
+    lineHeight: 20,
+  },
+  checkboxLabelDisabled: {
+    color: colors.gray400,
+  },
   container: {
     flexDirection: "row",
     gap: 12,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingBottom: 16,
   },
   denyButton: {
     flex: 1,

@@ -833,6 +833,38 @@ func TestCreateStandingApproval_ConstraintsEmptyObject(t *testing.T) {
 	}
 }
 
+func TestCreateStandingApproval_ParameterlessActionNullOrEmptyConstraints(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	actionType := "google.list_calendars"
+	testhelper.InsertConnector(t, tx, "google")
+	testhelper.InsertConnectorAction(t, tx, "google", actionType, actionType)
+	acID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfigFull(t, tx, acID, agentID, uid, "google", actionType, testhelper.ActionConfigOpts{
+		Parameters: []byte("{}"),
+	})
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	for _, constraints := range []string{"null", "{}"} {
+		t.Run("constraints="+constraints, func(t *testing.T) {
+			body := fmt.Sprintf(
+				`{"agent_id": %d, "action_type": %q, "constraints": %s, "source_action_configuration_id": %q, "expires_at": null}`,
+				agentID, actionType, constraints, acID,
+			)
+			r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+			w := httptest.NewRecorder()
+			router.ServeHTTP(w, r)
+			if w.Code != http.StatusCreated {
+				t.Fatalf("expected 201 for parameterless action, got %d: %s", w.Code, w.Body.String())
+			}
+		})
+	}
+}
+
 func TestCreateStandingApproval_ConstraintsAllWildcard(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

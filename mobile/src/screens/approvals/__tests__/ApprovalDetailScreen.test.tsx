@@ -8,6 +8,7 @@ import { makeApproval, MOCK_AGENTS, mockGetAgentDisplayName } from "../testFixtu
 
 const mockApproveApproval = jest.fn();
 const mockDenyApproval = jest.fn();
+const mockCreateStandingApproval = jest.fn();
 
 jest.mock("../../../hooks/useApproveApproval", () => ({
   useApproveApproval: () => ({
@@ -24,6 +25,38 @@ jest.mock("../../../hooks/useDenyApproval", () => ({
     isPending: false,
     error: null,
     reset: jest.fn(),
+  }),
+}));
+
+jest.mock("../../../hooks/useStandingApprovals", () => ({
+  useStandingApprovals: () => ({
+    standingApprovals: [],
+    isLoading: false,
+  }),
+}));
+
+jest.mock("../../../hooks/useCreateStandingApproval", () => ({
+  useCreateStandingApproval: () => ({
+    createStandingApproval: mockCreateStandingApproval,
+    isPending: false,
+  }),
+}));
+
+jest.mock("../../../hooks/useActionConfigs", () => ({
+  useActionConfigs: () => ({
+    configs: [
+      {
+        id: "ac_config1",
+        agent_id: 42,
+        connector_id: "email",
+        action_type: "email.send",
+        status: "active",
+        name: "Send",
+        parameters: {},
+      },
+    ],
+    isLoading: false,
+    isFetched: true,
   }),
 }));
 
@@ -459,6 +492,54 @@ describe("ApprovalDetailScreen", () => {
     });
 
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it("shows auto-approve checkbox for pending approvals", async () => {
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasTestId(renderer, "auto-approve-checkbox")).toBe(true);
+  });
+
+  it("creates standing approval when checkbox is ticked and approve succeeds", async () => {
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+    });
+    mockCreateStandingApproval.mockResolvedValueOnce({
+      standing_approval_id: "sa_new",
+    });
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const checkbox = findFirstByTestId(renderer, "auto-approve-checkbox");
+    await act(async () => {
+      checkbox?.props.onPress();
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockCreateStandingApproval).toHaveBeenCalledWith(
+      expect.objectContaining({
+        agent_id: 42,
+        action_type: "email.send",
+        source_action_configuration_id: "ac_config1",
+        expires_at: null,
+      }),
+    );
+    expect(hasTestId(renderer, "standing-approval-success")).toBe(true);
   });
 
   it("hides action buttons after successful approval", async () => {
