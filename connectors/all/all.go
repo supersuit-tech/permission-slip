@@ -48,6 +48,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip/connectors/paypal"
 	_ "github.com/supersuit-tech/permission-slip/connectors/plaid"
 	_ "github.com/supersuit-tech/permission-slip/connectors/postgres"
+	_ "github.com/supersuit-tech/permission-slip/connectors/protonmail"
 	_ "github.com/supersuit-tech/permission-slip/connectors/quickbooks"
 	_ "github.com/supersuit-tech/permission-slip/connectors/redis"
 	_ "github.com/supersuit-tech/permission-slip/connectors/salesforce"

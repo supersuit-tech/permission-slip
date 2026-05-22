@@ -10,6 +10,8 @@ For background on how custom connectors work, see [Custom Connectors](custom-con
 
 _No community connectors listed yet._
 
+**Proton Mail:** The former external repo [permission-slip-proton](https://github.com/supersuit-tech/permission-slip-proton) is superseded by the built-in `protonmail` connector. Use [Proton Mail (built-in)](../connectors/protonmail.md) instead of installing a subprocess connector.
+
 If you've built a custom connector and would like it listed here, open a pull request adding it to the table below.
 
 <!-- Add connectors to this table as they become available:

@@ -1,0 +1,47 @@
+package protonmail
+
+import (
+	"encoding/json"
+
+	"github.com/supersuit-tech/permission-slip/connectors"
+)
+
+func protonmailTemplates() []connectors.ManifestTemplate {
+	return []connectors.ManifestTemplate{
+		{
+			ID:          "tpl_protonmail_send",
+			ActionType:  "protonmail.send_email",
+			Name:        "Send emails from your Proton Mail account",
+			Description: "Agent can send emails on your behalf via Proton Mail Bridge.",
+			Parameters:  json.RawMessage(`{"to":"*","subject":"*","body":"*"}`),
+		},
+		{
+			ID:          "tpl_protonmail_read_inbox",
+			ActionType:  "protonmail.read_inbox",
+			Name:        "Read recent inbox emails",
+			Description: "Agent can read your recent inbox emails.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","limit":"*"}`),
+		},
+		{
+			ID:          "tpl_protonmail_search",
+			ActionType:  "protonmail.search_emails",
+			Name:        "Search emails",
+			Description: "Agent can search your emails by subject, sender, or date.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","limit":"*"}`),
+		},
+		{
+			ID:          "tpl_protonmail_read_email",
+			ActionType:  "protonmail.read_email",
+			Name:        "Read a specific email",
+			Description: "Agent can read the full content of a specific email.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","message_id":"*"}`),
+		},
+		{
+			ID:          "tpl_protonmail_archive",
+			ActionType:  "protonmail.archive_email",
+			Name:        "Archive emails",
+			Description: "Agent can move emails to the Archive folder.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","message_id":"*","message_ids":"*"}`),
+		},
+	}
+}

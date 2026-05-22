@@ -37,7 +37,7 @@ func TestBuiltInConnectorsAreRegistered(t *testing.T) {
 	// There are 56 active built-in connectors; kroger is disabled via
 	// connectors/kroger/disabled (embedded in the binary via //go:embed).
 	// Update this number when adding, removing, or re-enabling connectors.
-	const expected = 56
+	const expected = 57
 	if len(got) != expected {
 		t.Fatalf("expected %d built-in connectors, got %d — did you forget to add register.go or a blank import in connectors/all?", expected, len(got))
 	}
