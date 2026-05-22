@@ -254,6 +254,18 @@ When a user connects Slack from Permission Slip, they'll complete Slack's OAuth 
 
 ---
 
+## Email: Proton Mail (Bridge)
+
+Gmail is covered by the [Google connector](#step-5-connect-google) (OAuth). **Proton Mail** is a built-in connector that uses [Proton Mail Bridge](https://proton.me/mail/bridge) on the same machine as Permission Slip — there is no cloud OAuth flow.
+
+1. Install and run Bridge headless (systemd user unit, `pass` keychain, login). Full steps: **[Proton Mail connector guide](connectors/protonmail.md)**.
+2. In the Permission Slip UI, add **Proton Mail** credentials with your Bridge username and Bridge-generated password.
+3. Grant agent permissions using the Proton templates (send, read inbox, search, read message, archive).
+
+Bridge must be running when you save credentials; validation performs a real IMAP LOGIN.
+
+---
+
 ## Other Connectors
 
 Permission Slip ships with 15+ more OAuth providers — Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, PayPal, Stripe, and X (Twitter). See the [OAuth setup guide](oauth-setup.md) for per-provider instructions.
