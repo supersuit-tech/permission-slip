@@ -80,14 +80,6 @@ Permission Slip supports four notification channels. Channels are active only wh
 
 **Requirement Level:** Services MUST support webhook notifications.
 
-### Web Push Notifications (Optional)
-
-**Web push** delivers browser notifications via the [Web Push Protocol](https://www.rfc-editor.org/rfc/rfc8030) using VAPID authentication. Subscriptions are stored per browser; the service sends encrypted payloads directly to the browser push service (FCM for Chrome, Mozilla for Firefox, etc.).
-
-**Configuration:** Set `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`. Keys are auto-generated in development mode. See the README for key generation instructions.
-
-**Requirement Level:** Services MAY support web push as an optional enhancement.
-
 ### Mobile Push Notifications (Optional)
 
 **Mobile push notifications** deliver alerts to iOS and Android devices via the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/), which routes to APNs (iOS) and FCM (Android). Device tokens are registered on login via the Permission Slip mobile app.

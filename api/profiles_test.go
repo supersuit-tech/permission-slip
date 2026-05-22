@@ -324,10 +324,9 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("failed to unmarshal: %v", err)
 	}
-	// web-push is not exposed in the notification preferences API.
-	expectedChannels := len(allChannels) - 1
+	expectedChannels := len(allChannels)
 	if len(resp.Preferences) != expectedChannels {
-		t.Fatalf("expected %d preferences (web-push excluded), got %d", expectedChannels, len(resp.Preferences))
+		t.Fatalf("expected %d preferences, got %d", expectedChannels, len(resp.Preferences))
 	}
 
 	// Index preferences by channel for explicit assertions.
@@ -350,9 +349,6 @@ func TestGetNotificationPreferences_Defaults(t *testing.T) {
 		if !p.Available {
 			t.Errorf("expected channel %q to be available", ch)
 		}
-	}
-	if _, ok := prefsByChannel["web-push"]; ok {
-		t.Error("expected web-push to be excluded from notification preferences API")
 	}
 }
 

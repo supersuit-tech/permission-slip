@@ -87,9 +87,6 @@ func TestValidateConfig_MissingDatabaseURL(t *testing.T) {
 		"MODE":               "",
 		"DATABASE_PATH":      "",
 		"JWT_SIGNING_SECRET": "test-jwt-signing-secret-32chars-min!",
-		"VAPID_PUBLIC_KEY":   "",
-		"VAPID_PRIVATE_KEY":  "",
-		"VAPID_SUBJECT":      "",
 	})
 
 	errs, _ := validateConfig()
@@ -112,9 +109,6 @@ func TestValidateConfig_MissingJWTSigningSecret(t *testing.T) {
 		"DATABASE_PATH":         "/tmp/test.db",
 		"SECRET_ENCRYPTION_KEY": testSecretEncryptionKeyB64,
 		"JWT_SIGNING_SECRET":    "",
-		"VAPID_PUBLIC_KEY":      "",
-		"VAPID_PRIVATE_KEY":     "",
-		"VAPID_SUBJECT":         "",
 	})
 
 	errs, _ := validateConfig()
@@ -139,9 +133,6 @@ func TestValidateConfig_MissingSecretEncryptionKeyInProduction(t *testing.T) {
 		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
 		"INVITE_HMAC_KEY":       "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":              "https://example.com",
-		"VAPID_PUBLIC_KEY":      "",
-		"VAPID_PRIVATE_KEY":     "",
-		"VAPID_SUBJECT":         "",
 	})
 
 	errs, _ := validateConfig()
@@ -165,9 +156,6 @@ func TestValidateConfig_InvalidSecretEncryptionKeyInProduction(t *testing.T) {
 		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
 		"INVITE_HMAC_KEY":       "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":              "https://example.com",
-		"VAPID_PUBLIC_KEY":      "",
-		"VAPID_PRIVATE_KEY":     "",
-		"VAPID_SUBJECT":         "",
 	})
 
 	errs, _ := validateConfig()
@@ -191,9 +179,6 @@ func TestValidateConfig_JWTSigningSecretSuffices(t *testing.T) {
 		"JWT_SIGNING_SECRET":    "my-secret-that-is-32-chars-long!",
 		"INVITE_HMAC_KEY":       "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":              "https://example.com",
-		"VAPID_PUBLIC_KEY":      "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":     "examplePrivateKey",
-		"VAPID_SUBJECT":         "mailto:test@example.com",
 	})
 
 	errs, _ := validateConfig()
@@ -213,9 +198,6 @@ func TestValidateConfig_OptionalWarnings(t *testing.T) {
 		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
 		"INVITE_HMAC_KEY":       "",
 		"BASE_URL":              "",
-		"VAPID_PUBLIC_KEY":      "",
-		"VAPID_PRIVATE_KEY":     "",
-		"VAPID_SUBJECT":         "",
 	})
 
 	_, warnings := validateConfig()
@@ -245,9 +227,6 @@ func TestValidateConfig_AllValid(t *testing.T) {
 		"INVITE_HMAC_KEY":          "test-invite-hmac-key-at-least-32c!",
 		"BASE_URL":                 "https://example.com",
 		"OAUTH_STATE_SECRET":       "test-oauth-state-secret-32chars!",
-		"VAPID_PUBLIC_KEY":         "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":        "examplePrivateKey",
-		"VAPID_SUBJECT":            "mailto:test@example.com",
 		"GOOGLE_CLIENT_ID":         "test-google-id",
 		"GOOGLE_CLIENT_SECRET":     "test-google-secret",
 		"MICROSOFT_CLIENT_ID":      "test-msft-id",
@@ -265,178 +244,6 @@ func TestValidateConfig_AllValid(t *testing.T) {
 	}
 	if len(warnings) != 0 {
 		t.Errorf("expected no warnings, got %d: %v", len(warnings), warnings)
-	}
-}
-
-func TestValidateConfig_NoVAPIDKeysInProduction_WebPushDisabled(t *testing.T) {
-	// When no VAPID vars are set at all, Web Push is simply disabled — no errors.
-	setEnvForTest(t, map[string]string{
-		"MODE":                  "",
-		"DATABASE_PATH":         "/tmp/test.db",
-		"SECRET_ENCRYPTION_KEY": testSecretEncryptionKeyB64,
-		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
-		"INVITE_HMAC_KEY":       "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":              "https://example.com",
-		"VAPID_PUBLIC_KEY":      "",
-		"VAPID_PRIVATE_KEY":     "",
-		"VAPID_SUBJECT":         "",
-	})
-
-	errs, _ := validateConfig()
-	for _, e := range errs {
-		if e.envVar == "VAPID_PUBLIC_KEY" || e.envVar == "VAPID_PRIVATE_KEY" || e.envVar == "VAPID_SUBJECT" {
-			t.Errorf("unexpected VAPID error when no VAPID vars are set (Web Push should be disabled): %s: %s", e.envVar, e.message)
-		}
-	}
-}
-
-func TestValidateConfig_PartialVAPIDInProduction_SubjectOnly(t *testing.T) {
-	// If only VAPID_SUBJECT is set, the keys are missing — error.
-	setEnvForTest(t, map[string]string{
-		"MODE":                  "",
-		"DATABASE_PATH":         "/tmp/test.db",
-		"SECRET_ENCRYPTION_KEY": testSecretEncryptionKeyB64,
-		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
-		"VAPID_PUBLIC_KEY":      "",
-		"VAPID_PRIVATE_KEY":     "",
-		"VAPID_SUBJECT":         "mailto:test@example.com",
-	})
-
-	errs, _ := validateConfig()
-
-	foundPub := false
-	foundPriv := false
-	for _, e := range errs {
-		if e.envVar == "VAPID_PUBLIC_KEY" {
-			foundPub = true
-		}
-		if e.envVar == "VAPID_PRIVATE_KEY" {
-			foundPriv = true
-		}
-	}
-	if !foundPub {
-		t.Error("expected error for missing VAPID_PUBLIC_KEY when VAPID_SUBJECT is set")
-	}
-	if !foundPriv {
-		t.Error("expected error for missing VAPID_PRIVATE_KEY when VAPID_SUBJECT is set")
-	}
-}
-
-func TestValidateConfig_VAPIDKeysNotRequiredInDevMode(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":              "development",
-		"VAPID_PUBLIC_KEY":  "",
-		"VAPID_PRIVATE_KEY": "",
-		"VAPID_SUBJECT":     "",
-	})
-
-	errs, _ := validateConfig()
-	vapidVars := map[string]bool{
-		"VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY": true,
-		"VAPID_PUBLIC_KEY":                       true,
-		"VAPID_PRIVATE_KEY":                      true,
-		"VAPID_SUBJECT":                          true,
-	}
-	for _, e := range errs {
-		if vapidVars[e.envVar] {
-			t.Errorf("unexpected VAPID error in dev mode: %s: %s", e.envVar, e.message)
-		}
-	}
-}
-
-func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPrivate(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":                  "",
-		"DATABASE_PATH":         "/tmp/test.db",
-		"SECRET_ENCRYPTION_KEY": testSecretEncryptionKeyB64,
-		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
-		"VAPID_PUBLIC_KEY":      "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":     "", // missing private key
-		"VAPID_SUBJECT":         "mailto:test@example.com",
-	})
-
-	errs, _ := validateConfig()
-
-	found := false
-	for _, e := range errs {
-		if e.envVar == "VAPID_PRIVATE_KEY" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected error specifically for missing VAPID_PRIVATE_KEY")
-	}
-}
-
-func TestValidateConfig_PartialVAPIDKeysInProduction_MissingPublic(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":                  "",
-		"DATABASE_PATH":         "/tmp/test.db",
-		"SECRET_ENCRYPTION_KEY": testSecretEncryptionKeyB64,
-		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
-		"VAPID_PUBLIC_KEY":      "",
-		"VAPID_PRIVATE_KEY":     "examplePrivateKey", // missing public key
-		"VAPID_SUBJECT":         "mailto:test@example.com",
-	})
-
-	errs, _ := validateConfig()
-
-	found := false
-	for _, e := range errs {
-		if e.envVar == "VAPID_PUBLIC_KEY" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected error specifically for missing VAPID_PUBLIC_KEY")
-	}
-}
-
-func TestValidateConfig_VAPIDSubjectMustBeContactURI(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":                  "",
-		"DATABASE_PATH":         "/tmp/test.db",
-		"SECRET_ENCRYPTION_KEY": testSecretEncryptionKeyB64,
-		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
-		"VAPID_PUBLIC_KEY":      "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":     "examplePrivateKey",
-		"VAPID_SUBJECT":         "admin@example.com", // missing mailto: or https:// prefix
-	})
-
-	errs, _ := validateConfig()
-
-	found := false
-	for _, e := range errs {
-		if e.envVar == "VAPID_SUBJECT" {
-			found = true
-			break
-		}
-	}
-	if !found {
-		t.Error("expected error for VAPID_SUBJECT without mailto: or https:// prefix")
-	}
-}
-
-func TestValidateConfig_VAPIDSubjectAcceptsHTTPS(t *testing.T) {
-	setEnvForTest(t, map[string]string{
-		"MODE":                  "",
-		"DATABASE_PATH":         "/tmp/test.db",
-		"SECRET_ENCRYPTION_KEY": testSecretEncryptionKeyB64,
-		"JWT_SIGNING_SECRET":    "test-jwt-signing-secret-32chars-min!",
-		"VAPID_PUBLIC_KEY":      "BExamplePublicKey",
-		"VAPID_PRIVATE_KEY":     "examplePrivateKey",
-		"VAPID_SUBJECT":         "https://example.com/contact",
-		"INVITE_HMAC_KEY":       "test-invite-hmac-key-at-least-32c!",
-		"BASE_URL":              "https://example.com",
-	})
-
-	errs, _ := validateConfig()
-	for _, e := range errs {
-		if e.envVar == "VAPID_SUBJECT" {
-			t.Errorf("unexpected VAPID_SUBJECT error with https:// prefix: %s", e.message)
-		}
 	}
 }
 

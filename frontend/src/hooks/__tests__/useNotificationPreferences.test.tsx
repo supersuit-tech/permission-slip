@@ -10,8 +10,7 @@ vi.mock("../../api/client");
 const mockPreferencesResponse = {
   preferences: [
     { channel: "email", enabled: true, available: true },
-    { channel: "web-push", enabled: true, available: true },
-    { channel: "sms", enabled: false, available: true },
+    { channel: "mobile-push", enabled: true, available: true },
   ],
 };
 

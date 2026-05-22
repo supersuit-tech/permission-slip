@@ -75,41 +75,6 @@ func validateConfig() (errs []configError, warnings []configError) {
 		}
 	}
 
-	// Web Push (VAPID) — optional channel, but if partially configured, error.
-	// If no VAPID vars are set, Web Push is simply disabled. If some are set,
-	// all must be set to avoid misconfiguration.
-	// Trim whitespace to handle common copy-paste issues (trailing newlines, etc.).
-	hasVAPIDPublicKey := strings.TrimSpace(os.Getenv("VAPID_PUBLIC_KEY")) != ""
-	hasVAPIDPrivateKey := strings.TrimSpace(os.Getenv("VAPID_PRIVATE_KEY")) != ""
-	vapidSubject := strings.TrimSpace(os.Getenv("VAPID_SUBJECT"))
-	hasVAPIDSubject := vapidSubject != ""
-	anyVAPID := hasVAPIDPublicKey || hasVAPIDPrivateKey || hasVAPIDSubject
-	if !devMode && anyVAPID {
-		if !hasVAPIDPublicKey {
-			errs = append(errs, configError{
-				envVar:  "VAPID_PUBLIC_KEY",
-				message: "missing (other VAPID vars are set; all three are required for Web Push); generate keys with: make generate-vapid-keys",
-			})
-		}
-		if !hasVAPIDPrivateKey {
-			errs = append(errs, configError{
-				envVar:  "VAPID_PRIVATE_KEY",
-				message: "missing (other VAPID vars are set; all three are required for Web Push); generate keys with: make generate-vapid-keys",
-			})
-		}
-		if !hasVAPIDSubject {
-			errs = append(errs, configError{
-				envVar:  "VAPID_SUBJECT",
-				message: "missing (other VAPID vars are set; required by the Web Push spec, e.g. mailto:admin@mycompany.com)",
-			})
-		} else if !strings.HasPrefix(vapidSubject, "mailto:") && !strings.HasPrefix(vapidSubject, "https://") {
-			errs = append(errs, configError{
-				envVar:  "VAPID_SUBJECT",
-				message: "must start with \"mailto:\" or \"https://\" per the Web Push spec (e.g. mailto:admin@mycompany.com)",
-			})
-		}
-	}
-
 	// OAuth — warn when built-in provider client credentials are not set.
 	// These are non-fatal but the corresponding connectors won't be usable
 	// without them.

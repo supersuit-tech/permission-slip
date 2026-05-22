@@ -148,7 +148,7 @@ permission-slip/
 ├── api/                 # Go API route handlers (one file per domain)
 ├── connectors/          # Service connectors (Slack, GitHub, custom)
 ├── db/                  # Database queries, migrations, test helpers
-├── cmd/                 # CLI tools (migrate, VAPID keys, connector installer)
+├── cmd/                 # CLI tools (migrate, connector installer)
 ├── frontend/src/
 │   ├── api/             # Generated API client and types (from OpenAPI spec)
 │   ├── auth/            # Supabase auth integration

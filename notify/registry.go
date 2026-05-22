@@ -28,17 +28,8 @@ type BuildContext struct {
 	Config Config
 
 	// DevMode is true when the server is running in development mode
-	// (MODE=development). Factories use this to relax hard requirements —
-	// for example, the web push factory auto-generates VAPID keys in dev mode
-	// rather than failing, and uses a default VAPID_SUBJECT.
+	// (MODE=development). Factories use this to relax hard requirements.
 	DevMode bool
-
-	// OnVAPIDPublicKey, when non-nil, is called by the web push factory with
-	// the VAPID public key once VAPID keys are initialised. The caller stores
-	// the key for serving to browser clients via /push/vapid-public-key.
-	// This callback pattern avoids a global variable for the public key while
-	// keeping the factory self-contained.
-	OnVAPIDPublicKey func(publicKey string)
 }
 
 // SenderFactory constructs Senders from a BuildContext.

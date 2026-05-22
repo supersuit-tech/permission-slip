@@ -205,9 +205,6 @@ func main() {
 		DB:      deps.DB,
 		Config:  notifyCfg,
 		DevMode: deps.DevMode,
-		OnVAPIDPublicKey: func(key string) {
-			deps.VAPIDPublicKey = key
-		},
 	})
 
 	notify.LogChannelSummary(senders)

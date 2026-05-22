@@ -89,16 +89,16 @@ func TestIsNotificationChannelEnabled_Enabled(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 
 	ctx := context.Background()
-	if err := db.UpsertNotificationPreference(ctx, tx, uid, "web-push", true); err != nil {
+	if err := db.UpsertNotificationPreference(ctx, tx, uid, "mobile-push", true); err != nil {
 		t.Fatalf("upsert: %v", err)
 	}
 
-	enabled, err := db.IsNotificationChannelEnabled(ctx, tx, uid, "web-push")
+	enabled, err := db.IsNotificationChannelEnabled(ctx, tx, uid, "mobile-push")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if !enabled {
-		t.Error("expected web-push to be enabled")
+		t.Error("expected mobile-push to be enabled")
 	}
 }
 

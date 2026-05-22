@@ -101,7 +101,7 @@ func (d *Dispatcher) enabledSenders(ctx context.Context, recipient Recipient) []
 
 // recipientHasContact returns true if the recipient has the contact info
 // required by the given channel. Channels not listed here are assumed to
-// not need any specific contact field (e.g. web-push uses the UserID).
+// not need any specific contact field (e.g. mobile-push uses the UserID).
 func recipientHasContact(channel string, r Recipient) bool {
 	switch channel {
 	case "email":

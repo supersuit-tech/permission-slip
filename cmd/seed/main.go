@@ -415,30 +415,14 @@ func insertUser(ctx context.Context, tx db.DBTX, _ *supabaseClient, id, email st
 func seedNotificationPreferences(ctx context.Context, tx db.DBTX) {
 	// userHasEverything: all channels enabled
 	exec(ctx, tx, `INSERT INTO notification_preferences (user_id, channel, enabled) VALUES ($1, 'email', true)`, userHasEverything)
-	exec(ctx, tx, `INSERT INTO notification_preferences (user_id, channel, enabled) VALUES ($1, 'web-push', true)`, userHasEverything)
 	exec(ctx, tx, `INSERT INTO notification_preferences (user_id, channel, enabled) VALUES ($1, 'sms', true)`, userHasEverything)
+	exec(ctx, tx, `INSERT INTO notification_preferences (user_id, channel, enabled) VALUES ($1, 'mobile-push', true)`, userHasEverything)
 
 	// userHasActivity: email enabled, sms disabled
 	exec(ctx, tx, `INSERT INTO notification_preferences (user_id, channel, enabled) VALUES ($1, 'email', true)`, userHasActivity)
 	exec(ctx, tx, `INSERT INTO notification_preferences (user_id, channel, enabled) VALUES ($1, 'sms', false)`, userHasActivity)
 
-	// userHasPendingApproval: web-push disabled (tests default-enabled behavior for unset channels)
-	exec(ctx, tx, `INSERT INTO notification_preferences (user_id, channel, enabled) VALUES ($1, 'web-push', false)`, userHasPendingApproval)
-
 	fmt.Println("  ✓ notification_preferences seeded")
-}
-
-func seedPushSubscriptions(ctx context.Context, tx db.DBTX) {
-	// userHasEverything: has a push subscription (simulates an enrolled browser)
-	exec(ctx, tx,
-		`INSERT INTO push_subscriptions (user_id, endpoint, p256dh, auth) VALUES ($1, $2, $3, $4)`,
-		userHasEverything,
-		"https://fcm.googleapis.com/fcm/send/seed-subscription-1",
-		"BNcRdreALRFXTkOOUHK1EtK2wtaz5Ry4YfYCA_0QTpQtUbVlUls0VJXg7A8u-Ts1XbjhazAkj7I99e8p8REqnSw",
-		"tBHItJI5svbpC7RB5gg6bQ",
-	)
-
-	fmt.Println("  \u2713 push_subscriptions seeded")
 }
 
 // seedUsagePeriods creates sample usage data for active users.
@@ -473,7 +457,6 @@ func seed(ctx context.Context, tx db.DBTX, supa *supabaseClient) {
 	seedUserHasEverything(ctx, tx, supa)
 	seedUserHasPendingApprovals(ctx, tx, supa)
 	seedNotificationPreferences(ctx, tx)
-	seedPushSubscriptions(ctx, tx)
 	seedUsagePeriods(ctx, tx)
 	seedAuditEvents(ctx, tx)
 }

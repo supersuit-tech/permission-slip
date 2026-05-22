@@ -8,7 +8,7 @@
        generate generate-frontend generate-mobile \
        generate-frontend-from-bundle generate-mobile-from-bundle \
        migrate-up migrate-down migrate-create db-setup seed \
-       bundle generate-vapid-keys install-connectors \
+       bundle install-connectors \
        audit audit-backend audit-frontend audit-mobile \
        docker-build deploy \
        cli cli-install cli-build cli-test
@@ -221,10 +221,6 @@ seed:
 # Install custom connectors from custom-connectors.json
 install-connectors:
 	go run ./cmd/install-connectors
-
-# Generate a VAPID key pair for Web Push (required to enable Web Push in production)
-generate-vapid-keys:
-	go run ./cmd/generate-vapid-keys
 
 # ---------- CLI ----------
 
