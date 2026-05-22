@@ -110,6 +110,9 @@ func main() {
 		port = "8080"
 	}
 
+	// Apply APPROVAL_REQUEST_TTL override (defaults to 10m, clamped to [1m, 24h]).
+	db.DefaultApprovalTTL = db.ApprovalTTLFromEnv(logger)
+
 	// Configure dependencies
 	var deps api.Deps
 	deps.Logger = logger
