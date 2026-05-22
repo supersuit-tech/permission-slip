@@ -44,7 +44,7 @@ describe("customHostMiddleware", () => {
     // does NOT copy the body in React Native's whatwg-fetch polyfill. Self-hosted
     // POST/PUT requests were arriving at the server with empty bodies, causing
     // 400s on push-subscriptions and notification-preferences toggles.
-    await setCustomHostConfig("https://my-host.example.com/api", null);
+    await setCustomHostConfig("https://my-host.example.com/api");
 
     const payload = JSON.stringify({
       type: "expo",
@@ -64,7 +64,7 @@ describe("customHostMiddleware", () => {
   });
 
   it("preserves headers and method when rewriting", async () => {
-    await setCustomHostConfig("https://my-host.example.com/api", null);
+    await setCustomHostConfig("https://my-host.example.com/api");
 
     const original = new Request(`${PLACEHOLDER}/v1/profile/notification-preferences`, {
       method: "PUT",
@@ -82,19 +82,6 @@ describe("customHostMiddleware", () => {
     expect(modified.headers.get("Content-Type")).toBe("application/json");
   });
 
-  it("injects X-Gateway-Secret header when configured", async () => {
-    await setCustomHostConfig("https://my-host.example.com/api", "secret-value");
-
-    const original = new Request(`${PLACEHOLDER}/v1/profile`, {
-      method: "GET",
-      headers: { Authorization: "Bearer abc" },
-    });
-
-    const modified = await runMiddleware(original);
-
-    expect(modified.headers.get("X-Gateway-Secret")).toBe("secret-value");
-  });
-
   it("does not touch the request when no custom host is set", async () => {
     const original = new Request(`${PLACEHOLDER}/v1/profile`, {
       method: "GET",
@@ -104,11 +91,10 @@ describe("customHostMiddleware", () => {
     const modified = await runMiddleware(original);
 
     expect(modified.url).toBe(`${PLACEHOLDER}/v1/profile`);
-    expect(modified.headers.get("X-Gateway-Secret")).toBeNull();
   });
 
   it("does not attempt to read a body from GET requests", async () => {
-    await setCustomHostConfig("https://my-host.example.com/api", null);
+    await setCustomHostConfig("https://my-host.example.com/api");
 
     const original = new Request(`${PLACEHOLDER}/v1/profile`, {
       method: "GET",
