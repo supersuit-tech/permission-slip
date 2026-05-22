@@ -24,6 +24,10 @@ import {
 } from "../../hooks/useAgents";
 import { useApproveApproval } from "../../hooks/useApproveApproval";
 import { useDenyApproval } from "../../hooks/useDenyApproval";
+import { useStandingApprovals } from "../../hooks/useStandingApprovals";
+import { useCreateStandingApproval } from "../../hooks/useCreateStandingApproval";
+import { useActionConfigs } from "../../hooks/useActionConfigs";
+import { buildCreateStandingApprovalFromApproval } from "./standingApprovalFromApproval";
 import { colors } from "../../theme/colors";
 import {
   humanizeActionType,
@@ -58,6 +62,8 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const [isApproved, setIsApproved] = useState(false);
   const [isDenied, setIsDenied] = useState(false);
   const [resolvedAt, setResolvedAt] = useState<string | null>(null);
+  const [autoApproveFuture, setAutoApproveFuture] = useState(false);
+  const [standingApprovalCreated, setStandingApprovalCreated] = useState(false);
 
   const {
     approveApproval,
@@ -67,6 +73,12 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     denyApproval,
     isPending: isDenying,
   } = useDenyApproval();
+  const { standingApprovals, isLoading: standingApprovalsLoading } =
+    useStandingApprovals();
+  const { createStandingApproval } = useCreateStandingApproval();
+  const { configs, isFetched: configsFetched } = useActionConfigs(
+    approval.agent_id,
+  );
 
   const agent = useMemo(
     () => agents.find((a: AgentSummary) => a.agent_id === approval.agent_id),
@@ -104,6 +116,25 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const isPending = approval.status === "pending" && !isApproved && !isDenied;
   const expired = checkExpired(approval.status, approval.expires_at);
   const canAct = isPending && !expired;
+
+  const hasExistingStandingApproval = useMemo(
+    () =>
+      standingApprovals.some(
+        (sa) =>
+          sa.agent_id === approval.agent_id &&
+          sa.action_type === approval.action.type,
+      ),
+    [standingApprovals, approval.agent_id, approval.action.type],
+  );
+  const matchingActionConfig = useMemo(
+    () =>
+      configs.find(
+        (c) => c.status === "active" && c.action_type === approval.action.type,
+      ) ?? null,
+    [configs, approval.action.type],
+  );
+  const showAutoApproveCheckbox =
+    !standingApprovalsLoading && !hasExistingStandingApproval;
 
   const summary = buildActionSummary(approval.action.type, parameters, undefined, approval.resource_details as Record<string, unknown> | undefined);
   const actionName = humanizeActionType(approval.action.type);
@@ -161,13 +192,45 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       setResolvedAt(new Date().toISOString());
       setIsApproved(true);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+
+      if (autoApproveFuture) {
+        if (!configsFetched || !matchingActionConfig) {
+          Alert.alert(
+            "Auto-approval not set up",
+            "Request approved, but no action configuration was found to enable auto-approval.",
+          );
+        } else {
+          try {
+            await createStandingApproval(
+              buildCreateStandingApprovalFromApproval(
+                approval,
+                matchingActionConfig.id,
+              ),
+            );
+            setStandingApprovalCreated(true);
+          } catch (err) {
+            const message =
+              err instanceof Error
+                ? err.message
+                : "Failed to create auto-approval rule.";
+            Alert.alert("Auto-approval failed", message);
+          }
+        }
+      }
     } catch (err) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const message =
         err instanceof Error ? err.message : "Failed to approve request";
       Alert.alert("Approval Failed", message);
     }
-  }, [approveApproval, approval.approval_id]);
+  }, [
+    approveApproval,
+    approval,
+    autoApproveFuture,
+    configsFetched,
+    matchingActionConfig,
+    createStandingApproval,
+  ]);
 
   const handleDeny = useCallback(() => {
     Alert.alert(
@@ -213,6 +276,17 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
               <StatusPill status="approved" />
               <Text style={styles.confirmationText}>Request Approved</Text>
             </View>
+            {standingApprovalCreated && (
+              <View
+                style={styles.standingApprovalBanner}
+                accessibilityRole="text"
+                testID="standing-approval-success"
+              >
+                <Text style={styles.standingApprovalBannerText}>
+                  Future matching requests will be auto-approved.
+                </Text>
+              </View>
+            )}
             <TouchableOpacity
               style={styles.doneButton}
               onPress={handleDone}
@@ -357,6 +431,9 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             isApproving={isApproving}
             isDenying={isDenying}
             disabled={expired}
+            showAutoApproveCheckbox={showAutoApproveCheckbox}
+            autoApproveFuture={autoApproveFuture}
+            onAutoApproveFutureChange={setAutoApproveFuture}
           />
         </View>
       )}
@@ -401,6 +478,19 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     color: colors.gray900,
+  },
+  standingApprovalBanner: {
+    marginTop: 12,
+    backgroundColor: "#ECFDF5",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#A7F3D0",
+  },
+  standingApprovalBannerText: {
+    fontSize: 14,
+    color: "#047857",
+    fontWeight: "500",
   },
   // --- Sections ---
   sectionMajor: {
