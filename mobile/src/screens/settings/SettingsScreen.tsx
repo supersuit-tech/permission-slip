@@ -3,10 +3,11 @@
  * and sign out. Currently shows a toggle for the mobile-push notification
  * channel; other channels are managed via the web app.
  */
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Switch,
@@ -14,6 +15,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import * as Notifications from "expo-notifications";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
@@ -68,6 +70,13 @@ export default function SettingsScreen(_props: Props) {
   const { updatePreferences: updateTypePreferences, isUpdating: isUpdatingType } =
     useUpdateNotificationTypePreferences();
   const { deleteAccount, isDeleting } = useDeleteAccount();
+
+  const [osNotifPermGranted, setOsNotifPermGranted] = useState<boolean | null>(null);
+  useEffect(() => {
+    Notifications.getPermissionsAsync().then(({ status }) => {
+      setOsNotifPermGranted(status === "granted");
+    });
+  }, []);
 
   const contentContainerStyle = useMemo(
     () => ({ paddingBottom: insets.bottom + 24 }),
@@ -197,6 +206,19 @@ export default function SettingsScreen(_props: Props) {
                 accessibilityState={{ checked: mobilePushEnabled }}
               />
             </View>
+            {osNotifPermGranted === false && (
+              <TouchableOpacity
+                style={styles.permissionWarning}
+                onPress={() => Linking.openSettings()}
+                accessibilityRole="button"
+                accessibilityLabel="Open device settings to enable notifications"
+              >
+                <Text style={styles.permissionWarningText}>
+                  Notifications are blocked in your device settings.{" "}
+                  <Text style={styles.permissionWarningLink}>Open Settings →</Text>
+                </Text>
+              </TouchableOpacity>
+            )}
             <Text style={styles.subsectionTitle}>Notify me about</Text>
             <View style={[styles.card, styles.cardSpaced]}>
               <View style={styles.toggleRow}>
@@ -407,6 +429,18 @@ const styles = StyleSheet.create({
   destructiveActionText: {
     color: colors.error,
     fontSize: 15,
+    fontWeight: "600",
+  },
+  permissionWarning: {
+    paddingHorizontal: 16,
+    paddingBottom: 14,
+  },
+  permissionWarningText: {
+    fontSize: 13,
+    color: colors.error,
+    lineHeight: 18,
+  },
+  permissionWarningLink: {
     fontWeight: "600",
   },
   buildInfo: {
