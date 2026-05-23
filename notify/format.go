@@ -82,6 +82,9 @@ func BuildPushContent(approval Approval) PushContent {
 	if approval.Type == NotificationTypeStandingExecution {
 		return buildStandingExecutionPushContent(approval)
 	}
+	if approval.Type == NotificationTypeStandingApprovalRequest {
+		return buildStandingApprovalRequestPushContent(approval)
+	}
 
 	if approval.Type == NotificationTypeCardExpiring {
 		info := extractCardExpiringInfo(approval.Context)

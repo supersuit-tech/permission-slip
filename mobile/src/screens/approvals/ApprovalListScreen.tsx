@@ -19,6 +19,10 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useIsFocused } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useApprovals, type ApprovalSummary } from "../../hooks/useApprovals";
+import {
+  useStandingApprovalRequests,
+  type StandingApprovalRequestSummary,
+} from "../../hooks/useStandingApprovalRequests";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
 import { colors } from "../../theme/colors";
 import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime, formatLastUpdated } from "./approvalUtils";
@@ -40,6 +44,11 @@ export default function ApprovalListScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<StatusTab>("pending");
   const { approvals, isLoading, isRefetching, error, refetch, dataUpdatedAt } =
     useApprovals(activeTab);
+  const {
+    requests: ruleProposals,
+    refetch: refetchRules,
+    isRefetching: rulesRefetching,
+  } = useStandingApprovalRequests();
   const { agents } = useAgents();
   const insets = useSafeAreaInsets();
 
@@ -77,6 +86,16 @@ export default function ApprovalListScreen({ navigation }: Props) {
       navigation.navigate("ApprovalDetail", {
         approvalId: approval.approval_id,
         approval,
+      });
+    },
+    [navigation],
+  );
+
+  const handleRulePress = useCallback(
+    (request: StandingApprovalRequestSummary) => {
+      navigation.navigate("StandingApprovalRequestDetail", {
+        requestId: request.request_id,
+        request,
       });
     },
     [navigation],
@@ -188,13 +207,36 @@ export default function ApprovalListScreen({ navigation }: Props) {
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={
-            approvals.length === 0 ? styles.emptyContainer : styles.list
+            approvals.length === 0 && (activeTab !== "pending" || ruleProposals.length === 0)
+              ? styles.emptyContainer
+              : styles.list
           }
-          ListEmptyComponent={<EmptyState tab={activeTab} />}
+          ListHeaderComponent={
+            activeTab === "pending" && ruleProposals.length > 0 ? (
+              <View style={styles.ruleSection}>
+                {ruleProposals.map((request: StandingApprovalRequestSummary) => (
+                  <RuleProposalRow
+                    key={request.request_id}
+                    request={request}
+                    agentName={resolveAgentName(request.agent_id)}
+                    onPress={() => handleRulePress(request)}
+                  />
+                ))}
+              </View>
+            ) : null
+          }
+          ListEmptyComponent={
+            activeTab === "pending" && ruleProposals.length > 0 ? null : (
+              <EmptyState tab={activeTab} />
+            )
+          }
           refreshControl={
             <RefreshControl
-              refreshing={isRefetching}
-              onRefresh={() => refetch()}
+              refreshing={isRefetching || rulesRefetching}
+              onRefresh={() => {
+                refetch();
+                if (activeTab === "pending") refetchRules();
+              }}
               tintColor={colors.gray500}
             />
           }
@@ -203,6 +245,26 @@ export default function ApprovalListScreen({ navigation }: Props) {
     </View>
   );
 }
+
+const RuleProposalRow = memo(function RuleProposalRow({
+  request,
+  agentName,
+  onPress,
+}: {
+  request: StandingApprovalRequestSummary;
+  agentName: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.ruleRow} onPress={onPress} accessibilityRole="button">
+      <View style={styles.ruleBadge}>
+        <Text style={styles.ruleBadgeText}>Rule proposal</Text>
+      </View>
+      <Text style={styles.rowTitle}>{humanizeActionType(request.action_type)}</Text>
+      <Text style={styles.rowSubtitle}>{agentName}</Text>
+    </TouchableOpacity>
+  );
+});
 
 /** A single row in the approval list showing action type, agent, risk, and countdown. */
 const ApprovalRow = memo(function ApprovalRow({
@@ -497,5 +559,39 @@ const styles = StyleSheet.create({
     color: colors.gray400,
     textAlign: "center",
     lineHeight: 20,
+  },
+  ruleSection: {
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray200,
+  },
+  ruleRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+    backgroundColor: "#f5f3ff",
+  },
+  ruleBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: colors.gray200,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    marginBottom: 6,
+  },
+  ruleBadgeText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.gray700,
+  },
+  rowTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.gray900,
+  },
+  rowSubtitle: {
+    fontSize: 12,
+    color: colors.gray500,
+    marginTop: 2,
   },
 });

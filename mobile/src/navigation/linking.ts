@@ -19,6 +19,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
   config: {
     screens: {
       DeepLinkDetail: "permission-slip/approve/:approvalId",
+      DeepLinkRuleDetail: "permission-slip/approve-rule/:requestId",
       ApprovalList: "",
     },
   },

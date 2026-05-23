@@ -260,6 +260,21 @@ paths:
   /v1/standing-approvals/{standing_approval_id}/execute:
     $ref: './components/paths/standing_approvals.yaml#/executeStandingApproval'
 
+  /v1/standing-approvals/request:
+    $ref: './components/paths/standing_approval_requests.yaml#/agentCreateStandingApprovalRequest'
+
+  /v1/standing-approval-requests:
+    $ref: './components/paths/standing_approval_requests.yaml#/listStandingApprovalRequests'
+
+  /v1/standing-approval-requests/{request_id}:
+    $ref: './components/paths/standing_approval_requests.yaml#/getStandingApprovalRequest'
+
+  /v1/standing-approval-requests/{request_id}/approve:
+    $ref: './components/paths/standing_approval_requests.yaml#/approveStandingApprovalRequest'
+
+  /v1/standing-approval-requests/{request_id}/deny:
+    $ref: './components/paths/standing_approval_requests.yaml#/denyStandingApprovalRequest'
+
   /v1/onboarding:
     $ref: './components/paths/onboarding.yaml#/onboarding'
 

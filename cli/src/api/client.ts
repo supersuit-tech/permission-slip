@@ -281,6 +281,25 @@ export class ApiClient {
     });
   }
 
+  /** POST /standing-approvals/request — propose a standing approval rule */
+  async requestStandingApproval(body: {
+    action_type: string;
+    action_version?: string;
+    constraints: unknown;
+    max_executions?: number;
+    expires_in_seconds?: number;
+    source_action_configuration_id?: string;
+  }) {
+    return this.request<{
+      request_id: string;
+      status: string;
+    }>({
+      method: "POST",
+      routerPath: "/standing-approvals/request",
+      body,
+    });
+  }
+
   /** GET /approvals/{id}/status — check approval and execution status */
   async approvalStatus(approvalId: string): Promise<ApprovalStatusResult> {
     return this.request<ApprovalStatusResult>({

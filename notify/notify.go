@@ -49,6 +49,9 @@ const (
 	// action via a standing approval. Informational only — not an approval
 	// request. Uses a distinct template with a blue accent and activity link.
 	NotificationTypeStandingExecution NotificationType = "standing_execution"
+	// NotificationTypeStandingApprovalRequest is sent when an agent proposes
+	// a new standing approval rule for human review.
+	NotificationTypeStandingApprovalRequest NotificationType = "standing_approval_request"
 )
 
 // Approval holds the fields a notification channel needs to construct its

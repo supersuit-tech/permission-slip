@@ -6,6 +6,9 @@ import LoginScreen from "../screens/LoginScreen";
 import ApprovalListScreen from "../screens/approvals/ApprovalListScreen";
 import ApprovalDetailScreen from "../screens/approvals/ApprovalDetailScreen";
 import DeepLinkDetailScreen from "../screens/approvals/DeepLinkDetailScreen";
+import StandingApprovalRequestDetailScreen from "../screens/approvals/StandingApprovalRequestDetailScreen";
+import DeepLinkRuleDetailScreen from "../screens/approvals/DeepLinkRuleDetailScreen";
+import type { StandingApprovalRequestSummary } from "../hooks/useStandingApprovalRequests";
 import SettingsScreen from "../screens/settings/SettingsScreen";
 import type { ApprovalSummary } from "../hooks/useApprovals";
 import { linking } from "./linking";
@@ -21,6 +24,13 @@ export type RootStackParamList = {
   };
   DeepLinkDetail: {
     approvalId: string;
+  };
+  StandingApprovalRequestDetail: {
+    requestId: string;
+    request: StandingApprovalRequestSummary;
+  };
+  DeepLinkRuleDetail: {
+    requestId: string;
   };
   Settings: undefined;
 };
@@ -60,6 +70,24 @@ export default function RootNavigator() {
               options={{
                 headerShown: true,
                 headerTitle: "Approval Details",
+                headerBackTitle: "Back",
+              }}
+            />
+            <Stack.Screen
+              name="StandingApprovalRequestDetail"
+              component={StandingApprovalRequestDetailScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "Rule Proposal",
+                headerBackTitle: "Back",
+              }}
+            />
+            <Stack.Screen
+              name="DeepLinkRuleDetail"
+              component={DeepLinkRuleDetailScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "Rule Proposal",
                 headerBackTitle: "Back",
               }}
             />

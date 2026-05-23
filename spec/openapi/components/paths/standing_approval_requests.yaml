@@ -1,0 +1,125 @@
+agentCreateStandingApprovalRequest:
+  post:
+    operationId: agentCreateStandingApprovalRequest
+    summary: Propose Standing Approval Rule
+    description: |
+      Agent proposes a new auto-approve (standing approval) rule. The proposal stays
+      pending until the agent's owning user approves or denies it from web or mobile.
+      expires_at on the resulting rule is computed at approval time from expires_in_seconds.
+    tags:
+      - Standing Approval Requests
+    security:
+      - PermissionSlipSignature: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/standing_approval_requests.yaml#/AgentCreateStandingApprovalRequestBody'
+    responses:
+      '200':
+        description: Proposal created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approval_requests.yaml#/AgentCreateStandingApprovalRequestResponse'
+
+listStandingApprovalRequests:
+  get:
+    operationId: listStandingApprovalRequests
+    summary: List Standing Approval Rule Proposals
+    tags:
+      - Standing Approval Requests
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [pending, approved, denied, all]
+          default: pending
+      - name: limit
+        in: query
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 50
+      - name: after
+        in: query
+        schema:
+          type: string
+    responses:
+      '200':
+        description: List of proposals
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approval_requests.yaml#/StandingApprovalRequestListResponse'
+
+getStandingApprovalRequest:
+  get:
+    operationId: getStandingApprovalRequest
+    summary: Get Standing Approval Rule Proposal
+    tags:
+      - Standing Approval Requests
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Proposal detail
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approval_requests.yaml#/StandingApprovalRequest'
+
+approveStandingApprovalRequest:
+  post:
+    operationId: approveStandingApprovalRequest
+    summary: Approve Standing Approval Rule Proposal
+    tags:
+      - Standing Approval Requests
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Approved; standing approval created
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approval_requests.yaml#/ApproveStandingApprovalRequestResponse'
+
+denyStandingApprovalRequest:
+  post:
+    operationId: denyStandingApprovalRequest
+    summary: Deny Standing Approval Rule Proposal
+    tags:
+      - Standing Approval Requests
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: request_id
+        in: path
+        required: true
+        schema:
+          type: string
+    responses:
+      '200':
+        description: Denied
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approval_requests.yaml#/DenyStandingApprovalRequestResponse'
