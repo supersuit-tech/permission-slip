@@ -31,6 +31,13 @@ ARG SENTRY_AUTH_TOKEN
 ARG SENTRY_ORG
 ARG SENTRY_PROJECT
 
+# Build stamp: .git isn't copied into this stage, so the host must pass the
+# commit SHA + ISO timestamp as build args (Makefile docker-build/deploy do).
+ARG GIT_COMMIT_HASH
+ARG GIT_COMMIT_TIMESTAMP
+ENV VITE_GIT_COMMIT_HASH=$GIT_COMMIT_HASH
+ENV VITE_GIT_COMMIT_TIMESTAMP=$GIT_COMMIT_TIMESTAMP
+
 # Copy shared validation config (imported by frontend/src/lib/validation.ts)
 COPY shared/ /app/shared/
 
