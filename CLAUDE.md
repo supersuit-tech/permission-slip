@@ -96,8 +96,6 @@ Always run relevant tests after making changes, before committing. Before pushin
 - **Mobile only:** `make mobile-test` (runs `cd mobile && npm test -- --ci`)
 - **Database tests only:** `go test ./db/... -v`
 
-Database tests require a running Postgres instance. They use `DATABASE_URL_TEST` (defaults to `postgres://localhost:5432/permission_slip_test?sslmode=disable`).
-
 ### What to run
 
 - **Changed only non-code files (e.g. markdown, docs):** skip tests — no test run needed.
@@ -151,54 +149,6 @@ make migrate-create NAME=add_users_table
 This generates a real timestamp from `date +%Y%m%d%H%M%S` and creates the file with the correct goose boilerplate. If you need multiple migrations, run the command once for each — the second-level precision ensures unique timestamps when run sequentially.
 
 A test (`TestMigrationTimestampsUnique` in `db/migrations_integrity_test.go`) validates that all migration timestamps are unique and in sorted order. This runs as part of `make test-backend` and will catch duplicates before CI.
-
-**Extension-managed objects need explicit grants.** `ALTER DEFAULT PRIVILEGES` only applies to tables created *after* the grant runs — it never covers tables created by extensions (e.g., `vault.secrets`, pgcrypto functions). Whenever a migration grants access to an extension-managed schema, always add explicit `GRANT ... ON <table> TO app_backend` for every object the app touches, not just the functions and views.
-
-## app_backend Role Permissions
-
-The Go backend runs as the `app_backend` PostgreSQL role (non-superuser). Every database object the backend touches needs an explicit grant. This section documents what's granted and the principles to follow when adding new objects.
-
-### What's Currently Granted
-
-| Schema | Object | Grant | Migration |
-|--------|--------|-------|-----------|
-| `public` | All existing tables | SELECT, INSERT, UPDATE, DELETE | `20260309003720` |
-| `public` | All sequences | USAGE, SELECT | `20260309003720` |
-| `public` | Future tables/sequences | ALTER DEFAULT PRIVILEGES | `20260309003720` |
-| `public` | All RLS-enabled tables | `app_backend_all` policy (FOR ALL) | `20260310111634` |
-| `auth` | Schema | USAGE | `20260310102034` |
-| `auth` | `auth.users` | SELECT only | `20260309212920` |
-| `vault` | Schema | USAGE | `20260311123718` |
-| `vault` | `vault.decrypted_secrets` | SELECT | `20260311123718` |
-| `vault` | `vault.secrets` | SELECT, INSERT, UPDATE, DELETE | `20260312023009` |
-| `vault` | `vault.create_secret()` | EXECUTE | `20260311123718` |
-| `vault` | `vault.update_secret()` | EXECUTE | `20260311123718` |
-| `vault` | `vault._crypto_aead_det_decrypt()` | EXECUTE (vault v0.3.0+) | `20260312123238` |
-| `pgsodium` | Schema | USAGE | `20260312113621` |
-| `pgsodium` | `pgsodium._crypto_aead_det_decrypt()` | EXECUTE (vault v0.2.x) | `20260312113621` |
-
-### When Adding New Grants — Checklist
-
-Follow this checklist whenever a migration introduces a new table, uses a new extension, or accesses a new schema:
-
-1. **New public table?** `ALTER DEFAULT PRIVILEGES` covers it automatically for DML. But you MUST also:
-   - Enable RLS: `ALTER TABLE <name> ENABLE ROW LEVEL SECURITY;`
-   - Add policy: `CREATE POLICY app_backend_all ON <name> FOR ALL TO app_backend USING (true) WITH CHECK (true);`
-   - The RLS test (`TestAppBackendHasPoliciesOnAllRLSTables`) will catch this if you forget.
-
-2. **New extension table/view?** Extensions create objects *before* `ALTER DEFAULT PRIVILEGES` runs, so they are NEVER covered. Add an explicit `GRANT SELECT/INSERT/UPDATE/DELETE ON <schema>.<table> TO app_backend;` for each object the backend touches.
-
-3. **New extension function?** Grant EXECUTE on the exact function signature. Don't grant on ALL FUNCTIONS — follow least-privilege.
-
-4. **New schema?** Grant `USAGE ON SCHEMA <name> TO app_backend;` — without USAGE, no objects in the schema are accessible regardless of object-level grants.
-
-5. **SECURITY INVOKER views?** Views are SECURITY INVOKER by default. If a view calls functions or reads from tables in other schemas, `app_backend` needs grants on **every object the view touches**, not just SELECT on the view itself. This is the root cause of the `vault.decrypted_secrets` + `pgsodium._crypto_aead_det_decrypt` issue — the view runs as the caller (app_backend), so it needs EXECUTE on internal decrypt functions.
-
-6. **SECURITY DEFINER functions?** These run as the function owner (typically superuser). No additional grants needed for objects they access internally. `vault.create_secret()` and `vault.update_secret()` are SECURITY DEFINER — that's why they work without extra grants on pgsodium internals.
-
-7. **Extension upgrades?** Supabase extensions evolve across versions (e.g., vault v0.2.8 → v0.3.0 moved `_crypto_aead_det_decrypt` from pgsodium to vault schema). When granting on extension functions, consider version differences. Use a `BEGIN / EXCEPTION WHEN undefined_function OR invalid_schema_name THEN NULL; END;` block (see item 8) to handle both old and new signatures gracefully — this is tighter than a `pg_proc` name-only check because it validates the exact signature at grant time.
-
-8. **Wrap grants in IF EXISTS guards.** Extension schemas (vault, pgsodium) don't exist in plain Postgres (CI/test). For schema-level or table-level grants, check schema existence: `DO $$ IF EXISTS (SELECT 1 FROM information_schema.schemata WHERE schema_name = '...') THEN ... END IF; $$`. For function-level grants, use a `BEGIN / EXCEPTION WHEN undefined_function THEN NULL; END;` block to silently skip when the function doesn't exist — this is tighter than a name-only pg_proc check and handles signature changes across extension versions.
 
 ## Database Seed Data
 
@@ -338,26 +288,6 @@ At the start of each session, install npm dependencies for frontend and mobile (
 ```bash
 cd frontend && npm install && cd ..
 cd mobile && npm install && cd ..
-```
-
-## PostgreSQL Setup
-
-At the start of each session, set up PostgreSQL for database tests:
-
-```bash
-# Start PostgreSQL
-sudo pg_ctlcluster 16 main start
-
-# Create the root role (this environment runs as root)
-sudo -u postgres psql -c "CREATE ROLE root WITH LOGIN SUPERUSER;" 2>/dev/null || true
-
-# Set local auth to trust (avoids password issues)
-sudo sed -i 's/^local\s\+all\s\+all\s\+peer/local all all trust/' /etc/postgresql/16/main/pg_hba.conf
-sudo sed -i 's/^host\s\+all\s\+all\s\+127.0.0.1\/32\s\+scram-sha-256/host all all 127.0.0.1\/32 trust/' /etc/postgresql/16/main/pg_hba.conf
-sudo pg_ctlcluster 16 main reload
-
-# Create dev and test databases
-make db-setup
 ```
 
 ## GitHub CLI (gh) Setup
