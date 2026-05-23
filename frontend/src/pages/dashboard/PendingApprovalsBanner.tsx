@@ -159,9 +159,9 @@ export function PendingApprovalsBanner() {
     }
   }, []);
 
-  if (isLoading && rulesLoading) return null;
+  if (isLoading || rulesLoading) return null;
 
-  if (error && rulesError) {
+  if (error || rulesError) {
     return (
       <div className="rounded-lg border border-warning/30 bg-warning/5 px-4 py-3 text-sm text-foreground">
         Could not load pending approvals.{" "}
