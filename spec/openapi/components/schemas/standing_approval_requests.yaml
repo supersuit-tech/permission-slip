@@ -1,0 +1,137 @@
+StandingApprovalRequest:
+  type: object
+  required:
+    - request_id
+    - agent_id
+    - user_id
+    - action_type
+    - action_version
+    - constraints
+    - status
+    - created_at
+    - updated_at
+  properties:
+    request_id:
+      type: string
+    agent_id:
+      type: integer
+      format: int64
+    user_id:
+      type: string
+      format: uuid
+    action_type:
+      type: string
+    action_version:
+      type: string
+    constraints:
+      type: object
+      additionalProperties: true
+    max_executions:
+      type: integer
+      nullable: true
+    expires_in_seconds:
+      type: integer
+      nullable: true
+      description: |
+        Relative expiry window in seconds. When the user approves, expires_at on
+        the resulting standing approval is computed from approval time (not request time).
+    source_action_configuration_id:
+      type: string
+      nullable: true
+    status:
+      type: string
+      enum: [pending, approved, denied, expired, cancelled]
+    decided_at:
+      type: string
+      format: date-time
+      nullable: true
+    resulting_standing_approval_id:
+      type: string
+      nullable: true
+    created_at:
+      type: string
+      format: date-time
+    updated_at:
+      type: string
+      format: date-time
+
+StandingApprovalRequestListResponse:
+  type: object
+  required:
+    - data
+    - has_more
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '#/StandingApprovalRequest'
+    has_more:
+      type: boolean
+    next_cursor:
+      type: string
+      nullable: true
+
+AgentCreateStandingApprovalRequestBody:
+  type: object
+  required:
+    - action_type
+    - constraints
+  properties:
+    action_type:
+      type: string
+    action_version:
+      type: string
+    constraints:
+      type: object
+      additionalProperties: true
+    max_executions:
+      type: integer
+      minimum: 1
+    expires_in_seconds:
+      type: integer
+      minimum: 1
+    source_action_configuration_id:
+      type: string
+
+AgentCreateStandingApprovalRequestResponse:
+  type: object
+  required:
+    - request_id
+    - status
+  properties:
+    request_id:
+      type: string
+    status:
+      type: string
+      enum: [pending]
+
+ApproveStandingApprovalRequestResponse:
+  type: object
+  required:
+    - request_id
+    - status
+    - resulting_standing_approval_id
+  properties:
+    request_id:
+      type: string
+    status:
+      type: string
+    resulting_standing_approval_id:
+      type: string
+    standing_approval:
+      $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
+
+DenyStandingApprovalRequestResponse:
+  type: object
+  required:
+    - request_id
+    - status
+    - decided_at
+  properties:
+    request_id:
+      type: string
+    status:
+      type: string
+    decided_at:
+      type: string
+      format: date-time

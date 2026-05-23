@@ -12,6 +12,15 @@ import { PendingApprovalsBanner } from "../PendingApprovalsBanner";
 
 vi.mock("../../../api/client");
 
+vi.mock("@/hooks/useStandingApprovalRequests", () => ({
+  useStandingApprovalRequests: () => ({
+    requests: [],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  }),
+}));
+
 const NOW = new Date("2026-02-21T10:00:00Z");
 
 const mockApproval = {

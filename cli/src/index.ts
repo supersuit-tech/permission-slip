@@ -29,6 +29,7 @@ import { requestCommand } from "./commands/request.js";
 import { requestStatusCommand } from "./commands/request-status.js";
 import { configCommand } from "./commands/config.js";
 import { whoamiCommand } from "./commands/whoami.js";
+import { autoApproveRequestCommand } from "./commands/autoApproveRequest.js";
 
 const program = new Command();
 
@@ -55,5 +56,6 @@ requestCommand(program);
 requestStatusCommand(program);
 configCommand(program);
 whoamiCommand(program);
+autoApproveRequestCommand(program);
 
 program.parse(process.argv);

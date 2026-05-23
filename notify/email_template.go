@@ -17,6 +17,9 @@ func buildEmailSubject(approval Approval) string {
 	if approval.Type == NotificationTypeStandingExecution {
 		return buildStandingExecutionSubject(approval)
 	}
+	if approval.Type == NotificationTypeStandingApprovalRequest {
+		return buildStandingApprovalRequestSubject(approval)
+	}
 	actionType := extractActionType(approval.Action)
 	if actionType != "" {
 		return fmt.Sprintf("Approval needed: %s", actionType)
@@ -31,6 +34,9 @@ func buildEmailPlainBody(approval Approval) string {
 	}
 	if approval.Type == NotificationTypeStandingExecution {
 		return buildStandingExecutionPlainBody(approval)
+	}
+	if approval.Type == NotificationTypeStandingApprovalRequest {
+		return buildStandingApprovalRequestPlainBody(approval)
 	}
 
 	var b strings.Builder
@@ -75,6 +81,9 @@ func buildEmailHTMLBody(approval Approval) string {
 	}
 	if approval.Type == NotificationTypeStandingExecution {
 		return buildStandingExecutionHTMLBody(approval)
+	}
+	if approval.Type == NotificationTypeStandingApprovalRequest {
+		return buildStandingApprovalRequestHTMLBody(approval)
 	}
 
 	agentName := approval.AgentName

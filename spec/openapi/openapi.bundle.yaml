@@ -5013,6 +5013,131 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/standing-approvals/request:
+    post:
+      operationId: agentCreateStandingApprovalRequest
+      summary: Propose Standing Approval Rule
+      description: |
+        Agent proposes a new auto-approve (standing approval) rule. The proposal stays
+        pending until the agent's owning user approves or denies it from web or mobile.
+        expires_at on the resulting rule is computed at approval time from expires_in_seconds.
+      tags:
+        - Standing Approval Requests
+      security:
+        - PermissionSlipSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AgentCreateStandingApprovalRequestBody'
+      responses:
+        '200':
+          description: Proposal created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentCreateStandingApprovalRequestResponse'
+  /v1/standing-approval-requests:
+    get:
+      operationId: listStandingApprovalRequests
+      summary: List Standing Approval Rule Proposals
+      tags:
+        - Standing Approval Requests
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum:
+              - pending
+              - approved
+              - denied
+              - all
+            default: pending
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: after
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of proposals
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingApprovalRequestListResponse'
+  /v1/standing-approval-requests/{request_id}:
+    get:
+      operationId: getStandingApprovalRequest
+      summary: Get Standing Approval Rule Proposal
+      tags:
+        - Standing Approval Requests
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Proposal detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/StandingApprovalRequest'
+  /v1/standing-approval-requests/{request_id}/approve:
+    post:
+      operationId: approveStandingApprovalRequest
+      summary: Approve Standing Approval Rule Proposal
+      tags:
+        - Standing Approval Requests
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Approved; standing approval created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApproveStandingApprovalRequestResponse'
+  /v1/standing-approval-requests/{request_id}/deny:
+    post:
+      operationId: denyStandingApprovalRequest
+      summary: Deny Standing Approval Rule Proposal
+      tags:
+        - Standing Approval Requests
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: request_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Denied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DenyStandingApprovalRequestResponse'
   /v1/onboarding:
     post:
       operationId: createOnboarding
@@ -10793,6 +10918,144 @@ components:
         standing_approval:
           $ref: '#/components/schemas/StandingApproval'
           description: Present when the template bundles a standing approval.
+    AgentCreateStandingApprovalRequestBody:
+      type: object
+      required:
+        - action_type
+        - constraints
+      properties:
+        action_type:
+          type: string
+        action_version:
+          type: string
+        constraints:
+          type: object
+          additionalProperties: true
+        max_executions:
+          type: integer
+          minimum: 1
+        expires_in_seconds:
+          type: integer
+          minimum: 1
+        source_action_configuration_id:
+          type: string
+    AgentCreateStandingApprovalRequestResponse:
+      type: object
+      required:
+        - request_id
+        - status
+      properties:
+        request_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+    StandingApprovalRequest:
+      type: object
+      required:
+        - request_id
+        - agent_id
+        - user_id
+        - action_type
+        - action_version
+        - constraints
+        - status
+        - created_at
+        - updated_at
+      properties:
+        request_id:
+          type: string
+        agent_id:
+          type: integer
+          format: int64
+        user_id:
+          type: string
+          format: uuid
+        action_type:
+          type: string
+        action_version:
+          type: string
+        constraints:
+          type: object
+          additionalProperties: true
+        max_executions:
+          type: integer
+          nullable: true
+        expires_in_seconds:
+          type: integer
+          nullable: true
+          description: |
+            Relative expiry window in seconds. When the user approves, expires_at on
+            the resulting standing approval is computed from approval time (not request time).
+        source_action_configuration_id:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - denied
+            - expired
+            - cancelled
+        decided_at:
+          type: string
+          format: date-time
+          nullable: true
+        resulting_standing_approval_id:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+    StandingApprovalRequestListResponse:
+      type: object
+      required:
+        - data
+        - has_more
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StandingApprovalRequest'
+        has_more:
+          type: boolean
+        next_cursor:
+          type: string
+          nullable: true
+    ApproveStandingApprovalRequestResponse:
+      type: object
+      required:
+        - request_id
+        - status
+        - resulting_standing_approval_id
+      properties:
+        request_id:
+          type: string
+        status:
+          type: string
+        resulting_standing_approval_id:
+          type: string
+        standing_approval:
+          $ref: '#/components/schemas/StandingApproval'
+    DenyStandingApprovalRequestResponse:
+      type: object
+      required:
+        - request_id
+        - status
+        - decided_at
+      properties:
+        request_id:
+          type: string
+        status:
+          type: string
+        decided_at:
+          type: string
+          format: date-time
     NotificationPreferenceUpdate:
       type: object
       description: A channel preference update (request-only, no `available` field).

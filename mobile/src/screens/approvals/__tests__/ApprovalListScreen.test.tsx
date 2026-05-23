@@ -42,6 +42,17 @@ jest.mock("../../../hooks/useApprovals", () => ({
   useApprovals: () => mockUseApprovalsReturn,
 }));
 
+jest.mock("../../../hooks/useStandingApprovalRequests", () => ({
+  useStandingApprovalRequests: () => ({
+    requests: [],
+    isLoading: false,
+    isRefetching: false,
+    error: null,
+    refetch: jest.fn(),
+    dataUpdatedAt: Date.now(),
+  }),
+}));
+
 jest.mock("../../../hooks/useAgents", () => ({
   useAgents: () => ({
     agents: MOCK_AGENTS.map((a) => ({ ...a, status: "registered" })),

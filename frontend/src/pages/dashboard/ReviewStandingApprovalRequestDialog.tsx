@@ -1,0 +1,123 @@
+import { useState } from "react";
+import { Loader2, Shield } from "lucide-react";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useApproveStandingApprovalRequest } from "@/hooks/useApproveStandingApprovalRequest";
+import { useDenyStandingApprovalRequest } from "@/hooks/useDenyStandingApprovalRequest";
+import type { StandingApprovalRequestSummary } from "@/hooks/useStandingApprovalRequests";
+
+interface ReviewStandingApprovalRequestDialogProps {
+  request: StandingApprovalRequestSummary;
+  agentDisplayName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function ReviewStandingApprovalRequestDialog({
+  request,
+  agentDisplayName,
+  open,
+  onOpenChange,
+}: ReviewStandingApprovalRequestDialogProps) {
+  const { approveRequest, isPending: isApproving } = useApproveStandingApprovalRequest();
+  const { denyRequest, isPending: isDenying } = useDenyStandingApprovalRequest();
+  const [done, setDone] = useState<"approved" | "denied" | null>(null);
+
+  const constraintsJson = JSON.stringify(request.constraints, null, 2);
+  const busy = isApproving || isDenying;
+
+  async function handleApprove() {
+    try {
+      await approveRequest(request.request_id);
+      setDone("approved");
+      toast.success("Auto-approve rule activated");
+      setTimeout(() => onOpenChange(false), 1500);
+    } catch {
+      toast.error("Failed to approve rule");
+    }
+  }
+
+  async function handleDeny() {
+    try {
+      await denyRequest(request.request_id);
+      setDone("denied");
+      toast.success("Rule proposal denied");
+      setTimeout(() => onOpenChange(false), 1500);
+    } catch {
+      toast.error("Failed to deny rule");
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex flex-wrap items-center gap-2">
+            <Shield className="size-5" />
+            Rule proposal
+            <Badge variant="secondary">Rule proposal</Badge>
+          </DialogTitle>
+          <DialogDescription>
+            Review constraints before approving this standing auto-approve rule.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4 text-sm">
+          <p>
+            <span className="font-medium">{agentDisplayName}</span> wants a standing
+            auto-approve rule for <span className="font-mono">{request.action_type}</span>.
+          </p>
+
+          <div>
+            <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
+              Constraints
+            </p>
+            <pre className="bg-muted max-h-48 overflow-auto rounded-md p-3 text-xs">
+              {constraintsJson}
+            </pre>
+          </div>
+
+          {request.max_executions != null && (
+            <p>
+              <span className="text-muted-foreground">Max executions:</span>{" "}
+              {request.max_executions}
+            </p>
+          )}
+          {request.expires_in_seconds != null && (
+            <p>
+              <span className="text-muted-foreground">Expires after approval:</span>{" "}
+              {Math.round(request.expires_in_seconds / 86400)} day(s) (
+              {request.expires_in_seconds}s)
+            </p>
+          )}
+
+          {done === "approved" && (
+            <p className="text-green-600 dark:text-green-400">Rule approved and active.</p>
+          )}
+          {done === "denied" && (
+            <p className="text-muted-foreground">Proposal denied.</p>
+          )}
+        </div>
+
+        {!done && (
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={handleDeny} disabled={busy}>
+              {isDenying ? <Loader2 className="size-4 animate-spin" /> : "Deny"}
+            </Button>
+            <Button onClick={handleApprove} disabled={busy}>
+              {isApproving ? <Loader2 className="size-4 animate-spin" /> : "Approve rule"}
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
+  );
+}
