@@ -12,6 +12,10 @@ interface ImportMetaEnv {
   readonly VITE_REACT_DEVTOOLS?: string;
   /** Sentry DSN for error tracking. Omit to disable Sentry. */
   readonly VITE_SENTRY_DSN?: string;
+  /** Git commit SHA stamped at build time (full hash). */
+  readonly VITE_GIT_COMMIT_HASH?: string;
+  /** Git commit timestamp stamped at build time (ISO-8601). */
+  readonly VITE_GIT_COMMIT_TIMESTAMP?: string;
 }
 
 interface ImportMeta {

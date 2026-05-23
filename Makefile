@@ -70,6 +70,8 @@ typecheck: generate-frontend
 # Build for production (generates API client first, then compiles)
 # Embeds the git SHA as the Sentry release version via -ldflags.
 GIT_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+GIT_COMMIT_HASH := $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
+GIT_COMMIT_TIMESTAMP := $(shell git log -1 --format=%cI HEAD 2>/dev/null || echo "unknown")
 build: generate
 	cd frontend && npm run build
 	touch frontend/dist/.gitkeep
@@ -96,6 +98,8 @@ docker-build:
 	docker build \
 		--build-arg VITE_SUPABASE_URL=$${VITE_SUPABASE_URL} \
 		--build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$${VITE_SUPABASE_PUBLISHABLE_KEY} \
+		--build-arg GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) \
+		--build-arg GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) \
 		-t permission-slip .
 
 # Deploy to Fly.io. Reads Supabase build args from the environment.
@@ -104,7 +108,9 @@ docker-build:
 deploy:
 	fly deploy \
 		--build-arg VITE_SUPABASE_URL=$${VITE_SUPABASE_URL} \
-		--build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$${VITE_SUPABASE_PUBLISHABLE_KEY}
+		--build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$${VITE_SUPABASE_PUBLISHABLE_KEY} \
+		--build-arg GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) \
+		--build-arg GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP)
 
 # ---------- Testing ----------
 
