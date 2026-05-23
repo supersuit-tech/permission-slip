@@ -5,6 +5,7 @@ import {
   getCustomHost,
   PLACEHOLDER_API_BASE,
 } from "../lib/customHostConfig";
+import { loggingMiddleware } from "../devlogs/loggingMiddleware";
 
 /**
  * Returns the default API base URL for the mobile app.
@@ -136,6 +137,9 @@ const client = useMockApi
 if (!useMockApi) {
   client.use(customHostMiddleware);
   client.use(jsonSafeMiddleware);
+  // Logging is installed last so it sees the final URL after rewrites and the
+  // final Response after jsonSafeMiddleware normalizes non-JSON errors.
+  client.use(loggingMiddleware);
 }
 
 export default client;

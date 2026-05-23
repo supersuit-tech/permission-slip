@@ -25,6 +25,8 @@ import {
   hasConfiguredApiBase,
   loadCustomHostConfig,
 } from "./src/lib/customHostConfig";
+import { loadDevModeConfig } from "./src/lib/devModeConfig";
+import DevLogsOverlay from "./src/devlogs/DevLogsOverlay";
 import ServerUrlSetupScreen from "./src/screens/ServerUrlSetupScreen";
 import { ServerSetupContext } from "./src/lib/serverSetupContext";
 
@@ -167,7 +169,9 @@ export default function App() {
   const [hostHydrated, setHostHydrated] = useState(false);
   const [serverSetupBump, setServerSetupBump] = useState(0);
   useEffect(() => {
-    loadCustomHostConfig().finally(() => setHostHydrated(true));
+    Promise.all([loadCustomHostConfig(), loadDevModeConfig()]).finally(() =>
+      setHostHydrated(true),
+    );
   }, []);
 
   // Subscribe to AppState changes so React Query knows when the app is focused.
@@ -256,6 +260,7 @@ export default function App() {
               onOpenServerSetup={openServerSetup}
             />
             <StatusBar style="auto" />
+            <DevLogsOverlay />
           </ActiveAuthProvider>
         </ServerSetupContext.Provider>
       </SafeAreaProvider>
