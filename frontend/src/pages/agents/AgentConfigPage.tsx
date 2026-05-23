@@ -6,6 +6,7 @@ import { useAgentConnectors } from "@/hooks/useAgentConnectors";
 import { AgentInfoSection } from "./AgentInfoSection";
 import { AgentPaymentMethodSection } from "./AgentPaymentMethodSection";
 import { AgentConnectorsSection } from "./AgentConnectorsSection";
+import { AgentStandingApprovalsSection } from "./AgentStandingApprovalsSection";
 import { DeactivateSection } from "./DeactivateSection";
 
 export function AgentConfigPage() {
@@ -66,6 +67,7 @@ export function AgentConfigPage() {
         isLoading={connectorsLoading}
         error={connectorsError}
       />
+      <AgentStandingApprovalsSection agentId={agentId} />
       {agent.status !== "deactivated" && (
         <DeactivateSection agentId={agent.agent_id} />
       )}

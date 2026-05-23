@@ -134,7 +134,7 @@ describe("Dashboard", () => {
       expect(screen.getByText("Registered Agents")).toBeInTheDocument();
     });
     expect(screen.getByText("Recent Activity")).toBeInTheDocument();
-    expect(screen.getByText("Standing approvals")).toBeInTheDocument();
+    expect(screen.queryByText("Standing approvals")).not.toBeInTheDocument();
 
     // Onboarding hero should NOT appear
     expect(
