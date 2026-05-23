@@ -35,6 +35,7 @@ import Constants from "expo-constants";
 import { useDeleteAccount } from "../../hooks/useDeleteAccount";
 import { colors } from "../../theme/colors";
 import CustomServerSettings from "./CustomServerSettings";
+import DeveloperSettings from "./DeveloperSettings";
 
 const GIT_COMMIT_HASH: string =
   (Constants.expoConfig?.extra?.gitCommitHash as string) ?? "unknown";
@@ -296,6 +297,8 @@ export default function SettingsScreen(_props: Props) {
         </Text>
         <CustomServerSettings onSaved={signOut} />
       </View>
+
+      <DeveloperSettings />
 
       <View style={styles.buildInfo}>
         <Text style={styles.buildInfoText} testID="git-commit-hash">
