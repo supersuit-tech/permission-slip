@@ -185,43 +185,45 @@ export default function SettingsScreen(_props: Props) {
             </TouchableOpacity>
           </View>
         ) : (
-          <View style={styles.card}>
-            <View style={styles.toggleRow}>
-              <View style={styles.toggleLabel}>
-                <Text style={styles.toggleTitle}>Push Notifications</Text>
-                <Text style={styles.toggleDescription}>
-                  Receive push notifications when actions need your approval.
-                </Text>
+          <>
+            <View style={styles.card}>
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLabel}>
+                  <Text style={styles.toggleTitle}>Push Notifications</Text>
+                  <Text style={styles.toggleDescription}>
+                    Receive push notifications when actions need your approval.
+                  </Text>
+                </View>
+                <Switch
+                  testID="mobile-push-toggle"
+                  value={mobilePushEnabled}
+                  onValueChange={handleToggleMobilePush}
+                  disabled={isUpdating}
+                  trackColor={{
+                    false: colors.gray300,
+                    true: colors.primary,
+                  }}
+                  accessibilityLabel="Push Notifications"
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: mobilePushEnabled }}
+                />
               </View>
-              <Switch
-                testID="mobile-push-toggle"
-                value={mobilePushEnabled}
-                onValueChange={handleToggleMobilePush}
-                disabled={isUpdating}
-                trackColor={{
-                  false: colors.gray300,
-                  true: colors.primary,
-                }}
-                accessibilityLabel="Push Notifications"
-                accessibilityRole="switch"
-                accessibilityState={{ checked: mobilePushEnabled }}
-              />
+              {osNotifPermGranted === false && (
+                <TouchableOpacity
+                  style={styles.permissionWarning}
+                  onPress={() => Linking.openSettings()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Open device settings to enable notifications"
+                >
+                  <Text style={styles.permissionWarningText}>
+                    Notifications are blocked in your device settings.{" "}
+                    <Text style={styles.permissionWarningLink}>Open Settings →</Text>
+                  </Text>
+                </TouchableOpacity>
+              )}
             </View>
-            {osNotifPermGranted === false && (
-              <TouchableOpacity
-                style={styles.permissionWarning}
-                onPress={() => Linking.openSettings()}
-                accessibilityRole="button"
-                accessibilityLabel="Open device settings to enable notifications"
-              >
-                <Text style={styles.permissionWarningText}>
-                  Notifications are blocked in your device settings.{" "}
-                  <Text style={styles.permissionWarningLink}>Open Settings →</Text>
-                </Text>
-              </TouchableOpacity>
-            )}
             <Text style={styles.subsectionTitle}>Notify me about</Text>
-            <View style={[styles.card, styles.cardSpaced]}>
+            <View style={styles.card}>
               <View style={styles.toggleRow}>
                 <View style={styles.toggleLabel}>
                   <Text style={styles.toggleTitle}>Auto-approval executions</Text>
@@ -245,7 +247,7 @@ export default function SettingsScreen(_props: Props) {
                 />
               </View>
             </View>
-          </View>
+          </>
         )}
       </View>
 
@@ -365,9 +367,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: colors.gray200,
-  },
-  cardSpaced: {
-    marginTop: 12,
   },
   subsectionTitle: {
     fontSize: 13,
