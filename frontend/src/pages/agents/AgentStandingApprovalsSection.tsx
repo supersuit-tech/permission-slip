@@ -19,10 +19,8 @@ import {
   useStandingApprovals,
   type StandingApproval,
 } from "@/hooks/useStandingApprovals";
-import { useAgents, type Agent } from "@/hooks/useAgents";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import { useActionConfigMap } from "@/hooks/useActionConfigMap";
-import { getAgentDisplayName } from "@/lib/agents";
 
 function formatExpiresIn(expiresAt: string | null | undefined): string {
   if (expiresAt === null) return "Never";
@@ -43,24 +41,13 @@ function formatExpiresIn(expiresAt: string | null | undefined): string {
   return `${diffDays}d`;
 }
 
-function resolveAgentName(
-  agentId: number,
-  agentMap: Map<number, Agent>,
-): string {
-  const agent = agentMap.get(agentId);
-  return agent ? getAgentDisplayName(agent) : `Agent ${agentId}`;
-}
-
 function StandingApprovalSummaryRow({
   sa,
   config,
-  agentMap,
 }: {
   sa: StandingApproval;
   config: ActionConfiguration | undefined;
-  agentMap: Map<number, Agent>;
 }) {
-  const agentName = resolveAgentName(sa.agent_id, agentMap);
   const href =
     config != null
       ? `/agents/${sa.agent_id}/connectors/${encodeURIComponent(config.connector_id)}`
@@ -82,9 +69,6 @@ function StandingApprovalSummaryRow({
       </TableCell>
       <TableCell className="text-sm">
         {config?.connector_id ?? "\u2014"}
-      </TableCell>
-      <TableCell className="max-w-[200px] truncate text-xs">
-        {agentName}
       </TableCell>
       <TableCell>{formatExpiresIn(sa.expires_at)}</TableCell>
       <TableCell className="text-right">
@@ -116,32 +100,27 @@ function EmptyState() {
   );
 }
 
-export function StandingApprovalsCard() {
-  const { standingApprovals, isLoading, error, refetch } = useStandingApprovals();
-  const { agents } = useAgents();
+interface AgentStandingApprovalsSectionProps {
+  agentId: number;
+}
 
-  const linkedActive = useMemo(
+export function AgentStandingApprovalsSection({
+  agentId,
+}: AgentStandingApprovalsSectionProps) {
+  const { standingApprovals, isLoading, error, refetch } = useStandingApprovals();
+
+  const linkedActiveForAgent = useMemo(
     () =>
       standingApprovals.filter(
         (sa) =>
+          sa.agent_id === agentId &&
           !!sa.source_action_configuration_id &&
           sa.status === "active",
       ),
-    [standingApprovals],
+    [standingApprovals, agentId],
   );
 
-  const agentIds = useMemo(
-    () => [...new Set(linkedActive.map((sa) => sa.agent_id))],
-    [linkedActive],
-  );
-  const configMap = useActionConfigMap(agentIds);
-  const agentMap = useMemo(() => {
-    const map = new Map<number, Agent>();
-    for (const agent of agents) {
-      map.set(agent.agent_id, agent);
-    }
-    return map;
-  }, [agents]);
+  const configMap = useActionConfigMap([agentId]);
 
   return (
     <Card>
@@ -170,17 +149,16 @@ export function StandingApprovalsCard() {
               Retry
             </button>
           </div>
-        ) : linkedActive.length === 0 ? (
+        ) : linkedActiveForAgent.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="overflow-x-auto">
-            <div className="min-w-[560px] overflow-hidden rounded-lg">
+            <div className="min-w-[480px] overflow-hidden rounded-lg">
               <Table>
                 <TableHeader>
                   <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
                     <TableHead>Configuration</TableHead>
                     <TableHead>Connector</TableHead>
-                    <TableHead>Agent</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead className="text-right">
                       <span className="sr-only">Open</span>
@@ -188,7 +166,7 @@ export function StandingApprovalsCard() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {linkedActive.map((sa) => {
+                  {linkedActiveForAgent.map((sa) => {
                     const cid = sa.source_action_configuration_id;
                     const config =
                       cid != null ? configMap.get(cid) : undefined;
@@ -197,7 +175,6 @@ export function StandingApprovalsCard() {
                         key={sa.standing_approval_id}
                         sa={sa}
                         config={config}
-                        agentMap={agentMap}
                       />
                     );
                   })}

@@ -1,12 +1,10 @@
 import { useState } from "react";
 import { useApprovalEvents } from "@/hooks/useApprovalEvents";
 import { useAgents } from "@/hooks/useAgents";
-import { useStandingApprovals } from "@/hooks/useStandingApprovals";
 import { useAuditEvents } from "@/hooks/useAuditEvents";
 import { PendingApprovalsBanner } from "./PendingApprovalsBanner";
 import { RecentActivityCard } from "./RecentActivityCard";
 import { RegisteredAgentsCard } from "./RegisteredAgentsCard";
-import { StandingApprovalsCard } from "./StandingApprovalsCard";
 import { AgentOnboardingHero } from "./AgentOnboardingHero";
 import { AgentConfigHero } from "./AgentConfigHero";
 import { InviteCodeDialog } from "./InviteCodeDialog";
@@ -15,8 +13,6 @@ import { useUnconfiguredAgent } from "@/hooks/useUnconfiguredAgent";
 export function Dashboard() {
   useApprovalEvents();
   const { agents, isLoading, error } = useAgents();
-  const { standingApprovals, isLoading: standingLoading } =
-    useStandingApprovals();
   const { events, isLoading: eventsLoading } = useAuditEvents();
   const [inviteDialogOpen, setInviteDialogOpen] = useState(false);
   const { isUnconfigured, agentId: unconfiguredAgentId, agentName: unconfiguredAgentName } =
@@ -29,8 +25,6 @@ export function Dashboard() {
   // While a hook is still fetching we don't yet know whether data exists,
   // so default to showing the card to avoid jarring pop-in for returning users.
   const showActivity = eventsLoading || hasActivity;
-  const showStandingApprovals =
-    standingLoading || standingApprovals.length > 0 || hasActivity;
 
   // Dashboard has three states based on the user's onboarding progress:
   // 1. No agents registered → AgentOnboardingHero (register first agent)
@@ -62,7 +56,6 @@ export function Dashboard() {
           <PendingApprovalsBanner />
           <RegisteredAgentsCard />
           {showActivity && <RecentActivityCard />}
-          {showStandingApprovals && <StandingApprovalsCard />}
         </>
       )}
     </div>
