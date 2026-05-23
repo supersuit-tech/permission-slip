@@ -343,7 +343,7 @@ func handleStandingApprovalRequestError(w http.ResponseWriter, r *http.Request, 
 	switch reqErr.Code {
 	case db.StandingApprovalRequestErrNotFound:
 		RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Standing approval request not found"))
-	case db.StandingApprovalRequestErrApprovalAlreadyResolved:
+	case db.StandingApprovalRequestErrAlreadyResolved:
 		RespondError(w, r, http.StatusConflict, Conflict(ErrApprovalAlreadyResolved, "Standing approval request is no longer pending"))
 	default:
 		RespondError(w, r, http.StatusForbidden, Forbidden(ErrAgentNotAuthorized, "Not allowed to modify this standing approval request"))

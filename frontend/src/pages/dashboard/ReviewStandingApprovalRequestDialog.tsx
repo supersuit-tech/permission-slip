@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -64,6 +65,9 @@ export function ReviewStandingApprovalRequestDialog({
             Rule proposal
             <Badge variant="secondary">Rule proposal</Badge>
           </DialogTitle>
+          <DialogDescription>
+            Review constraints before approving this standing auto-approve rule.
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 text-sm">
