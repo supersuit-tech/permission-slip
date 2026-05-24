@@ -64,7 +64,7 @@ The server serves both the API and frontend on a single port (default 8080). The
 | `JWT_SIGNING_SECRET` | Yes (production) | HMAC secret for HS256 access tokens — `openssl rand -base64 32` (min 32 bytes) |
 | `BASE_URL` | Yes | Public URL (e.g. `https://your-server.example.com`) |
 | `INVITE_HMAC_KEY` | Recommended | HMAC key for invite codes — `openssl rand -hex 32` |
-| `EXPO_ACCESS_TOKEN` | Optional | Expo Push Service token for higher rate limits |
+| `EXPO_ACCESS_TOKEN` | Self-host push | Expo token allowed to send to the mobile app's Expo project; see [deployment-self-hosted.md](deployment-self-hosted.md#mobile-push-notifications) |
 
 Bootstrap the first user on a new database with `go run ./cmd/create-user user@example.com 'password'` (see repository README). For the full production deployment walkthrough, see [Self-hosted deployment](deployment-self-hosted.md).
 

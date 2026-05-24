@@ -84,7 +84,7 @@ Permission Slip supports four notification channels. Channels are active only wh
 
 **Mobile push notifications** deliver alerts to iOS and Android devices via the [Expo Push Service](https://docs.expo.dev/push-notifications/overview/), which routes to APNs (iOS) and FCM (Android). Device tokens are registered on login via the Permission Slip mobile app.
 
-**Configuration:** Always enabled when a database is available. Set `EXPO_ACCESS_TOKEN` for higher rate limits (authenticated mode); unauthenticated mode is used otherwise.
+**Configuration:** Always enabled when a database is available. Set `EXPO_ACCESS_TOKEN` to an Expo access token that is permitted to send to the mobile app's Expo project (required when Expo push security is enabled; otherwise unauthenticated mode may work with lower rate limits). The token must match the project that built the app — a self-hoster's personal token does not work with the App Store build. See [Self-hosted deployment — Mobile Push Notifications](../deployment-self-hosted.md#mobile-push-notifications).
 
 **Requirement Level:** Services MAY support mobile push as an optional enhancement.
 
