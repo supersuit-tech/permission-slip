@@ -312,6 +312,37 @@ If you followed Step 3, this is already set to your Tailscale hostname. If you'r
 
 The server sends push requests to `exp.host` (Expo's push API). Your server needs outbound HTTPS access to reach it — this is typically available by default on any machine with internet access.
 
+### 3. `EXPO_ACCESS_TOKEN` (Expo project must match the mobile app)
+
+Expo push tokens are tied to the **Expo project that built the app**, not to your Permission Slip server URL. When you send a push, Expo checks that your server is allowed to deliver to that project.
+
+Set in `.env`:
+
+```bash
+EXPO_ACCESS_TOKEN=your_expo_access_token
+```
+
+Generate the token at [expo.dev/settings/access-tokens](https://expo.dev/settings/access-tokens). When creating it, enable permission to **send push notifications** (wording may vary; see Expo's [additional push security](https://docs.expo.dev/push-notifications/sending-notifications/#additional-security) docs).
+
+Restart the server and confirm startup logs say `Mobile Push: Expo access token configured (authenticated mode)`.
+
+**Which Expo account?** The token must belong to the **same Expo project** as the app on your phone:
+
+| Mobile app | What you need |
+|------------|----------------|
+| **App Store / official build** | An access token for the **Permission Slip** Expo project (`@supersuit-tech/permission-slip`). A token from your personal Expo account will **not** work — Expo returns `403` / "Insufficient permissions to send push notifications". Ask the project maintainers for a self-host token, or use a custom build (below). |
+| **Your own EAS build** | Your own Expo account: run `npx eas-cli init` in `mobile/`, configure iOS APNs (and Android FCM) in EAS, build and install that app, then set `EXPO_ACCESS_TOKEN` from **that** account. See [Mobile builds](mobile-builds.md). |
+
+**Self-hosted push with your own Expo (recommended if you cannot use the official token):**
+
+1. Create an [Expo account](https://expo.dev/signup) and link a project (`EXPO_PROJECT_ID`, `EXPO_OWNER` in `mobile/.env` — see [mobile/README.md](../mobile/README.md)).
+2. Configure push credentials in EAS (`eas credentials` for iOS APNs; Android FCM as needed).
+3. Build and install the app on your devices ([mobile-builds.md](mobile-builds.md)) — do **not** rely on the App Store build for this path.
+4. Create an access token with push permission and set `EXPO_ACCESS_TOKEN` on your server.
+5. Point the app at your self-hosted URL, sign in, and confirm `POST /api/v1/push-subscriptions` returns `201`.
+
+Without a matching token, registration can still succeed (`201`) while delivery fails when an approval is created.
+
 ### Troubleshooting
 
 **"Failed to update notification preference" error in the app:**
@@ -322,6 +353,9 @@ This was a bug (fixed in build `23c1cb5`) where self-hosted POST/PUT requests ar
 2. Check server logs for `[mobilepush]` lines showing push dispatch errors.
 3. Confirm the push subscription was registered: look for `POST /api/v1/push-subscriptions` returning `201` in your logs. If you don't see it, sign out and back in to force re-registration.
 4. On the phone, go to **Settings → Permission Slip → Notifications** and confirm notifications are allowed. The app's Settings screen will show a warning and an "Open Settings" link if device-level permission is blocked.
+
+**Expo `403` / "Insufficient permissions to send push notifications":**
+Your `EXPO_ACCESS_TOKEN` does not match the Expo project for the app on the device (common with the App Store build plus a personal Expo token). Use a token from the app's project, or switch to your own EAS build and your own token (see §3 above).
 
 **Using Cloudflare Tunnel instead of Tailscale:**
 Set `BASE_URL` to your Cloudflare Tunnel public URL (e.g. `https://your-subdomain.trycloudflare.com`). Everything else works the same — the server reaches Expo's push API via its own outbound connection, not through a callback to your URL.
