@@ -15,15 +15,16 @@ import (
 // imapDial establishes a raw IMAP connection. It is a package-level variable
 // so tests can replace it without needing a running server.
 //
-// For localhost (Proton Mail Bridge), it dials without TLS since Bridge handles
-// encryption internally. For remote hosts, it uses implicit TLS (port 993 style)
+// For localhost (Proton Mail Bridge or hydroxide), it dials without TLS — both
+// proxies handle Proton-side encryption internally and expose plain IMAP on the
+// loopback interface. For remote hosts, it uses implicit TLS (port 993 style)
 // to protect credentials in transit.
 var imapDial = func(addr string, timeout time.Duration) (*imapclient.Client, error) {
 	host, _, _ := net.SplitHostPort(addr)
 	dialer := &net.Dialer{Timeout: timeout}
 
 	if isLocalhost(host) {
-		// Proton Mail Bridge on localhost uses plain IMAP (no TLS).
+		// The Proton local proxy (Bridge or hydroxide) uses plain IMAP on loopback.
 		conn, err := dialer.Dial("tcp", addr)
 		if err != nil {
 			return nil, err

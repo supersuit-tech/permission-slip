@@ -12,7 +12,7 @@ func protonmailTemplates() []connectors.ManifestTemplate {
 			ID:          "tpl_protonmail_send",
 			ActionType:  "protonmail.send_email",
 			Name:        "Send emails from your Proton Mail account",
-			Description: "Agent can send emails on your behalf via Proton Mail Bridge.",
+			Description: "Agent can send emails on your behalf via your local Proton IMAP/SMTP proxy.",
 			Parameters:  json.RawMessage(`{"to":"*","subject":"*","body":"*"}`),
 		},
 		{

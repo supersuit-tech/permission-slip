@@ -14,13 +14,13 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "protonmail",
 		Name:        "Proton Mail",
-		Description: "Send and read emails through Proton Mail via IMAP/SMTP Bridge. Requires Proton Mail Bridge running locally.",
+		Description: "Send and read emails through Proton Mail via a local IMAP/SMTP proxy (Proton Mail Bridge on x86_64, or hydroxide on ARM/Raspberry Pi). The proxy must be running on the same host as Permission Slip.",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
 				ActionType:  "protonmail.send_email",
 				Name:        "Send Email",
-				Description: "Send an email via SMTP through Proton Mail Bridge",
+				Description: "Send an email via SMTP through the local Proton IMAP/SMTP proxy",
 				RiskLevel:   "high",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -193,7 +193,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				Service:         "protonmail",
 				AuthType:        "custom",
-				InstructionsURL: "https://proton.me/support/bridge",
+				InstructionsURL: "https://github.com/supersuit-tech/permission-slip/blob/main/docs/connectors/protonmail.md",
 			},
 		},
 		Templates: protonmailTemplates(),

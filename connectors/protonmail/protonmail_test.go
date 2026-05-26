@@ -135,7 +135,7 @@ func TestProtonMailConnector_ValidateCredentials(t *testing.T) {
 	}
 }
 
-func TestProtonMailConnector_ValidateCredentials_bridgeUnreachable(t *testing.T) {
+func TestProtonMailConnector_ValidateCredentials_proxyUnreachable(t *testing.T) {
 	t.Parallel()
 
 	old := validateIMAPConn
@@ -145,7 +145,7 @@ func TestProtonMailConnector_ValidateCredentials_bridgeUnreachable(t *testing.T)
 	c := New()
 	err := c.ValidateCredentials(t.Context(), validCreds())
 	if err == nil {
-		t.Fatal("expected error when Proton Bridge is not running")
+		t.Fatal("expected error when the local Proton proxy (Bridge or hydroxide) is not running")
 	}
 	if connectors.IsValidationError(err) {
 		t.Fatalf("expected connection/auth error, got validation error: %v", err)
