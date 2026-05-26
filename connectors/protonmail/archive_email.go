@@ -10,12 +10,12 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
-// archiveMailbox is the IMAP folder that Proton Mail Bridge exposes for
-// archived messages. Proton Bridge maps the "Archive" label to this folder.
+// archiveMailbox is the IMAP folder that both Proton Mail Bridge and hydroxide
+// expose for Proton's Archive system label (LabelArchive in hydroxide's source).
 const archiveMailbox = "Archive"
 
 // archiveEmailAction moves one or more emails to the Archive folder via IMAP
-// MOVE (RFC 6851). Proton Mail Bridge supports MOVE natively.
+// MOVE (RFC 6851). Both Bridge and hydroxide support MOVE.
 type archiveEmailAction struct {
 	conn *ProtonMailConnector
 }
@@ -143,7 +143,7 @@ func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionR
 		// Provide a helpful hint if the Archive folder doesn't exist.
 		if strings.Contains(err.Error(), "TRYCREATE") || strings.Contains(err.Error(), "Mailbox doesn't exist") {
 			return nil, &connectors.ExternalError{
-				Message: fmt.Sprintf("Archive folder not found on server — the mailbox %q may not exist. Ensure Proton Mail Bridge is configured correctly: %v", archiveMailbox, err),
+				Message: fmt.Sprintf("Archive folder not found on server — the mailbox %q may not exist. Ensure your local Proton IMAP/SMTP proxy (Bridge or hydroxide) is configured correctly and exposes an Archive folder: %v", archiveMailbox, err),
 			}
 		}
 		return nil, imapErr

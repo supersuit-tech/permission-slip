@@ -1,5 +1,7 @@
 // Package protonmail implements the built-in Proton Mail connector for Permission
-// Slip. It uses IMAP/SMTP against a locally running Proton Mail Bridge instance.
+// Slip. It speaks IMAP/SMTP to a locally running Proton proxy — either Proton
+// Mail Bridge (official, x86_64) or hydroxide (open-source, ARM-friendly). Both
+// expose the same loopback IMAP/SMTP surface that this connector targets.
 //
 // Actions: send_email (SMTP), read_inbox, search_emails, read_email, archive_email (IMAP).
 package protonmail
@@ -30,7 +32,7 @@ const (
 )
 
 // validateIMAPConn is the IMAP dial+login used by ValidateCredentials. Tests may
-// replace it to avoid requiring a running Bridge.
+// replace it to avoid requiring a running local Proton proxy.
 var validateIMAPConn = connectIMAP
 
 // ProtonMailConnector owns the shared configuration for all Proton Mail actions.
@@ -59,8 +61,9 @@ func (c *ProtonMailConnector) Actions() map[string]connectors.Action {
 	}
 }
 
-// ValidateCredentials checks credential shape and verifies Bridge is reachable
-// with a real IMAP LOGIN. Bridge must be running when credentials are saved.
+// ValidateCredentials checks credential shape and verifies the local Proton
+// proxy is reachable with a real IMAP LOGIN. The proxy (Bridge or hydroxide)
+// must be running when credentials are saved.
 func (c *ProtonMailConnector) ValidateCredentials(ctx context.Context, creds connectors.Credentials) error {
 	if err := validateCredentialShape(creds); err != nil {
 		return err
@@ -101,8 +104,8 @@ func validateCredentialShape(creds connectors.Credentials) error {
 	return nil
 }
 
-// smtpConfig extracts SMTP connection settings from credentials, using defaults
-// for Proton Mail Bridge when not specified.
+// smtpConfig extracts SMTP connection settings from credentials, using the
+// loopback defaults shared by Proton Mail Bridge and hydroxide.
 func smtpConfig(creds connectors.Credentials) (host, port, username, password string) {
 	host, _ = creds.Get(credKeySMTPHost)
 	if host == "" {
@@ -117,8 +120,8 @@ func smtpConfig(creds connectors.Credentials) (host, port, username, password st
 	return host, port, username, password
 }
 
-// imapConfig extracts IMAP connection settings from credentials, using defaults
-// for Proton Mail Bridge when not specified.
+// imapConfig extracts IMAP connection settings from credentials, using the
+// loopback defaults shared by Proton Mail Bridge and hydroxide.
 func imapConfig(creds connectors.Credentials) (host, port, username, password string) {
 	host, _ = creds.Get(credKeyIMAPHost)
 	if host == "" {

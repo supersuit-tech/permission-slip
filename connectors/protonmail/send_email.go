@@ -13,9 +13,9 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
-// sendEmailAction sends an email via SMTP through Proton Mail Bridge.
-// The sendFunc field allows tests to inject a mock SMTP sender without
-// requiring a running Bridge instance.
+// sendEmailAction sends an email via SMTP through the local Proton proxy
+// (Bridge or hydroxide). The sendFunc field allows tests to inject a mock
+// SMTP sender without requiring a running proxy instance.
 type sendEmailAction struct {
 	conn     *ProtonMailConnector
 	sendFunc func(addr string, a smtp.Auth, from string, to []string, msg []byte) error
@@ -149,7 +149,8 @@ func buildMessage(from string, params sendEmailParams) []byte {
 
 // sendMailTLS establishes a plain TCP connection, upgrades to TLS via STARTTLS
 // if the server advertises it, then authenticates and sends the message. This
-// matches Proton Mail Bridge's default behavior on port 1025.
+// matches the default behavior of both Proton Mail Bridge and hydroxide on
+// port 1025 — Bridge advertises STARTTLS, hydroxide does not, and both work.
 func sendMailTLS(ctx context.Context, addr, host string, auth smtp.Auth, from string, to []string, msg []byte) error {
 	// Use a dialer with context deadline if set.
 	dialer := &net.Dialer{}
@@ -172,7 +173,8 @@ func sendMailTLS(ctx context.Context, addr, host string, auth smtp.Auth, from st
 	}
 	defer client.Close()
 
-	// Try STARTTLS — Proton Mail Bridge supports it.
+	// Try STARTTLS — Bridge advertises it; hydroxide does not (and this block
+	// is a no-op when the proxy doesn't advertise the extension).
 	if ok, _ := client.Extension("STARTTLS"); ok {
 		tlsConfig := &tls.Config{ServerName: host}
 		if err := client.StartTLS(tlsConfig); err != nil {

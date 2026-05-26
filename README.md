@@ -125,7 +125,7 @@ Tested a connector? [Open an issue](https://github.com/supersuit-tech/permission
 - [Openclaw Integration Guide](docs/agents.md) — how Openclaw connects to Permission Slip
 - [Creating Connectors](docs/creating-connectors.md) — build new built-in connectors
 - [Custom Connectors](docs/custom-connectors.md) — add connectors from external Git repos
-- [Proton Mail (Bridge)](docs/connectors/protonmail.md) — built-in Proton Mail via Proton Mail Bridge on self-hosted instances
+- [Proton Mail](docs/connectors/protonmail.md) — built-in Proton Mail via Bridge (x86_64) or hydroxide (ARM / Raspberry Pi) on self-hosted instances
 
 **Contributing**
 - [CONTRIBUTING.md](CONTRIBUTING.md) — workflow, code standards, PR process
