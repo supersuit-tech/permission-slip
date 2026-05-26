@@ -27,8 +27,7 @@ These steps assume a dedicated Linux user (example: `proton`) on the same host a
 On Debian/Ubuntu (including Raspberry Pi OS):
 
 ```bash
-# Official package — see https://proton.me/mail/bridge for other distros
-wget https://proton.me/download/bridge/protonmail-bridge_3.0.21-1_amd64.deb
+# Get Official package — see https://proton.me/mail/bridge for other distros
 sudo apt install ./protonmail-bridge_*.deb
 ```
 
