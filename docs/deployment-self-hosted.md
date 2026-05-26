@@ -254,15 +254,14 @@ When a user connects Slack from Permission Slip, they'll complete Slack's OAuth 
 
 ---
 
-## Email: Proton Mail (Bridge or hydroxide)
+## Email: Proton Mail (Bridge)
 
-Gmail is covered by the [Google connector](#step-5-connect-google) (OAuth). **Proton Mail** is a built-in connector that uses a local IMAP/SMTP proxy on the same machine as Permission Slip — there is no cloud OAuth flow. Two proxies are supported:
+Gmail is covered by the [Google connector](#step-5-connect-google) (OAuth). **Proton Mail** is a built-in connector that uses [Proton Mail Bridge](https://proton.me/mail/bridge) — Proton's official local IMAP/SMTP proxy — on the same machine as Permission Slip. There is no cloud OAuth flow.
 
-- **[Proton Mail Bridge](https://proton.me/mail/bridge)** — recommended on x86_64 Linux / macOS / Windows.
-- **[hydroxide](https://github.com/emersion/hydroxide)** — recommended on Raspberry Pi / ARM (Bridge has no ARM build).
+Bridge runs on x86_64 Linux, macOS, and Windows. Proton does not publish an ARM build, so Raspberry Pi and other ARM boards are not supported hosts for the Proton Mail connector. If you're on ARM, we recommend running Permission Slip on a small x86_64 mini PC with the specs you need.
 
-1. Install and run your chosen proxy headless (systemd user unit). Full steps for both: **[Proton Mail connector guide](connectors/protonmail.md)**.
-2. In the Permission Slip UI, add **Proton Mail** credentials with your Proton address and the bridge password printed by Bridge or `hydroxide auth`.
+1. Install and run Bridge headless (systemd user unit). Full steps: **[Proton Mail connector guide](connectors/protonmail.md)**.
+2. In the Permission Slip UI, add **Proton Mail** credentials with your Proton address and the bridge password printed by Bridge.
 3. Grant agent permissions using the Proton templates (send, read inbox, search, read message, archive).
 
 The proxy must be running when you save credentials; validation performs a real IMAP LOGIN.
