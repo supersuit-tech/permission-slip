@@ -2,7 +2,11 @@
 
 Permission Slip ships as a **single Go binary** with the React frontend embedded. You'll run it on your own machine and reach it privately over Tailscale — no port forwarding, no manual TLS, your own HTTPS hostname. Your instance is **only reachable from devices on your tailnet**, never exposed to the public internet.
 
-> **Recommended hardware: Raspberry Pi 5 (4GB+).** Cheap, silent, always-on. The steps below use a Pi as the example but work on any Linux machine, VM, or VPS. You need **Go 1.24+** and **Node.js 20+** to build from source.
+> **Recommended hardware:**
+> - **x86_64 mini PC (amd64)** — e.g. an Intel N100/NUC-class box. Silent, always-on, and **the only option if you want the Proton Mail connector**, since Proton Bridge ships x86_64 builds only (no ARM). Pick this if in doubt.
+> - **Raspberry Pi 5 (4GB+)** — cheaper and lower-power, but ARM-only, so it **cannot run the Proton Mail connector** (see [Email: Proton Mail](#email-proton-mail-bridge)).
+>
+> The steps below work on any Linux machine, VM, or VPS. Where the Go install differs by CPU architecture, both **amd64** (mini PC / most desktops & VMs) and **arm64** (Raspberry Pi) commands are shown — run the one that matches your hardware (`uname -m` prints `x86_64` for amd64, `aarch64` for arm64). You need **Go 1.24+** and **Node.js 20+** to build from source.
 
 ```
  ┌──────────────┐
@@ -37,9 +41,16 @@ You need a **[Tailscale account](https://login.tailscale.com/start)** — the fr
 ## Step 1: Get the Binary
 
 ```bash
-# Install Go (arm64)
-wget https://go.dev/dl/go1.24.1.linux-arm64.tar.gz
-sudo tar -C /usr/local -xzf go1.24.1.linux-arm64.tar.gz
+# Install Go — pick the line that matches your CPU (run `uname -m` to check)
+
+# amd64 / x86_64 (mini PC, most desktops & VMs):
+wget https://go.dev/dl/go1.24.1.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.24.1.linux-amd64.tar.gz
+
+# arm64 / aarch64 (Raspberry Pi):
+# wget https://go.dev/dl/go1.24.1.linux-arm64.tar.gz
+# sudo tar -C /usr/local -xzf go1.24.1.linux-arm64.tar.gz
+
 echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
 source ~/.bashrc
 
@@ -55,8 +66,13 @@ make install
 make build
 ```
 
-> **Faster build on arm64:** Cross-compile on your development machine and copy the binary over:
+> **Faster build:** Cross-compile on a beefier development machine and copy the binary over. Set `GOARCH` to match the target host:
 > ```bash
+> # Target an amd64 / x86_64 mini PC:
+> GOOS=linux GOARCH=amd64 CGO_ENABLED=0 make build
+> scp bin/server user@minipc.local:~/permission-slip/bin/server
+>
+> # Target an arm64 Raspberry Pi:
 > GOOS=linux GOARCH=arm64 CGO_ENABLED=0 make build
 > scp bin/server pi@raspberrypi.local:~/permission-slip/bin/server
 > ```
