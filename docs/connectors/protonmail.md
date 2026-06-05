@@ -99,13 +99,16 @@ What each line does:
 >
 > Avoid the interactive `gpg --full-generate-key` for this: modern GnuPG routes the passphrase prompt through `pinentry`, which on a headless server often loops back instead of accepting an empty passphrase cleanly. The `--batch` file above sidesteps `pinentry` entirely, so there's no screen to fight with.
 
-Once the key is generated, initialize the `pass` store with its fingerprint:
+Once the key is generated, move into the `proton` user's home directory and initialize the `pass` store with the key's fingerprint:
 
 ```bash
+cd ~                  # the proton user's home: /home/proton
 pass init "$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/{print $10; exit}')"
 ```
 
-The command pulls the new key's fingerprint out of `gpg`'s machine-readable output automatically, so you don't have to copy it by hand. We use the full fingerprint (not the short key ID) because it's the unambiguous form `gpg` always accepts.
+`pass` keeps its data in `$HOME/.password-store`, so it's tied to the **`proton` user's home directory**, not to wherever you happen to be standing in the filesystem. `cd ~` makes sure you're operating in `/home/proton` before initializing, so the store is created in the right place — the same home Bridge will read from in the steps below. If `cd ~` doesn't land you in `/home/proton` (check with `echo $HOME`), your shell didn't inherit the `proton` user's home; start it as a login shell instead with `sudo -iu proton`.
+
+The `pass init` command pulls the new key's fingerprint out of `gpg`'s machine-readable output automatically, so you don't have to copy it by hand. We use the full fingerprint (not the short key ID) because it's the unambiguous form `gpg` always accepts.
 
 ### 4. Log in to Proton (one-time, interactive)
 
