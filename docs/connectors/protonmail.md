@@ -64,12 +64,38 @@ Switch into the proton shell — **everything from here on runs as `proton` and 
 sudo -u proton bash   # you are now the proton user; do NOT run sudo from here
 ```
 
-Bridge stores its encryption key in `pass`, so generate a GPG key and initialize the store:
+Bridge stores its encryption key in `pass`, which in turn is unlocked by a GPG key. You need to generate that GPG key, then point `pass` at it.
+
+Run:
 
 ```bash
 gpg --full-generate-key
+```
+
+This is interactive. Answer the prompts as follows:
+
+| Prompt | What to enter | Why |
+|--------|---------------|-----|
+| *Please select what kind of key you want* | Press **Enter** to accept the default (`RSA and RSA`) | The default is fine for this purpose. |
+| *What keysize do you want?* | Press **Enter** to accept the default (`3072`) | Default is secure. |
+| *Key is valid for?* | Type `0`, press **Enter**, then `y` to confirm | `0` means the key never expires — important, because an expired key would lock Bridge out of its own store. |
+| *Real name* | Type anything memorable, e.g. `Proton Bridge` | This is just a label; it isn't checked against your Proton account. |
+| *Email address* | Leave blank and press **Enter** (or use `proton@localhost`) | Only used to label the key. |
+| *Comment* | Leave blank and press **Enter** | Optional. |
+| *Change (N)ame, (C)omment, (E)mail or (O)kay/(Q)uit?* | Type `O` and press **Enter** | Confirms the details above. |
+| *Passphrase* | **Leave it empty** — press **Enter**, then confirm the empty passphrase | See the note below. |
+
+> **Why no passphrase?** Bridge runs unattended under systemd (step 5). If the GPG key has a passphrase, `gpg-agent` will block startup waiting for someone to type it interactively — which never happens for a background service, so Bridge fails to start. An empty passphrase is acceptable here because the key lives in a dedicated, **unprivileged** `proton` account with no password and no `sudo`, and the `pass` store only holds Bridge's own local keychain secret. If your threat model requires a passphrase, you'll need to configure `gpg-agent` caching or a systemd credential to supply it on boot — that's beyond this guide.
+>
+> On a headless server, the empty-passphrase confirmation may appear as a text-based `pinentry-curses` dialog rather than inline prompts. Use the arrow keys / **Tab** to select **OK**/**Yes** and confirm you want no passphrase. If `gpg` can't open a pinentry program at all, install one with `sudo apt install pinentry-curses` (run this as your admin user before switching to `proton`).
+
+Once the key is generated, initialize the `pass` store with its ID:
+
+```bash
 pass init "$(gpg --list-secret-keys --keyid-format LONG | awk '/^sec/{print $2}' | head -1)"
 ```
+
+The `awk` command pulls the new key's ID out of `gpg --list-secret-keys` automatically, so you don't have to copy it by hand. If you have more than one secret key in this account, `head -1` takes the first one — in a fresh `proton` account there's only the key you just created.
 
 ### 4. Log in to Proton (one-time, interactive)
 
