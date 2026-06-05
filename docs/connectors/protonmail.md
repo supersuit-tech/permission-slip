@@ -28,35 +28,52 @@ Calendar, Drive, Contacts, VPN, and Pass are **not** available through Bridge (n
 
 These steps assume a dedicated Linux user (example: `proton`) on the same host as Permission Slip.
 
-### 1. Install Bridge
+> **About `sudo` and the `proton` user.** Steps 1–3 are system-level and must run as your normal, sudo-capable admin account. Step 2 creates the `proton` user with **no password** — `useradd` leaves the account locked, and it is *not* in the `sudo`/`sudoers` group. That's intentional: it's an unprivileged service account.
+>
+> Do all `sudo apt install` (and any other `sudo`) work **before** you switch into the proton shell in step 4. Once you run `sudo -u proton bash`, every command runs *as* `proton`, so running `sudo` there will prompt for a password the account doesn't have (and would fail authorization anyway). Everything from step 4 onward is designed to run **without `sudo`**.
+
+### 1. Install Bridge and its dependencies
+
+Run these as your **admin user** (the one with `sudo`). Installing the system packages up front means you never need `sudo` once you switch to the `proton` user.
 
 On Debian/Ubuntu (x86_64):
 
 ```bash
+# Bridge's keychain backend
+sudo apt install pass gnupg
+
 # Download the official package from https://proton.me/mail/bridge
 sudo apt install ./protonmail-bridge_*.deb
 ```
 
-### 2. Create a service user
+### 2. Create the service user
+
+Still as your **admin user**:
 
 ```bash
 sudo useradd -m -s /bin/bash proton
-sudo -u proton bash
 ```
+
+This account has no password and cannot use `sudo` — that's expected. You operate it with `sudo -u proton ...` from your admin account, never by logging in as `proton`.
 
 ### 3. Initialize a `pass` password store (Bridge keychain)
 
-Bridge stores its encryption key in `pass`:
+Switch into the proton shell — **everything from here on runs as `proton` and needs no `sudo`:**
 
 ```bash
-sudo apt install pass gnupg
-gpg --full-generate-key   # as the proton user
+sudo -u proton bash   # you are now the proton user; do NOT run sudo from here
+```
+
+Bridge stores its encryption key in `pass`, so generate a GPG key and initialize the store:
+
+```bash
+gpg --full-generate-key
 pass init "$(gpg --list-secret-keys --keyid-format LONG | awk '/^sec/{print $2}' | head -1)"
 ```
 
 ### 4. Log in to Proton (one-time, interactive)
 
-Still as `proton`:
+Still in the `proton` shell (no `sudo`):
 
 ```bash
 protonmail-bridge --cli
@@ -90,6 +107,8 @@ systemctl --user status protonmail-bridge.service
 
 `enable-linger` keeps the user's systemd instance running after logout so Bridge stays up for Permission Slip.
 
+> The `systemctl --user` commands run as `proton` (no `sudo`). `loginctl enable-linger proton` enables linger for the current user and usually succeeds without `sudo` via polkit; if your system prompts for admin authentication, run it once from your **admin account** instead: `sudo loginctl enable-linger proton`.
+
 ## Configure credentials in Permission Slip
 
 Once Bridge is running, add **Proton Mail** credentials (`custom` auth) in the UI:
@@ -115,6 +134,7 @@ If you previously used the external [permission-slip-proton](https://github.com/
 | Auth / LOGIN errors | Username must match the address in Bridge; password must be the bridge password, not your Proton account password |
 | Connection refused on 1143/1025 | Another process using the port, or Bridge bound to a different interface |
 | Login loop in Bridge CLI | Clock skew, 2FA, or `pass` store not initialized |
+| `sudo` asks for a password inside the proton shell | You ran `sudo` after `sudo -u proton bash`. The `proton` account has no password and no sudo rights. `exit` back to your admin user and run system/`apt` commands there (steps 1–2); only run the non-`sudo` commands as `proton` |
 | Archive action fails | Proton's Archive folder must exist; Bridge exposes it as `"Archive"` |
 
 For general self-hosted setup (Tailscale, Google, Slack), see [Self-hosted deployment](../deployment-self-hosted.md).
