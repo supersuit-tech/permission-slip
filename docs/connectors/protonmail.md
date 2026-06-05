@@ -66,36 +66,46 @@ sudo -u proton bash   # you are now the proton user; do NOT run sudo from here
 
 Bridge stores its encryption key in `pass`, which in turn is unlocked by a GPG key. You need to generate that GPG key, then point `pass` at it.
 
-Run:
+Generate the key non-interactively with a batch parameter file:
 
 ```bash
-gpg --full-generate-key
+cat > /tmp/proton-gpg-keygen <<'EOF'
+%no-protection
+Key-Type: RSA
+Key-Length: 3072
+Subkey-Type: RSA
+Subkey-Length: 3072
+Name-Real: Proton Bridge
+Name-Email: proton@localhost
+Expire-Date: 0
+%commit
+EOF
+
+gpg --batch --generate-key /tmp/proton-gpg-keygen
+rm /tmp/proton-gpg-keygen
 ```
 
-This is interactive. Answer the prompts as follows:
+What each line does:
 
-| Prompt | What to enter | Why |
-|--------|---------------|-----|
-| *Please select what kind of key you want* | Press **Enter** to accept the default (`RSA and RSA`) | The default is fine for this purpose. |
-| *What keysize do you want?* | Press **Enter** to accept the default (`3072`) | Default is secure. |
-| *Key is valid for?* | Type `0`, press **Enter**, then `y` to confirm | `0` means the key never expires — important, because an expired key would lock Bridge out of its own store. |
-| *Real name* | Type anything memorable, e.g. `Proton Bridge` | This is just a label; it isn't checked against your Proton account. |
-| *Email address* | Leave blank and press **Enter** (or use `proton@localhost`) | Only used to label the key. |
-| *Comment* | Leave blank and press **Enter** | Optional. |
-| *Change (N)ame, (C)omment, (E)mail or (O)kay/(Q)uit?* | Type `O` and press **Enter** | Confirms the details above. |
-| *Passphrase* | **Leave it empty** — press **Enter**, then confirm the empty passphrase | See the note below. |
+| Line | Meaning |
+|------|---------|
+| `%no-protection` | Creates the key **without a passphrase**. This is the important one — see the note below. |
+| `Key-Type` / `Key-Length` | A 3072-bit RSA primary key (GnuPG's secure default). |
+| `Subkey-Type` / `Subkey-Length` | A matching RSA encryption subkey — `pass` needs an encryption-capable key. |
+| `Name-Real` / `Name-Email` | Just a label for the key; not checked against your Proton account. Use anything. |
+| `Expire-Date: 0` | The key never expires. Important — an expired key would lock Bridge out of its own store. |
 
 > **Why no passphrase?** Bridge runs unattended under systemd (step 5). If the GPG key has a passphrase, `gpg-agent` will block startup waiting for someone to type it interactively — which never happens for a background service, so Bridge fails to start. An empty passphrase is acceptable here because the key lives in a dedicated, **unprivileged** `proton` account with no password and no `sudo`, and the `pass` store only holds Bridge's own local keychain secret. If your threat model requires a passphrase, you'll need to configure `gpg-agent` caching or a systemd credential to supply it on boot — that's beyond this guide.
 >
-> On a headless server, the empty-passphrase confirmation may appear as a text-based `pinentry-curses` dialog rather than inline prompts. Use the arrow keys / **Tab** to select **OK**/**Yes** and confirm you want no passphrase. If `gpg` can't open a pinentry program at all, install one with `sudo apt install pinentry-curses` (run this as your admin user before switching to `proton`).
+> Avoid the interactive `gpg --full-generate-key` for this: modern GnuPG routes the passphrase prompt through `pinentry`, which on a headless server often loops back instead of accepting an empty passphrase cleanly. The `--batch` file above sidesteps `pinentry` entirely, so there's no screen to fight with.
 
-Once the key is generated, initialize the `pass` store with its ID:
+Once the key is generated, initialize the `pass` store with its fingerprint:
 
 ```bash
-pass init "$(gpg --list-secret-keys --keyid-format LONG | awk '/^sec/{print $2}' | head -1)"
+pass init "$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/{print $10; exit}')"
 ```
 
-The `awk` command pulls the new key's ID out of `gpg --list-secret-keys` automatically, so you don't have to copy it by hand. If you have more than one secret key in this account, `head -1` takes the first one — in a fresh `proton` account there's only the key you just created.
+The command pulls the new key's fingerprint out of `gpg`'s machine-readable output automatically, so you don't have to copy it by hand. We use the full fingerprint (not the short key ID) because it's the unambiguous form `gpg` always accepts.
 
 ### 4. Log in to Proton (one-time, interactive)
 
