@@ -288,7 +288,7 @@ func handleAgentBulkRequestApproval(deps *Deps) http.HandlerFunc {
 		}
 
 		if err := db.TouchAgentLastActive(r.Context(), deps.DB, agent.AgentID); err != nil {
-			log.Printf("[%s] BulkRequest: touch last_active: %v", TraceID(r.Context()), agent.AgentID, err)
+			log.Printf("[%s] BulkRequest: touch last_active for agent %d: %v", TraceID(r.Context()), agent.AgentID, err)
 		}
 
 		if anyPending {
