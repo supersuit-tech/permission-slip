@@ -311,7 +311,7 @@ func handleDenyApproval(deps *Deps) http.HandlerFunc {
 		}
 
 		var req denyApprovalRequest
-		if r.ContentLength > 0 {
+		if ct := r.Header.Get("Content-Type"); strings.HasPrefix(ct, "application/json") {
 			if !DecodeJSONOrReject(w, r, &req) {
 				return
 			}
