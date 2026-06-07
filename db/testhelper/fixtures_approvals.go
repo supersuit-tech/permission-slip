@@ -29,7 +29,9 @@ func InsertApprovalWithStatus(t *testing.T, d db.DBTX, approvalID string, agentI
 // The agent and approver must already exist via InsertUser and InsertAgent.
 func InsertApprovalWithCreatedAt(t *testing.T, d db.DBTX, approvalID string, agentID int64, approverID string, createdAt time.Time) {
 	t.Helper()
-	expiresAt := createdAt.Add(time.Hour)
+	// expires_at must stay in the future for pending-list queries even when
+	// created_at is set to an arbitrary historical timestamp in tests.
+	expiresAt := time.Now().UTC().Add(24 * time.Hour)
 	mustExec(t, d,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, expires_at, created_at)
 		 VALUES ($1, $2, $3, '{"type":"test"}', '{"description":"test"}', 'pending', $4, $5)`,
