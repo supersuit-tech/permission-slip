@@ -345,6 +345,8 @@ components:
       $ref: './components/schemas/approvals.yaml#/ApprovalRequestResponse'
     CancelApprovalRequest:
       $ref: './components/schemas/approvals.yaml#/CancelApprovalRequest'
+    DenyApprovalRequest:
+      $ref: './components/schemas/approvals.yaml#/DenyApprovalRequest'
     CancelApprovalResponse:
       $ref: './components/schemas/approvals.yaml#/CancelApprovalResponse'
     ApprovalSummary:

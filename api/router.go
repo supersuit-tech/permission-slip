@@ -15,28 +15,29 @@ import (
 
 // Deps holds shared dependencies for API route handlers.
 type Deps struct {
-	DB                   db.DBTX                 // nil when running without a database
-	Vault                vault.VaultStore        // credential secret encryption; nil returns 503 on credential endpoints
-	JWTSigningSecret     string                  // HMAC-SHA256 secret for HS256 access JWTs (min 32 bytes; set JWT_SIGNING_SECRET)
-	BaseURL              string                  // Public base URL (e.g. "https://your-server.example.com"); used to construct invite URLs
-	InviteHMACKey        string                  // HMAC key for hashing short codes (invite codes, confirmation codes); if empty, falls back to plain SHA-256
-	Notifier             *notify.Dispatcher      // notification fan-out; nil means notifications are disabled
-	Stripe               *pstripe.Client         // Stripe API for saved payment methods; nil when STRIPE_SECRET_KEY is unset
-	Connectors           *connectors.Registry    // connector execution registry; nil means no connectors are available
-	OAuthProviders       *oauth.Registry         // OAuth provider registry; nil means OAuth is not available
-	OAuthRedirectBaseURL string                  // Public base URL for OAuth callbacks; falls back to BaseURL
-	OAuthStateSecret     string                  // HMAC-SHA256 secret for signing OAuth CSRF state tokens; if empty, falls back to JWTSigningSecret
-	DevMode              bool                    // true when MODE=development; disables rate limiting
-	RateLimiter          *RateLimiter            // pre-auth rate limiter (per-IP + global); nil disables
-	AuthRateLimiter      *RateLimiter            // rate limiter for /api/auth/* (signup/login); nil disables
-	AgentRateLimiter     *RateLimiter            // post-auth rate limiter (per verified agent); nil disables
-	VerifyRateLimiter    *RateLimiter            // per-IP rate limiter for POST /agents/{id}/verify; nil disables
-	TrustedProxyHeader   string                  // header to read client IP from behind a reverse proxy (e.g. "Fly-Client-IP"); empty uses RemoteAddr
-	AllowedOrigins       []string                // allowed CORS origins; empty means cross-origin requests are blocked
-	Logger               *slog.Logger            // structured logger for request logging; if nil, request logging is skipped
-	ApprovalEvents       *ApprovalEventBroker    // SSE broker for real-time approval notifications; nil disables SSE
-	SlackSigningSecret   string                  // Slack signing secret for verifying Events API webhook signatures; empty disables Slack events
-	EventBroker          *connectors.EventBroker // connector event dispatch; nil means inbound events are accepted but not processed
+	DB                     db.DBTX                 // nil when running without a database
+	Vault                  vault.VaultStore        // credential secret encryption; nil returns 503 on credential endpoints
+	JWTSigningSecret       string                  // HMAC-SHA256 secret for HS256 access JWTs (min 32 bytes; set JWT_SIGNING_SECRET)
+	BaseURL                string                  // Public base URL (e.g. "https://your-server.example.com"); used to construct invite URLs
+	InviteHMACKey          string                  // HMAC key for hashing short codes (invite codes, confirmation codes); if empty, falls back to plain SHA-256
+	Notifier               *notify.Dispatcher      // notification fan-out; nil means notifications are disabled
+	Stripe                 *pstripe.Client         // Stripe API for saved payment methods; nil when STRIPE_SECRET_KEY is unset
+	Connectors             *connectors.Registry    // connector execution registry; nil means no connectors are available
+	OAuthProviders         *oauth.Registry         // OAuth provider registry; nil means OAuth is not available
+	OAuthRedirectBaseURL   string                  // Public base URL for OAuth callbacks; falls back to BaseURL
+	OAuthStateSecret       string                  // HMAC-SHA256 secret for signing OAuth CSRF state tokens; if empty, falls back to JWTSigningSecret
+	DevMode                bool                    // true when MODE=development; disables rate limiting
+	RateLimiter            *RateLimiter            // pre-auth rate limiter (per-IP + global); nil disables
+	AuthRateLimiter        *RateLimiter            // rate limiter for /api/auth/* (signup/login); nil disables
+	AgentRateLimiter       *RateLimiter            // post-auth rate limiter (per verified agent); nil disables
+	VerifyRateLimiter      *RateLimiter            // per-IP rate limiter for POST /agents/{id}/verify; nil disables
+	TrustedProxyHeader     string                  // header to read client IP from behind a reverse proxy (e.g. "Fly-Client-IP"); empty uses RemoteAddr
+	AllowedOrigins         []string                // allowed CORS origins; empty means cross-origin requests are blocked
+	Logger                 *slog.Logger            // structured logger for request logging; if nil, request logging is skipped
+	ApprovalEvents         *ApprovalEventBroker    // SSE broker for real-time approval notifications; nil disables SSE
+	ApprovalDenialCooldown time.Duration           // window for short-circuiting re-requests of recently denied actions; zero uses db.DefaultDenialCooldown
+	SlackSigningSecret     string                  // Slack signing secret for verifying Events API webhook signatures; empty disables Slack events
+	EventBroker            *connectors.EventBroker // connector event dispatch; nil means inbound events are accepted but not processed
 }
 
 // NewRouter returns an http.Handler that serves all /api/v1/ routes.

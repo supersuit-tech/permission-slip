@@ -34,6 +34,8 @@ const (
 	ErrRegistrationExpired          ErrorCode = "registration_expired"
 	ErrVerificationLocked           ErrorCode = "verification_locked"
 	ErrApprovalExpired              ErrorCode = "approval_expired"
+	ErrApprovalCancelled            ErrorCode = "approval_cancelled"
+	ErrApprovalRecentlyDenied       ErrorCode = "approval_recently_denied"
 	ErrRateLimited                  ErrorCode = "rate_limited"
 	ErrInternalError                ErrorCode = "internal_error"
 	ErrInternalPanic                ErrorCode = "internal_panic"

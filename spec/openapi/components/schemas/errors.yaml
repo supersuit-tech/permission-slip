@@ -33,6 +33,8 @@ Error:
         # 403 Forbidden
         - agent_not_authorized
         - approval_denied
+        - approval_cancelled
+        - approval_recently_denied
         - token_already_used
         - insufficient_scope
         - invalid_parameters
@@ -56,6 +58,8 @@ Error:
         - agent_already_registered
         - duplicate_request_id
         - approval_already_resolved
+        - approval_cancelled
+        - approval_recently_denied
         - duplicate_credential
         # 410 Gone
         - registration_expired

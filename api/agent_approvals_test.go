@@ -64,6 +64,12 @@ func TestAgentRequestApproval_Success(t *testing.T) {
 	if resp.Status != "pending" {
 		t.Errorf("expected status 'pending', got %q", resp.Status)
 	}
+	if resp.Terminal {
+		t.Error("expected terminal=false for pending approval")
+	}
+	if resp.Retryable {
+		t.Error("expected retryable=false for pending approval")
+	}
 	if resp.ExpiresAt.IsZero() {
 		t.Error("expected expires_at to be set")
 	}
@@ -727,6 +733,12 @@ func TestAgentApprovalStatus_Pending(t *testing.T) {
 	if statusResp.Status != "pending" {
 		t.Errorf("expected status 'pending', got %q", statusResp.Status)
 	}
+	if statusResp.Terminal {
+		t.Error("expected terminal=false for pending status")
+	}
+	if statusResp.Retryable {
+		t.Error("expected retryable=false for pending status")
+	}
 	if statusResp.ExecutionStatus != nil {
 		t.Errorf("expected nil execution_status for pending approval, got %v", *statusResp.ExecutionStatus)
 	}
@@ -776,6 +788,12 @@ func TestAgentApprovalStatus_ApprovedWithExecution(t *testing.T) {
 	if statusResp.Status != "approved" {
 		t.Errorf("expected status 'approved', got %q", statusResp.Status)
 	}
+	if !statusResp.Terminal {
+		t.Error("expected terminal=true for approved status")
+	}
+	if statusResp.Retryable {
+		t.Error("expected retryable=false for approved status")
+	}
 	if statusResp.ExecutionStatus == nil || *statusResp.ExecutionStatus != "success" {
 		t.Errorf("expected execution_status 'success', got %v", statusResp.ExecutionStatus)
 	}
@@ -821,7 +839,7 @@ func TestAgentApprovalStatus_Denied(t *testing.T) {
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
 	approvalID := "appr_status_denied"
-	testhelper.InsertApprovalWithStatus(t, tx, approvalID, agentID, uid, "denied")
+	testhelper.InsertResolvedApproval(t, tx, approvalID, agentID, uid, "denied")
 
 	deps := testDepsForDB(t, tx)
 	router := NewRouter(deps)
@@ -830,22 +848,207 @@ func TestAgentApprovalStatus_Denied(t *testing.T) {
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusOK {
-		t.Fatalf("status: expected 200, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusConflict {
+		t.Fatalf("status: expected 409, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var statusResp agentApprovalStatusResponse
-	if err := json.Unmarshal(w.Body.Bytes(), &statusResp); err != nil {
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if statusResp.Status != "denied" {
-		t.Errorf("expected status 'denied', got %q", statusResp.Status)
+	if errResp.Error.Code != ErrApprovalDenied {
+		t.Errorf("expected error code %q, got %q", ErrApprovalDenied, errResp.Error.Code)
 	}
-	if statusResp.ExecutionStatus != nil {
-		t.Errorf("expected nil execution_status for denied approval, got %v", *statusResp.ExecutionStatus)
+	if errResp.Error.Retryable {
+		t.Error("expected retryable=false for denied approval")
 	}
-	if statusResp.ExecutionResult != nil {
-		t.Error("expected nil execution_result for denied approval")
+	if errResp.Error.Details["status"] != "denied" {
+		t.Errorf("expected details.status denied, got %v", errResp.Error.Details["status"])
+	}
+}
+
+func TestAgentApprovalStatus_DeniedWithReason(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	approvalID := "appr_status_denied_reason"
+	action := []byte(`{"type":"email.send","parameters":{"to":"alice@example.com"}}`)
+	fingerprint := db.ComputeActionFingerprint(agentID, uid, action)
+	_, err = tx.Exec(context.Background(),
+		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, status, action_fingerprint, expires_at, denied_at, denial_reason)
+		 VALUES ($1, $2, $3, $4, '{"description":"test"}', 'denied', $5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), $6)`,
+		approvalID, agentID, uid, action, fingerprint, "Recipient not authorized",
+	)
+	if err != nil {
+		t.Fatalf("insert denied approval: %v", err)
+	}
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	r := signedJSONRequest(t, http.MethodGet, "/approvals/"+approvalID+"/status", "", privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("status: expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if errResp.Error.Details["reason"] != "Recipient not authorized" {
+		t.Errorf("expected denial reason in details, got %v", errResp.Error.Details["reason"])
+	}
+}
+
+func TestAgentApprovalStatus_Expired(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	approvalID := "appr_status_expired"
+	testhelper.InsertApprovalWithExpiresAt(t, tx, approvalID, agentID, uid, time.Now().Add(-time.Hour))
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	r := signedJSONRequest(t, http.MethodGet, "/approvals/"+approvalID+"/status", "", privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusGone {
+		t.Fatalf("status: expected 410, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if errResp.Error.Code != ErrApprovalExpired {
+		t.Errorf("expected error code %q, got %q", ErrApprovalExpired, errResp.Error.Code)
+	}
+}
+
+func TestAgentApprovalStatus_Cancelled(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	approvalID := "appr_status_cancelled"
+	testhelper.InsertResolvedApproval(t, tx, approvalID, agentID, uid, "cancelled")
+
+	deps := testDepsForDB(t, tx)
+	router := NewRouter(deps)
+
+	r := signedJSONRequest(t, http.MethodGet, "/approvals/"+approvalID+"/status", "", privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusConflict {
+		t.Fatalf("status: expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if errResp.Error.Code != ErrApprovalCancelled {
+		t.Errorf("expected error code %q, got %q", ErrApprovalCancelled, errResp.Error.Code)
+	}
+}
+
+func TestAgentRequestApproval_RecentlyDeniedShortCircuited(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	deps := &Deps{
+		DB:                     tx,
+		JWTSigningSecret:       testJWTSecret,
+		ApprovalDenialCooldown: time.Hour,
+	}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"req_dedup_1","action":{"type":"email.send","parameters":{"to":"alice@example.com"}},"context":{"description":"Send email"}}`
+	r1 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, r1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("request: expected 200, got %d: %s", w1.Code, w1.Body.String())
+	}
+	var createResp agentRequestApprovalResponse
+	if err := json.Unmarshal(w1.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal create response: %v", err)
+	}
+
+	denyBody := `{"reason":"Not authorized"}`
+	rDeny := authenticatedJSONRequest(t, http.MethodPost, "/approvals/"+createResp.ApprovalID+"/deny", uid, denyBody)
+	wDeny := httptest.NewRecorder()
+	router.ServeHTTP(wDeny, rDeny)
+	if wDeny.Code != http.StatusOK {
+		t.Fatalf("deny: expected 200, got %d: %s", wDeny.Code, wDeny.Body.String())
+	}
+
+	reqBody2 := `{"request_id":"req_dedup_2","action":{"type":"email.send","parameters":{"to":"alice@example.com"}},"context":{"description":"Send email"}}`
+	r2 := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody2, privKey, agentID)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, r2)
+
+	if w2.Code != http.StatusConflict {
+		t.Fatalf("re-request: expected 409, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	var errResp ErrorResponse
+	if err := json.Unmarshal(w2.Body.Bytes(), &errResp); err != nil {
+		t.Fatalf("unmarshal error response: %v", err)
+	}
+	if errResp.Error.Code != ErrApprovalRecentlyDenied {
+		t.Errorf("expected error code %q, got %q", ErrApprovalRecentlyDenied, errResp.Error.Code)
+	}
+	if errResp.Error.Details["approval_id"] != createResp.ApprovalID {
+		t.Errorf("expected original approval_id in details, got %v", errResp.Error.Details["approval_id"])
+	}
+
+	var pendingCount int
+	if err := tx.QueryRow(context.Background(),
+		`SELECT COUNT(*) FROM approvals WHERE agent_id = $1 AND status = 'pending'`,
+		agentID,
+	).Scan(&pendingCount); err != nil {
+		t.Fatalf("count pending approvals: %v", err)
+	}
+	if pendingCount != 0 {
+		t.Errorf("expected 0 pending approvals after dedup short-circuit, got %d", pendingCount)
 	}
 }
 

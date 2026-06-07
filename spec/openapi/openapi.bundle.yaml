@@ -2800,19 +2800,36 @@ paths:
                         approver: alice
                       trace_id: trace_xyz789
         '409':
-          description: Duplicate request ID
+          description: Duplicate request ID or recently denied action
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: duplicate_request_id
-                  message: Request ID already used
-                  retryable: false
-                  details:
-                    request_id: a925fbe0-db83-4969-9dc5-27f40385f12c
-                  trace_id: trace_xyz789
+              examples:
+                duplicate_request_id:
+                  summary: Duplicate request ID
+                  value:
+                    error:
+                      code: duplicate_request_id
+                      message: Request ID already used
+                      retryable: false
+                      details:
+                        request_id: a925fbe0-db83-4969-9dc5-27f40385f12c
+                      trace_id: trace_xyz789
+                recently_denied:
+                  summary: Recently denied action (dedup short-circuit)
+                  value:
+                    error:
+                      code: approval_recently_denied
+                      message: This action was recently denied; do not retry without user intervention
+                      retryable: false
+                      details:
+                        approval_id: appr_xyz789
+                        status: denied
+                        terminal: true
+                        retryable: false
+                        reason: Recipient not on approved contacts list.
+                      trace_id: trace_xyz789
         '429':
           $ref: '#/components/responses/TooManyRequests'
         '500':
@@ -3401,6 +3418,9 @@ paths:
         authenticated user (as approver) and must be in `pending` status and
         not expired.
 
+        An optional `reason` may be supplied so the agent receives human-readable
+        feedback instead of blindly retrying the same action.
+
         This is a dashboard endpoint for human approvers.
       tags:
         - Approvals
@@ -3408,6 +3428,14 @@ paths:
         - SupabaseSession: []
       parameters:
         - $ref: '#/components/parameters/ApprovalId'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DenyApprovalRequest'
+            example:
+              reason: Recipient not on approved contacts list.
       responses:
         '200':
           description: Approval denied successfully
@@ -3487,11 +3515,25 @@ paths:
         - `pending` → `approved` (with execution result) or `denied` or `cancelled`
         - Once resolved, the status is final and will not change
 
+        ## Terminal States (Non-200 Responses)
+
+        Terminal-negative states return explicit HTTP error codes so agents cannot
+        mistake them for "still pending":
+
+        - `denied` → `409 Conflict` with error code `approval_denied`, `retryable: false`
+        - `expired` → `410 Gone` with error code `approval_expired`, `retryable: false`
+        - `cancelled` → `409 Conflict` with error code `approval_cancelled`, `retryable: false`
+
+        Successful responses (`pending`, `approved`) return `200 OK` and include
+        `terminal` and `retryable` boolean fields. Agents MUST respect these flags
+        and MUST NOT re-submit actions that received a terminal-negative response.
+
         ## Recommended Polling Strategy
 
         - Poll every 1–2 seconds for the first 30 seconds
         - Then every 5 seconds until expiration
-        - Stop polling when status is no longer `pending` or when `expires_at` has passed
+        - Stop polling when status is no longer `pending`, when `terminal` is `true`,
+          when a non-200 response is received, or when `expires_at` has passed
         - Prefer SSE (`GET /v1/approvals/events`) for real-time notifications when possible
 
         ## Security
@@ -3517,12 +3559,16 @@ paths:
                   value:
                     approval_id: appr_xyz789
                     status: pending
+                    terminal: false
+                    retryable: false
                     expires_at: '2026-02-21T10:35:00Z'
                 approved_with_result:
                   summary: Approved and executed successfully
                   value:
                     approval_id: appr_xyz789
                     status: approved
+                    terminal: true
+                    retryable: false
                     approved_at: '2026-02-21T10:30:00Z'
                     expires_at: '2026-02-21T10:35:00Z'
                     execution_status: success
@@ -3535,16 +3581,11 @@ paths:
                   value:
                     approval_id: appr_xyz789
                     status: approved
+                    terminal: true
+                    retryable: false
                     approved_at: '2026-02-21T10:30:00Z'
                     expires_at: '2026-02-21T10:35:00Z'
                     execution_status: pending
-                denied:
-                  summary: Approval denied
-                  value:
-                    approval_id: appr_xyz789
-                    status: denied
-                    denied_at: '2026-02-21T10:30:00Z'
-                    expires_at: '2026-02-21T10:35:00Z'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -3562,6 +3603,60 @@ paths:
                   retryable: false
                   details:
                     approval_id: appr_xyz789
+                  trace_id: trace_xyz789
+        '409':
+          description: Approval denied or cancelled (terminal, non-retryable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                denied:
+                  summary: Approval denied by approver
+                  value:
+                    error:
+                      code: approval_denied
+                      message: Approval was denied by the approver
+                      retryable: false
+                      details:
+                        approval_id: appr_xyz789
+                        status: denied
+                        terminal: true
+                        retryable: false
+                        reason: Recipient not on approved contacts list.
+                        denied_at: '2026-02-21T10:30:00Z'
+                      trace_id: trace_xyz789
+                cancelled:
+                  summary: Approval cancelled by agent
+                  value:
+                    error:
+                      code: approval_cancelled
+                      message: Approval was cancelled
+                      retryable: false
+                      details:
+                        approval_id: appr_xyz789
+                        status: cancelled
+                        terminal: true
+                        retryable: false
+                        cancelled_at: '2026-02-21T10:29:00Z'
+                      trace_id: trace_xyz789
+        '410':
+          description: Approval expired (terminal, non-retryable)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                error:
+                  code: approval_expired
+                  message: Approval has expired
+                  retryable: false
+                  details:
+                    approval_id: appr_xyz789
+                    status: expired
+                    terminal: true
+                    retryable: false
+                    expires_at: '2026-02-21T10:25:00Z'
                   trace_id: trace_xyz789
         '429':
           $ref: '#/components/responses/TooManyRequests'
@@ -6472,6 +6567,8 @@ components:
         result, or listen via `GET /v1/approvals/events` (SSE).
       required:
         - status
+        - terminal
+        - retryable
       properties:
         approval_id:
           type: string
@@ -6499,6 +6596,18 @@ components:
             `pending` — approval created, awaiting human review.
             `approved` — auto-approved via standing approval, result is inline.
           example: pending
+        terminal:
+          type: boolean
+          description: |
+            `true` when the approval lifecycle is complete (`approved`).
+            `false` while awaiting human review (`pending`).
+          example: false
+        retryable:
+          type: boolean
+          description: |
+            Whether the agent should retry the request. Always `false` for approval
+            request responses — agents must not blindly re-submit denied actions.
+          example: false
         expires_at:
           type: string
           format: date-time
@@ -6524,6 +6633,8 @@ components:
         approval_id: appr_xyz789
         approval_url: http://localhost:8080/permission-slip/approve/appr_xyz789
         status: pending
+        terminal: false
+        retryable: false
         expires_at: '2026-02-11T13:25:00Z'
     CancelApprovalRequest:
       type: object
@@ -6539,6 +6650,16 @@ components:
           example: 21d9ec79-6b20-45b9-8695-83537318966d
       example:
         request_id: 21d9ec79-6b20-45b9-8695-83537318966d
+    DenyApprovalRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          maxLength: 500
+          description: |
+            Optional human-readable explanation for the denial. Returned to the
+            agent via the status endpoint so it can adapt rather than retry blindly.
+          example: This recipient is not on the approved contacts list.
     CancelApprovalResponse:
       type: object
       required:
@@ -6738,6 +6859,12 @@ components:
           format: date-time
           description: When the approval was denied
           example: '2026-02-21T10:30:00Z'
+        reason:
+          type: string
+          maxLength: 500
+          description: |
+            Optional human-readable explanation provided by the approver when denying.
+          example: Recipient not on approved contacts list.
     ApprovalStatusResponse:
       type: object
       description: |
@@ -6747,6 +6874,8 @@ components:
       required:
         - approval_id
         - status
+        - terminal
+        - retryable
       properties:
         approval_id:
           type: string
@@ -6762,6 +6891,28 @@ components:
             - expired
           description: Current status of the approval request. Pending approvals past their expiration time are returned as "expired".
           example: approved
+        terminal:
+          type: boolean
+          description: |
+            `true` when the approval lifecycle is complete and will not change
+            (`approved`, `denied`, `cancelled`, `expired`). `false` while still
+            `pending`.
+          example: true
+        retryable:
+          type: boolean
+          description: |
+            Whether the agent should retry the request. Always `false` for approval
+            status responses — terminal-negative states return non-200 HTTP codes.
+          example: false
+        reason:
+          type: string
+          maxLength: 500
+          description: |
+            Optional human-readable explanation when the approver denied the
+            request. Present on successful (200) responses only when the approver
+            supplied a reason; terminal error responses include `reason` in
+            `error.details` instead.
+          example: Recipient not on approved contacts list.
         approved_at:
           type: string
           format: date-time
@@ -10432,6 +10583,8 @@ components:
             - oauth_refresh_failed
             - agent_not_authorized
             - approval_denied
+            - approval_cancelled
+            - approval_recently_denied
             - token_already_used
             - insufficient_scope
             - invalid_parameters
@@ -10451,6 +10604,8 @@ components:
             - agent_already_registered
             - duplicate_request_id
             - approval_already_resolved
+            - approval_cancelled
+            - approval_recently_denied
             - duplicate_credential
             - registration_expired
             - verification_locked

@@ -48,13 +48,14 @@ func ApprovalTTLFromEnv(logger *slog.Logger) time.Duration {
 
 // InsertApprovalParams holds the parameters for creating a new approval.
 type InsertApprovalParams struct {
-	ApprovalID      string
-	AgentID         int64
-	ApproverID      string
-	Action          []byte // raw JSONB
-	Context         []byte // raw JSONB
-	ResourceDetails []byte // raw JSONB — human-readable resource metadata (optional)
-	ExpiresAt       time.Time
+	ApprovalID        string
+	AgentID           int64
+	ApproverID        string
+	Action            []byte // raw JSONB
+	Context           []byte // raw JSONB
+	ResourceDetails   []byte // raw JSONB — human-readable resource metadata (optional)
+	ActionFingerprint string
+	ExpiresAt         time.Time
 }
 
 // InsertApproval creates a new pending approval row. It also inserts the
@@ -85,10 +86,10 @@ func InsertApproval(ctx context.Context, d DBTX, p InsertApprovalParams, request
 	}
 
 	row := tx.QueryRow(ctx,
-		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, resource_details, status, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, 'pending', $7)
+		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, resource_details, action_fingerprint, status, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), 'pending', $8)
 		 RETURNING `+approvalColumns,
-		p.ApprovalID, p.AgentID, p.ApproverID, p.Action, p.Context, p.ResourceDetails, TimestampForSQLite(p.ExpiresAt),
+		p.ApprovalID, p.AgentID, p.ApproverID, p.Action, p.Context, p.ResourceDetails, p.ActionFingerprint, TimestampForSQLite(p.ExpiresAt),
 	)
 	appr, err := scanApproval(row)
 	if err != nil {

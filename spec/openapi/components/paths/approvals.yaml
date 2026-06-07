@@ -261,19 +261,36 @@ request:
                     trace_id: "trace_xyz789"
       
       '409':
-        description: Duplicate request ID
+        description: Duplicate request ID or recently denied action
         content:
           application/json:
             schema:
               $ref: '../schemas/errors.yaml#/ErrorResponse'
-            example:
-              error:
-                code: "duplicate_request_id"
-                message: "Request ID already used"
-                retryable: false
-                details:
-                  request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
-                trace_id: "trace_xyz789"
+            examples:
+              duplicate_request_id:
+                summary: Duplicate request ID
+                value:
+                  error:
+                    code: "duplicate_request_id"
+                    message: "Request ID already used"
+                    retryable: false
+                    details:
+                      request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
+                    trace_id: "trace_xyz789"
+              recently_denied:
+                summary: Recently denied action (dedup short-circuit)
+                value:
+                  error:
+                    code: "approval_recently_denied"
+                    message: "This action was recently denied; do not retry without user intervention"
+                    retryable: false
+                    details:
+                      approval_id: "appr_xyz789"
+                      status: "denied"
+                      terminal: true
+                      retryable: false
+                      reason: "Recipient not on approved contacts list."
+                    trace_id: "trace_xyz789"
       
       '429':
         $ref: '../responses/errors.yaml#/TooManyRequests'
@@ -933,11 +950,25 @@ approvalStatus:
       - `pending` → `approved` (with execution result) or `denied` or `cancelled`
       - Once resolved, the status is final and will not change
 
+      ## Terminal States (Non-200 Responses)
+
+      Terminal-negative states return explicit HTTP error codes so agents cannot
+      mistake them for "still pending":
+
+      - `denied` → `409 Conflict` with error code `approval_denied`, `retryable: false`
+      - `expired` → `410 Gone` with error code `approval_expired`, `retryable: false`
+      - `cancelled` → `409 Conflict` with error code `approval_cancelled`, `retryable: false`
+
+      Successful responses (`pending`, `approved`) return `200 OK` and include
+      `terminal` and `retryable` boolean fields. Agents MUST respect these flags
+      and MUST NOT re-submit actions that received a terminal-negative response.
+
       ## Recommended Polling Strategy
 
       - Poll every 1–2 seconds for the first 30 seconds
       - Then every 5 seconds until expiration
-      - Stop polling when status is no longer `pending` or when `expires_at` has passed
+      - Stop polling when status is no longer `pending`, when `terminal` is `true`,
+        when a non-200 response is received, or when `expires_at` has passed
       - Prefer SSE (`GET /v1/approvals/events`) for real-time notifications when possible
 
       ## Security
@@ -967,12 +998,16 @@ approvalStatus:
                 value:
                   approval_id: "appr_xyz789"
                   status: "pending"
+                  terminal: false
+                  retryable: false
                   expires_at: "2026-02-21T10:35:00Z"
               approved_with_result:
                 summary: Approved and executed successfully
                 value:
                   approval_id: "appr_xyz789"
                   status: "approved"
+                  terminal: true
+                  retryable: false
                   approved_at: "2026-02-21T10:30:00Z"
                   expires_at: "2026-02-21T10:35:00Z"
                   execution_status: "success"
@@ -985,16 +1020,67 @@ approvalStatus:
                 value:
                   approval_id: "appr_xyz789"
                   status: "approved"
+                  terminal: true
+                  retryable: false
                   approved_at: "2026-02-21T10:30:00Z"
                   expires_at: "2026-02-21T10:35:00Z"
                   execution_status: "pending"
+
+      '409':
+        description: Approval denied or cancelled (terminal, non-retryable)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            examples:
               denied:
-                summary: Approval denied
+                summary: Approval denied by approver
                 value:
+                  error:
+                    code: "approval_denied"
+                    message: "Approval was denied by the approver"
+                    retryable: false
+                    details:
+                      approval_id: "appr_xyz789"
+                      status: "denied"
+                      terminal: true
+                      retryable: false
+                      reason: "Recipient not on approved contacts list."
+                      denied_at: "2026-02-21T10:30:00Z"
+                    trace_id: "trace_xyz789"
+              cancelled:
+                summary: Approval cancelled by agent
+                value:
+                  error:
+                    code: "approval_cancelled"
+                    message: "Approval was cancelled"
+                    retryable: false
+                    details:
+                      approval_id: "appr_xyz789"
+                      status: "cancelled"
+                      terminal: true
+                      retryable: false
+                      cancelled_at: "2026-02-21T10:29:00Z"
+                    trace_id: "trace_xyz789"
+
+      '410':
+        description: Approval expired (terminal, non-retryable)
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/errors.yaml#/ErrorResponse'
+            example:
+              error:
+                code: "approval_expired"
+                message: "Approval has expired"
+                retryable: false
+                details:
                   approval_id: "appr_xyz789"
-                  status: "denied"
-                  denied_at: "2026-02-21T10:30:00Z"
-                  expires_at: "2026-02-21T10:35:00Z"
+                  status: "expired"
+                  terminal: true
+                  retryable: false
+                  expires_at: "2026-02-21T10:25:00Z"
+                trace_id: "trace_xyz789"
 
       '401':
         $ref: '../responses/errors.yaml#/Unauthorized'
@@ -1034,6 +1120,9 @@ denyApproval:
       authenticated user (as approver) and must be in `pending` status and
       not expired.
 
+      An optional `reason` may be supplied so the agent receives human-readable
+      feedback instead of blindly retrying the same action.
+
       This is a dashboard endpoint for human approvers.
 
     tags:
@@ -1044,6 +1133,15 @@ denyApproval:
 
     parameters:
       - $ref: '../parameters/common.yaml#/ApprovalId'
+
+    requestBody:
+      required: false
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/approvals.yaml#/DenyApprovalRequest'
+          example:
+            reason: "Recipient not on approved contacts list."
 
     responses:
       '200':

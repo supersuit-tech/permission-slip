@@ -11,28 +11,31 @@ import (
 
 // Approval represents a row from the approvals table.
 type Approval struct {
-	ApprovalID      string
-	AgentID         int64
-	ApproverID      string
-	Action          []byte // raw JSONB
-	Context         []byte // raw JSONB
-	Status          string
-	ExecutionStatus *string
-	ExecutionResult []byte // raw JSONB
-	ExecutedAt      *time.Time
-	ResourceDetails []byte // raw JSONB — human-readable resource metadata
-	ExpiresAt       time.Time
-	ApprovedAt      *time.Time
-	DeniedAt        *time.Time
-	CancelledAt     *time.Time
-	CreatedAt       time.Time
+	ApprovalID        string
+	AgentID           int64
+	ApproverID        string
+	Action            []byte // raw JSONB
+	Context           []byte // raw JSONB
+	Status            string
+	ExecutionStatus   *string
+	ExecutionResult   []byte // raw JSONB
+	ExecutedAt        *time.Time
+	ResourceDetails   []byte // raw JSONB — human-readable resource metadata
+	ExpiresAt         time.Time
+	ApprovedAt        *time.Time
+	DeniedAt          *time.Time
+	CancelledAt       *time.Time
+	DenialReason      *string
+	ActionFingerprint string
+	CreatedAt         time.Time
 }
 
 // approvalColumns is the canonical column list for SELECT on the approvals table.
 // Keep in sync with scanApproval.
 const approvalColumns = `approval_id, agent_id, approver_id, action, context,
 	status, execution_status, execution_result, executed_at, resource_details,
-	expires_at, approved_at, denied_at, cancelled_at, created_at`
+	expires_at, approved_at, denied_at, cancelled_at, denial_reason,
+	action_fingerprint, created_at`
 
 // ApprovalCursor identifies the position of the last item on a page,
 // using both created_at and approval_id as a compound key to avoid
@@ -52,10 +55,11 @@ type ApprovalPage struct {
 func scanApproval(row rowScanner) (*Approval, error) {
 	var a Approval
 	var executedAt, expiresAt, approvedAt, deniedAt, cancelledAt, createdAt sql.NullString
+	var denialReason, actionFingerprint sql.NullString
 	err := row.Scan(
 		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
 		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &executedAt, &a.ResourceDetails,
-		&expiresAt, &approvedAt, &deniedAt, &cancelledAt, &createdAt,
+		&expiresAt, &approvedAt, &deniedAt, &cancelledAt, &denialReason, &actionFingerprint, &createdAt,
 	)
 	if err != nil {
 		return nil, err
@@ -80,6 +84,13 @@ func scanApproval(row rowScanner) (*Approval, error) {
 	a.CancelledAt, err2 = sqliteTimePtr(cancelledAt)
 	if err2 != nil {
 		return nil, err2
+	}
+	if denialReason.Valid {
+		reason := denialReason.String
+		a.DenialReason = &reason
+	}
+	if actionFingerprint.Valid {
+		a.ActionFingerprint = actionFingerprint.String
 	}
 	a.CreatedAt, err2 = sqliteTimeRequired(createdAt)
 	if err2 != nil {
@@ -198,13 +209,14 @@ func GetApprovalByIDAndApprover(ctx context.Context, db DBTX, approvalID, approv
 // ApproveApproval atomically sets the approval status to 'approved' and records
 // the timestamp. Returns the updated approval and the agent's metadata snapshot.
 func ApproveApproval(ctx context.Context, db DBTX, approvalID, approverID string) (*Approval, []byte, error) {
-	return resolveApproval(ctx, db, approvalID, approverID, "approved", "approved_at")
+	return resolveApproval(ctx, db, approvalID, approverID, "approved", "approved_at", "")
 }
 
 // DenyApproval atomically sets the approval status to 'denied' and records the
 // timestamp. Returns the updated approval and the agent's metadata snapshot.
-func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID string) (*Approval, []byte, error) {
-	return resolveApproval(ctx, db, approvalID, approverID, "denied", "denied_at")
+// reason is optional human-readable context for the agent; empty string is stored as NULL.
+func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID, reason string) (*Approval, []byte, error) {
+	return resolveApproval(ctx, db, approvalID, approverID, "denied", "denied_at", reason)
 }
 
 // resolveApproval is the shared implementation for ApproveApproval and
@@ -214,7 +226,7 @@ func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID string) (
 //
 // Safety: newStatus and timestampCol are caller-controlled constants
 // ("approved"/"denied" and "approved_at"/"denied_at"), never user input.
-func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newStatus, timestampCol string) (*Approval, []byte, error) {
+func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newStatus, timestampCol, denialReason string) (*Approval, []byte, error) {
 	// SQLite rejects UPDATE-in-WITH combined with JOIN to agents (PostgreSQL shape).
 	tx, owned, err := BeginOrContinue(ctx, db)
 	if err != nil {
@@ -224,15 +236,30 @@ func resolveApproval(ctx context.Context, db DBTX, approvalID, approverID, newSt
 		defer func() { _ = RollbackTx(ctx, tx) }()
 	}
 
-	query := fmt.Sprintf(
-		`UPDATE approvals
-		 SET status = $3, %s = strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ', 'now')
-		 WHERE approval_id = $1 AND approver_id = $2
-		   AND status = 'pending' AND datetime(expires_at) > datetime('now')
-		 RETURNING %s`,
-		timestampCol, approvalColumns,
-	)
-	row := tx.QueryRow(ctx, query, approvalID, approverID, newStatus)
+	var query string
+	var args []any
+	if newStatus == "denied" && denialReason != "" {
+		query = fmt.Sprintf(
+			`UPDATE approvals
+			 SET status = $3, %s = strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ', 'now'), denial_reason = $4
+			 WHERE approval_id = $1 AND approver_id = $2
+			   AND status = 'pending' AND datetime(expires_at) > datetime('now')
+			 RETURNING %s`,
+			timestampCol, approvalColumns,
+		)
+		args = []any{approvalID, approverID, newStatus, denialReason}
+	} else {
+		query = fmt.Sprintf(
+			`UPDATE approvals
+			 SET status = $3, %s = strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ', 'now')
+			 WHERE approval_id = $1 AND approver_id = $2
+			   AND status = 'pending' AND datetime(expires_at) > datetime('now')
+			 RETURNING %s`,
+			timestampCol, approvalColumns,
+		)
+		args = []any{approvalID, approverID, newStatus}
+	}
+	row := tx.QueryRow(ctx, query, args...)
 	appr, err := scanApproval(row)
 	if err == nil {
 		var agentMeta []byte

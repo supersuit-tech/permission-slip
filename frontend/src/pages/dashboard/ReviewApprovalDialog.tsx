@@ -114,6 +114,7 @@ export function ReviewApprovalDialog({
   const [standingApprovalCreated, setStandingApprovalCreated] = useState(false);
   const [autoApproveFuture, setAutoApproveFuture] = useState(false);
   const [pendingAction, setPendingAction] = useState<"approve" | null>(null);
+  const [denialReason, setDenialReason] = useState("");
   const [paramsOpen, setParamsOpen] = useState(false);
   const isApproved = approveResult !== null;
   const { approveApproval } = useApproveApproval();
@@ -226,13 +227,14 @@ export function ReviewApprovalDialog({
 
   const handleDeny = useCallback(async () => {
     try {
-      await denyApproval(approval.approval_id);
+      const reason = denialReason.trim();
+      await denyApproval(approval.approval_id, reason || undefined);
       toast.success("Request denied");
       onOpenChange(false);
     } catch {
       toast.error("Failed to deny request. Please try again.");
     }
-  }, [denyApproval, approval.approval_id, onOpenChange]);
+  }, [denyApproval, approval.approval_id, denialReason, onOpenChange]);
 
   function handleClose(nextOpen: boolean) {
     if (!nextOpen) {
@@ -240,6 +242,7 @@ export function ReviewApprovalDialog({
       setStandingApprovalCreated(false);
       setAutoApproveFuture(false);
       setPendingAction(null);
+      setDenialReason("");
     }
     onOpenChange(nextOpen);
   }
@@ -463,6 +466,22 @@ export function ReviewApprovalDialog({
                   </Label>
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label htmlFor="denial-reason" className="text-sm font-medium">
+                  Reason for denial (optional)
+                </Label>
+                <textarea
+                  id="denial-reason"
+                  value={denialReason}
+                  onChange={(event) => setDenialReason(event.target.value)}
+                  disabled={isBusy || isExpired}
+                  maxLength={500}
+                  rows={3}
+                  placeholder="Explain why you're denying this request so the agent can adapt."
+                  className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                />
+              </div>
 
               <Button
                 size="lg"
