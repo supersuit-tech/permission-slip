@@ -52,6 +52,9 @@ const (
 	// NotificationTypeStandingApprovalRequest is sent when an agent proposes
 	// a new standing approval rule for human review.
 	NotificationTypeStandingApprovalRequest NotificationType = "standing_approval_request"
+	// NotificationTypeBulkApproval is sent when an agent submits a bulk approval
+	// group — one notification for N same-type actions.
+	NotificationTypeBulkApproval NotificationType = "bulk_approval"
 )
 
 // Approval holds the fields a notification channel needs to construct its
@@ -67,6 +70,10 @@ type Approval struct {
 	ExpiresAt   time.Time
 	CreatedAt   time.Time
 	Type        NotificationType // determines which email/SMS/push template to use; zero value = approval
+	// BulkApproval fields (when Type == NotificationTypeBulkApproval)
+	BulkGroupID string
+	ActionType  string
+	ItemCount   int
 }
 
 // Recipient identifies who should receive the notification and provides

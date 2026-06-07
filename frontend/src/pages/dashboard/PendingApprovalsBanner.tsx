@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { buildSummary } from "@/components/ActionPreviewSummary";
 import { CountdownBadge, RiskBadge } from "./approval-components";
 import { ReviewApprovalDialog } from "./ReviewApprovalDialog";
+import { ReviewBulkApprovalDialog } from "./ReviewBulkApprovalDialog";
 import { ReviewStandingApprovalRequestDialog } from "./ReviewStandingApprovalRequestDialog";
 
 function resolveAgentName(
@@ -48,6 +49,44 @@ function RuleProposalBannerItem({
       </div>
       <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
         Review
+      </span>
+    </button>
+  );
+}
+
+function BulkApprovalBannerItem({
+  bulkGroupId,
+  actionType,
+  itemCount,
+  agentDisplayName,
+  expiresAt,
+  onOpenDialog,
+}: {
+  bulkGroupId: string;
+  actionType: string;
+  itemCount: number;
+  agentDisplayName: string;
+  expiresAt: string;
+  onOpenDialog: (bulkGroupId: string, agentDisplayName: string) => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={() => onOpenDialog(bulkGroupId, agentDisplayName)}
+      className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-info/30 bg-info/5 px-4 py-3 text-left text-sm text-foreground shadow-sm transition-colors hover:bg-info/10"
+      aria-label={`Bulk approval: ${itemCount} ${actionType} from ${agentDisplayName}`}
+    >
+      <Bot className="size-5 shrink-0" />
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+        <span className="font-medium">{actionType}</span>
+        <Badge variant="secondary" className="text-xs">
+          {itemCount} items
+        </Badge>
+        <span className="text-xs opacity-75">{agentDisplayName}</span>
+        <CountdownBadge expiresAt={expiresAt} />
+      </div>
+      <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
+        Review batch
       </span>
     </button>
   );
@@ -117,6 +156,10 @@ export function PendingApprovalsBanner() {
   const activeRuleRef = useRef<StandingApprovalRequestSummary | null>(null);
   const activeRuleAgentNameRef = useRef<string>("");
 
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+  const activeBulkGroupIdRef = useRef<string>("");
+  const activeBulkAgentNameRef = useRef<string>("");
+
   const agentMap = useMemo(() => {
     const map = new Map<number, Agent>();
     for (const agent of agents) {
@@ -159,6 +202,53 @@ export function PendingApprovalsBanner() {
     }
   }, []);
 
+  const { standaloneApprovals, bulkGroups } = useMemo(() => {
+    const groups = new Map<
+      string,
+      { actionType: string; itemCount: number; expiresAt: string; agentId: number }
+    >();
+    const standalone: ApprovalSummary[] = [];
+    for (const approval of approvals) {
+      const gid = approval.bulk_group_id;
+      if (gid) {
+        const existing = groups.get(gid);
+        if (!existing) {
+          groups.set(gid, {
+            actionType: approval.action.type,
+            itemCount: 1,
+            expiresAt: approval.expires_at,
+            agentId: approval.agent_id,
+          });
+        } else {
+          existing.itemCount += 1;
+        }
+      } else {
+        standalone.push(approval);
+      }
+    }
+    return {
+      standaloneApprovals: standalone,
+      bulkGroups: [...groups.entries()].map(([id, meta]) => ({ id, ...meta })),
+    };
+  }, [approvals]);
+
+  const handleOpenBulkDialog = useCallback(
+    (bulkGroupId: string, agentDisplayName: string) => {
+      activeBulkGroupIdRef.current = bulkGroupId;
+      activeBulkAgentNameRef.current = agentDisplayName;
+      setBulkDialogOpen(true);
+    },
+    [],
+  );
+
+  const handleBulkDialogChange = useCallback((nextOpen: boolean) => {
+    setBulkDialogOpen(nextOpen);
+    if (!nextOpen) {
+      activeBulkGroupIdRef.current = "";
+      activeBulkAgentNameRef.current = "";
+    }
+  }, []);
+
   if (isLoading || rulesLoading) return null;
 
   if (error || rulesError) {
@@ -179,15 +269,20 @@ export function PendingApprovalsBanner() {
     );
   }
 
-  const totalPending = approvals.length + ruleProposals.length;
-  if (totalPending === 0 && !dialogOpen && !ruleDialogOpen) return null;
+  const totalPending =
+    standaloneApprovals.length + bulkGroups.length + ruleProposals.length;
+  if (totalPending === 0 && !dialogOpen && !ruleDialogOpen && !bulkDialogOpen) {
+    return null;
+  }
 
   return (
     <>
       <span className="sr-only" aria-live="polite" aria-atomic="true">
         {totalPending} pending item{totalPending !== 1 ? "s" : ""}
       </span>
-      {(ruleProposals.length > 0 || approvals.length > 0) && (
+      {(ruleProposals.length > 0 ||
+        standaloneApprovals.length > 0 ||
+        bulkGroups.length > 0) && (
         <div className="space-y-2" aria-label="Pending approvals and rule proposals">
           {ruleProposals.map((request) => (
             <RuleProposalBannerItem
@@ -197,7 +292,18 @@ export function PendingApprovalsBanner() {
               onOpenDialog={handleOpenRuleDialog}
             />
           ))}
-          {approvals.map((approval) => (
+          {bulkGroups.map((group) => (
+            <BulkApprovalBannerItem
+              key={group.id}
+              bulkGroupId={group.id}
+              actionType={group.actionType}
+              itemCount={group.itemCount}
+              agentDisplayName={resolveAgentName(group.agentId, agentMap)}
+              expiresAt={group.expiresAt}
+              onOpenDialog={handleOpenBulkDialog}
+            />
+          ))}
+          {standaloneApprovals.map((approval) => (
             <ApprovalBannerItem
               key={approval.approval_id}
               approval={approval}
@@ -223,6 +329,14 @@ export function PendingApprovalsBanner() {
           agentDisplayName={activeRuleAgentNameRef.current}
           open={ruleDialogOpen}
           onOpenChange={handleRuleDialogChange}
+        />
+      )}
+      {activeBulkGroupIdRef.current && (
+        <ReviewBulkApprovalDialog
+          bulkGroupId={activeBulkGroupIdRef.current}
+          agentDisplayName={activeBulkAgentNameRef.current}
+          open={bulkDialogOpen}
+          onOpenChange={handleBulkDialogChange}
         />
       )}
     </>

@@ -307,4 +307,50 @@ export class ApiClient {
       routerPath: `/approvals/${approvalId}/status`,
     });
   }
+
+  /** GET /approval-groups/{id}/status — bulk group status for agents */
+  async bulkGroupStatus(groupId: string) {
+    return this.request<{
+      bulk_group_id: string;
+      action_type: string;
+      item_count: number;
+      status: string;
+      expires_at: string;
+      created_at: string;
+      results: Array<{
+        approval_id?: string;
+        request_id?: string;
+        status: string;
+        execution_status?: string;
+        execution_result?: unknown;
+      }>;
+    }>({
+      method: "GET",
+      routerPath: `/approval-groups/${groupId}/status`,
+    });
+  }
+
+  /** POST /approvals/bulk-request — submit N same-type actions */
+  async requestBulkApproval(
+    items: Array<{
+      request_id?: string;
+      action: { type: string; parameters: unknown };
+      context: Record<string, unknown>;
+    }>,
+  ) {
+    return this.request<{
+      bulk_group_id: string;
+      approval_url?: string;
+      action_type: string;
+      item_count: number;
+      status: string;
+      expires_at?: string;
+      created_at?: string;
+      results: unknown[];
+    }>({
+      method: "POST",
+      routerPath: "/approvals/bulk-request",
+      body: { items },
+    });
+  }
 }

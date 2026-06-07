@@ -64,12 +64,14 @@ export function useApprovalEvents() {
     es.addEventListener("approval_created", onApprovalCreated);
     es.addEventListener("approval_resolved", invalidateApprovals);
     es.addEventListener("approval_cancelled", invalidateApprovals);
+    es.addEventListener("bulk_approval_changed", invalidateApprovals);
 
     // Clean up on unmount or token change.
     return () => {
       es.removeEventListener("approval_created", onApprovalCreated);
       es.removeEventListener("approval_resolved", invalidateApprovals);
       es.removeEventListener("approval_cancelled", invalidateApprovals);
+      es.removeEventListener("bulk_approval_changed", invalidateApprovals);
       es.close();
       eventSourceRef.current = null;
     };

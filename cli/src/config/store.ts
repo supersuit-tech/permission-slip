@@ -100,6 +100,8 @@ export function findRegistration(server: string): Registration | undefined {
 /** Stored in ~/.permission-slip/config.json — extend with new optional fields as needed. */
 export interface CliConfigFile {
   default_server?: string;
+  /** Last CLI version for which the agent read the changelog. */
+  last_changelog_version?: string;
 }
 
 export function normalizeServerUrl(url: string): string {

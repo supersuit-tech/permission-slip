@@ -240,6 +240,15 @@ func notifyApprovalChange(deps *Deps, userID string, eventType string, approvalI
 	}
 }
 
+// notifyBulkApprovalChange sends an SSE event when a bulk group is created or updated.
+func notifyBulkApprovalChange(deps *Deps, userID string, bulkGroupID string) {
+	if deps.ApprovalEvents == nil {
+		return
+	}
+	event := fmt.Sprintf("event: bulk_approval_changed\ndata: {\"bulk_group_id\":%q}", bulkGroupID)
+	deps.ApprovalEvents.Notify(userID, event)
+}
+
 // notifyApprovalExecuted sends an SSE event with the execution status when an
 // approved action has been executed. This notifies the approver's connected
 // browser tabs so they can update the UI with the execution outcome.

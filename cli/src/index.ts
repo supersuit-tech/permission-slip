@@ -12,7 +12,9 @@
  *   capabilities  List available action configurations and standing approvals
  *   connectors    List available connectors
  *   request        Request approval for an action (auto-approves if standing approval matches)
+ *   request-bulk   Request bulk approval for N same-type actions (one notification)
  *   request-status Check the status/outcome of an approval request
+ *   changelog      Show CLI updates since your last session (read before multi-step work)
  *   config        Show or update saved configuration and registrations
  *   whoami        Show agent identity and registration info
  *
@@ -26,10 +28,13 @@ import { statusCommand } from "./commands/status.js";
 import { capabilitiesCommand } from "./commands/capabilities.js";
 import { connectorsCommand } from "./commands/connectors.js";
 import { requestCommand } from "./commands/request.js";
+import { requestBulkCommand } from "./commands/request-bulk.js";
 import { requestStatusCommand } from "./commands/request-status.js";
+import { changelogCommand } from "./commands/changelog.js";
 import { configCommand } from "./commands/config.js";
 import { whoamiCommand } from "./commands/whoami.js";
 import { autoApproveRequestCommand } from "./commands/autoApproveRequest.js";
+import { printUnreadChangelogNotice, currentCliVersion } from "./changelog.js";
 
 const program = new Command();
 
@@ -43,9 +48,11 @@ program
     "Quick start:\n" +
     "  1. Register:  permission-slip register --invite-code <code>\n" +
     "  2. Verify:    permission-slip verify --code <confirmation_code>\n" +
-    "  3. Discover:  permission-slip capabilities",
+    "  3. Changelog:  permission-slip changelog   (check for new capabilities)\n" +
+    "  4. Discover:  permission-slip capabilities\n" +
+    "  5. Bulk work: permission-slip request-bulk --action <type> --actions '[...]'",
   )
-  .version("0.1.0");
+  .version(currentCliVersion());
 
 registerCommand(program);
 verifyCommand(program);
@@ -53,9 +60,17 @@ statusCommand(program);
 capabilitiesCommand(program);
 connectorsCommand(program);
 requestCommand(program);
+requestBulkCommand(program);
 requestStatusCommand(program);
+changelogCommand(program);
 configCommand(program);
 whoamiCommand(program);
 autoApproveRequestCommand(program);
+
+// Surface unread changelog entries unless this IS the changelog command.
+const invoked = process.argv[2];
+if (invoked !== "changelog") {
+  printUnreadChangelogNotice();
+}
 
 program.parse(process.argv);

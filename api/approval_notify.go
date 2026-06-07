@@ -55,6 +55,46 @@ func NotifyApprovalRequest(ctx context.Context, deps *Deps, approval *db.Approva
 	log.Printf("notify: dispatched approval notification for %s to user %s", approval.ApprovalID, approver.ID)
 }
 
+// NotifyBulkApprovalRequest dispatches one notification for a bulk approval group.
+func NotifyBulkApprovalRequest(ctx context.Context, deps *Deps, group *db.ApprovalBulkGroup, agent *db.Agent, approver *db.Profile, actionType string) {
+	if deps.Notifier == nil {
+		return
+	}
+	if deps.BaseURL == "" {
+		log.Printf("notify: skipping bulk notification for %s — BASE_URL is not configured", group.BulkGroupID)
+		return
+	}
+
+	agentName := extractAgentName(agent)
+	approvalURL := fmt.Sprintf("%s/approve-group/%s", deps.BaseURL, group.BulkGroupID)
+	actionJSON, _ := json.Marshal(map[string]string{"type": actionType})
+
+	notifApproval := notify.Approval{
+		ApprovalID:  group.BulkGroupID,
+		BulkGroupID: group.BulkGroupID,
+		AgentID:     group.AgentID,
+		AgentName:   agentName,
+		Action:      actionJSON,
+		ActionType:  actionType,
+		ItemCount:   group.ItemCount,
+		ApprovalURL: approvalURL,
+		ExpiresAt:   group.ExpiresAt,
+		CreatedAt:   group.CreatedAt,
+		Type:        notify.NotificationTypeBulkApproval,
+	}
+
+	recipient := notify.Recipient{
+		UserID:   approver.ID,
+		Username: approver.Username,
+		Email:    approver.Email,
+		Phone:    approver.Phone,
+	}
+
+	deps.Notifier.Dispatch(ctx, notifApproval, recipient)
+	log.Printf("notify: dispatched bulk approval notification for %s (%d items) to user %s",
+		group.BulkGroupID, group.ItemCount, approver.ID)
+}
+
 // extractAgentName pulls the human-readable name from agent metadata JSONB.
 // Falls back to "Agent <id>" if no name is set.
 func extractAgentName(agent *db.Agent) string {

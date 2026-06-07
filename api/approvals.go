@@ -19,6 +19,7 @@ import (
 type approvalResponse struct {
 	ApprovalID      string     `json:"approval_id"`
 	AgentID         int64      `json:"agent_id"`
+	BulkGroupID     *string    `json:"bulk_group_id,omitempty"`
 	Action          any        `json:"action"`
 	Context         any        `json:"context"`
 	Status          string     `json:"status"`
@@ -61,6 +62,7 @@ type denyApprovalRequest struct {
 type approvalDetailResponse struct {
 	ApprovalID      string     `json:"approval_id"`
 	AgentID         int64      `json:"agent_id"`
+	BulkGroupID     *string    `json:"bulk_group_id,omitempty"`
 	Action          any        `json:"action"`
 	Context         any        `json:"context"`
 	Status          string     `json:"status"`
@@ -402,6 +404,7 @@ func toApprovalResponse(ctx context.Context, a db.Approval) approvalResponse {
 	resp := approvalResponse{
 		ApprovalID:  a.ApprovalID,
 		AgentID:     a.AgentID,
+		BulkGroupID: a.BulkGroupID,
 		Status:      resolvedApprovalStatus(a),
 		ExpiresAt:   a.ExpiresAt,
 		ApprovedAt:  a.ApprovedAt,
@@ -445,6 +448,7 @@ func toApprovalDetailResponse(a db.Approval) approvalDetailResponse {
 	resp := approvalDetailResponse{
 		ApprovalID:      a.ApprovalID,
 		AgentID:         a.AgentID,
+		BulkGroupID:     a.BulkGroupID,
 		Status:          resolvedApprovalStatus(a),
 		ExecutionStatus: a.ExecutionStatus,
 		ExecutedAt:      a.ExecutedAt,

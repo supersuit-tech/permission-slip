@@ -212,6 +212,18 @@ paths:
   /v1/approvals/{approval_id}/status:
     $ref: './components/paths/approvals.yaml#/approvalStatus'
 
+  /v1/approvals/bulk-request:
+    $ref: './components/paths/approvals.yaml#/bulkRequest'
+
+  /v1/approval-groups/{group_id}:
+    $ref: './components/paths/approvals.yaml#/getBulkGroup'
+
+  /v1/approval-groups/{group_id}/decide:
+    $ref: './components/paths/approvals.yaml#/bulkGroupDecide'
+
+  /v1/approval-groups/{group_id}/status:
+    $ref: './components/paths/approvals.yaml#/bulkGroupStatus'
+
   /v1/action-config-templates:
     $ref: './components/paths/action_config_templates.yaml#/actionConfigTemplates'
 
@@ -359,6 +371,18 @@ components:
       $ref: './components/schemas/approvals.yaml#/DenyApprovalResponse'
     ApprovalStatusResponse:
       $ref: './components/schemas/approvals.yaml#/ApprovalStatusResponse'
+    BulkApprovalRequest:
+      $ref: './components/schemas/approvals.yaml#/BulkApprovalRequest'
+    BulkApprovalResponse:
+      $ref: './components/schemas/approvals.yaml#/BulkApprovalResponse'
+    ApprovalBulkGroupSummary:
+      $ref: './components/schemas/approvals.yaml#/ApprovalBulkGroupSummary'
+    BulkApprovalDecisionRequest:
+      $ref: './components/schemas/approvals.yaml#/BulkApprovalDecisionRequest'
+    BulkApprovalDecisionResponse:
+      $ref: './components/schemas/approvals.yaml#/BulkApprovalDecisionResponse'
+    BulkApprovalGroupStatusResponse:
+      $ref: './components/schemas/approvals.yaml#/BulkApprovalGroupStatusResponse'
 
     # Action Configuration Templates
     ActionConfigTemplate:
