@@ -3664,6 +3664,145 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/approvals/bulk-request:
+    post:
+      operationId: bulkRequestApproval
+      summary: Request Bulk Approval for Same-Type Actions
+      description: |
+        Submit N actions of the **same action type** in one request. The approver
+        receives **one** notification and reviews all items on a single screen.
+
+        **Constraints (v1):**
+        - All items must share one action type (mixed types rejected).
+        - Payment-required actions are not supported in bulk.
+        - Minimum 2 items, maximum 50.
+        - Standing-approval auto-approve applies per item at submit time.
+
+        Creation of all child approvals is transactional. Execution at approve
+        time is best-effort per item.
+      tags:
+        - Approvals
+      security:
+        - PermissionSlipSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkApprovalRequest'
+      responses:
+        '200':
+          description: Bulk request processed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkApprovalResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/approval-groups/{group_id}:
+    get:
+      operationId: getApprovalBulkGroup
+      summary: Get Bulk Approval Group
+      description: |
+        Returns a bulk approval group with all child items for the authenticated
+        approver. Used by the group review screen.
+      tags:
+        - Approvals
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Bulk group retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ApprovalBulkGroupSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/approval-groups/{group_id}/decide:
+    post:
+      operationId: decideApprovalBulkGroup
+      summary: Submit Per-Item Decisions for a Bulk Group
+      description: |
+        Approve or deny each item in a bulk group in one call. Approved items
+        execute best-effort; partial failures are reported per item.
+      tags:
+        - Approvals
+      security:
+        - SupabaseSession: []
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkApprovalDecisionRequest'
+      responses:
+        '200':
+          description: Decisions applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkApprovalDecisionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /v1/approval-groups/{group_id}/status:
+    get:
+      operationId: getApprovalBulkGroupStatus
+      summary: Get Bulk Approval Group Status (Agent)
+      description: |
+        Poll the status of a bulk approval group and per-item outcomes.
+        Only the submitting agent may access this endpoint.
+      tags:
+        - Approvals
+      security:
+        - PermissionSlipSignature: []
+      parameters:
+        - name: group_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Group status retrieved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkApprovalGroupStatusResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
   /v1/action-config-templates:
     get:
       operationId: listActionConfigTemplates
@@ -6755,6 +6894,13 @@ components:
           format: date-time
           description: When the approval request was created
           example: '2026-02-11T13:20:00Z'
+        bulk_group_id:
+          type: string
+          nullable: true
+          description: |
+            When set, this approval is part of a bulk group submitted together.
+            Null for single (non-bulk) requests.
+          example: bgrp_abc123
         resource_details:
           type: object
           nullable: true
@@ -6945,6 +7091,160 @@ components:
           $ref: '#/components/schemas/ExecutionResult'
         executed_at:
           $ref: '#/components/schemas/ExecutedAt'
+    BulkApprovalRequest:
+      type: object
+      required:
+        - items
+      properties:
+        items:
+          type: array
+          minItems: 2
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/BulkApprovalRequestItem'
+          description: |
+            Same-action-type actions to submit as one bulk approval. Minimum 2 items.
+            Payment-required actions are not supported in bulk (v1).
+        expires_in:
+          type: integer
+          minimum: 60
+          maximum: 86400
+          description: Optional TTL override in seconds for all items in the group.
+    BulkApprovalResponse:
+      type: object
+      required:
+        - bulk_group_id
+        - action_type
+        - item_count
+        - status
+        - results
+      properties:
+        bulk_group_id:
+          type: string
+          description: Identifier for the bulk group. Use for polling and review deep links.
+          example: bgrp_abc123
+        approval_url:
+          type: string
+          format: uri
+          description: Review URL for the approver (present when any item is pending).
+        action_type:
+          type: string
+          description: Shared action type for all items in the group.
+        item_count:
+          type: integer
+          description: Number of items in the group.
+        status:
+          type: string
+          enum:
+            - pending
+            - partial
+            - resolved
+          description: |
+            `pending` — at least one item awaiting review.
+            `partial` — some items resolved, some still pending.
+            `resolved` — all items have a final status.
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkApprovalResult'
+    ApprovalBulkGroupSummary:
+      type: object
+      description: A bulk approval group for dashboard list/detail views.
+      required:
+        - bulk_group_id
+        - agent_id
+        - action_type
+        - item_count
+        - status
+        - expires_at
+        - created_at
+        - items
+      properties:
+        bulk_group_id:
+          type: string
+        agent_id:
+          type: integer
+          format: int64
+        action_type:
+          type: string
+        item_count:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - partial
+            - resolved
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ApprovalSummary'
+    BulkApprovalDecisionRequest:
+      type: object
+      required:
+        - decisions
+      properties:
+        decisions:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            $ref: '#/components/schemas/BulkApprovalDecisionItem'
+    BulkApprovalDecisionResponse:
+      type: object
+      required:
+        - bulk_group_id
+        - results
+      properties:
+        bulk_group_id:
+          type: string
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkApprovalDecisionResult'
+    BulkApprovalGroupStatusResponse:
+      type: object
+      required:
+        - bulk_group_id
+        - action_type
+        - item_count
+        - status
+        - results
+      properties:
+        bulk_group_id:
+          type: string
+        action_type:
+          type: string
+        item_count:
+          type: integer
+        status:
+          type: string
+          enum:
+            - pending
+            - partial
+            - resolved
+        expires_at:
+          type: string
+          format: date-time
+        created_at:
+          type: string
+          format: date-time
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkApprovalResult'
     ActionConfigTemplate:
       type: object
       required:
@@ -10928,6 +11228,109 @@ components:
             recently downgraded from a paid plan. After this time, the shorter
             retention window takes effect.
           example: '2026-03-08T14:30:00Z'
+    BulkApprovalRequestItem:
+      type: object
+      required:
+        - request_id
+        - action
+        - context
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          maxLength: 64
+          description: Unique idempotency key for this item within the bulk request.
+        action:
+          $ref: '#/components/schemas/Action'
+        context:
+          $ref: '#/components/schemas/ActionContext'
+        configuration_id:
+          type: string
+          pattern: ^ac_[a-f0-9]{32}$
+          maxLength: 36
+          description: Optional action configuration reference for this item.
+    BulkApprovalResult:
+      type: object
+      required:
+        - request_id
+        - status
+      properties:
+        request_id:
+          type: string
+          description: The item's idempotency key from the request.
+        approval_id:
+          type: string
+          description: Present when status is `pending` or after resolution.
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - denied
+            - cancelled
+            - expired
+          description: Per-item outcome at submission or after human review.
+        result:
+          description: Execution result when auto-approved via standing approval at submit time.
+        standing_approval_id:
+          type: string
+          description: Standing approval that auto-approved this item (if any).
+        execution_status:
+          allOf:
+            - $ref: '#/components/schemas/ExecutionStatus'
+            - nullable: true
+        execution_result:
+          $ref: '#/components/schemas/ExecutionResult'
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+    BulkApprovalDecisionItem:
+      type: object
+      required:
+        - approval_id
+        - decision
+      properties:
+        approval_id:
+          type: string
+        decision:
+          type: string
+          enum:
+            - approve
+            - deny
+    BulkApprovalDecisionResult:
+      type: object
+      required:
+        - approval_id
+        - status
+      properties:
+        approval_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - approved
+            - denied
+            - skipped
+        confirmation_code:
+          type: string
+          description: Ephemeral receipt code when approved.
+        execution_status:
+          allOf:
+            - $ref: '#/components/schemas/ExecutionStatus'
+            - nullable: true
+        execution_result:
+          $ref: '#/components/schemas/ExecutionResult'
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+            message:
+              type: string
     StandingApprovalTemplateSpec:
       type: object
       description: |

@@ -14,6 +14,7 @@ type Approval struct {
 	ApprovalID        string
 	AgentID           int64
 	ApproverID        string
+	BulkGroupID       *string
 	Action            []byte // raw JSONB
 	Context           []byte // raw JSONB
 	Status            string
@@ -32,7 +33,7 @@ type Approval struct {
 
 // approvalColumns is the canonical column list for SELECT on the approvals table.
 // Keep in sync with scanApproval.
-const approvalColumns = `approval_id, agent_id, approver_id, action, context,
+const approvalColumns = `approval_id, agent_id, approver_id, bulk_group_id, action, context,
 	status, execution_status, execution_result, executed_at, resource_details,
 	expires_at, approved_at, denied_at, cancelled_at, denial_reason,
 	action_fingerprint, created_at`
@@ -54,15 +55,19 @@ type ApprovalPage struct {
 // scanApproval scans a single row into an Approval. The row must select approvalColumns.
 func scanApproval(row rowScanner) (*Approval, error) {
 	var a Approval
+	var bulkGroupID sql.NullString
 	var executedAt, expiresAt, approvedAt, deniedAt, cancelledAt, createdAt sql.NullString
 	var denialReason, actionFingerprint sql.NullString
 	err := row.Scan(
-		&a.ApprovalID, &a.AgentID, &a.ApproverID, &a.Action, &a.Context,
+		&a.ApprovalID, &a.AgentID, &a.ApproverID, &bulkGroupID, &a.Action, &a.Context,
 		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &executedAt, &a.ResourceDetails,
 		&expiresAt, &approvedAt, &deniedAt, &cancelledAt, &denialReason, &actionFingerprint, &createdAt,
 	)
 	if err != nil {
 		return nil, err
+	}
+	if bulkGroupID.Valid {
+		a.BulkGroupID = &bulkGroupID.String
 	}
 	var err2 error
 	a.ExecutedAt, err2 = sqliteTimePtr(executedAt)

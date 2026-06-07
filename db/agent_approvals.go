@@ -51,6 +51,7 @@ type InsertApprovalParams struct {
 	ApprovalID        string
 	AgentID           int64
 	ApproverID        string
+	BulkGroupID       *string
 	Action            []byte // raw JSONB
 	Context           []byte // raw JSONB
 	ResourceDetails   []byte // raw JSONB — human-readable resource metadata (optional)
@@ -86,10 +87,10 @@ func InsertApproval(ctx context.Context, d DBTX, p InsertApprovalParams, request
 	}
 
 	row := tx.QueryRow(ctx,
-		`INSERT INTO approvals (approval_id, agent_id, approver_id, action, context, resource_details, action_fingerprint, status, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, NULLIF($7, ''), 'pending', $8)
+		`INSERT INTO approvals (approval_id, agent_id, approver_id, bulk_group_id, action, context, resource_details, action_fingerprint, status, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), 'pending', $9)
 		 RETURNING `+approvalColumns,
-		p.ApprovalID, p.AgentID, p.ApproverID, p.Action, p.Context, p.ResourceDetails, p.ActionFingerprint, TimestampForSQLite(p.ExpiresAt),
+		p.ApprovalID, p.AgentID, p.ApproverID, p.BulkGroupID, p.Action, p.Context, p.ResourceDetails, p.ActionFingerprint, TimestampForSQLite(p.ExpiresAt),
 	)
 	appr, err := scanApproval(row)
 	if err != nil {

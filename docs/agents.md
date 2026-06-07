@@ -31,14 +31,45 @@ npx @permission-slip/cli register --invite-code <code>
 # Step 2: Verify (user shares the confirmation code from their dashboard)
 npx @permission-slip/cli verify --code <confirmation_code>
 
-# Step 3: Discover what you can do
+# Step 3: Read the CLI changelog (do this every session — new capabilities appear here)
+npx @permission-slip/cli changelog
+npx @permission-slip/cli changelog --mark-read   # after updating your notes
+
+# Step 4: Discover what you can do
 npx @permission-slip/cli capabilities
 
-# Step 4: Request approval (auto-executes if standing approval matches)
+# Step 5: Request approval (auto-executes if standing approval matches)
 npx @permission-slip/cli request --action email.send --params '{"to":"user@example.com","subject":"Hi"}'
+
+# Bulk: N same-type actions → one notification (prefer this over N separate requests)
+npx @permission-slip/cli request-bulk --action calendar.create_event --actions '[
+  {"parameters":{"title":"Standup","start":"2026-06-08T09:00:00Z"}},
+  {"parameters":{"title":"Retro","start":"2026-06-08T15:00:00Z"}}
+]'
+npx @permission-slip/cli status --group <bulk_group_id>
 ```
 
 Run `npx @permission-slip/cli --help` for all available commands.
+
+### CLI changelog (agents: read every session)
+
+The CLI ships a **changelog** (`permission-slip changelog`) so you always learn about
+new commands and behavior without guessing. At the start of each session:
+
+1. Run `permission-slip changelog` — shows entries newer than your last `--mark-read`.
+2. Update your workflow notes if bulk or other capabilities apply.
+3. Run `permission-slip changelog --mark-read` when done.
+
+If you skip this, the CLI prints a one-line reminder on the next command.
+
+### Bulk approval requests
+
+When you need **multiple actions of the same type** (e.g. create 4 calendar events),
+use **`request-bulk`** instead of calling `request` four times. The user gets **one**
+notification and reviews all items on a single screen.
+
+**Rules (v1):** same action type only, 2–50 items, no payment actions, best-effort
+per-item execution after approval.
 
 ### Self-hosted servers
 

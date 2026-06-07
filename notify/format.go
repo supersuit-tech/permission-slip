@@ -85,6 +85,9 @@ func BuildPushContent(approval Approval) PushContent {
 	if approval.Type == NotificationTypeStandingApprovalRequest {
 		return buildStandingApprovalRequestPushContent(approval)
 	}
+	if approval.Type == NotificationTypeBulkApproval {
+		return buildBulkApprovalPushContent(approval)
+	}
 
 	if approval.Type == NotificationTypeCardExpiring {
 		info := extractCardExpiringInfo(approval.Context)
@@ -150,4 +153,22 @@ func TruncateUTF8(s string, maxRunes int) string {
 		return string(runes[:maxRunes])
 	}
 	return string(runes[:maxRunes-3]) + "..."
+}
+
+func buildBulkApprovalPushContent(approval Approval) PushContent {
+	title := "Approval Request"
+	if approval.AgentName != "" {
+		title = approval.AgentName
+	}
+	itemWord := "actions"
+	if approval.ItemCount == 1 {
+		itemWord = "action"
+	}
+	body := fmt.Sprintf("Wants approval for %d %s (%s)", approval.ItemCount, itemWord, approval.ActionType)
+	return PushContent{
+		Title:      title,
+		Body:       body,
+		URL:        approval.ApprovalURL,
+		ApprovalID: approval.BulkGroupID,
+	}
 }

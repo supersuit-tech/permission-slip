@@ -1209,3 +1209,163 @@ denyApproval:
 
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
+bulkRequest:
+  post:
+    operationId: bulkRequestApproval
+    summary: Request Bulk Approval for Same-Type Actions
+    description: |
+      Submit N actions of the **same action type** in one request. The approver
+      receives **one** notification and reviews all items on a single screen.
+
+      **Constraints (v1):**
+      - All items must share one action type (mixed types rejected).
+      - Payment-required actions are not supported in bulk.
+      - Minimum 2 items, maximum 50.
+      - Standing-approval auto-approve applies per item at submit time.
+
+      Creation of all child approvals is transactional. Execution at approve
+      time is best-effort per item.
+
+    tags:
+      - Approvals
+
+    security:
+      - PermissionSlipSignature: []
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/approvals.yaml#/BulkApprovalRequest'
+
+    responses:
+      '200':
+        description: Bulk request processed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/BulkApprovalResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+getBulkGroup:
+  get:
+    operationId: getApprovalBulkGroup
+    summary: Get Bulk Approval Group
+    description: |
+      Returns a bulk approval group with all child items for the authenticated
+      approver. Used by the group review screen.
+
+    tags:
+      - Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: group_id
+        in: path
+        required: true
+        schema:
+          type: string
+
+    responses:
+      '200':
+        description: Bulk group retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/ApprovalBulkGroupSummary'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+bulkGroupDecide:
+  post:
+    operationId: decideApprovalBulkGroup
+    summary: Submit Per-Item Decisions for a Bulk Group
+    description: |
+      Approve or deny each item in a bulk group in one call. Approved items
+      execute best-effort; partial failures are reported per item.
+
+    tags:
+      - Approvals
+
+    security:
+      - SupabaseSession: []
+
+    parameters:
+      - name: group_id
+        in: path
+        required: true
+        schema:
+          type: string
+
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/approvals.yaml#/BulkApprovalDecisionRequest'
+
+    responses:
+      '200':
+        description: Decisions applied
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/BulkApprovalDecisionResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '409':
+        $ref: '../responses/errors.yaml#/Conflict'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+bulkGroupStatus:
+  get:
+    operationId: getApprovalBulkGroupStatus
+    summary: Get Bulk Approval Group Status (Agent)
+    description: |
+      Poll the status of a bulk approval group and per-item outcomes.
+      Only the submitting agent may access this endpoint.
+
+    tags:
+      - Approvals
+
+    security:
+      - PermissionSlipSignature: []
+
+    parameters:
+      - name: group_id
+        in: path
+        required: true
+        schema:
+          type: string
+
+    responses:
+      '200':
+        description: Group status retrieved
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/BulkApprovalGroupStatusResponse'
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'

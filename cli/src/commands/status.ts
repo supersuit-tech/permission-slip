@@ -15,8 +15,9 @@ import { output, type OutputOptions } from "../output.js";
 export function statusCommand(program: Command): void {
   program
     .command("status")
-    .description("Show registration state, or check approval status with an approval_id")
+    .description("Show registration state, or check approval/bulk group status")
     .argument("[approval_id]", "Approval ID to check (omit for registration status)")
+    .option("--group <bulk_group_id>", "Bulk group ID to poll (instead of approval_id)")
     .option(
       "--server <url>",
       "Permission Slip server URL — required unless PS_SERVER or config default_server is set",
@@ -26,6 +27,7 @@ export function statusCommand(program: Command): void {
     .action(async (approvalId: string | undefined, opts: {
       server?: string;
       agentId?: string;
+      group?: string;
       pretty?: boolean;
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
@@ -34,15 +36,19 @@ export function statusCommand(program: Command): void {
         const agentId = resolveAgentId(server, opts.agentId);
         const client = new ApiClient({ serverUrl: server, agentId });
 
-        if (!approvalId) {
-          // No approval_id: show registration state.
+        if (!approvalId && !opts.group) {
           const result = await client.status();
           output(result, outputOpts);
           return;
         }
 
-        // Single check, return immediately.
-        const result = await client.approvalStatus(approvalId);
+        if (opts.group) {
+          const result = await client.bulkGroupStatus(opts.group);
+          output(result, outputOpts);
+          return;
+        }
+
+        const result = await client.approvalStatus(approvalId!);
         output(result, outputOpts);
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);

@@ -91,6 +91,42 @@ export default function ApprovalListScreen({ navigation }: Props) {
     [navigation],
   );
 
+  const handleBulkPress = useCallback(
+    (bulkGroupId: string) => {
+      navigation.navigate("BulkApprovalGroup", { bulkGroupId });
+    },
+    [navigation],
+  );
+
+  const { standaloneApprovals, bulkGroups } = useMemo(() => {
+    const groups = new Map<
+      string,
+      { actionType: string; itemCount: number; agentId: number }
+    >();
+    const standalone: ApprovalSummary[] = [];
+    for (const approval of approvals) {
+      const gid = approval.bulk_group_id;
+      if (gid) {
+        const existing = groups.get(gid);
+        if (!existing) {
+          groups.set(gid, {
+            actionType: approval.action.type,
+            itemCount: 1,
+            agentId: approval.agent_id,
+          });
+        } else {
+          existing.itemCount += 1;
+        }
+      } else {
+        standalone.push(approval);
+      }
+    }
+    return {
+      standaloneApprovals: standalone,
+      bulkGroups: [...groups.entries()].map(([id, meta]) => ({ id, ...meta })),
+    };
+  }, [approvals]);
+
   const handleRulePress = useCallback(
     (request: StandingApprovalRequestSummary) => {
       navigation.navigate("StandingApprovalRequestDetail", {
@@ -143,7 +179,9 @@ export default function ApprovalListScreen({ navigation }: Props) {
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
           const count =
-            isActive && approvals.length > 0 ? approvals.length : null;
+            isActive && (standaloneApprovals.length + bulkGroups.length) > 0
+              ? standaloneApprovals.length + bulkGroups.length
+              : null;
           return (
             <TouchableOpacity
               key={tab.key}
@@ -203,17 +241,35 @@ export default function ApprovalListScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
-          data={approvals}
+          data={standaloneApprovals}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={
-            approvals.length === 0 && (activeTab !== "pending" || ruleProposals.length === 0)
+            standaloneApprovals.length === 0 &&
+            bulkGroups.length === 0 &&
+            (activeTab !== "pending" || ruleProposals.length === 0)
               ? styles.emptyContainer
               : styles.list
           }
           ListHeaderComponent={
-            activeTab === "pending" && ruleProposals.length > 0 ? (
+            activeTab === "pending" &&
+            (ruleProposals.length > 0 || bulkGroups.length > 0) ? (
               <View style={styles.ruleSection}>
+                {bulkGroups.map((group) => (
+                  <TouchableOpacity
+                    key={group.id}
+                    style={styles.bulkRow}
+                    onPress={() => handleBulkPress(group.id)}
+                  >
+                    <Text style={styles.bulkTitle}>
+                      {humanizeActionType(group.actionType)} ({group.itemCount}{" "}
+                      items)
+                    </Text>
+                    <Text style={styles.bulkAgent}>
+                      {resolveAgentName(group.agentId)}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
                 {ruleProposals.map((request: StandingApprovalRequestSummary) => (
                   <RuleProposalRow
                     key={request.request_id}
@@ -563,6 +619,23 @@ const styles = StyleSheet.create({
   ruleSection: {
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
+  },
+  bulkRow: {
+    paddingHorizontal: 20,
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+    backgroundColor: "#eff6ff",
+  },
+  bulkTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.gray900,
+  },
+  bulkAgent: {
+    fontSize: 12,
+    color: colors.gray500,
+    marginTop: 4,
   },
   ruleRow: {
     paddingHorizontal: 20,

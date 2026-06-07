@@ -8,6 +8,8 @@ import ApprovalDetailScreen from "../screens/approvals/ApprovalDetailScreen";
 import DeepLinkDetailScreen from "../screens/approvals/DeepLinkDetailScreen";
 import StandingApprovalRequestDetailScreen from "../screens/approvals/StandingApprovalRequestDetailScreen";
 import DeepLinkRuleDetailScreen from "../screens/approvals/DeepLinkRuleDetailScreen";
+import BulkApprovalGroupScreen from "../screens/approvals/BulkApprovalGroupScreen";
+import DeepLinkBulkGroupScreen from "../screens/approvals/DeepLinkBulkGroupScreen";
 import type { StandingApprovalRequestSummary } from "../hooks/useStandingApprovalRequests";
 import SettingsScreen from "../screens/settings/SettingsScreen";
 import type { ApprovalSummary } from "../hooks/useApprovals";
@@ -31,6 +33,12 @@ export type RootStackParamList = {
   };
   DeepLinkRuleDetail: {
     requestId: string;
+  };
+  BulkApprovalGroup: {
+    bulkGroupId: string;
+  };
+  DeepLinkBulkGroup: {
+    bulkGroupId: string;
   };
   Settings: undefined;
 };
@@ -90,6 +98,20 @@ export default function RootNavigator() {
                 headerTitle: "Rule Proposal",
                 headerBackTitle: "Back",
               }}
+            />
+            <Stack.Screen
+              name="BulkApprovalGroup"
+              component={BulkApprovalGroupScreen}
+              options={{
+                headerShown: true,
+                headerTitle: "Bulk Approval",
+                headerBackTitle: "Back",
+              }}
+            />
+            <Stack.Screen
+              name="DeepLinkBulkGroup"
+              component={DeepLinkBulkGroupScreen}
+              options={{ headerShown: false }}
             />
             <Stack.Screen
               name="Settings"

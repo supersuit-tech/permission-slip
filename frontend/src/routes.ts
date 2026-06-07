@@ -5,6 +5,7 @@ import { ConnectorConfigPage } from "./pages/agents/connectors/ConnectorConfigPa
 import { ActivityPage } from "./pages/activity/ActivityPage";
 import { SettingsLayout } from "./pages/settings/SettingsLayout";
 import { ApproveRedirectPage } from "./pages/approve/ApproveRedirectPage";
+import { ApproveGroupRedirectPage } from "./pages/approve/ApproveGroupRedirectPage";
 import { ApproveRuleRedirectPage } from "./pages/approve/ApproveRuleRedirectPage";
 
 export interface RouteConfig {
@@ -27,5 +28,6 @@ export const appRoutes: RouteConfig[] = [
   { path: "/activity", Component: ActivityPage },
   { path: "/settings/*", Component: SettingsLayout },
   { path: "/approve/:approvalId", Component: ApproveRedirectPage },
+  { path: "/approve-group/:groupId", Component: ApproveGroupRedirectPage },
   { path: "/approve-rule/:requestId", Component: ApproveRuleRedirectPage },
 ];

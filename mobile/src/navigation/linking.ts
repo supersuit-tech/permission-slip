@@ -20,6 +20,7 @@ export const linking: LinkingOptions<RootStackParamList> = {
     screens: {
       DeepLinkDetail: "permission-slip/approve/:approvalId",
       DeepLinkRuleDetail: "permission-slip/approve-rule/:requestId",
+      DeepLinkBulkGroup: "permission-slip/approve-group/:bulkGroupId",
       ApprovalList: "",
     },
   },
