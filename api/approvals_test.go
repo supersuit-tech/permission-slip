@@ -254,10 +254,7 @@ func TestListApprovals_ResponseShape(t *testing.T) {
 // ── Pagination ───────────────────────────────────────────────────────────────
 
 func TestListApprovals_Pagination(t *testing.T) {
-	t.Parallel()
-
 	t.Run("LimitParam", func(t *testing.T) {
-		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -292,7 +289,6 @@ func TestListApprovals_Pagination(t *testing.T) {
 	})
 
 	t.Run("CursorPagination", func(t *testing.T) {
-		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -386,7 +382,6 @@ func TestListApprovals_Pagination(t *testing.T) {
 	})
 
 	t.Run("InvalidLimit", func(t *testing.T) {
-		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -408,7 +403,6 @@ func TestListApprovals_Pagination(t *testing.T) {
 	})
 
 	t.Run("InvalidCursor", func(t *testing.T) {
-		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -434,7 +428,6 @@ func TestListApprovals_Pagination(t *testing.T) {
 	})
 
 	t.Run("DefaultLimit", func(t *testing.T) {
-		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
 		uid := testhelper.GenerateUID(t)
 		agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -469,7 +462,6 @@ func TestListApprovals_Pagination(t *testing.T) {
 	})
 
 	t.Run("EmptyPage", func(t *testing.T) {
-		t.Parallel()
 		tx := testhelper.SetupTestDB(t)
 		uid := testhelper.GenerateUID(t)
 		testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
