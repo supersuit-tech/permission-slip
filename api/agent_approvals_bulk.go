@@ -171,7 +171,7 @@ func handleAgentBulkRequestApproval(deps *Deps) http.HandlerFunc {
 		}
 
 		results := make([]bulkApprovalItemResult, len(prepared))
-		var pendingApprovals []*db.Approval
+		var pendingApprovals []db.Approval
 		anyPending := false
 
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
@@ -229,7 +229,7 @@ func handleAgentBulkRequestApproval(deps *Deps) http.HandlerFunc {
 					RequestID: item.requestID,
 					Status:    "denied",
 					Error: &bulkItemError{
-						Code:    ErrApprovalRecentlyDenied,
+						Code:    string(ErrApprovalRecentlyDenied),
 						Message: "This action was recently denied; do not retry without user intervention",
 					},
 				}
@@ -269,7 +269,7 @@ func handleAgentBulkRequestApproval(deps *Deps) http.HandlerFunc {
 				return
 			}
 
-			pendingApprovals = append(pendingApprovals, appr)
+			pendingApprovals = append(pendingApprovals, *appr)
 			anyPending = true
 			results[i] = bulkApprovalItemResult{
 				RequestID:  item.requestID,
@@ -294,8 +294,8 @@ func handleAgentBulkRequestApproval(deps *Deps) http.HandlerFunc {
 		if anyPending {
 			NotifyBulkApprovalRequest(r.Context(), deps, group, agent, approverProfile, actionType)
 			notifyBulkApprovalChange(deps, agent.ApproverID, bulkGroupID)
-			for _, appr := range pendingApprovals {
-				emitApprovalRequestAuditEvent(r.Context(), deps.DB, agent.ApproverID, appr, agent.Metadata)
+			for i := range pendingApprovals {
+				emitApprovalRequestAuditEvent(r.Context(), deps.DB, agent.ApproverID, &pendingApprovals[i], agent.Metadata)
 			}
 		}
 
