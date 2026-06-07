@@ -295,7 +295,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			ActionType:                  req.ActionType,
 			ActionVersion:               req.ActionVersion,
 			Constraints:                 constraintsBytes,
-			SourceActionConfigurationID: &sourceConfigIDPtr,
+			SourceActionConfigurationID: sourceConfigIDPtr,
 			StartsAt:                    startsAt,
 			ExpiresAt:                   req.ExpiresAt,
 		})
