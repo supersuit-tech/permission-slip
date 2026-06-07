@@ -116,7 +116,6 @@ func TestRequestIdCascadeDeleteOnAgentDelete(t *testing.T) {
 }
 
 func TestListApprovalsByApproverPaginated(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -190,7 +189,6 @@ func TestListApprovalsByApproverPaginated(t *testing.T) {
 }
 
 func TestListApprovalsByApproverPaginated_DuplicateTimestamps(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
@@ -247,7 +245,6 @@ func TestListApprovalsByApproverPaginated_DuplicateTimestamps(t *testing.T) {
 }
 
 func TestListApprovalsByApproverPaginated_StatusFilters(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])

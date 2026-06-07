@@ -82,7 +82,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const { standingApprovals, isLoading: standingApprovalsLoading } =
     useStandingApprovals();
   const { createStandingApproval } = useCreateStandingApproval();
-  const { configs, isFetched: configsFetched } = useActionConfigs(
+  const { configs } = useActionConfigs(
     approval.agent_id,
   );
 
@@ -201,27 +201,20 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
       if (autoApproveFuture) {
-        if (!configsFetched || !matchingActionConfig) {
-          Alert.alert(
-            "Auto-approval not set up",
-            "Request approved, but no action configuration was found to enable auto-approval.",
+        try {
+          await createStandingApproval(
+            buildCreateStandingApprovalFromApproval(
+              approval,
+              matchingActionConfig?.id,
+            ),
           );
-        } else {
-          try {
-            await createStandingApproval(
-              buildCreateStandingApprovalFromApproval(
-                approval,
-                matchingActionConfig.id,
-              ),
-            );
-            setStandingApprovalCreated(true);
-          } catch (err) {
-            const message =
-              err instanceof Error
-                ? err.message
-                : "Failed to create auto-approval rule.";
-            Alert.alert("Auto-approval failed", message);
-          }
+          setStandingApprovalCreated(true);
+        } catch (err) {
+          const message =
+            err instanceof Error
+              ? err.message
+              : "Failed to create auto-approval rule.";
+          Alert.alert("Auto-approval failed", message);
         }
       }
     } catch (err) {
@@ -234,7 +227,6 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     approveApproval,
     approval,
     autoApproveFuture,
-    configsFetched,
     matchingActionConfig,
     createStandingApproval,
   ]);

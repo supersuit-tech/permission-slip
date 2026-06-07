@@ -233,6 +233,66 @@ describe("ReviewApprovalDialog — auto-approve future requests", () => {
     ).toBeInTheDocument();
   });
 
+  it("creates standing approval without config id when no action configuration exists", async () => {
+    setupMocks({ actionConfigs: [] });
+    mockApproveSuccess();
+    mockPost.mockResolvedValueOnce({
+      data: {
+        standing_approval_id: "sa_new",
+        agent_id: 1,
+        action_type: "email.send",
+        status: "active",
+      },
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ReviewApprovalDialog
+        approval={makeApproval()}
+        agentDisplayName="Test Bot"
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await settleAuthHydration();
+
+    await waitFor(() => {
+      expect(
+        screen.getByLabelText("Auto-approve all future requests like this"),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(
+      screen.getByLabelText("Auto-approve all future requests like this"),
+    );
+    await user.click(screen.getByText("Approve"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Action Executed Successfully")).toBeInTheDocument();
+    });
+
+    const createCall = mockPost.mock.calls.find(
+      (call) => call[0] === "/v1/standing-approvals/create",
+    );
+    expect(createCall).toBeDefined();
+    expect(createCall?.[1]?.body).toMatchObject({
+      agent_id: 1,
+      action_type: "email.send",
+      constraints: {
+        recipient: "user@example.com",
+        subject: "Hello",
+      },
+      expires_at: null,
+    });
+    expect(createCall?.[1]?.body).not.toHaveProperty("source_action_configuration_id");
+
+    expect(
+      screen.getByText("Future matching requests will be auto-approved."),
+    ).toBeInTheDocument();
+  });
+
   it("standing approval failure does not block approve from succeeding", async () => {
     setupMocks();
     mockApproveSuccess();

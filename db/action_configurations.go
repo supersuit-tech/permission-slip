@@ -1,11 +1,10 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"errors"
 	"time"
-
 )
 
 // ActionConfiguration represents a row from the action_configurations table.
@@ -257,6 +256,29 @@ func DeleteActionConfig(ctx context.Context, db DBTX, configID, userID string) (
 // execution time, but standing approvals still gate actual execution
 // per-action-type.
 const WildcardActionType = "*"
+
+// FindLatestActionConfigForAgentActionType returns the best matching action
+// configuration for the given agent, user, and action type. Active configs
+// are preferred over disabled; among equal status, the newest wins.
+func FindLatestActionConfigForAgentActionType(ctx context.Context, db DBTX, agentID int64, userID, actionType string) (*ActionConfiguration, error) {
+	row := db.QueryRow(ctx,
+		`SELECT `+actionConfigColumns+`
+		 FROM action_configurations
+		 WHERE agent_id = $1 AND user_id = $2 AND action_type = $3
+		 ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'disabled' THEN 1 ELSE 2 END,
+		          created_at DESC
+		 LIMIT 1`,
+		agentID, userID, actionType,
+	)
+	ac, err := scanActionConfig(row)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return ac, nil
+}
 
 // ConnectorActionExists checks whether a (connector_id, action_type) pair
 // exists in the connector_actions table. Used to validate non-wildcard

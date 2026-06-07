@@ -1028,6 +1028,7 @@ func TestCreateStandingApproval_MissingSourceActionConfigurationID(t *testing.T)
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	standingApprovalTestConnectorOnly(t, tx, "email.send")
 
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -1042,8 +1043,30 @@ func TestCreateStandingApproval_MissingSourceActionConfigurationID(t *testing.T)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.SourceActionConfigurationID == nil || *resp.SourceActionConfigurationID == "" {
+		t.Fatal("expected auto-created source_action_configuration_id")
+	}
+
+	configs, err := db.ListActionConfigsByAgent(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("ListActionConfigsByAgent: %v", err)
+	}
+	if len(configs) != 1 {
+		t.Fatalf("expected 1 auto-created action config, got %d", len(configs))
+	}
+	if configs[0].Status != "active" {
+		t.Errorf("expected auto-created config status active, got %q", configs[0].Status)
+	}
+	if configs[0].Name != autoApprovedFromRequestConfigName {
+		t.Errorf("expected config name %q, got %q", autoApprovedFromRequestConfigName, configs[0].Name)
 	}
 }
 
@@ -1076,11 +1099,24 @@ func TestCreateStandingApproval_SourceActionConfigWrongAgent(t *testing.T) {
 	}
 }
 
+// standingApprovalTestConnectorOnly inserts connector + action rows without an action_configuration.
+func standingApprovalTestConnectorOnly(t *testing.T, tx db.DBTX, actionType string) {
+	t.Helper()
+	connectorIDPtr := connectorIDFromActionType(actionType)
+	if connectorIDPtr == nil {
+		t.Fatalf("action type %q has no connector prefix", actionType)
+	}
+	connectorID := *connectorIDPtr
+	testhelper.InsertConnector(t, tx, connectorID)
+	testhelper.InsertConnectorAction(t, tx, connectorID, actionType, actionType)
+}
+
 func TestCreateStandingApproval_SourceActionConfigIDEmpty(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	standingApprovalTestConnectorOnly(t, tx, "email.send")
 
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
@@ -1099,8 +1135,8 @@ func TestCreateStandingApproval_SourceActionConfigIDEmpty(t *testing.T) {
 
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -1411,5 +1447,123 @@ func TestCreateStandingApproval_BareStringPatternAutoWrapped(t *testing.T) {
 	bodyConstraint, ok := constraintsMap["body"].(string)
 	if !ok || bodyConstraint != "*" {
 		t.Errorf("expected body constraint to remain \"*\", got %v", constraintsMap["body"])
+	}
+}
+
+func TestCreateStandingApproval_AutoCreateReusesActiveConfig(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	acID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{
+		"agent_id": %d,
+		"action_type": "email.send",
+		"constraints": {"to": "user@example.com"},
+		"expires_at": "%s"
+	}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.SourceActionConfigurationID == nil || *resp.SourceActionConfigurationID != acID {
+		t.Errorf("expected reused config %q, got %v", acID, resp.SourceActionConfigurationID)
+	}
+
+	configs, err := db.ListActionConfigsByAgent(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("ListActionConfigsByAgent: %v", err)
+	}
+	if len(configs) != 1 {
+		t.Fatalf("expected 1 action config (no duplicate), got %d", len(configs))
+	}
+}
+
+func TestCreateStandingApproval_AutoCreateReactivatesDisabledConfig(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	standingApprovalTestConnectorOnly(t, tx, "email.send")
+	acID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfigFull(t, tx, acID, agentID, uid, "email", "email.send", testhelper.ActionConfigOpts{
+		Status: "disabled",
+	})
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{
+		"agent_id": %d,
+		"action_type": "email.send",
+		"constraints": {"to": "user@example.com"},
+		"expires_at": "%s"
+	}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.SourceActionConfigurationID == nil || *resp.SourceActionConfigurationID != acID {
+		t.Errorf("expected reactivated config %q, got %v", acID, resp.SourceActionConfigurationID)
+	}
+
+	ac, err := db.GetActionConfigByID(t.Context(), tx, acID, uid)
+	if err != nil {
+		t.Fatalf("GetActionConfigByID: %v", err)
+	}
+	if ac == nil || ac.Status != "active" {
+		t.Errorf("expected config reactivated to active, got %+v", ac)
+	}
+
+	configs, err := db.ListActionConfigsByAgent(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("ListActionConfigsByAgent: %v", err)
+	}
+	if len(configs) != 1 {
+		t.Fatalf("expected 1 action config (no duplicate), got %d", len(configs))
+	}
+}
+
+func TestCreateStandingApproval_AutoCreateUnderivableConnector(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{
+		"agent_id": %d,
+		"action_type": "malformed_action_type",
+		"constraints": {"to": "user@example.com"},
+		"expires_at": "%s"
+	}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 }

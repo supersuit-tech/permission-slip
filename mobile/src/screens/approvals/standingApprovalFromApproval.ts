@@ -26,7 +26,7 @@ function standingApprovalConstraintsForCreate(
 
 export function buildCreateStandingApprovalFromApproval(
   approval: ApprovalSummary,
-  sourceActionConfigurationId: string,
+  sourceActionConfigurationId?: string,
 ): CreateStandingApprovalRequest {
   const params = approval.action.parameters as Record<string, unknown>;
   const version =
@@ -34,12 +34,17 @@ export function buildCreateStandingApprovalFromApproval(
       ? approval.action.version
       : "1";
 
-  return {
+  const request: CreateStandingApprovalRequest = {
     agent_id: approval.agent_id,
     action_type: approval.action.type,
     action_version: version,
     constraints: standingApprovalConstraintsForCreate(params),
-    source_action_configuration_id: sourceActionConfigurationId,
     expires_at: null,
   };
+
+  if (sourceActionConfigurationId !== undefined) {
+    request.source_action_configuration_id = sourceActionConfigurationId;
+  }
+
+  return request;
 }
