@@ -1,22 +1,23 @@
-package db
+package db_test
 
 import (
 	"context"
 	"testing"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
 func TestComputeActionFingerprintStable(t *testing.T) {
 	t.Parallel()
 	action := []byte(`{"type":"email.send","parameters":{"to":"alice@example.com"}}`)
-	a := ComputeActionFingerprint(42, "approver-1", action)
-	b := ComputeActionFingerprint(42, "approver-1", action)
+	a := db.ComputeActionFingerprint(42, "approver-1", action)
+	b := db.ComputeActionFingerprint(42, "approver-1", action)
 	if a != b {
 		t.Fatalf("expected stable fingerprint, got %q vs %q", a, b)
 	}
-	if a == ComputeActionFingerprint(43, "approver-1", action) {
+	if a == db.ComputeActionFingerprint(43, "approver-1", action) {
 		t.Fatal("expected different fingerprint for different agent")
 	}
 }
@@ -29,7 +30,7 @@ func TestFindRecentDeniedApproval(t *testing.T) {
 	agentID := testhelper.InsertAgent(t, tx, uid)
 
 	action := []byte(`{"type":"email.send","parameters":{"to":"alice@example.com"}}`)
-	fingerprint := ComputeActionFingerprint(agentID, uid, action)
+	fingerprint := db.ComputeActionFingerprint(agentID, uid, action)
 	approvalID := testhelper.GenerateID(t, "appr_")
 
 	_, err := tx.Exec(context.Background(),
@@ -41,7 +42,7 @@ func TestFindRecentDeniedApproval(t *testing.T) {
 		t.Fatalf("insert denied approval: %v", err)
 	}
 
-	found, err := FindRecentDeniedApproval(context.Background(), tx, agentID, uid, fingerprint, time.Now().Add(-time.Hour))
+	found, err := db.FindRecentDeniedApproval(context.Background(), tx, agentID, uid, fingerprint, time.Now().Add(-time.Hour))
 	if err != nil {
 		t.Fatalf("FindRecentDeniedApproval: %v", err)
 	}
@@ -49,7 +50,7 @@ func TestFindRecentDeniedApproval(t *testing.T) {
 		t.Fatalf("expected recent denial %q, got %+v", approvalID, found)
 	}
 
-	outsideWindow, err := FindRecentDeniedApproval(context.Background(), tx, agentID, uid, fingerprint, time.Now().Add(time.Minute))
+	outsideWindow, err := db.FindRecentDeniedApproval(context.Background(), tx, agentID, uid, fingerprint, time.Now().Add(time.Minute))
 	if err != nil {
 		t.Fatalf("FindRecentDeniedApproval outside window: %v", err)
 	}
