@@ -1102,11 +1102,11 @@ func TestCreateStandingApproval_SourceActionConfigWrongAgent(t *testing.T) {
 // standingApprovalTestConnectorOnly inserts connector + action rows without an action_configuration.
 func standingApprovalTestConnectorOnly(t *testing.T, tx db.DBTX, actionType string) {
 	t.Helper()
-	safe := strings.ReplaceAll(strings.ReplaceAll(actionType, ".", "_"), "*", "wildcard")
-	connectorID := "tconn_" + safe
-	if len(connectorID) > 200 {
-		connectorID = connectorID[:200]
+	connectorIDPtr := connectorIDFromActionType(actionType)
+	if connectorIDPtr == nil {
+		t.Fatalf("action type %q has no connector prefix", actionType)
 	}
+	connectorID := *connectorIDPtr
 	testhelper.InsertConnector(t, tx, connectorID)
 	testhelper.InsertConnectorAction(t, tx, connectorID, actionType, actionType)
 }
@@ -1498,7 +1498,7 @@ func TestCreateStandingApproval_AutoCreateReactivatesDisabledConfig(t *testing.T
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	standingApprovalTestConnectorOnly(t, tx, "email.send")
 	acID := testhelper.GenerateID(t, "ac_")
-	testhelper.InsertActionConfigFull(t, tx, acID, agentID, uid, "tconn_email_send", "email.send", testhelper.ActionConfigOpts{
+	testhelper.InsertActionConfigFull(t, tx, acID, agentID, uid, "email", "email.send", testhelper.ActionConfigOpts{
 		Status: "disabled",
 	})
 
