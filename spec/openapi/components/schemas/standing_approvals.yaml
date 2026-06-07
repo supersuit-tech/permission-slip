@@ -240,7 +240,6 @@ CreateStandingApprovalRequest:
     - agent_id
     - action_type
     - constraints
-    - source_action_configuration_id
   properties:
     agent_id:
       type: integer
@@ -282,9 +281,13 @@ CreateStandingApprovalRequest:
       minLength: 1
       maxLength: 128
       description: |
-        Action configuration this standing approval is created from. Must exist,
-        belong to the same `agent_id`, and have the same `action_type` as the request.
-        Expected format: `ac_` prefix followed by 32 hex characters (e.g.,
+        Action configuration this standing approval is created from. When omitted,
+        the backend auto-creates or reactivates a backing configuration for the
+        agent and action type.
+
+        When provided, the configuration must exist, belong to the same `agent_id`,
+        and have the same `action_type` as the request. Expected format: `ac_` prefix
+        followed by 32 hex characters (e.g.,
         `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
         enforce the pattern — only non-empty and max 128 characters.
       example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"

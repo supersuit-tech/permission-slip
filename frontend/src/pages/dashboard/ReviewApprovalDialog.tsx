@@ -140,7 +140,7 @@ export function ReviewApprovalDialog({
   const isBusy = pendingAction !== null || isDenying;
 
   const { standingApprovals, isLoading: standingApprovalsLoading } = useStandingApprovals();
-  const { configs, isFetched: configsFetched } = useActionConfigs(approval.agent_id);
+  const { configs } = useActionConfigs(approval.agent_id);
   const params = approval.action.parameters as Record<string, unknown>;
   const hasParams = Object.keys(params).length > 0;
   const hasExistingStandingApproval = useMemo(
@@ -188,26 +188,20 @@ export function ReviewApprovalDialog({
       setApproveResult(result);
 
       if (autoApproveFuture && result.execution_status !== "error") {
-        if (!configsFetched || !matchingActionConfig) {
-          toast.error(
-            "Request approved, but no action configuration was found to enable auto-approval.",
+        try {
+          await createStandingApproval(
+            buildCreateStandingApprovalFromApproval(
+              approval,
+              matchingActionConfig?.id,
+            ),
           );
-        } else {
-          try {
-            await createStandingApproval(
-              buildCreateStandingApprovalFromApproval(
-                approval,
-                matchingActionConfig.id,
-              ),
-            );
-            setStandingApprovalCreated(true);
-          } catch (err) {
-            toast.error(
-              err instanceof Error
-                ? err.message
-                : "Request approved, but failed to create auto-approval rule.",
-            );
-          }
+          setStandingApprovalCreated(true);
+        } catch (err) {
+          toast.error(
+            err instanceof Error
+              ? err.message
+              : "Request approved, but failed to create auto-approval rule.",
+          );
         }
       }
     } catch {
@@ -219,7 +213,6 @@ export function ReviewApprovalDialog({
     approveApproval,
     approval,
     autoApproveFuture,
-    configsFetched,
     matchingActionConfig,
     createStandingApproval,
   ]);
