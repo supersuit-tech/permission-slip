@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -8,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
@@ -708,6 +710,43 @@ func TestDenyApproval_Success(t *testing.T) {
 	}
 	if resp.DeniedAt.IsZero() {
 		t.Error("expected denied_at to be set")
+	}
+}
+
+func TestDenyApproval_WithReason(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	apprID := testhelper.GenerateID(t, "appr_")
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertApproval(t, tx, apprID, agentID, uid)
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedJSONRequest(t, http.MethodPost, "/approvals/"+apprID+"/deny", uid, `{"reason":"Not authorized for this recipient"}`)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp denyResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.Reason == nil || *resp.Reason != "Not authorized for this recipient" {
+		t.Errorf("expected denial reason in response, got %v", resp.Reason)
+	}
+
+	appr, err := db.GetApprovalByIDAndApprover(context.Background(), tx, apprID, uid)
+	if err != nil {
+		t.Fatalf("get approval: %v", err)
+	}
+	if appr == nil || appr.DenialReason == nil || *appr.DenialReason != "Not authorized for this recipient" {
+		t.Errorf("expected denial reason persisted on approval, got %+v", appr)
 	}
 }
 

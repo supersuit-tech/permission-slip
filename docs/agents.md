@@ -469,6 +469,20 @@ permission-slip status "$APPROVAL_ID"
 
 If your agent needs to wait for approval, implement your own polling loop externally. This gives you full control over timing, cancellation, and concurrency.
 
+Poll `GET /approvals/{approval_id}/status` and treat the HTTP status code as authoritative:
+
+| Outcome | HTTP | `error.code` (if non-200) | Agent action |
+|---|---|---|---|
+| Still pending | `200` | — | Keep polling (`terminal: false`) |
+| Approved | `200` | — | Stop polling; read `execution_result` (`terminal: true`) |
+| Denied | `409` | `approval_denied` | **Stop.** Do not retry without user intervention |
+| Expired | `410` | `approval_expired` | Stop; submit a new approval if still needed |
+| Cancelled | `409` | `approval_cancelled` | Stop; submit a new approval only if the user asks |
+
+Every `200` response includes `terminal` and `retryable` booleans. Terminal-negative states always return non-200 responses with `retryable: false` in the error body. When the approver supplied a denial reason, it appears in `error.details.reason` (non-200) or the `reason` field (200 responses for historical compatibility).
+
+**Dedup protection:** If you re-submit the same action shortly after a denial, Permission Slip returns `409 Conflict` with `approval_recently_denied` instead of creating a new pending approval. This prevents spamming the approver. The cooldown window defaults to 10 minutes and is configurable server-side via `APPROVAL_DENIAL_COOLDOWN`.
+
 Alternatively, the user can share the approval confirmation code out-of-band (paste it in chat, set it in your config, etc.).
 
 #### 4a-3. Verify and Get Token
@@ -657,7 +671,9 @@ All errors follow a consistent format:
 | `invite_locked` | 423 | 5 failed registration attempts — user must create new invite |
 | `registration_expired` | 410 | Didn't verify within 5 minutes — re-register |
 | `invalid_code` | 401 | Wrong confirmation code — check `attempts_remaining` in details |
-| `approval_denied` | 403 | User explicitly denied — do not retry without user intervention |
+| `approval_denied` | 409 | User explicitly denied — do not retry without user intervention |
+| `approval_cancelled` | 409 | Agent or user cancelled — do not retry the same approval ID |
+| `approval_recently_denied` | 409 | Same action was recently denied — do not retry; wait for user guidance |
 | `approval_expired` | 410 | Approval TTL elapsed — re-request |
 | `invalid_parameters` | 403 | Parameters don't match what was approved — must match exactly |
 | `token_already_used` | 403 | Token consumed — request new approval |

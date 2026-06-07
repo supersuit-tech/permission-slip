@@ -122,6 +122,8 @@ ApprovalRequestResponse:
     result, or listen via `GET /v1/approvals/events` (SSE).
   required:
     - status
+    - terminal
+    - retryable
   properties:
     approval_id:
       type: string
@@ -153,6 +155,20 @@ ApprovalRequestResponse:
         `approved` — auto-approved via standing approval, result is inline.
       example: "pending"
 
+    terminal:
+      type: boolean
+      description: |
+        `true` when the approval lifecycle is complete (`approved`).
+        `false` while awaiting human review (`pending`).
+      example: false
+
+    retryable:
+      type: boolean
+      description: |
+        Whether the agent should retry the request. Always `false` for approval
+        request responses — agents must not blindly re-submit denied actions.
+      example: false
+
     expires_at:
       type: string
       format: date-time
@@ -182,7 +198,20 @@ ApprovalRequestResponse:
     approval_id: "appr_xyz789"
     approval_url: "http://localhost:8080/permission-slip/approve/appr_xyz789"
     status: "pending"
+    terminal: false
+    retryable: false
     expires_at: "2026-02-11T13:25:00Z"
+
+DenyApprovalRequest:
+  type: object
+  properties:
+    reason:
+      type: string
+      maxLength: 500
+      description: |
+        Optional human-readable explanation for the denial. Returned to the
+        agent via the status endpoint so it can adapt rather than retry blindly.
+      example: "This recipient is not on the approved contacts list."
 
 CancelApprovalRequest:
   type: object
@@ -394,6 +423,8 @@ ApprovalStatusResponse:
   required:
     - approval_id
     - status
+    - terminal
+    - retryable
   properties:
     approval_id:
       type: string
@@ -409,6 +440,32 @@ ApprovalStatusResponse:
         - expired
       description: Current status of the approval request. Pending approvals past their expiration time are returned as "expired".
       example: "approved"
+
+    terminal:
+      type: boolean
+      description: |
+        `true` when the approval lifecycle is complete and will not change
+        (`approved`, `denied`, `cancelled`, `expired`). `false` while still
+        `pending`.
+      example: true
+
+    retryable:
+      type: boolean
+      description: |
+        Whether the agent should retry the request. Always `false` for approval
+        status responses — terminal-negative states return non-200 HTTP codes.
+      example: false
+
+    reason:
+      type: string
+      maxLength: 500
+      description: |
+        Optional human-readable explanation when the approver denied the
+        request. Present on successful (200) responses only when the approver
+        supplied a reason; terminal error responses include `reason` in
+        `error.details` instead.
+      example: "Recipient not on approved contacts list."
+
     approved_at:
       type: string
       format: date-time
@@ -464,3 +521,9 @@ DenyApprovalResponse:
       format: date-time
       description: When the approval was denied
       example: "2026-02-21T10:30:00Z"
+    reason:
+      type: string
+      maxLength: 500
+      description: |
+        Optional human-readable explanation provided by the approver when denying.
+      example: "Recipient not on approved contacts list."

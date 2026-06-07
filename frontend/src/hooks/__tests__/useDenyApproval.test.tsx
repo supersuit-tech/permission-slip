@@ -36,9 +36,33 @@ describe("useDenyApproval", () => {
       {
         headers: { Authorization: expect.stringMatching(/^Bearer /) },
         params: { path: { approval_id: "approval-abc" } },
+        body: undefined,
       },
     );
     expect(result.current.isPending).toBe(false);
+  });
+
+  it("sends optional denial reason in request body", async () => {
+    setupAuthMocks({ authenticated: true });
+    mockPost.mockResolvedValue({
+      data: { approval_id: "approval-abc", status: "denied", denied_at: "2026-02-21T12:00:00Z" },
+    });
+
+    const { result } = renderHook(() => useDenyApproval(), {
+      wrapper,
+    });
+
+    await settleAuthHydration();
+    await act(async () => {
+      await result.current.denyApproval("approval-abc", "Not authorized for this recipient");
+    });
+
+    expect(mockPost).toHaveBeenCalledWith(
+      "/v1/approvals/{approval_id}/deny",
+      expect.objectContaining({
+        body: { reason: "Not authorized for this recipient" },
+      }),
+    );
   });
 
   it("throws when not authenticated", async () => {

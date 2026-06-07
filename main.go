@@ -112,6 +112,7 @@ func main() {
 
 	// Apply APPROVAL_REQUEST_TTL override (defaults to 10m, clamped to [1m, 24h]).
 	db.DefaultApprovalTTL = db.ApprovalTTLFromEnv(logger)
+	db.DefaultDenialCooldown = db.DenialCooldownFromEnv(logger)
 
 	// Configure dependencies
 	var deps api.Deps
@@ -132,7 +133,7 @@ func main() {
 		log.Println("Rate limiting: disabled (development mode)")
 	}
 	deps.BaseURL = os.Getenv("BASE_URL")
-	deps.InviteHMACKey = os.Getenv("INVITE_HMAC_KEY")
+	deps.ApprovalDenialCooldown = db.DefaultDenialCooldown
 
 	// Initialize SSE broker for real-time approval notifications.
 	deps.ApprovalEvents = api.NewApprovalEventBroker()

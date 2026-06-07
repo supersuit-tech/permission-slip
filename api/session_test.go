@@ -57,6 +57,7 @@ func authenticatedJSONRequest(t *testing.T, method, path, userID, body string) *
 	t.Helper()
 	r := authenticatedRequest(t, method, path, userID)
 	r.Body = io.NopCloser(strings.NewReader(body))
+	r.ContentLength = int64(len(body))
 	r.Header.Set("Content-Type", "application/json")
 	return r
 }

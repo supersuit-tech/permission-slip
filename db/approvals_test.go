@@ -19,7 +19,7 @@ func TestApprovalsSchema(t *testing.T) {
 			"approval_id", "agent_id", "approver_id", "action", "context",
 			"status", "execution_status", "execution_result", "executed_at",
 			"expires_at", "approved_at", "denied_at",
-			"cancelled_at", "created_at",
+			"cancelled_at", "denial_reason", "action_fingerprint", "created_at",
 		})
 	})
 	t.Run("request_ids", func(t *testing.T) {
@@ -39,6 +39,7 @@ func TestApprovalIndexes(t *testing.T) {
 		{"approvals", "idx_approvals_agent_created"},
 		{"approvals", "idx_approvals_expires_at"},
 		{"approvals", "idx_approvals_approver_created"},
+		{"approvals", "idx_approvals_denial_dedup"},
 		{"request_ids", "idx_request_ids_created_at"},
 	}
 

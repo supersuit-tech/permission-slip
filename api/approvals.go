@@ -49,6 +49,11 @@ type denyResponse struct {
 	ApprovalID string    `json:"approval_id"`
 	Status     string    `json:"status"`
 	DeniedAt   time.Time `json:"denied_at"`
+	Reason     *string   `json:"reason,omitempty"`
+}
+
+type denyApprovalRequest struct {
+	Reason string `json:"reason,omitempty" validate:"omitempty,max=500"`
 }
 
 // approvalDetailResponse includes execution details for the activity feed
@@ -305,7 +310,18 @@ func handleDenyApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		appr, agentMeta, err := db.DenyApproval(r.Context(), deps.DB, approvalID, profile.ID)
+		var req denyApprovalRequest
+		if ct := r.Header.Get("Content-Type"); strings.HasPrefix(ct, "application/json") {
+			if !DecodeJSONOrReject(w, r, &req) {
+				return
+			}
+			if !ValidateRequest(w, r, &req) {
+				return
+			}
+		}
+		reason := strings.TrimSpace(req.Reason)
+
+		appr, agentMeta, err := db.DenyApproval(r.Context(), deps.DB, approvalID, profile.ID, reason)
 		if err != nil {
 			if handleApprovalError(w, r, err) {
 				return
@@ -325,6 +341,7 @@ func handleDenyApproval(deps *Deps) http.HandlerFunc {
 			ApprovalID: appr.ApprovalID,
 			Status:     appr.Status,
 			DeniedAt:   *appr.DeniedAt,
+			Reason:     appr.DenialReason,
 		})
 	}
 }

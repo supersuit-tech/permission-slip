@@ -127,6 +127,8 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 
 	RespondJSON(w, http.StatusOK, agentRequestApprovalResponse{
 		Status:             "approved",
+		Terminal:           true,
+		Retryable:          false,
 		Result:             actionResultPtr,
 		StandingApprovalID: sa.StandingApprovalID,
 	})

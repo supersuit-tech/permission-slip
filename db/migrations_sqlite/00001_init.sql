@@ -288,9 +288,13 @@ CREATE TABLE approvals (
     execution_result TEXT,
     executed_at TEXT,
     resource_details TEXT,
+    denial_reason TEXT,
+    action_fingerprint TEXT,
     CONSTRAINT approvals_action_check CHECK (length(action) <= 65536),
     CONSTRAINT approvals_approval_id_check CHECK (length(approval_id) <= 255),
     CONSTRAINT approvals_context_check CHECK (length(context) <= 262144),
+    CONSTRAINT approvals_denial_reason_check CHECK (denial_reason IS NULL OR length(denial_reason) <= 500),
+    CONSTRAINT approvals_action_fingerprint_check CHECK (action_fingerprint IS NULL OR length(action_fingerprint) <= 64),
     CONSTRAINT approvals_execution_status_check CHECK (execution_status IS NULL OR execution_status IN ('pending', 'success', 'error')),
     CONSTRAINT approvals_status_check CHECK (status IN ('pending', 'approved', 'denied', 'cancelled')),
     CONSTRAINT chk_execution_columns_consistent CHECK (
@@ -304,6 +308,7 @@ CREATE INDEX idx_approvals_agent_created ON approvals(agent_id, created_at);
 CREATE INDEX idx_approvals_agent_status ON approvals(agent_id, status);
 CREATE INDEX idx_approvals_approver_created ON approvals(approver_id, created_at DESC, approval_id DESC);
 CREATE INDEX idx_approvals_expires_at ON approvals(expires_at);
+CREATE INDEX idx_approvals_denial_dedup ON approvals(agent_id, approver_id, action_fingerprint, denied_at DESC) WHERE status = 'denied';
 
 CREATE TABLE action_configurations (
     id TEXT PRIMARY KEY,

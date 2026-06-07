@@ -40,9 +40,14 @@ type agentRequestApprovalResponse struct {
 	ExpiresAt   *time.Time `json:"expires_at,omitempty"`
 	CreatedAt   *time.Time `json:"created_at,omitempty"`
 
-	// ── Common field ──
+	// ── Common fields ──
 	// "pending" = awaiting human approval; "approved" = auto-approved via standing approval.
 	Status string `json:"status"`
+
+	// terminal is true when the approval lifecycle is complete (approved, denied, etc.).
+	Terminal bool `json:"terminal"`
+	// retryable is false for all approval outcomes — agents must not blindly re-request.
+	Retryable bool `json:"retryable"`
 
 	// ── Auto-approved fields (status="approved") ──
 	// Present only when a standing approval matched and the action was
@@ -247,6 +252,18 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		actionFingerprint := db.ComputeActionFingerprint(agent.AgentID, agent.ApproverID, req.Action)
+		cooldownSince := time.Now().UTC().Add(-approvalDenialCooldown(deps))
+		if recentDenied, err := db.FindRecentDeniedApproval(r.Context(), deps.DB, agent.AgentID, agent.ApproverID, actionFingerprint, cooldownSince); err != nil {
+			log.Printf("[%s] AgentRequestApproval: recent denial lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create approval"))
+			return
+		} else if recentDenied != nil {
+			respondRecentlyDeniedApproval(w, r, recentDenied)
+			return
+		}
+
 		// Compute expiration.
 		expiresAt := time.Now().UTC().Add(db.DefaultApprovalTTL)
 		if req.ExpiresIn != nil {
@@ -303,13 +320,14 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		)
 
 		approval, err := db.InsertApproval(r.Context(), deps.DB, db.InsertApprovalParams{
-			ApprovalID:      approvalID,
-			AgentID:         agent.AgentID,
-			ApproverID:      agent.ApproverID,
-			Action:          req.Action,
-			Context:         contextForStore,
-			ResourceDetails: resourceDetails,
-			ExpiresAt:       expiresAt,
+			ApprovalID:        approvalID,
+			AgentID:           agent.AgentID,
+			ApproverID:        agent.ApproverID,
+			Action:            req.Action,
+			Context:           contextForStore,
+			ResourceDetails:   resourceDetails,
+			ActionFingerprint: actionFingerprint,
+			ExpiresAt:         expiresAt,
 		}, req.RequestID)
 		if err != nil {
 			var apprErr *db.ApprovalError
@@ -343,6 +361,8 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			ApprovalID:  approval.ApprovalID,
 			ApprovalURL: approvalURL,
 			Status:      approval.Status,
+			Terminal:    false,
+			Retryable:   false,
 			ExpiresAt:   &approval.ExpiresAt,
 			CreatedAt:   &approval.CreatedAt,
 		})
@@ -391,6 +411,9 @@ func handleAgentCancelApproval(deps *Deps) http.HandlerFunc {
 type agentApprovalStatusResponse struct {
 	ApprovalID      string           `json:"approval_id"`
 	Status          string           `json:"status"`
+	Terminal        bool             `json:"terminal"`
+	Retryable       bool             `json:"retryable"`
+	Reason          *string          `json:"reason,omitempty"`
 	ExecutionStatus *string          `json:"execution_status,omitempty"`
 	ExecutionResult *json.RawMessage `json:"execution_result,omitempty"`
 	ExpiresAt       time.Time        `json:"expires_at"`
@@ -419,21 +442,7 @@ func handleAgentApprovalStatus(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		resp := agentApprovalStatusResponse{
-			ApprovalID: appr.ApprovalID,
-			Status:     resolvedApprovalStatus(*appr),
-			ExpiresAt:  appr.ExpiresAt,
-			CreatedAt:  appr.CreatedAt,
-		}
-		if appr.ExecutionStatus != nil {
-			resp.ExecutionStatus = appr.ExecutionStatus
-		}
-		if len(appr.ExecutionResult) > 0 {
-			raw := json.RawMessage(appr.ExecutionResult)
-			resp.ExecutionResult = &raw
-		}
-
-		RespondJSON(w, http.StatusOK, resp)
+		respondAgentApprovalStatus(w, r, appr)
 	}
 }
 
@@ -442,6 +451,13 @@ func handleAgentApprovalStatus(deps *Deps) http.HandlerFunc {
 // handleAgentApprovalError is an alias for the shared handleApprovalError
 // in approvals.go. Both dashboard and agent endpoints use the same mapping.
 var handleAgentApprovalError = handleApprovalError
+
+func approvalDenialCooldown(deps *Deps) time.Duration {
+	if deps.ApprovalDenialCooldown > 0 {
+		return deps.ApprovalDenialCooldown
+	}
+	return db.DefaultDenialCooldown
+}
 
 // resolveCredentialsForResolver is a best-effort credential resolver for the
 // ResourceDetailResolver call. It mirrors the credential resolution logic from
