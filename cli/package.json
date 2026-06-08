@@ -1,6 +1,6 @@
 {
   "name": "@permission-slip/cli",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "Agent-facing CLI for Permission Slip — register, verify, and interact with Permission Slip servers",
   "license": "MIT",
   "type": "module",
@@ -30,7 +30,7 @@
     "@types/node": "^25.6.0",
     "jest": "^30.3.0",
     "ts-jest": "^29.3.0",
-    "typescript": "^6.0.3"
+    "typescript": "^5.7.2"
   },
   "jest": {
     "preset": "ts-jest/presets/default-esm",
