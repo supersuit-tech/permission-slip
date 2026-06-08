@@ -6,6 +6,16 @@ about new capabilities since their last use.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.18] - 2026-06-08
+
+### Fixed
+
+- **CLI publishing restored.** The npm publish workflow had been failing since 0.1.16
+  because a TypeScript 6.0 bump broke Node type resolution during the `tsc` build, so
+  0.1.16 and 0.1.17 never reached npm. Pinned TypeScript back to 5.7.x to unblock
+  publishing; this release carries the 0.1.16/0.1.17 features (`request-bulk`,
+  `changelog`, bulk group status polling) to npm.
+
 ## [0.1.17] - 2026-06-07
 
 ### Added
