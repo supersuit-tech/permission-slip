@@ -220,13 +220,13 @@ func TestRateLimitKey_HandlesIPv6(t *testing.T) {
 	}
 }
 
-func TestClientIP_FlyClientIPHeader(t *testing.T) {
+func TestClientIP_CustomProxyHeader(t *testing.T) {
 	t.Parallel()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "172.16.0.1:12345" // proxy IP
-	req.Header.Set("Fly-Client-IP", "203.0.113.50")
+	req.Header.Set("X-Real-IP", "203.0.113.50")
 
-	ip := clientIP(req, "Fly-Client-IP")
+	ip := clientIP(req, "X-Real-IP")
 	if ip != "203.0.113.50" {
 		t.Fatalf("expected %q, got %q", "203.0.113.50", ip)
 	}
@@ -273,9 +273,9 @@ func TestClientIP_FallsBackToRemoteAddrWhenHeaderMissing(t *testing.T) {
 	t.Parallel()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "192.168.1.100:54321"
-	// No Fly-Client-IP header set.
+	// No X-Real-IP header set.
 
-	ip := clientIP(req, "Fly-Client-IP")
+	ip := clientIP(req, "X-Real-IP")
 	if ip != "192.168.1.100" {
 		t.Fatalf("expected %q, got %q", "192.168.1.100", ip)
 	}
@@ -285,9 +285,9 @@ func TestClientIP_FallsBackToRemoteAddrWhenHeaderEmpty(t *testing.T) {
 	t.Parallel()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "192.168.1.100:54321"
-	req.Header.Set("Fly-Client-IP", "")
+	req.Header.Set("X-Real-IP", "")
 
-	ip := clientIP(req, "Fly-Client-IP")
+	ip := clientIP(req, "X-Real-IP")
 	if ip != "192.168.1.100" {
 		t.Fatalf("expected %q, got %q", "192.168.1.100", ip)
 	}
@@ -297,7 +297,7 @@ func TestClientIP_FallsBackToRemoteAddrWhenNoProxyConfigured(t *testing.T) {
 	t.Parallel()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "192.168.1.100:54321"
-	req.Header.Set("Fly-Client-IP", "203.0.113.50") // should be ignored
+	req.Header.Set("X-Real-IP", "203.0.113.50") // should be ignored
 
 	ip := clientIP(req, "")
 	if ip != "192.168.1.100" {
@@ -309,9 +309,9 @@ func TestClientIP_IPv6InProxyHeader(t *testing.T) {
 	t.Parallel()
 	req := httptest.NewRequest("GET", "/", nil)
 	req.RemoteAddr = "172.16.0.1:12345"
-	req.Header.Set("Fly-Client-IP", "2001:db8::1")
+	req.Header.Set("X-Real-IP", "2001:db8::1")
 
-	ip := clientIP(req, "Fly-Client-IP")
+	ip := clientIP(req, "X-Real-IP")
 	if ip != "2001:db8::1" {
 		t.Fatalf("expected %q, got %q", "2001:db8::1", ip)
 	}
@@ -351,16 +351,16 @@ func TestRateLimitMiddleware_UsesProxyHeaderForRateLimiting(t *testing.T) {
 	})
 	limiter.nowFunc = func() time.Time { return now }
 
-	// Configure middleware with Fly-Client-IP as the trusted header.
-	handler := RateLimitMiddleware(limiter, false, "Fly-Client-IP")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	// Configure middleware with X-Real-IP as the trusted header.
+	handler := RateLimitMiddleware(limiter, false, "X-Real-IP")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	// Two requests from different RemoteAddrs but the same Fly-Client-IP
+	// Two requests from different RemoteAddrs but the same X-Real-IP
 	// should share a rate limit bucket.
 	req1 := httptest.NewRequest("GET", "/api/v1/agents", nil)
 	req1.RemoteAddr = "172.16.0.1:11111"
-	req1.Header.Set("Fly-Client-IP", "203.0.113.50")
+	req1.Header.Set("X-Real-IP", "203.0.113.50")
 	rec1 := httptest.NewRecorder()
 	handler.ServeHTTP(rec1, req1)
 	if rec1.Code != http.StatusOK {
@@ -368,8 +368,8 @@ func TestRateLimitMiddleware_UsesProxyHeaderForRateLimiting(t *testing.T) {
 	}
 
 	req2 := httptest.NewRequest("GET", "/api/v1/agents", nil)
-	req2.RemoteAddr = "172.16.0.2:22222" // different proxy IP
-	req2.Header.Set("Fly-Client-IP", "203.0.113.50") // same client
+	req2.RemoteAddr = "172.16.0.2:22222"         // different proxy IP
+	req2.Header.Set("X-Real-IP", "203.0.113.50") // same client
 	rec2 := httptest.NewRecorder()
 	handler.ServeHTTP(rec2, req2)
 	if rec2.Code != http.StatusTooManyRequests {
@@ -379,7 +379,7 @@ func TestRateLimitMiddleware_UsesProxyHeaderForRateLimiting(t *testing.T) {
 	// A request from a different client IP should still be allowed.
 	req3 := httptest.NewRequest("GET", "/api/v1/agents", nil)
 	req3.RemoteAddr = "172.16.0.3:33333"
-	req3.Header.Set("Fly-Client-IP", "198.51.100.99") // different client
+	req3.Header.Set("X-Real-IP", "198.51.100.99") // different client
 	rec3 := httptest.NewRecorder()
 	handler.ServeHTTP(rec3, req3)
 	if rec3.Code != http.StatusOK {

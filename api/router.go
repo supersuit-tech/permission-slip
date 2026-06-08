@@ -32,7 +32,7 @@ type Deps struct {
 	AuthRateLimiter        *RateLimiter            // rate limiter for /api/auth/* (signup/login); nil disables
 	AgentRateLimiter       *RateLimiter            // post-auth rate limiter (per verified agent); nil disables
 	VerifyRateLimiter      *RateLimiter            // per-IP rate limiter for POST /agents/{id}/verify; nil disables
-	TrustedProxyHeader     string                  // header to read client IP from behind a reverse proxy (e.g. "Fly-Client-IP"); empty uses RemoteAddr
+	TrustedProxyHeader     string                  // header to read client IP from behind a reverse proxy (e.g. "X-Forwarded-For"); empty uses RemoteAddr
 	AllowedOrigins         []string                // allowed CORS origins; empty means cross-origin requests are blocked
 	Logger                 *slog.Logger            // structured logger for request logging; if nil, request logging is skipped
 	ApprovalEvents         *ApprovalEventBroker    // SSE broker for real-time approval notifications; nil disables SSE
