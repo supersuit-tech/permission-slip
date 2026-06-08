@@ -10,7 +10,7 @@
        migrate-up migrate-down migrate-create db-setup seed \
        bundle install-connectors \
        audit audit-backend audit-frontend audit-mobile \
-       docker-build deploy \
+       docker-build deploy redeploy \
        cli cli-install cli-build cli-test
 
 # Install all dependencies (frontend + backend + mobile + cli)
@@ -111,6 +111,12 @@ deploy:
 		--build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$${VITE_SUPABASE_PUBLISHABLE_KEY} \
 		--build-arg GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) \
 		--build-arg GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP)
+
+# Update a self-hosted (systemd) install in one step: pull latest, reinstall
+# deps, rebuild, and restart the service. See scripts/redeploy.sh for details.
+# Override the unit name with PS_SERVICE=<name> if it isn't "permission-slip".
+redeploy:
+	./scripts/redeploy.sh
 
 # ---------- Testing ----------
 

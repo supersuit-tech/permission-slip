@@ -194,6 +194,38 @@ curl https://$PS_HOSTNAME/api/health            # through Tailscale (run from an
 
 ---
 
+## Updating an existing install
+
+To pull the latest release and apply it, run one command from the repo:
+
+```bash
+cd ~/permission-slip
+make redeploy
+```
+
+This pulls `origin/main`, reinstalls dependencies, rebuilds the frontend and
+server, restarts the systemd service, and prints the build it's now running
+(the same short SHA shown in the app footer, so you can confirm the update took
+effect). New connector fields, manifest changes, and migrations are picked up on
+the restart — there's nothing else to remember.
+
+> The running server is only ever replaced by a **successful** build. If the
+> build fails, `make redeploy` stops before restarting and your service keeps
+> serving the previous working binary. A transient `git pull` failure is
+> non-fatal — it rebuilds the current checkout instead.
+
+> **Named the service something other than `permission-slip`?** Pass it through:
+> ```bash
+> PS_SERVICE=my-unit make redeploy
+> ```
+
+> **Cross-compiling on a beefier box?** `make redeploy` builds and restarts on
+> the machine it runs on. If you build elsewhere and `scp bin/server` over (see
+> the build note in Step 1), pull + build there, copy the binary, then restart
+> on the host with `sudo systemctl restart permission-slip`.
+
+---
+
 ## Step 5: Connect Google
 
 Permission Slip's Google connector handles Gmail and Calendar actions. To enable it, register an OAuth client in Google Cloud:
