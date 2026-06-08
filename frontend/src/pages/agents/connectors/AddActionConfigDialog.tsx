@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +31,12 @@ import {
   type ParamMode,
 } from "./ActionConfigFormFields";
 import { TemplatePicker } from "./TemplatePicker";
+import {
+  RiskBadge,
+  riskBlurb,
+  riskCardClass,
+  riskDialogAccentClass,
+} from "./RiskBadge";
 import type { ApprovalMode } from "./RecommendedTemplatesDialog";
 
 const approvalModeOptions: { label: string; value: ApprovalMode }[] = [
@@ -81,6 +87,9 @@ export function AddActionConfigDialog({
     () => actions.find((a) => a.action_type === selectedActionType) ?? null,
     [actions, selectedActionType],
   );
+
+  const riskLevel = selectedAction?.risk_level;
+  const isElevatedRisk = riskLevel === "high" || riskLevel === "medium";
 
   const schema = useMemo(
     // Cast is safe: parameters_schema is typed as `{ [key: string]: unknown }` in
@@ -253,7 +262,9 @@ export function AddActionConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
+      <DialogContent
+        className={`max-h-[85dvh] overflow-y-auto sm:max-w-lg ${riskDialogAccentClass(riskLevel)}`}
+      >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
             <DialogTitle>Add Action Configuration</DialogTitle>
@@ -271,6 +282,17 @@ export function AddActionConfigDialog({
               actions={actions}
               disabled={isPending}
             />
+
+            {selectedAction && (
+              <div
+                className={`flex items-start gap-3 rounded-lg border p-3 ${riskCardClass(riskLevel)}`}
+              >
+                <RiskBadge level={riskLevel} />
+                <p className="text-muted-foreground text-sm">
+                  {riskBlurb(riskLevel)}
+                </p>
+              </div>
+            )}
 
             {selectedActionType && (
               <TemplatePicker
@@ -296,6 +318,22 @@ export function AddActionConfigDialog({
                   ? "A standing approval will be created so matching requests run automatically."
                   : "Each request will require your explicit approval before it runs."}
               </p>
+              {approvalMode === "auto_approve" && isElevatedRisk && (
+                <div
+                  role="alert"
+                  className="bg-destructive/10 border-destructive/20 flex items-start gap-2 rounded-lg border p-3"
+                >
+                  <AlertTriangle
+                    className="text-destructive mt-0.5 size-4 shrink-0"
+                    aria-hidden="true"
+                  />
+                  <p className="text-destructive text-sm">
+                    Auto-approving a {riskLevel}-risk action lets this agent run
+                    it without your review every time. Make sure that's what you
+                    want.
+                  </p>
+                </div>
+              )}
             </div>
 
             <NameField
