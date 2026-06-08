@@ -165,71 +165,9 @@ Once Bridge is running, add **Proton Mail** credentials (`custom` auth) in the U
 | `imap_host` / `imap_port` | Optional; default `127.0.0.1` / `1143` |
 | `smtp_host` / `smtp_port` | Optional; default `127.0.0.1` / `1025` |
 
-**Where do the host/port values come from?** If Permission Slip and Bridge run on the **same machine**, leave the host/port fields blank — the `127.0.0.1` defaults are correct and match what Bridge serves. If you're unsure or the defaults don't connect, run `protonmail-bridge --cli` and type `info` to see the exact host and ports Bridge is listening on.
-
-If Permission Slip runs on a **different machine** on your network, **do not** change these host fields to the Bridge machine's LAN IP — that won't work (see [Running Permission Slip on a separate machine](#running-permission-slip-on-a-separate-machine) for why, and what to do instead). You'll set up a tunnel and keep these fields on the `127.0.0.1` defaults.
+**Where do the host/port values come from?** Bridge and Permission Slip run on the same machine, so leave the host/port fields blank — the `127.0.0.1` defaults are correct and match what Bridge serves. If the defaults don't connect, run `protonmail-bridge --cli` and type `info` to see the exact host and ports Bridge is listening on.
 
 Saving credentials runs a real **IMAP LOGIN** against Bridge. Bridge must be running at save time.
-
-## Running Permission Slip on a separate machine
-
-A common setup is Bridge on one box (say a mini PC that stays on) and the Permission Slip CLI on another machine on the same internal network. This works, but **not** by pointing the credential host fields at the Bridge machine's LAN IP. Two things make that fail:
-
-- **Bridge only listens on loopback.** By [deliberate design](https://protonmail.uservoice.com/forums/284483-proton-mail-calendar/suggestions/50891396-allow-bridge-to-bind-to-ip), Bridge binds IMAP/SMTP to `127.0.0.1` and has no setting to bind to a LAN interface. Other devices can't reach it directly.
-- **The connector changes transport based on the host.** When `imap_host` is loopback, the connector speaks the plain IMAP that Bridge serves on `1143`. For any non-loopback host it switches to implicit TLS — which Bridge doesn't offer on that port — and SMTP's STARTTLS would fail the certificate check, because Bridge's certificate is issued for `127.0.0.1`, not your LAN IP. So a LAN IP breaks both reading and sending.
-
-The clean fix is an **SSH tunnel from the Permission Slip machine to the Bridge machine**. The tunnel re-exposes Bridge's ports on the Permission Slip machine's *own* `127.0.0.1`, so the connector sees exactly what it expects (plain loopback IMAP, a `127.0.0.1` cert for STARTTLS), while the hop across your network is encrypted by SSH. Bridge stays loopback-only — nothing is exposed on the LAN in the clear.
-
-### 1. Open the tunnel from the Permission Slip machine
-
-Run this **on the machine where Permission Slip runs**, pointing at the Bridge host (use SSH key auth so it can run unattended):
-
-```bash
-ssh -N \
-  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
-  -L 127.0.0.1:1143:127.0.0.1:1143 \
-  -L 127.0.0.1:1025:127.0.0.1:1025 \
-  youruser@bridge-host.lan
-```
-
-`-L 127.0.0.1:1143:127.0.0.1:1143` means "listen on this machine's loopback port 1143 and forward to the Bridge host's loopback port 1143." You can SSH as any user that has shell access on the Bridge box — the forward targets that box's *own* `127.0.0.1`, which is where Bridge is listening, so it doesn't have to be the `proton` user.
-
-### 2. Keep it up with systemd (Permission Slip machine)
-
-So the tunnel survives reboots and reconnects after a network blip, run it as a user systemd unit on the Permission Slip machine:
-
-```bash
-mkdir -p ~/.config/systemd/user
-cat > ~/.config/systemd/user/proton-bridge-tunnel.service << 'EOF'
-[Unit]
-Description=SSH tunnel to Proton Mail Bridge
-After=network-online.target
-Wants=network-online.target
-
-[Service]
-ExecStart=/usr/bin/ssh -N \
-  -o ServerAliveInterval=30 -o ServerAliveCountMax=3 -o ExitOnForwardFailure=yes \
-  -L 127.0.0.1:1143:127.0.0.1:1143 \
-  -L 127.0.0.1:1025:127.0.0.1:1025 \
-  youruser@bridge-host.lan
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=default.target
-EOF
-
-loginctl enable-linger "$USER"
-systemctl --user daemon-reload
-systemctl --user enable --now proton-bridge-tunnel.service
-systemctl --user status proton-bridge-tunnel.service
-```
-
-> Use SSH key authentication (`ssh-copy-id youruser@bridge-host.lan`) so the unit never blocks on a password prompt. If you prefer automatic reconnection with a single process instead of relying on `Restart=always`, `autossh` is a drop-in alternative for the `ExecStart` line.
-
-### 3. Configure credentials normally
-
-With the tunnel up, Bridge is reachable on the Permission Slip machine at `127.0.0.1:1143` / `127.0.0.1:1025`, so add credentials exactly as in [Configure credentials](#configure-credentials-in-permission-slip) and **leave the host/port fields blank** (the `127.0.0.1` defaults). The username and bridge password are still the ones from `info` on the Bridge host.
 
 ## Migrating from `permission-slip-proton`
 
@@ -243,7 +181,6 @@ If you previously used the external [permission-slip-proton](https://github.com/
 | Auth / LOGIN errors | Username must match the address in Bridge; password must be the bridge password, not your Proton account password |
 | Connection refused on 1143/1025 | Another process using the port, or Bridge bound to a different interface. Run `protonmail-bridge --cli` and type `info` to confirm the host/port Bridge is actually serving |
 | Login loop in Bridge CLI | Clock skew, 2FA, or `pass` store not initialized |
-| TLS / certificate errors from a remote Permission Slip host | You pointed `imap_host`/`smtp_host` at the Bridge machine's LAN IP. Don't — use an SSH tunnel and keep the `127.0.0.1` defaults (see [Running Permission Slip on a separate machine](#running-permission-slip-on-a-separate-machine)) |
 | `sudo` asks for a password inside the proton shell | You ran `sudo` after `sudo -u proton bash`. The `proton` account has no password and no sudo rights. `exit` back to your admin user and run system/`apt` commands there (steps 1–2); only run the non-`sudo` commands as `proton` |
 | Archive action fails | Proton's Archive folder must exist; Bridge exposes it as `"Archive"` |
 
