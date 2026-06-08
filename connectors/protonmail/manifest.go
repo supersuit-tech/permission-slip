@@ -194,8 +194,55 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				Service:         "protonmail",
 				AuthType:        "custom",
 				InstructionsURL: "https://github.com/supersuit-tech/permission-slip/blob/main/docs/connectors/protonmail.md",
+				Fields: []connectors.ManifestCredentialField{
+					{
+						Key:         "username",
+						Label:       "Bridge username",
+						Placeholder: "Your Proton address as shown by Bridge info",
+						Secret:      ptrBool(false),
+						Required:    ptrBool(true),
+					},
+					{
+						Key:         "password",
+						Label:       "Bridge password",
+						Placeholder: "From Bridge info (not your Proton account password)",
+						Secret:      ptrBool(true),
+						Required:    ptrBool(true),
+						HelpText:    "Run protonmail-bridge info to get the Bridge-generated password. This is not your Proton account login password.",
+					},
+					{
+						Key:         "imap_host",
+						Label:       "IMAP host",
+						Placeholder: "127.0.0.1",
+						Secret:      ptrBool(false),
+						Required:    ptrBool(false),
+					},
+					{
+						Key:         "imap_port",
+						Label:       "IMAP port",
+						Placeholder: "1143",
+						Secret:      ptrBool(false),
+						Required:    ptrBool(false),
+					},
+					{
+						Key:         "smtp_host",
+						Label:       "SMTP host",
+						Placeholder: "127.0.0.1",
+						Secret:      ptrBool(false),
+						Required:    ptrBool(false),
+					},
+					{
+						Key:         "smtp_port",
+						Label:       "SMTP port",
+						Placeholder: "1025",
+						Secret:      ptrBool(false),
+						Required:    ptrBool(false),
+					},
+				},
 			},
 		},
 		Templates: protonmailTemplates(),
 	}
 }
+
+func ptrBool(b bool) *bool { return &b }
