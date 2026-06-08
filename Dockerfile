@@ -18,7 +18,7 @@ COPY spec/ /app/spec/
 RUN npm ci
 
 # Vite inlines VITE_* env vars into the JS bundle at build time.
-# Pass these as Docker build args (--build-arg) or via [build.args] in fly.toml.
+# Pass these as Docker build args (--build-arg); see the Makefile docker-build target.
 ARG VITE_SENTRY_DSN
 ARG VITE_POSTHOG_KEY
 ARG VITE_POSTHOG_HOST

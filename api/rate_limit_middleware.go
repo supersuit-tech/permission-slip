@@ -55,7 +55,7 @@ func DefaultAgentRateLimiterConfig() RateLimiterConfig {
 // HTTP 429 with the standard error format and Retry-After header.
 //
 // The key is the client's IP address, extracted from trustedProxyHeader
-// (e.g. "Fly-Client-IP") when behind a reverse proxy, falling back to
+// (e.g. "X-Forwarded-For") when behind a reverse proxy, falling back to
 // RemoteAddr for direct connections or local development.
 //
 // This runs before authentication, so identity-based (per-agent) rate limiting
@@ -116,16 +116,14 @@ func rateLimitKey(r *http.Request, trustedProxyHeader string) string {
 
 // clientIP extracts the real client IP address from the request.
 //
-// When trustedProxyHeader is set (e.g. "Fly-Client-IP"), the IP is read from
+// When trustedProxyHeader is set (e.g. "X-Forwarded-For"), the IP is read from
 // that header. This is necessary when running behind a reverse proxy where
-// RemoteAddr is always the proxy's IP. Fly-Client-IP is set by Fly.io's proxy
-// and cannot be spoofed by clients, making it the recommended default for
-// Fly.io deployments.
+// RemoteAddr is always the proxy's IP.
 //
 // If the header contains a comma-separated list (as with X-Forwarded-For),
 // the leftmost (first) IP is used. Note: X-Forwarded-For can be spoofed by
-// clients prepending arbitrary IPs, so Fly-Client-IP is preferred when
-// available.
+// clients prepending arbitrary IPs, so only enable this header when running
+// behind a trusted reverse proxy that overwrites it.
 //
 // Falls back to RemoteAddr (with port stripped) when no trusted header is
 // configured or the header is absent — suitable for local development or
