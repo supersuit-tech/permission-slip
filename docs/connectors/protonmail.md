@@ -120,6 +120,10 @@ protonmail-bridge --cli
 
 In the CLI: log in with your Proton account, complete 2FA, and let Bridge finish syncing. Then note the **Bridge-generated password** and IMAP/SMTP ports (defaults are usually IMAP `127.0.0.1:1143`, SMTP `127.0.0.1:1025`).
 
+This is a **one-time, interactive login** — you do **not** keep this terminal open. Bridge saves your account into its local store (under the `proton` user's home), so once you've logged in, synced, and copied down the bridge password, type `exit` to quit the CLI. Quit it **before** moving to step 5: the systemd service starts Bridge headless, and two Bridge instances can't both bind ports `1143`/`1025` at the same time. From step 5 onward, systemd runs Bridge for you — you never need to start `--cli` again unless you have to re-authenticate.
+
+> **If a Proton Mail Bridge GUI window opens, you can ignore it.** This guide drives Bridge entirely through the CLI (step 4) and then headless under systemd (step 5) — it never uses the desktop GUI. Some desktop Linux installs add an autostart entry that launches the Bridge window on login, or running `protonmail-bridge` with no flags opens it. Just close it. The only thing to avoid is running the GUI **and** the systemd service at the same time, since both would try to bind the same ports.
+
 ### 5. Run Bridge under systemd (user unit)
 
 ```bash
