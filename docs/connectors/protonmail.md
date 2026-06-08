@@ -28,9 +28,25 @@ Calendar, Drive, Contacts, VPN, and Pass are **not** available through Bridge (n
 
 These steps assume a dedicated Linux user (example: `proton`) on the same host as Permission Slip.
 
-> **About `sudo` and the `proton` user.** Steps 1–3 are system-level and must run as your normal, sudo-capable admin account. Step 2 creates the `proton` user with **no password** — `useradd` leaves the account locked, and it is *not* in the `sudo`/`sudoers` group. That's intentional: it's an unprivileged service account.
+> **Which user runs each step — read this first.** This is the #1 source of setup
+> problems. Running a step as the wrong user creates a *second, separate* Bridge
+> instance with its own account and keychain. Both then try to serve the same IMAP
+> port, and you get baffling `no such user` errors because the instance answering
+> on `127.0.0.1:1143` isn't the one you logged into. Get the user right at every step.
 >
-> Do all `sudo apt install` (and any other `sudo`) work **before** you switch into the proton shell in step 4. Once you run `sudo -u proton bash`, every command runs *as* `proton`, so running `sudo` there will prompt for a password the account doesn't have (and would fail authorization anyway). Everything from step 4 onward is designed to run **without `sudo`**.
+> | Step | Run as | Why |
+> |------|--------|-----|
+> | 1. Install Bridge + dependencies | **root / admin** (`sudo`) | System-wide package install |
+> | 2. Create the `proton` user | **root / admin** (`sudo`) | Creates the unprivileged service account |
+> | 3. Initialize the `pass` keychain | **`proton`** | The keychain lives in proton's home directory |
+> | 4. Log in to Proton (one-time) | **`proton`** | The account must live in proton's Bridge config |
+> | 5. Run Bridge under systemd | **`proton`** | Headless `--user` service owned by proton |
+>
+> **Only steps 1–2 use `sudo`/root.** From step 3 onward you work *as the `proton`
+> user* and never run `sudo` — the account has no password and no sudo rights (that's
+> intentional; it's an unprivileged service account), so a `sudo` there just fails.
+> Every command block below is prefixed with a `# AS root` or `# AS proton` comment.
+> If you're ever unsure who you are, run `whoami`.
 
 ### 1. Install Bridge and its dependencies
 
@@ -39,6 +55,7 @@ Run these as your **admin user** (the one with `sudo`). Installing the system pa
 On Debian/Ubuntu (x86_64):
 
 ```bash
+# AS root (admin)
 # Bridge's keychain backend
 sudo apt install pass gnupg
 
@@ -51,18 +68,26 @@ sudo apt install ./protonmail-bridge_*.deb
 Still as your **admin user**:
 
 ```bash
+# AS root (admin)
 sudo useradd -m -s /bin/bash proton
 ```
 
 This account has no password and cannot use `sudo` — that's expected. You operate it with `sudo -u proton ...` from your admin account, never by logging in as `proton`.
 
-### 3. Initialize a `pass` password store (Bridge keychain)
+### 3. Initialize a `pass` password store (Bridge keychain) — *as `proton`*
 
-Switch into the proton shell — **everything from here on runs as `proton` and needs no `sudo`:**
+Switch into the proton user's **login** shell. **Everything from here through step 5 runs as `proton` and needs no `sudo`:**
 
 ```bash
-sudo -u proton bash   # you are now the proton user; do NOT run sudo from here
+# AS root (admin) — open a LOGIN shell as the proton user:
+sudo -iu proton
+# You are now `proton`. Confirm with:  whoami    →    proton
+# Do NOT run sudo from here.
 ```
+
+Use `-iu` (a login shell), not `sudo -u proton bash`. The login shell sets `HOME=/home/proton`
+*and* the systemd user-session environment (`XDG_RUNTIME_DIR`) that `systemctl --user` needs in
+step 5 — without it you'll hit `Failed to connect to bus`.
 
 Bridge stores its encryption key in `pass`, which in turn is unlocked by a GPG key. You need to generate that GPG key, then point `pass` at it.
 
@@ -110,11 +135,14 @@ pass init "$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr:/{print $10; 
 
 The `pass init` command pulls the new key's fingerprint out of `gpg`'s machine-readable output automatically, so you don't have to copy it by hand. We use the full fingerprint (not the short key ID) because it's the unambiguous form `gpg` always accepts.
 
-### 4. Log in to Proton (one-time, interactive)
+### 4. Log in to Proton (one-time, interactive) — *as `proton`*
 
-Still in the `proton` shell (no `sudo`):
+Still in the `proton` login shell from step 3 (no `sudo`). Confirm with `whoami` → `proton`
+**before** running this — logging in as the wrong user is what creates a second, conflicting
+Bridge instance:
 
 ```bash
+# AS proton
 protonmail-bridge --cli
 ```
 
@@ -125,10 +153,18 @@ In the CLI: log in with your Proton account, complete 2FA, and let Bridge finish
 This is a **one-time, interactive login** — you do **not** keep this terminal open. Bridge saves your account into its local store (under the `proton` user's home), so once you've logged in, synced, and copied down the bridge password, type `exit` to quit the CLI. Quit it **before** moving to step 5: the systemd service starts Bridge headless, and two Bridge instances can't both bind ports `1143`/`1025` at the same time. From step 5 onward, systemd runs Bridge for you — you never need to start `--cli` again unless you have to re-authenticate.
 
 > **If a Proton Mail Bridge GUI window opens, you can ignore it.** This guide drives Bridge entirely through the CLI (step 4) and then headless under systemd (step 5) — it never uses the desktop GUI. Some desktop Linux installs add an autostart entry that launches the Bridge window on login, or running `protonmail-bridge` with no flags opens it. Just close it. The only thing to avoid is running the GUI **and** the systemd service at the same time, since both would try to bind the same ports.
+>
+> **Especially: don't run `protonmail-bridge` as root or your admin user.** Doing so
+> starts a *completely separate* Bridge instance with its own account and keychain under
+> that user's home. If it (or its GUI) grabs port `1143` first, Permission Slip talks to
+> *that* instance — which has no account — and every login fails with `no such user`,
+> even though the `proton` instance is configured correctly. Bridge must only ever run
+> as the `proton` user.
 
 ### 5. Run Bridge under systemd (user unit)
 
 ```bash
+# AS proton
 mkdir -p ~/.config/systemd/user
 cat > ~/.config/systemd/user/protonmail-bridge.service << 'EOF'
 [Unit]
@@ -165,7 +201,14 @@ Once Bridge is running, add **Proton Mail** credentials (`custom` auth) in the U
 | `imap_host` / `imap_port` | Optional; default `127.0.0.1` / `1143` |
 | `smtp_host` / `smtp_port` | Optional; default `127.0.0.1` / `1025` |
 
-**Where do the host/port values come from?** Bridge and Permission Slip run on the same machine, so leave the host/port fields blank — the `127.0.0.1` defaults are correct and match what Bridge serves. If the defaults don't connect, run `protonmail-bridge --cli` and type `info` to see the exact host and ports Bridge is listening on.
+**Where do the host/port values come from?** Bridge and Permission Slip run on the same machine, so leave the host/port fields blank — the `127.0.0.1` defaults are correct and match what Bridge serves. If the defaults don't connect, re-read `info` **from the `proton` instance that owns the port** — reading it from any other user shows a *different* instance's details and is the most common cause of `no such user`. Because the running service already holds the port, stop it first, read `info`, then start it again:
+
+```bash
+# AS proton (login shell: sudo -iu proton)
+systemctl --user stop protonmail-bridge
+protonmail-bridge --cli      # type: info   (note username + bridge password), then: exit
+systemctl --user start protonmail-bridge
+```
 
 Saving credentials runs a real **IMAP LOGIN** against Bridge. Bridge must be running at save time.
 
@@ -183,5 +226,8 @@ If you previously used the external [permission-slip-proton](https://github.com/
 | Login loop in Bridge CLI | Clock skew, 2FA, or `pass` store not initialized |
 | `sudo` asks for a password inside the proton shell | You ran `sudo` after `sudo -u proton bash`. The `proton` account has no password and no sudo rights. `exit` back to your admin user and run system/`apt` commands there (steps 1–2); only run the non-`sudo` commands as `proton` |
 | Archive action fails | Proton's Archive folder must exist; Bridge exposes it as `"Archive"` |
+| IMAP says `no such user` (but `info` shows that user) | A **second Bridge instance under a different user** is serving the port — usually one accidentally started as root or your admin user. Find the owner: `sudo ss -tlnp \| grep 1143`, then `ps -o user= -p <pid>`. If it isn't `proton`, stop that instance (and remove any root autostart / systemd unit), then ensure the `proton` systemd service owns the port |
+| `systemctl --user`: `Failed to connect to bus` | You entered the proton shell without a user session. Use `sudo -iu proton` (login shell), or `export XDG_RUNTIME_DIR=/run/user/$(id -u)` before running `systemctl --user` |
+| Not sure which user a running Bridge belongs to | `sudo ss -tlnp \| grep 1143` shows the pid; `ps -o user=,cmd= -p <pid>` shows the owner. Only the `proton` instance should ever be listening |
 
 For general self-hosted setup (Tailscale, Google, Slack), see [Self-hosted deployment](../deployment-self-hosted.md).
