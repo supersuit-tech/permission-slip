@@ -1,6 +1,7 @@
 package protonmail
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -195,6 +196,49 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 	}
 	if cred.InstructionsURL == "" {
 		t.Error("credential instructions_url is empty, want a URL")
+	}
+
+	wantFields := []struct {
+		key      string
+		secret   bool
+		required bool
+	}{
+		{key: "username", secret: false, required: true},
+		{key: "password", secret: true, required: true},
+		{key: "imap_host", secret: false, required: false},
+		{key: "imap_port", secret: false, required: false},
+		{key: "smtp_host", secret: false, required: false},
+		{key: "smtp_port", secret: false, required: false},
+	}
+	if len(cred.Fields) != len(wantFields) {
+		t.Fatalf("credential fields has %d items, want %d", len(cred.Fields), len(wantFields))
+	}
+	for i, want := range wantFields {
+		got := cred.Fields[i]
+		if got.Key != want.key {
+			t.Errorf("credential fields[%d].key = %q, want %q", i, got.Key, want.key)
+		}
+		if got.Label == "" {
+			t.Errorf("credential fields[%d].label is empty, want a label", i)
+		}
+		if got.Secret == nil || *got.Secret != want.secret {
+			gotSecret := "<nil>"
+			if got.Secret != nil {
+				gotSecret = fmt.Sprintf("%v", *got.Secret)
+			}
+			t.Errorf("credential fields[%d].secret = %s, want %v", i, gotSecret, want.secret)
+		}
+		if got.Required == nil || *got.Required != want.required {
+			gotRequired := "<nil>"
+			if got.Required != nil {
+				gotRequired = fmt.Sprintf("%v", *got.Required)
+			}
+			t.Errorf("credential fields[%d].required = %s, want %v", i, gotRequired, want.required)
+		}
+	}
+	passwordField := cred.Fields[1]
+	if passwordField.HelpText == "" {
+		t.Error("password field help_text is empty, want guidance about the Bridge password")
 	}
 
 	for _, a := range m.Actions {

@@ -76,4 +76,35 @@ describe("staticCredentialButtonLabel", () => {
     );
     expect(label).toBe("credentials");
   });
+
+  it("uses credentials for Proton Mail bridge fields", () => {
+    const protonFields = [
+      { key: "username", label: "Bridge username", secret: false, required: true },
+      { key: "password", label: "Bridge password", secret: true, required: true },
+      { key: "imap_host", label: "IMAP host", secret: false, required: false },
+      { key: "imap_port", label: "IMAP port", secret: false, required: false },
+      { key: "smtp_host", label: "SMTP host", secret: false, required: false },
+      { key: "smtp_port", label: "SMTP port", secret: false, required: false },
+    ];
+    const credential = cred({
+      service: "protonmail",
+      auth_type: "custom",
+      fields: protonFields,
+    });
+
+    const fields = resolveStaticCredentialFields(credential);
+    expect(fields).toHaveLength(6);
+    expect(fields.map((f) => f.key)).toEqual([
+      "username",
+      "password",
+      "imap_host",
+      "imap_port",
+      "smtp_host",
+      "smtp_port",
+    ]);
+    expect(fields[0]?.secret).toBe(false);
+    expect(fields[1]?.secret).toBe(true);
+    expect(fields[2]?.required).toBe(false);
+    expect(staticCredentialButtonLabel(credential)).toBe("credentials");
+  });
 });
