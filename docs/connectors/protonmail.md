@@ -120,6 +120,8 @@ protonmail-bridge --cli
 
 In the CLI: log in with your Proton account, complete 2FA, and let Bridge finish syncing. Then note the **Bridge-generated password** and IMAP/SMTP ports (defaults are usually IMAP `127.0.0.1:1143`, SMTP `127.0.0.1:1025`).
 
+**Can't find the server address (host/port)?** Type `info` at the Bridge CLI prompt. Bridge prints the exact connection details it's serving — the IMAP and SMTP **host** and **port**, your username, and the bridge password — so you don't have to guess. That `info` output is the source of truth for the server address you enter in Permission Slip below. If you ever lose the bridge password, `info` shows it again (there's no separate "reveal" step).
+
 This is a **one-time, interactive login** — you do **not** keep this terminal open. Bridge saves your account into its local store (under the `proton` user's home), so once you've logged in, synced, and copied down the bridge password, type `exit` to quit the CLI. Quit it **before** moving to step 5: the systemd service starts Bridge headless, and two Bridge instances can't both bind ports `1143`/`1025` at the same time. From step 5 onward, systemd runs Bridge for you — you never need to start `--cli` again unless you have to re-authenticate.
 
 > **If a Proton Mail Bridge GUI window opens, you can ignore it.** This guide drives Bridge entirely through the CLI (step 4) and then headless under systemd (step 5) — it never uses the desktop GUI. Some desktop Linux installs add an autostart entry that launches the Bridge window on login, or running `protonmail-bridge` with no flags opens it. Just close it. The only thing to avoid is running the GUI **and** the systemd service at the same time, since both would try to bind the same ports.
@@ -163,6 +165,10 @@ Once Bridge is running, add **Proton Mail** credentials (`custom` auth) in the U
 | `imap_host` / `imap_port` | Optional; default `127.0.0.1` / `1143` |
 | `smtp_host` / `smtp_port` | Optional; default `127.0.0.1` / `1025` |
 
+**Where do the host/port values come from?** If Permission Slip and Bridge run on the **same machine**, leave the host/port fields blank — the `127.0.0.1` defaults are correct and match what Bridge serves. If you're unsure or the defaults don't connect, run `protonmail-bridge --cli` and type `info` to see the exact host and ports Bridge is listening on.
+
+If Permission Slip runs on a **different machine** on your LAN, `127.0.0.1` won't reach Bridge. You need to (1) tell Bridge to listen on a reachable interface instead of loopback (in the Bridge CLI, the IMAP/SMTP listen address is a setting; or use the GUI's *Settings → Advanced* once, then go headless again), and (2) enter that machine's LAN IP as `imap_host` / `smtp_host` here. Confirm the address with `info` after changing it.
+
 Saving credentials runs a real **IMAP LOGIN** against Bridge. Bridge must be running at save time.
 
 ## Migrating from `permission-slip-proton`
@@ -175,7 +181,7 @@ If you previously used the external [permission-slip-proton](https://github.com/
 |---------|----------------|
 | Credential validation fails immediately | Bridge running? `systemctl --user status protonmail-bridge` |
 | Auth / LOGIN errors | Username must match the address in Bridge; password must be the bridge password, not your Proton account password |
-| Connection refused on 1143/1025 | Another process using the port, or Bridge bound to a different interface |
+| Connection refused on 1143/1025 | Another process using the port, or Bridge bound to a different interface. Run `protonmail-bridge --cli` and type `info` to confirm the host/port Bridge is actually serving |
 | Login loop in Bridge CLI | Clock skew, 2FA, or `pass` store not initialized |
 | `sudo` asks for a password inside the proton shell | You ran `sudo` after `sudo -u proton bash`. The `proton` account has no password and no sudo rights. `exit` back to your admin user and run system/`apt` commands there (steps 1–2); only run the non-`sudo` commands as `proton` |
 | Archive action fails | Proton's Archive folder must exist; Bridge exposes it as `"Archive"` |
