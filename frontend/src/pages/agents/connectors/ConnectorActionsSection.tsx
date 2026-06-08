@@ -1,5 +1,3 @@
-import { Shield, ShieldAlert, ShieldCheck } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardHeader,
@@ -15,6 +13,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
+import { RiskBadge } from "./RiskBadge";
 
 interface ConnectorActionsSectionProps {
   actions: ConnectorAction[];
@@ -107,43 +106,4 @@ export function ActionRow({ action }: { action: ConnectorAction }) {
       </TableCell>
     </TableRow>
   );
-}
-
-export function RiskBadge({ level }: { level?: "low" | "medium" | "high" }) {
-  switch (level) {
-    case "low":
-      return (
-        <Badge
-          variant="secondary"
-          className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-        >
-          <ShieldCheck className="size-3" />
-          Low
-        </Badge>
-      );
-    case "medium":
-      return (
-        <Badge
-          variant="secondary"
-          className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400"
-        >
-          <Shield className="size-3" />
-          Medium
-        </Badge>
-      );
-    case "high":
-      return (
-        <Badge variant="destructive">
-          <ShieldAlert className="size-3" />
-          High
-        </Badge>
-      );
-    default:
-      return (
-        <Badge variant="outline">
-          <Shield className="size-3" />
-          Unknown
-        </Badge>
-      );
-  }
 }
