@@ -378,3 +378,45 @@ When using gh, the local git remote uses a proxy, so always set the repo explici
 ```bash
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh <command>
 ```
+
+## Pushing Release Tags (web sessions)
+
+**In the cloud/web sandbox, `git push origin <tag>` does NOT work for tags.** The git
+remote is a proxy that only authorizes pushing the session's assigned feature branch —
+any tag push (e.g. `cli/v*`, which triggers `publish-cli.yml`) is rejected with
+`HTTP 403`. Do not waste retries on it.
+
+**Create the tag through the GitHub REST API instead** — it goes straight to authenticated
+GitHub and bypasses the proxy. This is exactly what the `version-tag` skill does. A
+`GH_TOKEN` is available in the environment:
+
+```bash
+# Resolve the target commit (latest main, after any version-bump PR has merged)
+SHA=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
+  https://api.github.com/repos/supersuit-tech/permission-slip/git/ref/heads/main \
+  | jq -r '.object.sha')
+
+# Create the tag ref (fires the publish workflow)
+curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+  https://api.github.com/repos/supersuit-tech/permission-slip/git/refs \
+  -d "{\"ref\":\"refs/tags/cli/v<version>\",\"sha\":\"$SHA\"}"
+```
+
+Before tagging, confirm the package.json version at that SHA matches the tag (the publish
+workflow's "Verify package version matches tag" step will fail otherwise).
+
+**`publish-cli.yml` publishes only on a `cli/v*` tag push** — there is no
+`workflow_dispatch` trigger, so a branch push or manual dispatch will not publish.
+
+### When a publish run fails at `npm publish`
+
+A `404 '... is not in this registry'` from `npm publish` is npm's misleading symptom for
+an **auth failure** — the `NPM_TOKEN` secret is expired or invalid (scoped-package
+publishes return 404 instead of 401). The fix is a credential rotation the user must do:
+regenerate an npm token with read/write to the `@permission-slip` scope and update the
+`NPM_TOKEN` repo secret. Then re-run the failed job (no new tag needed):
+
+```bash
+curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+  https://api.github.com/repos/supersuit-tech/permission-slip/actions/runs/<run_id>/rerun-failed-jobs
+```
