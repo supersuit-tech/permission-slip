@@ -138,8 +138,6 @@ func TestProtonMailConnector_ValidateCredentials(t *testing.T) {
 }
 
 func TestProtonMailConnector_ValidateCredentials_proxyUnreachable(t *testing.T) {
-	t.Parallel()
-
 	oldIMAP := testIMAPConn
 	testIMAPConn = func(creds connectors.Credentials, timeout time.Duration) error {
 		session, err := connectIMAP(creds, timeout)
