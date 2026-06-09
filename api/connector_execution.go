@@ -51,11 +51,11 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 
 	connectorID := strings.SplitN(actionType, ".", 2)[0]
 
-	var creds connectors.Credentials
-	creds, err = resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
+	resolved, err := resolveCredentialsForExecution(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
 	if err != nil {
 		return nil, err
 	}
+	creds := resolved.Credentials
 
 	// Validate credentials before executing the action.
 	if conn, ok := deps.Connectors.Get(connectorID); ok {
@@ -103,13 +103,18 @@ func executeConnectorAction(ctx context.Context, deps *Deps, agentID int64, user
 		}
 	}
 
-	result, err := action.Execute(ctx, connectors.ActionRequest{
+	actionReq := connectors.ActionRequest{
 		ActionType:  actionType,
 		Parameters:  parameters,
 		Credentials: creds,
 		Payment:     paymentInfo,
 		UserEmail:   userEmail,
-	})
+	}
+	if connectorID == "protonmail" {
+		actionReq.MailboxUIDValidity = newProtonmailUIDValidityStore(ctx, deps, resolved.CredentialID)
+	}
+
+	result, err := action.Execute(ctx, actionReq)
 	if err != nil {
 		return nil, err
 	}
@@ -237,6 +242,87 @@ func validatePaymentMethod(ctx context.Context, deps *Deps, userID string, pp *p
 	}, nil
 }
 
+type credentialResolution struct {
+	Credentials  connectors.Credentials
+	CredentialID string // static credential ID when bound; empty for OAuth
+}
+
+// resolveCredentialsForExecution resolves credentials and returns binding metadata
+// needed during connector execution (e.g. Proton Mail UIDVALIDITY persistence).
+func resolveCredentialsForExecution(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string, reqCreds []db.RequiredCredential) (credentialResolution, error) {
+	var zero credentialResolution
+	if len(reqCreds) == 0 {
+		return credentialResolution{Credentials: connectors.NewCredentials(nil)}, nil
+	}
+
+	if agentID == 0 {
+		return zero, &connectors.ValidationError{
+			Message: "no credential assigned — assign a credential to this connector before running actions",
+		}
+	}
+
+	var binding *db.AgentConnectorCredential
+	var err error
+	if connectorInstanceID != "" {
+		binding, err = db.GetAgentConnectorCredentialByInstance(ctx, deps.DB, agentID, connectorID, connectorInstanceID)
+	} else {
+		binding, err = db.GetAgentConnectorCredential(ctx, deps.DB, agentID, connectorID)
+	}
+	if err != nil {
+		return zero, fmt.Errorf("look up agent connector credential: %w", err)
+	}
+	return resolveCredentialsFromBinding(ctx, deps, userID, binding)
+}
+
+func resolveCredentialsFromBinding(ctx context.Context, deps *Deps, userID string, binding *db.AgentConnectorCredential) (credentialResolution, error) {
+	var zero credentialResolution
+	if binding == nil {
+		return zero, &connectors.ValidationError{
+			Message: "no credential assigned — go to the agent's connector settings and assign a credential",
+		}
+	}
+
+	if binding.OAuthConnectionID != nil {
+		creds, err := resolveOAuthCredentialsFromBinding(ctx, deps, userID, binding)
+		if err != nil {
+			return zero, err
+		}
+		return credentialResolution{Credentials: creds}, nil
+	}
+	if binding.CredentialID != nil {
+		creds, err := resolveStaticCredentialByID(ctx, deps, userID, *binding.CredentialID)
+		if err != nil {
+			return zero, err
+		}
+		return credentialResolution{
+			Credentials:  creds,
+			CredentialID: *binding.CredentialID,
+		}, nil
+	}
+
+	return zero, &connectors.ValidationError{
+		Message: "credential binding is incomplete — reassign a credential for this connector",
+	}
+}
+
+func resolveOAuthCredentialsFromBinding(ctx context.Context, deps *Deps, userID string, binding *db.AgentConnectorCredential) (connectors.Credentials, error) {
+	conn, oauthErr := db.GetOAuthConnectionByID(ctx, deps.DB, *binding.OAuthConnectionID)
+	if oauthErr != nil {
+		return connectors.Credentials{}, fmt.Errorf("look up bound OAuth connection: %w", oauthErr)
+	}
+	if conn == nil {
+		return connectors.Credentials{}, &connectors.ValidationError{
+			Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
+		}
+	}
+	if conn.UserID != userID {
+		return connectors.Credentials{}, &connectors.ValidationError{
+			Message: "bound OAuth connection does not belong to this user",
+		}
+	}
+	return resolveOAuthCredentialsFromConnection(ctx, deps, conn)
+}
+
 // resolveCredentialsWithFallback resolves credentials for a connector action.
 // It requires an explicit credential binding on the agent — no auto-resolve.
 // If no binding exists, it returns a validation error prompting the user to
@@ -266,46 +352,16 @@ func resolveCredentialsWithFallback(ctx context.Context, deps *Deps, agentID int
 	if err != nil {
 		return connectors.Credentials{}, fmt.Errorf("look up agent connector credential: %w", err)
 	}
-	return resolveCredentialsFromAgentConnectorBinding(ctx, deps, userID, binding)
+	resolved, err := resolveCredentialsFromBinding(ctx, deps, userID, binding)
+	if err != nil {
+		return connectors.Credentials{}, err
+	}
+	return resolved.Credentials, nil
 }
 
 // resolveCredentialsForConnectorInstance resolves credentials for a specific connector instance (same rules as resolveCredentialsWithFallback).
 func resolveCredentialsForConnectorInstance(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string, reqCreds []db.RequiredCredential) (connectors.Credentials, error) {
 	return resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
-}
-
-func resolveCredentialsFromAgentConnectorBinding(ctx context.Context, deps *Deps, userID string, binding *db.AgentConnectorCredential) (connectors.Credentials, error) {
-	if binding == nil {
-		return connectors.Credentials{}, &connectors.ValidationError{
-			Message: "no credential assigned — go to the agent's connector settings and assign a credential",
-		}
-	}
-
-	if binding.OAuthConnectionID != nil {
-		conn, oauthErr := db.GetOAuthConnectionByID(ctx, deps.DB, *binding.OAuthConnectionID)
-		if oauthErr != nil {
-			return connectors.Credentials{}, fmt.Errorf("look up bound OAuth connection: %w", oauthErr)
-		}
-		if conn == nil {
-			return connectors.Credentials{}, &connectors.ValidationError{
-				Message: "bound OAuth connection no longer exists — reassign credentials for this connector",
-			}
-		}
-		// Verify the bound connection belongs to the executing user.
-		if conn.UserID != userID {
-			return connectors.Credentials{}, &connectors.ValidationError{
-				Message: "bound OAuth connection does not belong to this user",
-			}
-		}
-		return resolveOAuthCredentialsFromConnection(ctx, deps, conn)
-	}
-	if binding.CredentialID != nil {
-		return resolveStaticCredentialByID(ctx, deps, userID, *binding.CredentialID)
-	}
-
-	return connectors.Credentials{}, &connectors.ValidationError{
-		Message: "credential binding is incomplete — reassign a credential for this connector",
-	}
 }
 
 // resolveStaticCredentialByID fetches and decrypts a specific credential by its

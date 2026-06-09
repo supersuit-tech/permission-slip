@@ -19,8 +19,8 @@ import (
 // suffix so consumers know the content is incomplete.
 const maxBodySize = 1024 * 1024
 
-// readEmailAction fetches a single email by sequence number, returning the
-// full body, headers, and attachment metadata (but not attachment content).
+// readEmailAction fetches a single email by stable UID, returning the full
+// body, headers, and attachment metadata (but not attachment content).
 type readEmailAction struct {
 	conn *ProtonMailConnector
 }
@@ -41,18 +41,19 @@ func (p *readEmailParams) validate() error {
 }
 
 type emailDetail struct {
-	SeqNum      uint32           `json:"seq_num"`
-	Subject     string           `json:"subject"`
-	From        []string         `json:"from"`
-	To          []string         `json:"to"`
-	Cc          []string         `json:"cc,omitempty"`
-	ReplyTo     []string         `json:"reply_to,omitempty"`
-	Date        string           `json:"date"`
-	MessageID   string           `json:"message_id_header,omitempty"`
-	Flags       []string         `json:"flags"`
-	ContentType string           `json:"content_type"`
-	Body        string           `json:"body"`
-	Attachments []attachmentInfo `json:"attachments,omitempty"`
+	UID             uint32           `json:"uid"`
+	Folder          string           `json:"folder"`
+	Subject         string           `json:"subject"`
+	From            []string         `json:"from"`
+	To              []string         `json:"to"`
+	Cc              []string         `json:"cc,omitempty"`
+	ReplyTo         []string         `json:"reply_to,omitempty"`
+	Date            string           `json:"date"`
+	MessageIDHeader string           `json:"message_id_header,omitempty"`
+	Flags           []string         `json:"flags"`
+	ContentType     string           `json:"content_type"`
+	Body            string           `json:"body"`
+	Attachments     []attachmentInfo `json:"attachments,omitempty"`
 }
 
 type attachmentInfo struct {
@@ -80,28 +81,21 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 	if err != nil {
 		return nil, err
 	}
-
-	if params.MessageID > mboxData.NumMessages {
-		return nil, &connectors.ValidationError{
-			Message: fmt.Sprintf("message_id %d not found (mailbox has %d messages)", params.MessageID, mboxData.NumMessages),
-		}
+	if err := syncUIDValidity(params.Folder, mboxData, req.MailboxUIDValidity, uidValidityVerify); err != nil {
+		return nil, err
 	}
 
-	// Fetch the full message body.
-	var seqSet imap.SeqSet
-	seqSet.AddNum(params.MessageID)
+	uidSet := imap.UIDSetNum(imap.UID(params.MessageID))
 
 	bodySection := &imap.FetchItemBodySection{
-		Peek: true, // don't mark as read
-		// Limit the download at the IMAP protocol level to avoid pulling
-		// multi-MB attachments into memory. We request maxBodySize+1 so
-		// parseBody can detect truncation.
+		Peek:    true,
 		Partial: &imap.SectionPartial{Offset: 0, Size: int64(maxBodySize) + 1},
 	}
 
-	fetchCmd := session.client.Fetch(seqSet, &imap.FetchOptions{
+	fetchCmd := session.client.Fetch(uidSet, &imap.FetchOptions{
 		Envelope: true,
 		Flags:    true,
+		UID:      true,
 		BodySection: []*imap.FetchItemBodySection{
 			bodySection,
 		},
@@ -111,22 +105,30 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 
 	msg := fetchCmd.Next()
 	if msg == nil {
-		return nil, &connectors.ExternalError{Message: fmt.Sprintf("message %d not found", params.MessageID)}
+		return nil, &connectors.ValidationError{
+			Message: fmt.Sprintf("message uid %d not found in folder %q", params.MessageID, params.Folder),
+		}
 	}
 
 	buf, err := msg.Collect()
 	if err != nil {
 		return nil, mapIMAPError(err)
 	}
+	if buf.UID == 0 {
+		return nil, &connectors.ValidationError{
+			Message: fmt.Sprintf("message uid %d not found in folder %q", params.MessageID, params.Folder),
+		}
+	}
 
 	detail := emailDetail{
-		SeqNum: buf.SeqNum,
+		UID:    uint32(buf.UID),
+		Folder: params.Folder,
 	}
 
 	if buf.Envelope != nil {
 		detail.Subject = buf.Envelope.Subject
 		detail.Date = buf.Envelope.Date.Format(time.RFC3339)
-		detail.MessageID = buf.Envelope.MessageID
+		detail.MessageIDHeader = buf.Envelope.MessageID
 		detail.From = formatAddresses(buf.Envelope.From)
 		detail.To = formatAddresses(buf.Envelope.To)
 		detail.Cc = formatAddresses(buf.Envelope.Cc)
@@ -137,7 +139,6 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		detail.Flags = append(detail.Flags, string(f))
 	}
 
-	// Collect attachment info from body structure.
 	if buf.BodyStructure != nil {
 		buf.BodyStructure.Walk(func(path []int, part imap.BodyStructure) bool {
 			if sp, ok := part.(*imap.BodyStructureSinglePart); ok {
@@ -153,7 +154,6 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 		})
 	}
 
-	// Parse the body content.
 	rawBody := buf.FindBodySection(bodySection)
 	if rawBody != nil {
 		body, contentType := parseBody(rawBody)
@@ -170,7 +170,6 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 func parseBody(rawBody []byte) (body, contentType string) {
 	mr, err := mail.CreateReader(bytes.NewReader(rawBody))
 	if err != nil {
-		// Fall back to raw body if we can't parse it.
 		return truncateBody(string(rawBody)), "text/plain"
 	}
 	defer mr.Close()
@@ -186,7 +185,6 @@ func parseBody(rawBody []byte) (body, contentType string) {
 			h := part.Header.(*mail.InlineHeader)
 			ct, _, _ := h.ContentType()
 			if strings.HasPrefix(ct, "text/plain") || strings.HasPrefix(ct, "text/html") {
-				// Read maxBodySize+1 to detect if content was truncated.
 				b, err := io.ReadAll(io.LimitReader(part.Body, maxBodySize+1))
 				if err == nil {
 					if len(b) > maxBodySize {
@@ -197,7 +195,6 @@ func parseBody(rawBody []byte) (body, contentType string) {
 					contentType = ct
 				}
 				if strings.HasPrefix(ct, "text/plain") {
-					// Prefer text/plain; if found, stop looking.
 					return body, contentType
 				}
 			}

@@ -45,50 +45,55 @@ func (a *readInboxAction) Execute(ctx context.Context, req connectors.ActionRequ
 	if err != nil {
 		return nil, err
 	}
-
-	if mboxData.NumMessages == 0 {
-		return emptyEmailResult()
+	if err := syncUIDValidity(params.Folder, mboxData, req.MailboxUIDValidity, uidValidityRecord); err != nil {
+		return nil, err
 	}
 
-	// If unread_only, search for unseen messages first.
-	var seqNums []uint32
+	if mboxData.NumMessages == 0 {
+		return emailListResultWithFolder(params.Folder, nil)
+	}
+
+	var emails []emailSummary
 	if params.UnreadOnly {
 		criteria := &imap.SearchCriteria{
 			NotFlag: []imap.Flag{imap.FlagSeen},
 		}
-		searchData, err := session.client.Search(criteria, nil).Wait()
+		searchData, err := session.client.UIDSearch(criteria, nil).Wait()
 		if err != nil {
 			return nil, mapIMAPError(err)
 		}
-		seqNums = searchData.AllSeqNums()
-	}
+		uids := searchData.AllUIDs()
+		if len(uids) == 0 {
+			return emailListResultWithFolder(params.Folder, nil)
+		}
 
-	// Determine which messages to fetch.
-	var seqSet imap.SeqSet
-	if params.UnreadOnly {
-		if len(seqNums) == 0 {
-			return emptyEmailResult()
-		}
-		// Take only the last `limit` unread messages (most recent).
 		start := 0
-		if len(seqNums) > params.Limit {
-			start = len(seqNums) - params.Limit
+		if len(uids) > params.Limit {
+			start = len(uids) - params.Limit
 		}
-		for _, n := range seqNums[start:] {
-			seqSet.AddNum(n)
+		limited := uids[start:]
+
+		var uidSet imap.UIDSet
+		for _, uid := range limited {
+			uidSet.AddNum(uid)
+		}
+		emails, err = fetchEnvelopesByUID(session, uidSet)
+		if err != nil {
+			return nil, err
 		}
 	} else {
-		// Fetch the last `limit` messages by sequence number.
 		from := uint32(1)
 		if mboxData.NumMessages > uint32(params.Limit) {
 			from = mboxData.NumMessages - uint32(params.Limit) + 1
 		}
+		var seqSet imap.SeqSet
 		seqSet.AddRange(from, mboxData.NumMessages)
+
+		emails, err = fetchRecentEnvelopesBySeq(session, seqSet)
+		if err != nil {
+			return nil, err
+		}
 	}
 
-	emails, err := fetchEnvelopes(session, seqSet)
-	if err != nil {
-		return nil, err
-	}
-	return emailListResult(emails)
+	return emailListResultWithFolder(params.Folder, emails)
 }

@@ -236,6 +236,7 @@ CREATE TABLE credentials (
     service TEXT NOT NULL,
     label TEXT,
     vault_secret_id TEXT NOT NULL,
+    connector_state TEXT NOT NULL DEFAULT '{}',
     created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
     CONSTRAINT credentials_id_check CHECK (length(id) <= 255),
     CONSTRAINT credentials_label_check CHECK (length(label) <= 255),

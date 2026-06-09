@@ -12,7 +12,7 @@ func TestCredentialsSchema(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireColumns(t, tx, "credentials", []string{
-		"id", "user_id", "service", "label", "vault_secret_id", "created_at",
+		"id", "user_id", "service", "label", "vault_secret_id", "connector_state", "created_at",
 	})
 }
 

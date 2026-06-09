@@ -86,6 +86,10 @@ type ActionRequest struct {
 	Credentials Credentials     // decrypted at execution time; redacted in logs and JSON
 	Payment     *PaymentInfo    // non-nil when the action requires a payment method
 	UserEmail   string          // email of the Permission Slip user executing the action (may be empty)
+
+	// MailboxUIDValidity optionally tracks IMAP UIDVALIDITY per folder for
+	// connectors that address messages by stable UID (e.g. protonmail).
+	MailboxUIDValidity MailboxUIDValidityStore
 }
 
 // PaymentInfo contains the resolved payment method details passed to connectors
@@ -181,4 +185,3 @@ type UserLister interface {
 	// to look up required credentials for this list call (must exist in the DB).
 	UserListCredentialActionType() string
 }
-

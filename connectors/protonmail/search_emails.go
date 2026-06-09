@@ -61,7 +61,11 @@ func (a *searchEmailsAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 	defer session.close()
 
-	if _, err := session.selectMailbox(params.Folder); err != nil {
+	mboxData, err := session.selectMailbox(params.Folder)
+	if err != nil {
+		return nil, err
+	}
+	if err := syncUIDValidity(params.Folder, mboxData, req.MailboxUIDValidity, uidValidityRecord); err != nil {
 		return nil, err
 	}
 
@@ -88,31 +92,30 @@ func (a *searchEmailsAction) Execute(ctx context.Context, req connectors.ActionR
 		criteria.Before = t
 	}
 
-	searchData, err := session.client.Search(criteria, nil).Wait()
+	searchData, err := session.client.UIDSearch(criteria, nil).Wait()
 	if err != nil {
 		return nil, mapIMAPError(err)
 	}
 
-	seqNums := searchData.AllSeqNums()
-	if len(seqNums) == 0 {
-		return emptyEmailResult()
+	uids := searchData.AllUIDs()
+	if len(uids) == 0 {
+		return emailListResultWithFolder(params.Folder, nil)
 	}
 
-	// Limit results (take most recent).
 	start := 0
-	if len(seqNums) > params.Limit {
-		start = len(seqNums) - params.Limit
+	if len(uids) > params.Limit {
+		start = len(uids) - params.Limit
 	}
-	limited := seqNums[start:]
+	limited := uids[start:]
 
-	var seqSet imap.SeqSet
-	for _, n := range limited {
-		seqSet.AddNum(n)
+	var uidSet imap.UIDSet
+	for _, uid := range limited {
+		uidSet.AddNum(uid)
 	}
 
-	emails, err := fetchEnvelopes(session, seqSet)
+	emails, err := fetchEnvelopesByUID(session, uidSet)
 	if err != nil {
 		return nil, err
 	}
-	return emailListResult(emails)
+	return emailListResultWithFolder(params.Folder, emails)
 }
