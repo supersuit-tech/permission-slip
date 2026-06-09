@@ -393,6 +393,15 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     if (!summary) return null;
     return [text("Archive email "), ...summary];
   },
+
+  "protonmail.reply_email": (_params, rd) => {
+    if (!rd) return null;
+    const meta = protonmailInReplyToRecord(rd);
+    if (!meta) return null;
+    const summary = protonmailEmailSummaryParts(meta);
+    if (!summary) return null;
+    return [text("Reply to "), ...summary];
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -551,6 +560,16 @@ function formatRecipients(v: unknown): string | null {
     if (strs.length === 0) return null;
     if (strs.length <= 3) return strs.join(", ");
     return `${strs[0] ?? ""}, ${strs[1] ?? ""}, and ${strs.length - 2} more`;
+  }
+  return null;
+}
+
+function protonmailInReplyToRecord(
+  rd: Record<string, unknown>,
+): Record<string, unknown> | null {
+  const raw = rd.in_reply_to;
+  if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
+    return raw as Record<string, unknown>;
   }
   return null;
 }

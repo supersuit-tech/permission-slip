@@ -67,9 +67,10 @@ var resourceDetailFields = map[string]bool{
 	"team_name":      true,
 	"email_thread":   true,
 	// Proton Mail (see connectors/protonmail/resolve_resource_details.go)
-	"to":       true,
-	"date":     true,
-	"messages": true,
+	"to":          true,
+	"date":        true,
+	"messages":    true,
+	"in_reply_to": true,
 }
 
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a

@@ -29,6 +29,11 @@ import {
   EMAIL_REPLY_ACTION_TYPES,
   parseEmailThreadFromDetails,
 } from "@/components/previews/EmailThreadPreview";
+import {
+  ProtonInReplyToPreview,
+  PROTON_REPLY_ACTION_TYPE,
+  parseProtonInReplyTo,
+} from "@/components/previews/ProtonInReplyToPreview";
 import { SlackContextPreview } from "@/components/previews/SlackContextPreview";
 import type { components } from "@/api/schema";
 import {
@@ -168,6 +173,16 @@ export function ReviewApprovalDialog({
     [approval.context.details],
   );
   const showEmailThreadPreview = EMAIL_REPLY_ACTION_TYPES.has(approval.action.type);
+
+  const protonInReplyTo = useMemo(
+    () =>
+      parseProtonInReplyTo(
+        approval.resource_details as Record<string, unknown> | undefined,
+      ),
+    [approval.resource_details],
+  );
+  const showProtonInReplyToPreview =
+    approval.action.type === PROTON_REPLY_ACTION_TYPE;
 
   const slackContext = useMemo(
     () =>
@@ -366,6 +381,11 @@ export function ReviewApprovalDialog({
                   {showEmailThreadPreview && (
                     <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
                       <EmailThreadPreview thread={emailThread} />
+                    </div>
+                  )}
+                  {showProtonInReplyToPreview && (
+                    <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
+                      <ProtonInReplyToPreview metadata={protonInReplyTo} />
                     </div>
                   )}
                   <ActionPreviewCard

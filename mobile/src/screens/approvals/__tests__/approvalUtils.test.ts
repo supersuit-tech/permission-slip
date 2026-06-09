@@ -154,6 +154,25 @@ describe("buildActionSummary", () => {
     expect(result).toContain("10");
   });
 
+  it("formats protonmail.reply_email with in_reply_to enrichment", () => {
+    const result = buildActionSummary(
+      "protonmail.reply_email",
+      { in_reply_to_message_id: 7, body: "Sure" },
+      null,
+      {
+        in_reply_to: {
+          subject: "Question",
+          from: ["asker@example.com"],
+          to: ["me@proton.me"],
+          date: "2026-04-01T08:00:00Z",
+        },
+      },
+    );
+    expect(result).toContain("Reply to");
+    expect(result).toContain("Question");
+    expect(result).toContain("asker@example.com");
+  });
+
   it("formats protonmail.archive_email batch enrichment", () => {
     const result = buildActionSummary(
       "protonmail.archive_email",

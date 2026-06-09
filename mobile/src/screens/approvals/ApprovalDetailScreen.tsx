@@ -57,6 +57,11 @@ import {
   isEmailReplyAction,
   parseEmailThreadDetails,
 } from "./emailThreadUtils";
+import { ProtonInReplyToCard } from "./ProtonInReplyToCard";
+import {
+  isProtonReplyAction,
+  parseProtonInReplyTo,
+} from "./protonInReplyToUtils";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -105,9 +110,17 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   }, [approval.context.details]);
 
   const isEmailReply = isEmailReplyAction(approval.action.type);
+  const isProtonReply = isProtonReplyAction(approval.action.type);
   const emailThread = useMemo(
     () => parseEmailThreadDetails(approval.context.details),
     [approval.context.details],
+  );
+  const protonInReplyTo = useMemo(
+    () =>
+      parseProtonInReplyTo(
+        approval.resource_details as Record<string, unknown> | undefined,
+      ),
+    [approval.resource_details],
   );
 
   const contextDetailEntries: KeyValueEntry[] = useMemo(() => {
@@ -392,6 +405,13 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
         {isEmailReply && (
           <View style={styles.sectionMajor}>
             <EmailThreadCard thread={emailThread} testID="email-thread-card" />
+          </View>
+        )}
+
+        {isProtonReply && (
+          <View style={styles.sectionMajor}>
+            <Text style={styles.sectionLabel}>Reply Context</Text>
+            <ProtonInReplyToCard metadata={protonInReplyTo} />
           </View>
         )}
 

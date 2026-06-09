@@ -65,6 +65,57 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:  "protonmail.reply_email",
+				Name:        "Reply to Email",
+				Description: "Reply to an existing email with correct In-Reply-To threading via SMTP",
+				RiskLevel:   "medium",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["in_reply_to_message_id", "body"],
+					"properties": {
+						"in_reply_to_message_id": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Stable IMAP UID of the email being replied to (from read_inbox or search_emails results)"
+						},
+						"folder": {
+							"type": "string",
+							"default": "INBOX",
+							"description": "Mailbox folder containing the source email"
+						},
+						"to": {
+							"type": "array",
+							"items": {"type": "string", "format": "email"},
+							"description": "Reply recipients. Defaults to the source email sender when omitted."
+						},
+						"cc": {
+							"type": "array",
+							"items": {"type": "string", "format": "email"},
+							"description": "CC recipient email addresses"
+						},
+						"bcc": {
+							"type": "array",
+							"items": {"type": "string", "format": "email"},
+							"description": "BCC recipient email addresses"
+						},
+						"subject": {
+							"type": "string",
+							"description": "Reply subject. Defaults to Re: plus the source subject when omitted."
+						},
+						"body": {
+							"type": "string",
+							"description": "Reply body content"
+						},
+						"content_type": {
+							"type": "string",
+							"enum": ["text/plain", "text/html"],
+							"default": "text/plain",
+							"description": "Content type of the reply body"
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:  "protonmail.read_inbox",
 				Name:        "Read Inbox",
 				Description: "Fetch recent emails from a mailbox folder via IMAP",

@@ -9,6 +9,13 @@ import (
 func protonmailTemplates() []connectors.ManifestTemplate {
 	return []connectors.ManifestTemplate{
 		{
+			ID:          "tpl_protonmail_reply",
+			ActionType:  "protonmail.reply_email",
+			Name:        "Reply to emails in your Proton Mail account",
+			Description: "Agent can reply to existing emails on your behalf via your local Proton IMAP/SMTP proxy.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","in_reply_to_message_id":"*","body":"*"}`),
+		},
+		{
 			ID:          "tpl_protonmail_send",
 			ActionType:  "protonmail.send_email",
 			Name:        "Send emails from your Proton Mail account",
