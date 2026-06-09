@@ -428,6 +428,83 @@ describe("buildSummary", () => {
     });
   });
 
+  // ── Proton Mail ─────────────────────────────────────────────────
+
+  describe("protonmail.read_email", () => {
+    it("shows subject and sender from resourceDetails", () => {
+      const result = buildSummary(
+        "protonmail.read_email",
+        { message_id: 10, folder: "INBOX" },
+        null,
+        null,
+        undefined,
+        { subject: "Weekly Update", from: ["alice@example.com"] },
+      );
+      expect(result).toContain("Read email");
+      expect(result).toContain("Weekly Update");
+      expect(result).toContain("alice@example.com");
+    });
+
+    it("falls back when enrichment is absent", () => {
+      const result = buildSummary(
+        "protonmail.read_email",
+        { message_id: 10, folder: "INBOX" },
+        null,
+        "Read Email",
+      );
+      expect(result).toContain("Read Email");
+      expect(result).toContain("10");
+    });
+  });
+
+  describe("protonmail.archive_email", () => {
+    it("shows enriched single archive", () => {
+      const result = buildSummary(
+        "protonmail.archive_email",
+        { message_id: 10, folder: "INBOX" },
+        null,
+        null,
+        undefined,
+        { subject: "Archive me", from: ["sender@example.com"] },
+      );
+      expect(result).toContain("Archive email");
+      expect(result).toContain("Archive me");
+      expect(result).toContain("sender@example.com");
+    });
+
+    it("shows batch archive subjects", () => {
+      const result = buildSummary(
+        "protonmail.archive_email",
+        { message_ids: [10, 11], folder: "INBOX" },
+        null,
+        null,
+        undefined,
+        {
+          messages: {
+            "10": { subject: "First", from: ["a@example.com"], to: [], date: "2026-01-01T00:00:00Z" },
+            "11": { subject: "Second", from: ["b@example.com"], to: [], date: "2026-01-02T00:00:00Z" },
+          },
+        },
+      );
+      expect(result).toContain("Archive");
+      expect(result).toContain("2");
+      expect(result).toContain("emails");
+      expect(result).toContain("First");
+      expect(result).toContain("Second");
+    });
+
+    it("falls back when enrichment is absent", () => {
+      const result = buildSummary(
+        "protonmail.archive_email",
+        { message_id: 10, folder: "INBOX" },
+        null,
+        "Archive Email",
+      );
+      expect(result).toContain("Archive Email");
+      expect(result).toContain("10");
+    });
+  });
+
   // ── Existing describers still work ──────────────────────────────
 
   describe("generic / unknown action types", () => {

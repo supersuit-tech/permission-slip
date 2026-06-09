@@ -40,6 +40,9 @@ var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 //   - document / presentation / workbook → document_title, presentation_title, workbook_title
 //   - calendar / team / channel → calendar_name, team_name, channel_name (channel_name shared with Slack)
 //   - send_email_reply → subject, from, email_thread (via EmailThreadDetailsMap)
+//   - Proton Mail: connectors/protonmail/resolve_resource_details.go
+//   - read_email / single archive → subject, from, to, date
+//   - batch archive → messages (map keyed by UID handle)
 var resourceDetailFields = map[string]bool{
 	// Slack (see connectors/slack/resolve_resource_details.go)
 	"channel_name": true,
@@ -63,6 +66,10 @@ var resourceDetailFields = map[string]bool{
 	"workbook_title": true,
 	"team_name":      true,
 	"email_thread":   true,
+	// Proton Mail (see connectors/protonmail/resolve_resource_details.go)
+	"to":       true,
+	"date":     true,
+	"messages": true,
 }
 
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a

@@ -133,6 +133,44 @@ describe("buildActionSummary", () => {
     expect(result).toContain("U12345678");
   });
 
+  it("formats protonmail.read_email with enriched metadata", () => {
+    const result = buildActionSummary(
+      "protonmail.read_email",
+      { message_id: 10, folder: "INBOX" },
+      undefined,
+      { subject: "Weekly Update", from: ["alice@example.com"] },
+    );
+    expect(result).toContain("Read email");
+    expect(result).toContain("Weekly Update");
+    expect(result).toContain("alice@example.com");
+  });
+
+  it("falls back for protonmail.read_email without enrichment", () => {
+    const result = buildActionSummary("protonmail.read_email", {
+      message_id: 10,
+      folder: "INBOX",
+    });
+    expect(result).toContain("Read email");
+    expect(result).toContain("10");
+  });
+
+  it("formats protonmail.archive_email batch enrichment", () => {
+    const result = buildActionSummary(
+      "protonmail.archive_email",
+      { message_ids: [10, 11], folder: "INBOX" },
+      undefined,
+      {
+        messages: {
+          "10": { subject: "First", from: [], to: [], date: "2026-01-01T00:00:00Z" },
+          "11": { subject: "Second", from: [], to: [], date: "2026-01-02T00:00:00Z" },
+        },
+      },
+    );
+    expect(result).toContain("Archive 2 emails");
+    expect(result).toContain("First");
+    expect(result).toContain("Second");
+  });
+
   it("falls back to generic summary for unknown types", () => {
     const result = buildActionSummary("custom.do_thing", {
       target: "prod",
