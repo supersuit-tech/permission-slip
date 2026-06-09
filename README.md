@@ -52,6 +52,7 @@ Connectors are tested incrementally during the beta; maturity varies by integrat
 | Google | 🟡 Early Preview |
 | Microsoft | 🟡 Early Preview |
 | Slack | 🟡 Early Preview |
+| Proton Mail | 🟡 Early Preview |
 
 <details>
 <summary>Untested connectors (click to expand)</summary>
