@@ -23,6 +23,8 @@ func (c *ProtonMailConnector) ResolveResourceDetails(ctx context.Context, action
 		return c.resolveReadEmailDetails(ctx, params, creds)
 	case "protonmail.archive_email":
 		return c.resolveArchiveEmailDetails(ctx, params, creds)
+	case "protonmail.reply_email":
+		return c.resolveReplyEmailDetails(ctx, params, creds)
 	default:
 		return nil, nil
 	}
@@ -46,6 +48,32 @@ func (c *ProtonMailConnector) resolveReadEmailDetails(ctx context.Context, param
 		return nil, nil
 	}
 	return meta.asMap(), nil
+}
+
+func (c *ProtonMailConnector) resolveReplyEmailDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
+	var p struct {
+		InReplyToMessageID uint32 `json:"in_reply_to_message_id"`
+		Folder             string `json:"folder"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, nil
+	}
+	if p.InReplyToMessageID == 0 {
+		return nil, nil
+	}
+	if p.Folder == "" {
+		p.Folder = "INBOX"
+	}
+
+	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, p.Folder, []uint32{p.InReplyToMessageID}, connectors.MailboxUIDValidityFromContext(ctx))
+	if err != nil || len(metaByUID) == 0 {
+		return nil, nil
+	}
+	meta, ok := metaByUID[p.InReplyToMessageID]
+	if !ok {
+		return nil, nil
+	}
+	return map[string]any{"in_reply_to": meta.asMap()}, nil
 }
 
 func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {

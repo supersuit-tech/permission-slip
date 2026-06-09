@@ -9,6 +9,42 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
+func TestResolveResourceDetails_ReplyEmail_NestsInReplyTo(t *testing.T) {
+	t.Parallel()
+
+	orig := resolveMessageEnvelopes
+	t.Cleanup(func() { resolveMessageEnvelopes = orig })
+
+	resolveMessageEnvelopes = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, folder string, uids []uint32, _ connectors.MailboxUIDValidityStore) (map[uint32]emailEnvelopeMetadata, error) {
+		if folder != "INBOX" || len(uids) != 1 || uids[0] != 7 {
+			t.Fatalf("folder=%q uids=%v", folder, uids)
+		}
+		return map[uint32]emailEnvelopeMetadata{
+			7: {
+				Subject: "Question",
+				From:    []string{"asker@example.com"},
+				To:      []string{"me@proton.me"},
+				Date:    "2026-04-01T08:00:00Z",
+			},
+		}, nil
+	}
+
+	conn := New()
+	params, _ := json.Marshal(map[string]any{"in_reply_to_message_id": 7, "folder": "INBOX", "body": "Sure"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "protonmail.reply_email", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	raw, ok := details["in_reply_to"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected in_reply_to map, got %T", details["in_reply_to"])
+	}
+	assertEnvelopeMetadataOnly(t, raw)
+	if raw["subject"] != "Question" {
+		t.Errorf("subject = %v", raw["subject"])
+	}
+}
+
 func TestResolveResourceDetails_ReadEmail_PopulatesMetadata(t *testing.T) {
 	t.Parallel()
 

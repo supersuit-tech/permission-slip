@@ -25,6 +25,7 @@ func TestProtonMailConnector_Actions(t *testing.T) {
 
 	expected := []string{
 		"protonmail.send_email",
+		"protonmail.reply_email",
 		"protonmail.read_inbox",
 		"protonmail.search_emails",
 		"protonmail.read_email",
@@ -164,8 +165,8 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 	if m.Name != "Proton Mail" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Proton Mail")
 	}
-	if len(m.Actions) != 5 {
-		t.Fatalf("Manifest().Actions has %d items, want 5", len(m.Actions))
+	if len(m.Actions) != 6 {
+		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
 	}
 
 	actionTypes := make(map[string]bool)
@@ -174,6 +175,7 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 	}
 	for _, want := range []string{
 		"protonmail.send_email",
+		"protonmail.reply_email",
 		"protonmail.read_inbox",
 		"protonmail.search_emails",
 		"protonmail.read_email",
@@ -247,9 +249,9 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 			if a.RiskLevel != "high" {
 				t.Errorf("send_email risk_level = %q, want high", a.RiskLevel)
 			}
-		case "protonmail.archive_email":
+		case "protonmail.reply_email", "protonmail.archive_email":
 			if a.RiskLevel != "medium" {
-				t.Errorf("archive_email risk_level = %q, want medium", a.RiskLevel)
+				t.Errorf("%s risk_level = %q, want medium", a.ActionType, a.RiskLevel)
 			}
 		case "protonmail.read_inbox", "protonmail.search_emails", "protonmail.read_email":
 			if a.RiskLevel != "low" {

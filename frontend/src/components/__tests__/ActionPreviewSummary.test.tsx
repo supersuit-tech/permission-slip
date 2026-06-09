@@ -505,6 +505,29 @@ describe("buildSummary", () => {
     });
   });
 
+  describe("protonmail.reply_email", () => {
+    it("shows in-reply-to subject and sender from resourceDetails", () => {
+      const result = buildSummary(
+        "protonmail.reply_email",
+        { in_reply_to_message_id: 7, body: "Sure" },
+        null,
+        null,
+        undefined,
+        {
+          in_reply_to: {
+            subject: "Question",
+            from: ["asker@example.com"],
+            to: ["me@proton.me"],
+            date: "2026-04-01T08:00:00Z",
+          },
+        },
+      );
+      expect(result).toContain("Reply to");
+      expect(result).toContain("Question");
+      expect(result).toContain("asker@example.com");
+    });
+  });
+
   // ── Existing describers still work ──────────────────────────────
 
   describe("generic / unknown action types", () => {

@@ -313,6 +313,15 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
     if (batch) return batch;
     return protonmailEmailSummary("Archive email", rd);
   },
+
+  "protonmail.reply_email": (_params, rd) => {
+    if (!rd) return null;
+    const raw = rd.in_reply_to;
+    if (raw == null || typeof raw !== "object" || Array.isArray(raw)) {
+      return null;
+    }
+    return protonmailEmailSummary("Reply to", raw as Record<string, unknown>);
+  },
 };
 
 /**

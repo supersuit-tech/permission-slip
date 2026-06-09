@@ -197,6 +197,32 @@ describe("ApprovalDetailScreen", () => {
     expect(json).toContain("Welcome");
   });
 
+  it("shows proton in-reply-to card for protonmail.reply_email", async () => {
+    const approval = makeApproval({
+      action: {
+        type: "protonmail.reply_email",
+        version: "1",
+        parameters: { in_reply_to_message_id: 7, body: "Sure" },
+      },
+      resource_details: {
+        in_reply_to: {
+          subject: "Question about billing",
+          from: ["support@example.com"],
+          to: ["me@proton.me"],
+          date: "2026-03-01T12:00:00Z",
+        },
+      },
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    const json = JSON.stringify(renderer.toJSON());
+    expect(json).toContain("Reply Context");
+    expect(json).toContain("In reply to");
+    expect(json).toContain("Question about billing");
+    expect(json).toContain("support@example.com");
+  });
+
   it("shows email thread card for google.send_email_reply with thread in context", async () => {
     const approval = makeApproval({
       action: {
