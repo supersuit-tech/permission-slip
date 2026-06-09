@@ -86,8 +86,6 @@ func TestResolveResourceDetails_ReadEmail_PopulatesMetadata(t *testing.T) {
 }
 
 func TestResolveResourceDetails_ReadEmail_FailureFallsBack(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
@@ -171,8 +169,6 @@ func TestResolveResourceDetails_ArchiveEmail_BatchKeyedByHandle(t *testing.T) {
 }
 
 func TestResolveResourceDetails_PassesMailboxStoreFromContext(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
