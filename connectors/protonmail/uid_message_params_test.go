@@ -22,8 +22,11 @@ func TestParseUIDMessageParams_SingleID(t *testing.T) {
 func TestParseUIDMessageParams_MissingIDs(t *testing.T) {
 	t.Parallel()
 
-	_, err := parseUIDMessageParams([]byte(`{"folder": "INBOX"}`))
-	if err == nil {
+	params, err := parseUIDMessageParams([]byte(`{"folder": "INBOX"}`))
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	if err := params.validate(); err == nil {
 		t.Fatal("expected validation error")
 	}
 	if !connectors.IsValidationError(err) {
