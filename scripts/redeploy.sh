@@ -10,6 +10,10 @@
 #
 #   PS_SERVICE=my-unit scripts/redeploy.sh
 #
+# Target a user-level unit (systemctl --user) instead of a system unit:
+#
+#   PS_SYSTEMCTL_ARGS=--user scripts/redeploy.sh
+#
 # Safety: the running server is only ever replaced by a SUCCESSFUL build. A
 # failed `git pull` (e.g. a transient network blip) or a failed dependency
 # install is non-fatal — the script falls back to rebuilding the current
@@ -47,7 +51,16 @@ make build
 
 echo "==> Restarting service: $SERVICE"
 if command -v systemctl >/dev/null 2>&1; then
-  sudo systemctl restart "$SERVICE"
+  # Use sudo only when not already root and sudo is available — restarting a
+  # system unit needs root, but a root deploy job (or a passwordless-sudo-less
+  # box) shouldn't trip over a hardcoded `sudo`.
+  SUDO=""
+  if [ "$(id -u)" -ne 0 ] && command -v sudo >/dev/null 2>&1; then
+    SUDO="sudo"
+  fi
+  # PS_SYSTEMCTL_ARGS lets you target a user unit, e.g.
+  #   PS_SYSTEMCTL_ARGS=--user scripts/redeploy.sh
+  $SUDO systemctl ${PS_SYSTEMCTL_ARGS:-} restart "$SERVICE"
 else
   echo "    systemctl not found — restart your server process manually." >&2
 fi
