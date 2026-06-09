@@ -26,11 +26,12 @@ func TestParseUIDMessageParams_MissingIDs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected parse error: %v", err)
 	}
-	if err := params.validate(); err == nil {
+	valErr := params.validate()
+	if valErr == nil {
 		t.Fatal("expected validation error")
 	}
-	if !connectors.IsValidationError(err) {
-		t.Fatalf("expected ValidationError, got %T", err)
+	if !connectors.IsValidationError(valErr) {
+		t.Fatalf("expected ValidationError, got %T", valErr)
 	}
 }
 
