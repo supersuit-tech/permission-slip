@@ -253,6 +253,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						Placeholder: "Your Proton address as shown by Bridge info",
 						Secret:      ptrBool(false),
 						Required:    ptrBool(true),
+						HelpText:    "Run protonmail-bridge --cli, then type info. Use the username Bridge prints — it must match the running Bridge instance.",
 					},
 					{
 						Key:         "password",
@@ -260,7 +261,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						Placeholder: "From Bridge info (not your Proton account password)",
 						Secret:      ptrBool(true),
 						Required:    ptrBool(true),
-						HelpText:    "Run protonmail-bridge info to get the Bridge-generated password. This is not your Proton account login password.",
+						HelpText:    "From protonmail-bridge info — the Bridge-generated password, not your Proton account login password.",
 					},
 					{
 						Key:         "imap_host",
@@ -268,6 +269,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						Placeholder: "127.0.0.1",
 						Secret:      ptrBool(false),
 						Required:    ptrBool(false),
+						HelpText:    "Leave blank when Bridge runs on the same host (default 127.0.0.1:1143).",
 					},
 					{
 						Key:         "imap_port",
@@ -282,6 +284,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						Placeholder: "127.0.0.1",
 						Secret:      ptrBool(false),
 						Required:    ptrBool(false),
+						HelpText:    "Leave blank when Bridge runs on the same host (default 127.0.0.1:1025).",
 					},
 					{
 						Key:         "smtp_port",

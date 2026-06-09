@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label";
 import { useStoreCredential } from "@/hooks/useStoreCredential";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import validation from "@/lib/validation";
+import { BridgeTestConnectionButton } from "./BridgeTestConnectionButton";
 import { resolveStaticCredentialFields } from "./credentialFields";
 
 interface AddCredentialDialogProps {
@@ -222,6 +223,11 @@ export function AddCredentialDialog({
                 </div>
               ))
             )}
+            <BridgeTestConnectionButton
+              service={credential.service}
+              buildCredentials={buildCredentials}
+              disabled={isLoading}
+            />
           </div>
           <DialogFooter>
             <Button

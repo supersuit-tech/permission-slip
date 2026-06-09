@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -21,11 +22,18 @@ type storeCredentialRequest struct {
 	Label       *string        `json:"label,omitempty"`
 }
 
+type bridgeHealthSummary struct {
+	Status    string    `json:"status"`
+	CheckedAt time.Time `json:"checked_at"`
+	Message   string    `json:"message,omitempty"`
+}
+
 type credentialSummary struct {
-	ID        string    `json:"id"`
-	Service   string    `json:"service"`
-	Label     *string   `json:"label,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
+	ID           string               `json:"id"`
+	Service      string               `json:"service"`
+	Label        *string              `json:"label,omitempty"`
+	CreatedAt    time.Time            `json:"created_at"`
+	BridgeHealth *bridgeHealthSummary `json:"bridge_health,omitempty"`
 }
 
 type credentialListResponse struct {
@@ -78,7 +86,7 @@ func handleListCredentials(deps *Deps) http.HandlerFunc {
 
 		data := make([]credentialSummary, len(creds))
 		for i, c := range creds {
-			data[i] = toCredentialSummary(c)
+			data[i] = toCredentialSummaryWithHealth(r.Context(), deps.DB, c)
 		}
 
 		RespondJSON(w, http.StatusOK, credentialListResponse{Credentials: data})
@@ -147,6 +155,16 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, pickErr.Error()))
 			return
 		}
+		if err := maybeValidateLiveCredentials(r.Context(), deps, req.Service, credStrings); err != nil {
+			connErrCtx := ConnectorContext{ConnectorID: req.Service, ActionType: req.Service + ".read_inbox"}
+			if handleConnectorError(w, r, err, connErrCtx) {
+				return
+			}
+			log.Printf("[%s] StoreCredential: validate: %v", TraceID(r.Context()), err)
+			CaptureConnectorError(r.Context(), err, connErrCtx)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Credential validation failed"))
+			return
+		}
 		credJSON, err := json.Marshal(credStrings)
 		if err != nil {
 			log.Printf("[%s] StoreCredential: marshal credentials: %v", TraceID(r.Context()), err)
@@ -199,7 +217,14 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		RespondJSON(w, http.StatusCreated, toCredentialSummary(*cred))
+		if req.Service == protonmailService {
+			_ = db.SetProtonmailHealth(r.Context(), deps.DB, cred.ID, db.ProtonmailHealthState{
+				Status:    db.ProtonmailHealthOK,
+				CheckedAt: time.Now().UTC(),
+			})
+		}
+
+		RespondJSON(w, http.StatusCreated, toCredentialSummaryWithHealth(r.Context(), deps.DB, *cred))
 	}
 }
 
@@ -331,6 +356,16 @@ func handleUpdateCredential(deps *Deps) http.HandlerFunc {
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, pickErr.Error()))
 				return
 			}
+			if err := maybeValidateLiveCredentials(r.Context(), deps, ownedCred.Service, credStrings); err != nil {
+				connErrCtx := ConnectorContext{ConnectorID: ownedCred.Service, ActionType: ownedCred.Service + ".read_inbox"}
+				if handleConnectorError(w, r, err, connErrCtx) {
+					return
+				}
+				log.Printf("[%s] UpdateCredential: validate: %v", TraceID(r.Context()), err)
+				CaptureConnectorError(r.Context(), err, connErrCtx)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Credential validation failed"))
+				return
+			}
 			credJSON, err := json.Marshal(credStrings)
 			if err != nil {
 				log.Printf("[%s] UpdateCredential: marshal credentials: %v", TraceID(r.Context()), err)
@@ -385,7 +420,14 @@ func handleUpdateCredential(deps *Deps) http.HandlerFunc {
 			}
 		}
 
-		RespondJSON(w, http.StatusOK, toCredentialSummary(result))
+		if hasCredentialFieldUpdates && ownedCred.Service == protonmailService {
+			_ = db.SetProtonmailHealth(r.Context(), deps.DB, credID, db.ProtonmailHealthState{
+				Status:    db.ProtonmailHealthOK,
+				CheckedAt: time.Now().UTC(),
+			})
+		}
+
+		RespondJSON(w, http.StatusOK, toCredentialSummaryWithHealth(r.Context(), deps.DB, result))
 	}
 }
 
@@ -464,6 +506,23 @@ func toCredentialSummary(c db.Credential) credentialSummary {
 		Label:     c.Label,
 		CreatedAt: c.CreatedAt,
 	}
+}
+
+func toCredentialSummaryWithHealth(ctx context.Context, d db.DBTX, c db.Credential) credentialSummary {
+	summary := toCredentialSummary(c)
+	if c.Service != protonmailService {
+		return summary
+	}
+	health, err := db.GetProtonmailHealth(ctx, d, c.ID)
+	if err != nil || health == nil {
+		return summary
+	}
+	summary.BridgeHealth = &bridgeHealthSummary{
+		Status:    string(health.Status),
+		CheckedAt: health.CheckedAt,
+		Message:   health.Message,
+	}
+	return summary
 }
 
 // resolveAndValidateCredentialPayload picks the matching connector credential row

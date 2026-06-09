@@ -121,13 +121,14 @@ func TestValidateCredentialShape(t *testing.T) {
 }
 
 func TestProtonMailConnector_ValidateCredentials(t *testing.T) {
-	t.Parallel()
-
-	old := validateIMAPConn
-	validateIMAPConn = func(_ connectors.Credentials, _ time.Duration) (*imapSession, error) {
-		return &imapSession{}, nil
-	}
-	t.Cleanup(func() { validateIMAPConn = old })
+	oldIMAP := testIMAPConn
+	oldSMTP := testSMTPConn
+	testIMAPConn = func(_ connectors.Credentials, _ time.Duration) error { return nil }
+	testSMTPConn = func(_ connectors.Credentials, _ time.Duration) error { return nil }
+	t.Cleanup(func() {
+		testIMAPConn = oldIMAP
+		testSMTPConn = oldSMTP
+	})
 
 	c := New()
 	for _, creds := range []connectors.Credentials{validCreds(), validCredsAllFields()} {
@@ -138,11 +139,16 @@ func TestProtonMailConnector_ValidateCredentials(t *testing.T) {
 }
 
 func TestProtonMailConnector_ValidateCredentials_proxyUnreachable(t *testing.T) {
-	t.Parallel()
-
-	old := validateIMAPConn
-	validateIMAPConn = connectIMAP
-	t.Cleanup(func() { validateIMAPConn = old })
+	oldIMAP := testIMAPConn
+	testIMAPConn = func(creds connectors.Credentials, timeout time.Duration) error {
+		session, err := connectIMAP(creds, timeout)
+		if err != nil {
+			return err
+		}
+		session.close()
+		return nil
+	}
+	t.Cleanup(func() { testIMAPConn = oldIMAP })
 
 	c := New()
 	err := c.ValidateCredentials(t.Context(), validCreds())
@@ -238,9 +244,17 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 			t.Errorf("credential fields[%d].required = %s, want %v", i, gotRequired, want.required)
 		}
 	}
-	passwordField := cred.Fields[1]
-	if passwordField.HelpText == "" {
-		t.Error("password field help_text is empty, want guidance about the Bridge password")
+	for _, key := range []string{"username", "password"} {
+		var field connectors.ManifestCredentialField
+		for _, f := range cred.Fields {
+			if f.Key == key {
+				field = f
+				break
+			}
+		}
+		if field.HelpText == "" {
+			t.Errorf("%s field help_text is empty, want Bridge setup guidance", key)
+		}
 	}
 
 	for _, a := range m.Actions {

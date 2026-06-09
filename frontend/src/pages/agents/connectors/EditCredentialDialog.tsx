@@ -16,6 +16,7 @@ import type { CredentialSummary } from "@/hooks/useCredentials";
 import { useUpdateCredential } from "@/hooks/useUpdateCredential";
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import validation from "@/lib/validation";
+import { BridgeTestConnectionButton } from "./BridgeTestConnectionButton";
 import { resolveStaticCredentialFields } from "./credentialFields";
 
 interface EditCredentialDialogProps {
@@ -224,6 +225,12 @@ export function EditCredentialDialog({
                 </div>
               ))
             )}
+            <BridgeTestConnectionButton
+              service={credential.service}
+              credentialId={storedCredential.id}
+              buildCredentials={buildCredentialUpdates}
+              disabled={isLoading}
+            />
           </div>
           <DialogFooter>
             <Button
