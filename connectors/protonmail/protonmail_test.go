@@ -120,8 +120,6 @@ func TestValidateCredentialShape(t *testing.T) {
 }
 
 func TestProtonMailConnector_ValidateCredentials(t *testing.T) {
-	t.Parallel()
-
 	oldIMAP := testIMAPConn
 	oldSMTP := testSMTPConn
 	testIMAPConn = func(_ connectors.Credentials, _ time.Duration) error { return nil }

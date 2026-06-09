@@ -24,8 +24,6 @@ func decodeTestConnection(t *testing.T, body []byte) testCredentialConnectionRes
 }
 
 func TestTestCredentialConnection_Success(t *testing.T) {
-	t.Parallel()
-
 	old := testProtonBridgeConnection
 	testProtonBridgeConnection = func(_ context.Context, _ connectors.Credentials, _ time.Duration) error {
 		return nil
@@ -54,8 +52,6 @@ func TestTestCredentialConnection_Success(t *testing.T) {
 }
 
 func TestTestCredentialConnection_AuthFailure(t *testing.T) {
-	t.Parallel()
-
 	old := testProtonBridgeConnection
 	testProtonBridgeConnection = func(_ context.Context, _ connectors.Credentials, _ time.Duration) error {
 		return &connectors.AuthError{Message: "Wrong Bridge password"}
@@ -80,7 +76,6 @@ func TestTestCredentialConnection_AuthFailure(t *testing.T) {
 }
 
 func TestTestCredentialConnection_UnsupportedService(t *testing.T) {
-	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -99,8 +94,6 @@ func TestTestCredentialConnection_UnsupportedService(t *testing.T) {
 }
 
 func TestTestCredentialConnection_StoredCredentialPersistsHealth(t *testing.T) {
-	t.Parallel()
-
 	old := testProtonBridgeConnection
 	testProtonBridgeConnection = func(_ context.Context, _ connectors.Credentials, _ time.Duration) error {
 		return nil

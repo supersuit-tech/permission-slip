@@ -10,8 +10,6 @@ import (
 )
 
 func TestTestBridgeConnection_success(t *testing.T) {
-	t.Parallel()
-
 	oldIMAP := testIMAPConn
 	oldSMTP := testSMTPConn
 	testIMAPConn = func(_ connectors.Credentials, _ time.Duration) error { return nil }
@@ -27,8 +25,6 @@ func TestTestBridgeConnection_success(t *testing.T) {
 }
 
 func TestTestBridgeConnection_imapFailure(t *testing.T) {
-	t.Parallel()
-
 	oldIMAP := testIMAPConn
 	oldSMTP := testSMTPConn
 	testIMAPConn = func(_ connectors.Credentials, _ time.Duration) error {
@@ -57,8 +53,6 @@ func TestTestBridgeConnection_imapFailure(t *testing.T) {
 }
 
 func TestTestBridgeConnection_authFailure(t *testing.T) {
-	t.Parallel()
-
 	oldIMAP := testIMAPConn
 	testIMAPConn = func(_ connectors.Credentials, _ time.Duration) error {
 		return &connectors.AuthError{Message: "IMAP login failed: invalid credentials"}
@@ -82,8 +76,6 @@ func TestTestBridgeConnection_authFailure(t *testing.T) {
 }
 
 func TestTestBridgeConnection_timeout(t *testing.T) {
-	t.Parallel()
-
 	oldIMAP := testIMAPConn
 	testIMAPConn = func(_ connectors.Credentials, _ time.Duration) error {
 		return &connectors.TimeoutError{Message: "IMAP connection timed out"}
@@ -113,8 +105,6 @@ func TestIsConnectionRefused(t *testing.T) {
 }
 
 func TestProtonMailConnector_ValidateCredentials_usesBridgeTest(t *testing.T) {
-	t.Parallel()
-
 	oldIMAP := testIMAPConn
 	oldSMTP := testSMTPConn
 	called := false
