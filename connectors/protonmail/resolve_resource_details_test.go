@@ -60,7 +60,7 @@ func TestResolveResourceDetails_ReadEmail_FailureFallsBack(t *testing.T) {
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
 	resolveMessageEnvelopes = func(context.Context, *ProtonMailConnector, connectors.Credentials, string, []uint32, connectors.MailboxUIDValidityStore) (map[uint32]emailEnvelopeMetadata, error) {
-		return nil, connectors.ExternalError{Message: "proxy down"}
+		return nil, &connectors.ExternalError{Message: "proxy down"}
 	}
 
 	conn := New()
