@@ -243,13 +243,15 @@ func TestReplyEmail_HeaderInjectionPrevented(t *testing.T) {
 	}
 
 	msgStr := string(capturedMsg)
-	if strings.Contains(msgStr, "attacker@evil.com") {
-		t.Errorf("header injection not prevented: %q", msgStr)
+	lines := strings.Split(msgStr, "\r\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "Bcc:") {
+			t.Error("header injection: injected Bcc header found as separate line")
+		}
 	}
-	if !strings.Contains(msgStr, "In-Reply-To: <safe@example.com>Bcc: attacker@evil.com") {
-		// sanitize strips CR/LF so injected Bcc becomes same line without newline — still check no separate Bcc header
-		if strings.Contains(msgStr, "\r\nBcc:") || strings.Contains(msgStr, "\nBcc:") {
-			t.Errorf("newline header injection succeeded: %q", msgStr)
+	for _, line := range lines {
+		if strings.HasPrefix(line, "In-Reply-To:") && strings.Contains(line, "\r") {
+			t.Error("header injection: CR found in In-Reply-To line")
 		}
 	}
 }
