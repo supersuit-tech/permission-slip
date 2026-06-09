@@ -15,6 +15,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 		ID:          "protonmail",
 		Name:        "Proton Mail",
 		Description: "Send and read emails through Proton Mail via a local IMAP/SMTP proxy (Proton Mail Bridge on x86_64, or hydroxide on ARM/Raspberry Pi). The proxy must be running on the same host as Permission Slip.",
+		Status:      "early_preview",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
