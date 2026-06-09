@@ -37,6 +37,12 @@ type deleteCredentialResponse struct {
 	DeletedAt time.Time `json:"deleted_at"`
 }
 
+// updateCredentialRequestRaw uses json.RawMessage for PATCH semantics.
+type updateCredentialRequestRaw struct {
+	Label       json.RawMessage `json:"label"`
+	Credentials json.RawMessage `json:"credentials"`
+}
+
 // --- Validation ---
 
 var servicePattern = regexp.MustCompile(`^[a-z][a-z0-9_.-]*$`)
@@ -52,6 +58,7 @@ func RegisterCredentialRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /credentials", requireProfile(handleListCredentials(deps)))
 	mux.Handle("POST /credentials", requireProfile(handleStoreCredential(deps)))
+	mux.Handle("PATCH /credentials/{credential_id}", requireProfile(handleUpdateCredential(deps)))
 	mux.Handle("DELETE /credentials/{credential_id}", requireProfile(handleDeleteCredential(deps)))
 }
 
@@ -193,6 +200,192 @@ func handleStoreCredential(deps *Deps) http.HandlerFunc {
 		}
 
 		RespondJSON(w, http.StatusCreated, toCredentialSummary(*cred))
+	}
+}
+
+func handleUpdateCredential(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+		credID := r.PathValue("credential_id")
+
+		if credID == "" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "credential_id is required"))
+			return
+		}
+
+		var req updateCredentialRequestRaw
+		if !DecodeJSONOrReject(w, r, &req) {
+			return
+		}
+
+		newLabel, labelProvided, err := parseOptionalString(req.Label)
+		if err != nil {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "label must be a string or null"))
+			return
+		}
+		if labelProvided && newLabel != nil && len(*newLabel) > shared.CredentialLabelMaxLength {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "label exceeds maximum length"))
+			return
+		}
+
+		var credentialUpdates map[string]any
+		credentialsProvided := len(req.Credentials) > 0
+		if credentialsProvided {
+			if isRawJSONNull(req.Credentials) {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "credentials must be an object"))
+				return
+			}
+			if err := json.Unmarshal(req.Credentials, &credentialUpdates); err != nil {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "credentials must be an object"))
+				return
+			}
+		}
+
+		hasCredentialFieldUpdates := false
+		for _, v := range credentialUpdates {
+			s, ok := v.(string)
+			if !ok {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "credential values must be strings"))
+				return
+			}
+			if s != "" {
+				hasCredentialFieldUpdates = true
+				break
+			}
+		}
+
+		if !labelProvided && !hasCredentialFieldUpdates {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "at least one field must be provided"))
+			return
+		}
+
+		if hasCredentialFieldUpdates && deps.Vault == nil {
+			RespondError(w, r, http.StatusServiceUnavailable, ServiceUnavailable("Credential vault not available"))
+			return
+		}
+
+		tx, txOwned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] UpdateCredential: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+			return
+		}
+		if txOwned {
+			defer db.RollbackTx(r.Context(), tx) //nolint:errcheck // best-effort cleanup
+		}
+
+		ownedCred, err := db.GetOwnedCredential(r.Context(), tx, credID, profile.ID)
+		if err != nil {
+			var credErr *db.CredentialError
+			if errors.As(err, &credErr) && credErr.Code == db.CredentialErrNotFound {
+				RespondError(w, r, http.StatusNotFound, NotFound(ErrCredentialNotFound, "Credential not found"))
+				return
+			}
+			log.Printf("[%s] UpdateCredential: load: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+			return
+		}
+
+		result := ownedCred.Credential
+
+		if hasCredentialFieldUpdates {
+			raw, err := deps.Vault.ReadSecret(r.Context(), tx, ownedCred.VaultSecretID)
+			if err != nil {
+				log.Printf("[%s] UpdateCredential: vault read: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+				return
+			}
+
+			var existing map[string]string
+			if err := json.Unmarshal(raw, &existing); err != nil {
+				log.Printf("[%s] UpdateCredential: unmarshal existing: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+				return
+			}
+
+			merged := make(map[string]any, len(existing))
+			for k, v := range existing {
+				merged[k] = v
+			}
+			for k, v := range credentialUpdates {
+				s, ok := v.(string)
+				if !ok || s == "" {
+					continue
+				}
+				merged[k] = s
+			}
+
+			candidates, err := db.GetRequiredCredentialsByService(r.Context(), tx, ownedCred.Service)
+			if err != nil {
+				log.Printf("[%s] UpdateCredential: list required credentials: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+				return
+			}
+			credStrings, pickErr := resolveAndValidateCredentialPayload(ownedCred.Service, candidates, merged)
+			if pickErr != nil {
+				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, pickErr.Error()))
+				return
+			}
+			credJSON, err := json.Marshal(credStrings)
+			if err != nil {
+				log.Printf("[%s] UpdateCredential: marshal credentials: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+				return
+			}
+
+			if err := deps.Vault.UpdateSecret(r.Context(), tx, ownedCred.VaultSecretID, credJSON); err != nil {
+				log.Printf("[%s] UpdateCredential: vault update: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+				return
+			}
+		}
+
+		if labelProvided {
+			updated, err := db.UpdateCredentialLabel(r.Context(), tx, credID, profile.ID, newLabel)
+			if err != nil {
+				var credErr *db.CredentialError
+				if errors.As(err, &credErr) {
+					switch credErr.Code {
+					case db.CredentialErrNotFound:
+						RespondError(w, r, http.StatusNotFound, NotFound(ErrCredentialNotFound, "Credential not found"))
+						return
+					case db.CredentialErrDuplicate:
+						resp := Conflict(ErrDuplicateCredential, "Credentials already stored for this service with this label")
+						resp.Error.Details = map[string]any{
+							"service": ownedCred.Service,
+						}
+						if newLabel != nil {
+							resp.Error.Details["label"] = *newLabel
+						}
+						RespondError(w, r, http.StatusConflict, resp)
+						return
+					}
+				}
+				log.Printf("[%s] UpdateCredential: label: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+				return
+			}
+			result = *updated
+		}
+
+		if txOwned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] UpdateCredential: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update credential"))
+				return
+			}
+		}
+
+		RespondJSON(w, http.StatusOK, toCredentialSummary(result))
 	}
 }
 

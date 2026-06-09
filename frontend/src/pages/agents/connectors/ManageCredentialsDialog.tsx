@@ -6,6 +6,7 @@ import {
   ExternalLink,
   Loader2,
   LogIn,
+  Pencil,
   Plus,
   Trash2,
   Unplug,
@@ -34,6 +35,7 @@ import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
 import { AddCredentialDialog } from "./AddCredentialDialog";
+import { EditCredentialDialog } from "./EditCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
 import { DisconnectOAuthDialog } from "./DisconnectOAuthDialog";
 import {
@@ -541,6 +543,7 @@ function StaticCredentialRow({
   connectorId: string;
 }) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<CredentialSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(null);
   const { tryAssign } = useTryAutoAssign(agentId, connectorId);
 
@@ -619,15 +622,25 @@ function StaticCredentialRow({
                     Added {new Date(cred.created_at).toLocaleDateString()}
                   </p>
                 </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-destructive hover:text-destructive"
-                  onClick={() => setRemoveTarget(cred)}
-                  aria-label={`Remove credential ${cred.label ?? cred.service}`}
-                >
-                  <Trash2 className="size-4" />
-                </Button>
+                <div className="flex items-center gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setEditTarget(cred)}
+                    aria-label={`Edit credential ${cred.label ?? cred.service}`}
+                  >
+                    <Pencil className="size-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-destructive hover:text-destructive"
+                    onClick={() => setRemoveTarget(cred)}
+                    aria-label={`Remove credential ${cred.label ?? cred.service}`}
+                  >
+                    <Trash2 className="size-4" />
+                  </Button>
+                </div>
               </div>
             ))}
           </div>
@@ -642,6 +655,17 @@ function StaticCredentialRow({
           tryAssign({ credentialId });
         }}
       />
+
+      {editTarget && (
+        <EditCredentialDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditTarget(null);
+          }}
+          credential={requiredCredential}
+          storedCredential={editTarget}
+        />
+      )}
 
       {removeTarget && (
         <RemoveCredentialDialog

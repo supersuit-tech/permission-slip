@@ -81,6 +81,59 @@ func TestSQLiteVault_RoundTrip(t *testing.T) {
 	}
 }
 
+func TestSQLiteVault_UpdateSecret(t *testing.T) {
+	pool, cleanup := setupVaultTestDB(t)
+	defer cleanup()
+
+	v, err := NewSQLiteVault(testMasterKey(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := t.Context()
+	plain := []byte(`{"token":"original"}`)
+
+	tx, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	id, err := v.CreateSecret(ctx, tx, "cred_test", plain)
+	if err != nil {
+		t.Fatalf("CreateSecret: %v", err)
+	}
+	if err := tx.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	updated := []byte(`{"token":"rotated"}`)
+	tx2, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := v.UpdateSecret(ctx, tx2, id, updated); err != nil {
+		t.Fatalf("UpdateSecret: %v", err)
+	}
+	if err := tx2.Commit(); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := v.ReadSecret(ctx, pool, id)
+	if err != nil {
+		t.Fatalf("ReadSecret: %v", err)
+	}
+	if !bytes.Equal(got, updated) {
+		t.Fatalf("expected updated plaintext, got %q", got)
+	}
+
+	tx3, err := pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := v.UpdateSecret(ctx, tx3, "00000000-0000-0000-0000-000000000099", updated); err == nil {
+		t.Fatal("expected error updating missing secret")
+	}
+	_ = tx3.Rollback()
+}
+
 func TestSQLiteVault_TamperedCiphertext(t *testing.T) {
 	pool, cleanup := setupVaultTestDB(t)
 	defer cleanup()

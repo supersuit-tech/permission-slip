@@ -411,6 +411,236 @@ func TestStoreCredential_ServiceTooLong(t *testing.T) {
 	}
 }
 
+// ── PATCH /credentials/{credential_id} ────────────────────────────────────────
+
+func storeTestCredential(t *testing.T, router http.Handler, uid, body string) credentialSummary {
+	t.Helper()
+	r := authenticatedJSONRequest(t, http.MethodPost, "/credentials", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("store: expected 201, got %d: %s", w.Code, w.Body.String())
+	}
+	return decodeStoreCredential(t, w.Body.Bytes())
+}
+
+func patchCredential(t *testing.T, router http.Handler, uid, credID, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	r := authenticatedJSONRequest(t, http.MethodPatch, fmt.Sprintf("/credentials/%s", credID), uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	return w
+}
+
+func TestUpdateCredential_RenameLabel(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	stored := storeTestCredential(t, router, uid, `{"service": "github", "credentials": {"api_key": "ghp_test"}, "label": "work"}`)
+
+	w := patchCredential(t, router, uid, stored.ID, `{"label": "personal"}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := decodeStoreCredential(t, w.Body.Bytes())
+	if resp.Label == nil || *resp.Label != "personal" {
+		t.Errorf("expected label 'personal', got %v", resp.Label)
+	}
+	if resp.ID != stored.ID {
+		t.Errorf("expected same credential id %q, got %q", stored.ID, resp.ID)
+	}
+}
+
+func TestUpdateCredential_ClearLabel(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	stored := storeTestCredential(t, router, uid, `{"service": "github", "credentials": {"api_key": "ghp_test"}, "label": "work"}`)
+
+	w := patchCredential(t, router, uid, stored.ID, `{"label": null}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	resp := decodeStoreCredential(t, w.Body.Bytes())
+	if resp.Label != nil {
+		t.Errorf("expected nil label, got %v", resp.Label)
+	}
+}
+
+func TestUpdateCredential_UpdateSecret(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	fields := []byte(`[{"key":"username","label":"Username","secret":false,"required":true},{"key":"password","label":"Password","secret":true,"required":true}]`)
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "proton", "proton", "custom", fields)
+
+	mockVault := vault.NewMockVaultStore()
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	stored := storeTestCredential(t, router, uid, `{"service": "proton", "credentials": {"username": "alice", "password": "oldpass"}}`)
+
+	w := patchCredential(t, router, uid, stored.ID, `{"credentials": {"password": "newpass"}}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	vaultID, err := db.GetVaultSecretIDByCredentialID(context.Background(), tx, stored.ID)
+	if err != nil {
+		t.Fatalf("GetVaultSecretIDByCredentialID: %v", err)
+	}
+	raw, err := mockVault.ReadSecret(context.Background(), tx, vaultID)
+	if err != nil {
+		t.Fatalf("ReadSecret: %v", err)
+	}
+	var creds map[string]string
+	if err := json.Unmarshal(raw, &creds); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if creds["username"] != "alice" {
+		t.Errorf("expected username unchanged 'alice', got %q", creds["username"])
+	}
+	if creds["password"] != "newpass" {
+		t.Errorf("expected password 'newpass', got %q", creds["password"])
+	}
+}
+
+func TestUpdateCredential_PartialFieldMerge(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	fields := []byte(`[{"key":"host","label":"Host","secret":false,"required":true},{"key":"port","label":"Port","secret":false,"required":true},{"key":"password","label":"Password","secret":true,"required":true}]`)
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "bridge", "bridge", "custom", fields)
+
+	mockVault := vault.NewMockVaultStore()
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	stored := storeTestCredential(t, router, uid, `{"service": "bridge", "credentials": {"host": "127.0.0.1", "port": "1143", "password": "secret"}}`)
+
+	w := patchCredential(t, router, uid, stored.ID, `{"credentials": {"host": "", "port": "1025", "password": ""}}`)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	vaultID, err := db.GetVaultSecretIDByCredentialID(context.Background(), tx, stored.ID)
+	if err != nil {
+		t.Fatalf("GetVaultSecretIDByCredentialID: %v", err)
+	}
+	raw, err := mockVault.ReadSecret(context.Background(), tx, vaultID)
+	if err != nil {
+		t.Fatalf("ReadSecret: %v", err)
+	}
+	var creds map[string]string
+	if err := json.Unmarshal(raw, &creds); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if creds["host"] != "127.0.0.1" {
+		t.Errorf("expected host unchanged, got %q", creds["host"])
+	}
+	if creds["port"] != "1025" {
+		t.Errorf("expected port '1025', got %q", creds["port"])
+	}
+	if creds["password"] != "secret" {
+		t.Errorf("expected password unchanged, got %q", creds["password"])
+	}
+}
+
+func TestUpdateCredential_NoOpRejected(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	stored := storeTestCredential(t, router, uid, `{"service": "github", "credentials": {"api_key": "ghp_test"}}`)
+
+	w := patchCredential(t, router, uid, stored.ID, `{}`)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+
+	w2 := patchCredential(t, router, uid, stored.ID, `{"credentials": {"api_key": ""}}`)
+	if w2.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for blank-only credentials, got %d: %s", w2.Code, w2.Body.String())
+	}
+}
+
+func TestUpdateCredential_NotFound(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	w := patchCredential(t, router, uid, "cred_nonexistent", `{"label": "work"}`)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateCredential_OtherUserSeesNotFound(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid1 := testhelper.GenerateUID(t)
+	uid2 := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid1, "u_"+uid1[:8])
+	testhelper.InsertUser(t, tx, uid2, "u_"+uid2[:8])
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	stored := storeTestCredential(t, router, uid1, `{"service": "github", "credentials": {"api_key": "ghp_test"}, "label": "work"}`)
+
+	w := patchCredential(t, router, uid2, stored.ID, `{"label": "hijack"}`)
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+func TestUpdateCredential_LabelCollision(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertConnectorWithStaticCredential(t, tx, "github", "github", "api_key", nil)
+
+	deps := &Deps{DB: tx, Vault: vault.NewMockVaultStore(), JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	storeTestCredential(t, router, uid, `{"service": "github", "credentials": {"api_key": "ghp_1"}, "label": "work"}`)
+	stored2 := storeTestCredential(t, router, uid, `{"service": "github", "credentials": {"api_key": "ghp_2"}, "label": "personal"}`)
+
+	w := patchCredential(t, router, uid, stored2.ID, `{"label": "work"}`)
+	if w.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", w.Code, w.Body.String())
+	}
+	errResp := decodeErrorResponse(t, w.Body.Bytes())
+	if errResp.Error.Code != ErrDuplicateCredential {
+		t.Errorf("expected error code %q, got %q", ErrDuplicateCredential, errResp.Error.Code)
+	}
+}
+
 // ── DELETE /credentials/{credential_id} ─────────────────────────────────────
 
 func TestDeleteCredential_Success(t *testing.T) {
@@ -723,6 +953,9 @@ func (f *failingVaultStore) CreateSecret(_ context.Context, _ db.DBTX, _ string,
 }
 func (f *failingVaultStore) ReadSecret(_ context.Context, _ db.DBTX, _ string) ([]byte, error) {
 	return nil, fmt.Errorf("vault unavailable")
+}
+func (f *failingVaultStore) UpdateSecret(_ context.Context, _ db.DBTX, _ string, _ []byte) error {
+	return fmt.Errorf("vault unavailable")
 }
 func (f *failingVaultStore) DeleteSecret(_ context.Context, _ db.DBTX, _ string) error {
 	return fmt.Errorf("vault unavailable")
