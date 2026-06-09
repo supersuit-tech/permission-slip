@@ -10,8 +10,6 @@ import (
 )
 
 func TestResolveResourceDetails_ReplyEmail_NestsInReplyTo(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
@@ -46,8 +44,6 @@ func TestResolveResourceDetails_ReplyEmail_NestsInReplyTo(t *testing.T) {
 }
 
 func TestResolveResourceDetails_ReadEmail_PopulatesMetadata(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
@@ -111,8 +107,6 @@ func TestResolveResourceDetails_ReadEmail_FailureFallsBack(t *testing.T) {
 }
 
 func TestResolveResourceDetails_ArchiveEmail_SingleUsesFlatFields(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
@@ -138,8 +132,6 @@ func TestResolveResourceDetails_ArchiveEmail_SingleUsesFlatFields(t *testing.T) 
 }
 
 func TestResolveResourceDetails_ArchiveEmail_BatchKeyedByHandle(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
