@@ -1,9 +1,11 @@
 package protonmail
 
 import (
+	"context"
 	"time"
 
 	"github.com/emersion/go-imap/v2"
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // emailEnvelopeMetadata is the approval-safe subset of email metadata exposed
