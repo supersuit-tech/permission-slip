@@ -161,7 +161,12 @@ This is a **one-time, interactive login** — you do **not** keep this terminal 
 > even though the `proton` instance is configured correctly. Bridge must only ever run
 > as the `proton` user.
 
-### 5. Run Bridge under systemd (user unit)
+### 5. Run Bridge under systemd (user unit) — *as `proton`*
+
+Use `--noninteractive`, **not** `--no-window`. On a headless server `--no-window` still
+starts Bridge's Qt **GUI** (it only hides the window), so it crashes immediately with
+`qt.qpa.xcb: could not connect to display` and the service crash-loops, never binding the
+IMAP port. `--noninteractive` runs the bridge *core* with no GUI and no display.
 
 ```bash
 # AS proton
@@ -172,7 +177,7 @@ Description=Proton Mail Bridge
 After=network.target
 
 [Service]
-ExecStart=/usr/bin/protonmail-bridge --no-window
+ExecStart=/usr/bin/protonmail-bridge --noninteractive
 Restart=on-failure
 RestartSec=10
 
@@ -229,5 +234,6 @@ If you previously used the external [permission-slip-proton](https://github.com/
 | IMAP says `no such user` (but `info` shows that user) | A **second Bridge instance under a different user** is serving the port — usually one accidentally started as root or your admin user. Find the owner: `sudo ss -tlnp \| grep 1143`, then `ps -o user= -p <pid>`. If it isn't `proton`, stop that instance (and remove any root autostart / systemd unit), then ensure the `proton` systemd service owns the port |
 | `systemctl --user`: `Failed to connect to bus` | You entered the proton shell without a user session. Use `sudo -iu proton` (login shell), or `export XDG_RUNTIME_DIR=/run/user/$(id -u)` before running `systemctl --user` |
 | Not sure which user a running Bridge belongs to | `sudo ss -tlnp \| grep 1143` shows the pid; `ps -o user=,cmd= -p <pid>` shows the owner. Only the `proton` instance should ever be listening |
+| Service crash-loops; logs show `qt.qpa.xcb: could not connect to display` / `bridge-gui` / `core dumped` | The unit is launching the **GUI**. On a headless server the `ExecStart` must use `--noninteractive`, not `--no-window` (the latter still loads Qt and needs a display). Fix the `ExecStart`, `systemctl --user daemon-reload`, then restart |
 
 For general self-hosted setup (Tailscale, Google, Slack), see [Self-hosted deployment](../deployment-self-hosted.md).
