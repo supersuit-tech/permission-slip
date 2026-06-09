@@ -42,10 +42,10 @@ func TestResolveResourceDetails_ReadEmail_PopulatesMetadata(t *testing.T) {
 	if details["subject"] != "Weekly Update" {
 		t.Errorf("subject = %v", details["subject"])
 	}
-	if !reflect.DeepEqual(details["from"], []any{"alice@example.com"}) {
+	if !reflect.DeepEqual(details["from"], []string{"alice@example.com"}) {
 		t.Errorf("from = %v", details["from"])
 	}
-	if !reflect.DeepEqual(details["to"], []any{"bob@example.com"}) {
+	if !reflect.DeepEqual(details["to"], []string{"bob@example.com"}) {
 		t.Errorf("to = %v", details["to"])
 	}
 	if details["date"] != "2026-01-15T10:00:00Z" {
