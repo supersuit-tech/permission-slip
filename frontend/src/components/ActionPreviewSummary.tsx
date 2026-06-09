@@ -375,6 +375,24 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     if (from) parts.push(text(" from "), val(from));
     return parts;
   },
+
+  // ── Proton Mail ─────────────────────────────────────────────────
+
+  "protonmail.read_email": (_params, rd) => {
+    if (!rd) return null;
+    const summary = protonmailEmailSummaryParts(rd);
+    if (!summary) return null;
+    return [text("Read email "), ...summary];
+  },
+
+  "protonmail.archive_email": (_params, rd) => {
+    if (!rd) return null;
+    const batch = protonmailBatchArchiveSummaryParts(rd);
+    if (batch) return batch;
+    const summary = protonmailEmailSummaryParts(rd);
+    if (!summary) return null;
+    return [text("Archive email "), ...summary];
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -535,6 +553,50 @@ function formatRecipients(v: unknown): string | null {
     return `${strs[0] ?? ""}, ${strs[1] ?? ""}, and ${strs.length - 2} more`;
   }
   return null;
+}
+
+function protonmailEmailSummaryParts(
+  meta: Record<string, unknown>,
+): SummaryPart[] | null {
+  const subject = strVal(meta.subject);
+  if (!subject) return null;
+  const parts: SummaryPart[] = [val(subject)];
+  const from = formatRecipients(meta.from);
+  if (from) parts.push(text(" from "), val(from));
+  return parts;
+}
+
+function protonmailBatchArchiveSummaryParts(
+  rd: Record<string, unknown>,
+): SummaryPart[] | null {
+  const rawMessages = rd.messages;
+  if (rawMessages == null || typeof rawMessages !== "object" || Array.isArray(rawMessages)) {
+    return null;
+  }
+  const entries = Object.entries(rawMessages as Record<string, unknown>);
+  if (entries.length <= 1) {
+    return null;
+  }
+  const subjects = entries
+    .map(([, meta]) =>
+      meta != null && typeof meta === "object"
+        ? strVal((meta as Record<string, unknown>).subject)
+        : null,
+    )
+    .filter((s): s is string => s != null);
+  if (subjects.length === 0) return null;
+
+  const parts: SummaryPart[] = [
+    text("Archive "),
+    val(String(entries.length)),
+    text(" emails"),
+  ];
+  const preview =
+    subjects.length <= 2
+      ? subjects.join("; ")
+      : `${subjects.slice(0, 2).join("; ")} and ${subjects.length - 2} more`;
+  parts.push(text(": "), val(truncate(preview, 80)));
+  return parts;
 }
 
 function formatCurrency(amount: unknown, currency: string): string {

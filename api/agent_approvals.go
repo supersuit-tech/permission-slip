@@ -299,7 +299,8 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 				if conn, ok := deps.Connectors.Get(cid[0]); ok {
 					if resolver, ok := conn.(connectors.ResourceDetailResolver); ok {
 						resolveCtx, resolveCancel := context.WithTimeout(r.Context(), 5*time.Second)
-						details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCredentialsForResolver(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID))
+						resolveCtx, resolveCreds := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
+						details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCreds)
 						resolveCancel()
 						if resolveErr != nil {
 							log.Printf("[%s] ResolveResourceDetails: %v", TraceID(r.Context()), resolveErr)
@@ -459,20 +460,22 @@ func approvalDenialCooldown(deps *Deps) time.Duration {
 	return db.DefaultDenialCooldown
 }
 
-// resolveCredentialsForResolver is a best-effort credential resolver for the
-// ResourceDetailResolver call. It mirrors the credential resolution logic from
-// connector execution but returns empty credentials on any failure (since
-// resource detail resolution is non-fatal).
-func resolveCredentialsForResolver(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string) connectors.Credentials {
+// resolveResourceDetailsContext resolves credentials for resource detail lookup
+// and attaches connector-specific runtime state (e.g. Proton Mail UIDVALIDITY).
+// Returns empty credentials on any failure since resolution is non-fatal.
+func resolveResourceDetailsContext(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string) (context.Context, connectors.Credentials) {
 	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil || len(reqCreds) == 0 {
-		return connectors.NewCredentials(nil)
+		return ctx, connectors.NewCredentials(nil)
 	}
-	creds, err := resolveCredentialsWithFallback(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
+	resolved, err := resolveCredentialsForExecution(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
 	if err != nil {
-		return connectors.NewCredentials(nil)
+		return ctx, connectors.NewCredentials(nil)
 	}
-	return creds
+	if connectorID == "protonmail" && resolved.CredentialID != "" {
+		ctx = connectors.ContextWithMailboxUIDValidity(ctx, newProtonmailUIDValidityStore(ctx, deps, resolved.CredentialID))
+	}
+	return ctx, resolved.Credentials
 }
 
 // emitApprovalRequestAuditEvent writes an audit event for a new approval request.

@@ -94,6 +94,48 @@ export const GoogleReadEmail: Story = {
   },
 };
 
+export const ProtonmailReadEmail: Story = {
+  name: "protonmail.read_email",
+  args: {
+    actionType: "protonmail.read_email",
+    parameters: { message_id: 10, folder: "INBOX" },
+    schema: null,
+    actionName: "Read Email",
+    resourceDetails: {
+      subject: "Vendor contract review",
+      from: ["legal@vendor.com"],
+      to: ["me@proton.me"],
+      date: "2026-03-01T14:30:00Z",
+    },
+  },
+};
+
+export const ProtonmailArchiveEmailBatch: Story = {
+  name: "protonmail.archive_email (batch)",
+  args: {
+    actionType: "protonmail.archive_email",
+    parameters: { message_ids: [10, 11], folder: "INBOX" },
+    schema: null,
+    actionName: "Archive Email",
+    resourceDetails: {
+      messages: {
+        "10": {
+          subject: "March newsletter",
+          from: ["news@example.com"],
+          to: ["me@proton.me"],
+          date: "2026-03-01T09:00:00Z",
+        },
+        "11": {
+          subject: "Receipt for order #4821",
+          from: ["billing@shop.com"],
+          to: ["me@proton.me"],
+          date: "2026-03-02T11:15:00Z",
+        },
+      },
+    },
+  },
+};
+
 // --- Slack ---
 
 export const SlackSendMessage: Story = {

@@ -200,6 +200,42 @@ function truncate(s: string, maxLen: number): string {
   return s.slice(0, maxLen - 1) + "\u2026";
 }
 
+function protonmailEmailSummary(
+  prefix: string,
+  meta: Record<string, unknown>,
+): string | null {
+  const subject = strVal(meta.subject);
+  if (!subject) return null;
+  let result = `${prefix} \u201C${subject}\u201D`;
+  const from = formatRecipients(meta.from);
+  if (from) result += ` from ${from}`;
+  return result;
+}
+
+function protonmailBatchArchiveSummary(rd: Record<string, unknown>): string | null {
+  const rawMessages = rd.messages;
+  if (rawMessages == null || typeof rawMessages !== "object" || Array.isArray(rawMessages)) {
+    return null;
+  }
+  const entries = Object.entries(rawMessages as Record<string, unknown>);
+  if (entries.length <= 1) return null;
+
+  const subjects = entries
+    .map(([, meta]) =>
+      meta != null && typeof meta === "object"
+        ? strVal((meta as Record<string, unknown>).subject)
+        : null,
+    )
+    .filter((s): s is string => s != null);
+  if (subjects.length === 0) return null;
+
+  const preview =
+    subjects.length <= 2
+      ? subjects.join("; ")
+      : `${subjects.slice(0, 2).join("; ")} and ${subjects.length - 2} more`;
+  return `Archive ${String(entries.length)} emails: \u201C${truncate(preview, 80)}\u201D`;
+}
+
 /** Formats a recipient list (string or string[]) for display in email summaries. */
 function formatRecipients(v: unknown): string | null {
   if (typeof v === "string") return v;
@@ -264,6 +300,18 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
     let result = `Send email to ${to}`;
     if (subject) result += ` \u2014 ${truncate(subject, 60)}`;
     return result;
+  },
+
+  "protonmail.read_email": (_params, rd) => {
+    if (!rd) return null;
+    return protonmailEmailSummary("Read email", rd);
+  },
+
+  "protonmail.archive_email": (_params, rd) => {
+    if (!rd) return null;
+    const batch = protonmailBatchArchiveSummary(rd);
+    if (batch) return batch;
+    return protonmailEmailSummary("Archive email", rd);
   },
 };
 
