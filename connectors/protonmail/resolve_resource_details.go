@@ -25,6 +25,13 @@ func (c *ProtonMailConnector) ResolveResourceDetails(ctx context.Context, action
 		return c.resolveArchiveEmailDetails(ctx, params, creds)
 	case "protonmail.reply_email":
 		return c.resolveReplyEmailDetails(ctx, params, creds)
+	case "protonmail.mark_read",
+		"protonmail.mark_unread",
+		"protonmail.flag",
+		"protonmail.unflag",
+		"protonmail.move_to_folder",
+		"protonmail.delete":
+		return c.resolveUIDMessageDetails(ctx, params, creds)
 	default:
 		return nil, nil
 	}
@@ -76,6 +83,17 @@ func (c *ProtonMailConnector) resolveReplyEmailDetails(ctx context.Context, para
 	return map[string]any{"in_reply_to": meta.asMap()}, nil
 }
 
+func (c *ProtonMailConnector) resolveUIDMessageDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
+	uidParams, err := parseUIDMessageParams(params)
+	if err != nil {
+		return nil, nil
+	}
+	if err := uidParams.validate(); err != nil {
+		return nil, nil
+	}
+	return c.resolveMessageDetailsForUIDs(ctx, creds, uidParams.Folder, uidParams.MessageIDs)
+}
+
 func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
 	archiveParams, err := parseArchiveParams(params)
 	if err != nil {
@@ -85,20 +103,24 @@ func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, pa
 		return nil, nil
 	}
 
-	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, archiveParams.Folder, archiveParams.MessageIDs, connectors.MailboxUIDValidityFromContext(ctx))
+	return c.resolveMessageDetailsForUIDs(ctx, creds, archiveParams.Folder, archiveParams.MessageIDs)
+}
+
+func (c *ProtonMailConnector) resolveMessageDetailsForUIDs(ctx context.Context, creds connectors.Credentials, folder string, messageIDs []uint32) (map[string]any, error) {
+	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, folder, messageIDs, connectors.MailboxUIDValidityFromContext(ctx))
 	if err != nil || len(metaByUID) == 0 {
 		return nil, nil
 	}
 
-	if len(archiveParams.MessageIDs) == 1 {
-		if meta, ok := metaByUID[archiveParams.MessageIDs[0]]; ok {
+	if len(messageIDs) == 1 {
+		if meta, ok := metaByUID[messageIDs[0]]; ok {
 			return meta.asMap(), nil
 		}
 		return nil, nil
 	}
 
 	messages := make(map[string]any, len(metaByUID))
-	for _, id := range archiveParams.MessageIDs {
+	for _, id := range messageIDs {
 		if meta, ok := metaByUID[id]; ok {
 			messages[fmt.Sprintf("%d", id)] = meta.asMap()
 		}

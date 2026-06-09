@@ -212,7 +212,7 @@ function protonmailEmailSummary(
   return result;
 }
 
-function protonmailBatchArchiveSummary(rd: Record<string, unknown>): string | null {
+function protonmailBatchEmailSummary(rd: Record<string, unknown>): string | null {
   const rawMessages = rd.messages;
   if (rawMessages == null || typeof rawMessages !== "object" || Array.isArray(rawMessages)) {
     return null;
@@ -233,7 +233,26 @@ function protonmailBatchArchiveSummary(rd: Record<string, unknown>): string | nu
     subjects.length <= 2
       ? subjects.join("; ")
       : `${subjects.slice(0, 2).join("; ")} and ${subjects.length - 2} more`;
-  return `Archive ${String(entries.length)} emails: \u201C${truncate(preview, 80)}\u201D`;
+  return ` ${String(entries.length)} emails: \u201C${truncate(preview, 80)}\u201D`;
+}
+
+function protonmailBatchArchiveSummary(rd: Record<string, unknown>): string | null {
+  const batch = protonmailBatchEmailSummary(rd);
+  if (!batch) return null;
+  return `Archive${batch}`;
+}
+
+function protonmailUIDActionSummary(
+  prefix: string,
+  rd: Record<string, unknown> | null | undefined,
+  suffix?: string | null,
+): string | null {
+  if (!rd) return suffix ? `${prefix}${suffix}` : prefix;
+  const batch = protonmailBatchEmailSummary(rd);
+  if (batch) return `${prefix}${batch}${suffix ?? ""}`;
+  const summary = protonmailEmailSummary(prefix, rd);
+  if (!summary) return suffix ? `${prefix}${suffix}` : prefix;
+  return suffix ? `${summary}${suffix}` : summary;
 }
 
 /** Formats a recipient list (string or string[]) for display in email summaries. */
@@ -302,6 +321,42 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
     return result;
   },
 
+  "protonmail.send_email": (params) => {
+    const to = formatRecipients(params.to);
+    const subject = strVal(params.subject);
+    if (!to) return null;
+    let result = `Send email to ${to}`;
+    if (subject) result += ` \u2014 ${truncate(subject, 60)}`;
+    return result;
+  },
+
+  "protonmail.read_inbox": (params) => {
+    const folder = strVal(params.folder) ?? "INBOX";
+    const limit =
+      typeof params.limit === "number" && Number.isFinite(params.limit)
+        ? params.limit
+        : 10;
+    let result = `Read ${String(limit)} most recent in ${folder}`;
+    if (params.unread_only === true) result += " (unread only)";
+    return result;
+  },
+
+  "protonmail.search_emails": (params) => {
+    const folder = strVal(params.folder) ?? "INBOX";
+    const filters: string[] = [];
+    const subject = strVal(params.subject);
+    if (subject) filters.push(`'${subject}'`);
+    const from = strVal(params.from);
+    if (from) filters.push(`from ${from}`);
+    const since = strVal(params.since);
+    if (since) filters.push(`since ${since}`);
+    const before = strVal(params.before);
+    if (before) filters.push(`before ${before}`);
+    let result = `Search ${folder}`;
+    if (filters.length > 0) result += ` for ${filters.join(", ")}`;
+    return result;
+  },
+
   "protonmail.read_email": (_params, rd) => {
     if (!rd) return null;
     return protonmailEmailSummary("Read email", rd);
@@ -322,6 +377,21 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
     }
     return protonmailEmailSummary("Reply to", raw as Record<string, unknown>);
   },
+
+  "protonmail.list_folders": () => "List mailbox folders",
+
+  "protonmail.mark_read": (_params, rd) => protonmailUIDActionSummary("Mark as read", rd),
+  "protonmail.mark_unread": (_params, rd) => protonmailUIDActionSummary("Mark as unread", rd),
+  "protonmail.flag": (_params, rd) => protonmailUIDActionSummary("Flag email", rd),
+  "protonmail.unflag": (_params, rd) => protonmailUIDActionSummary("Unflag email", rd),
+
+  "protonmail.move_to_folder": (params, rd) => {
+    const target = strVal(params.target_folder);
+    const suffix = target ? ` to ${target}` : null;
+    return protonmailUIDActionSummary("Move email", rd, suffix);
+  },
+
+  "protonmail.delete": (_params, rd) => protonmailUIDActionSummary("Delete email", rd),
 };
 
 /**

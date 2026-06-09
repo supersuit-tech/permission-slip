@@ -94,6 +94,40 @@ export const GoogleReadEmail: Story = {
   },
 };
 
+export const ProtonmailSendEmail: Story = {
+  name: "protonmail.send_email",
+  args: {
+    actionType: "protonmail.send_email",
+    parameters: {
+      to: ["alice@example.com", "bob@example.com"],
+      subject: "Vendor follow-up",
+      body: "Hi,\n\nFollowing up on our conversation yesterday.",
+    },
+    schema: null,
+    actionName: "Send Email",
+  },
+};
+
+export const ProtonmailReadInbox: Story = {
+  name: "protonmail.read_inbox",
+  args: {
+    actionType: "protonmail.read_inbox",
+    parameters: { folder: "INBOX", limit: 10 },
+    schema: null,
+    actionName: "Read Inbox",
+  },
+};
+
+export const ProtonmailSearchEmails: Story = {
+  name: "protonmail.search_emails",
+  args: {
+    actionType: "protonmail.search_emails",
+    parameters: { folder: "INBOX", subject: "invoice", from: "acme.com" },
+    schema: null,
+    actionName: "Search Emails",
+  },
+};
+
 export const ProtonmailReadEmail: Story = {
   name: "protonmail.read_email",
   args: {

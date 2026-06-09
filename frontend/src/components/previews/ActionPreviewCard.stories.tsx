@@ -42,6 +42,23 @@ export const EventLayout: Story = {
 // Message layout
 // ---------------------------------------------------------------------------
 
+export const ProtonSendEmailLayout: Story = {
+  args: {
+    preview: {
+      layout: "message",
+      fields: { to: "to", subject: "subject", body: "body" },
+    },
+    parameters: {
+      to: ["alice@example.com", "bob@example.com"],
+      subject: "Contract review",
+      body: "Please review the attached contract before Friday.",
+    },
+    actionType: "protonmail.send_email",
+    schema: null,
+    actionName: "Send Email",
+  },
+};
+
 export const MessageLayout: Story = {
   args: {
     preview: {

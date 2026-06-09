@@ -1,6 +1,17 @@
 import { Mail } from "lucide-react";
 import { truncate } from "@/lib/formatValues";
 
+function formatMessageRecipient(value: unknown): string | null {
+  if (typeof value === "string" && value.length > 0) return value;
+  if (Array.isArray(value)) {
+    const recipients = value.filter((item): item is string => typeof item === "string" && item.length > 0);
+    if (recipients.length === 0) return null;
+    if (recipients.length <= 3) return recipients.join(", ");
+    return `${recipients[0]}, ${recipients[1]}, and ${recipients.length - 2} more`;
+  }
+  return null;
+}
+
 interface MessagePreviewLayoutProps {
   parameters: Record<string, unknown>;
   fields: Record<string, string>;
@@ -10,10 +21,7 @@ export function MessagePreviewLayout({
   parameters,
   fields,
 }: MessagePreviewLayoutProps) {
-  const to =
-    typeof parameters[fields.to ?? ""] === "string"
-      ? (parameters[fields.to ?? ""] as string)
-      : null;
+  const to = formatMessageRecipient(parameters[fields.to ?? ""]);
   const subject =
     typeof parameters[fields.subject ?? ""] === "string"
       ? (parameters[fields.subject ?? ""] as string)

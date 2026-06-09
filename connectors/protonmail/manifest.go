@@ -19,10 +19,15 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
 			{
-				ActionType:  "protonmail.send_email",
-				Name:        "Send Email",
-				Description: "Send an email via SMTP through the local Proton IMAP/SMTP proxy",
-				RiskLevel:   "high",
+				ActionType:      "protonmail.send_email",
+				Name:            "Send Email",
+				Description:     "Send an email via SMTP through the local Proton IMAP/SMTP proxy",
+				RiskLevel:       "high",
+				DisplayTemplate: "Send email to {{to}} — {{subject}}",
+				Preview: &connectors.ActionPreview{
+					Layout: "message",
+					Fields: map[string]string{"to": "to", "subject": "subject", "body": "body"},
+				},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["to", "subject", "body"],
@@ -117,10 +122,11 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "protonmail.read_inbox",
-				Name:        "Read Inbox",
-				Description: "Fetch recent emails from a mailbox folder via IMAP",
-				RiskLevel:   "low",
+				ActionType:      "protonmail.read_inbox",
+				Name:            "Read Inbox",
+				Description:     "Fetch recent emails from a mailbox folder via IMAP",
+				RiskLevel:       "low",
+				DisplayTemplate: "Read {{limit:count}} most recent in {{folder}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -145,10 +151,11 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "protonmail.search_emails",
-				Name:        "Search Emails",
-				Description: "Search emails by subject, sender, or date range via IMAP",
-				RiskLevel:   "low",
+				ActionType:      "protonmail.search_emails",
+				Name:            "Search Emails",
+				Description:     "Search emails by subject, sender, or date range via IMAP",
+				RiskLevel:       "low",
+				DisplayTemplate: "Search {{folder}} for emails",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -238,6 +245,65 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						}
 					}
 				}`)),
+			},
+			{
+				ActionType:      "protonmail.list_folders",
+				Name:            "List Folders",
+				Description:     "List mailbox folders available via IMAP",
+				RiskLevel:       "low",
+				DisplayTemplate: "List mailbox folders",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {}
+				}`)),
+			},
+			{
+				ActionType:       "protonmail.mark_read",
+				Name:             "Mark Read",
+				Description:      "Mark one or more emails as read via IMAP STORE \\Seen",
+				RiskLevel:        "low",
+				DisplayTemplate:  "Mark email as read",
+				ParametersSchema: uidMessageParametersSchema(),
+			},
+			{
+				ActionType:       "protonmail.mark_unread",
+				Name:             "Mark Unread",
+				Description:      "Mark one or more emails as unread via IMAP STORE \\Seen removal",
+				RiskLevel:        "low",
+				DisplayTemplate:  "Mark email as unread",
+				ParametersSchema: uidMessageParametersSchema(),
+			},
+			{
+				ActionType:       "protonmail.flag",
+				Name:             "Flag Email",
+				Description:      "Flag one or more emails via IMAP STORE \\Flagged",
+				RiskLevel:        "low",
+				DisplayTemplate:  "Flag email",
+				ParametersSchema: uidMessageParametersSchema(),
+			},
+			{
+				ActionType:       "protonmail.unflag",
+				Name:             "Unflag Email",
+				Description:      "Remove the flag from one or more emails via IMAP STORE \\Flagged removal",
+				RiskLevel:        "low",
+				DisplayTemplate:  "Unflag email",
+				ParametersSchema: uidMessageParametersSchema(),
+			},
+			{
+				ActionType:       "protonmail.move_to_folder",
+				Name:             "Move to Folder",
+				Description:      "Move one or more emails to another mailbox folder via IMAP MOVE",
+				RiskLevel:        "medium",
+				DisplayTemplate:  "Move email to {{target_folder}}",
+				ParametersSchema: moveToFolderParametersSchema(),
+			},
+			{
+				ActionType:       "protonmail.delete",
+				Name:             "Delete Email",
+				Description:      "Move one or more emails to the Trash folder via IMAP MOVE",
+				RiskLevel:        "high",
+				DisplayTemplate:  "Delete email",
+				ParametersSchema: uidMessageParametersSchema(),
 			},
 		},
 

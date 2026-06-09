@@ -30,6 +30,13 @@ func TestProtonMailConnector_Actions(t *testing.T) {
 		"protonmail.search_emails",
 		"protonmail.read_email",
 		"protonmail.archive_email",
+		"protonmail.list_folders",
+		"protonmail.mark_read",
+		"protonmail.mark_unread",
+		"protonmail.flag",
+		"protonmail.unflag",
+		"protonmail.move_to_folder",
+		"protonmail.delete",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
