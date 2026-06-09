@@ -154,8 +154,8 @@ func TestArchiveEmail_ArchiveFolderRejected(t *testing.T) {
 func TestArchiveEmailParams_Defaults(t *testing.T) {
 	t.Parallel()
 
-	p := &archiveEmailParams{MessageIDs: []uint32{1}}
-	if err := p.validate(); err != nil {
+	p := &uidMessageParams{MessageIDs: []uint32{1}}
+	if err := validateArchiveParams(p); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if p.Folder != "INBOX" {
@@ -199,7 +199,7 @@ func TestArchiveEmail_SingleAndBatchCombined(t *testing.T) {
 func TestArchiveEmail_Deduplication(t *testing.T) {
 	t.Parallel()
 
-	p := &archiveEmailParams{MessageIDs: []uint32{3, 1, 3, 2, 1}}
+	p := &uidMessageParams{MessageIDs: []uint32{3, 1, 3, 2, 1}}
 	if err := p.validate(); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

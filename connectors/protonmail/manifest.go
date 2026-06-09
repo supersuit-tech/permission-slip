@@ -71,10 +71,11 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "protonmail.reply_email",
-				Name:        "Reply to Email",
-				Description: "Reply to an existing email with correct In-Reply-To threading via SMTP",
-				RiskLevel:   "medium",
+				ActionType:      "protonmail.reply_email",
+				Name:            "Reply to Email",
+				Description:     "Reply to an existing email with correct In-Reply-To threading via SMTP",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Reply to email in {{folder}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["in_reply_to_message_id", "body"],
@@ -193,10 +194,11 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "protonmail.read_email",
-				Name:        "Read Email",
-				Description: "Fetch a specific email by stable IMAP UID with full body",
-				RiskLevel:   "low",
+				ActionType:      "protonmail.read_email",
+				Name:            "Read Email",
+				Description:     "Fetch a specific email by stable IMAP UID with full body",
+				RiskLevel:       "low",
+				DisplayTemplate: "Read email in {{folder}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["message_id"],
@@ -215,10 +217,11 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
-				ActionType:  "protonmail.archive_email",
-				Name:        "Archive Email",
-				Description: "Move one or more emails to the Archive folder via IMAP MOVE",
-				RiskLevel:   "medium",
+				ActionType:      "protonmail.archive_email",
+				Name:            "Archive Email",
+				Description:     "Move one or more emails to the Archive folder via IMAP MOVE",
+				RiskLevel:       "medium",
+				DisplayTemplate: "Archive email in {{folder}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"anyOf": [
