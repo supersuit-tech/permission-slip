@@ -15,7 +15,7 @@ import (
 const archiveMailbox = "Archive"
 
 // archiveEmailAction moves one or more emails to the Archive folder via IMAP
-// MOVE (RFC 6851). Both Bridge and hydroxide support MOVE.
+// UID MOVE (RFC 6851). Both Bridge and hydroxide support MOVE.
 type archiveEmailAction struct {
 	conn *ProtonMailConnector
 }
@@ -45,14 +45,12 @@ func parseArchiveParams(raw []byte) (*archiveEmailParams, error) {
 
 	params := &archiveEmailParams{Folder: r.Folder}
 
-	// Prefer message_ids array if provided.
 	if len(r.MessageIDs) > 0 && string(r.MessageIDs) != "null" {
 		if err := json.Unmarshal(r.MessageIDs, &params.MessageIDs); err != nil {
 			return nil, &connectors.ValidationError{Message: fmt.Sprintf("invalid message_ids: %v", err)}
 		}
 	}
 
-	// Also append message_id if provided; allows combining both fields.
 	if r.MessageID != nil {
 		params.MessageIDs = append(params.MessageIDs, *r.MessageID)
 	}
@@ -65,7 +63,6 @@ func (p *archiveEmailParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: provide message_id (single) or message_ids (array)"}
 	}
 
-	// Deduplicate: callers may accidentally pass the same ID twice.
 	p.MessageIDs = deduplicateUint32(p.MessageIDs)
 
 	if len(p.MessageIDs) > maxLimit {
@@ -114,36 +111,31 @@ func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionR
 	}
 	defer session.close()
 
-	// Open the source folder in read-write mode so we can move messages.
 	mboxData, err := session.selectMailboxReadWrite(params.Folder)
 	if err != nil {
 		return nil, err
 	}
-
-	// Best-effort bounds check against the message count at SELECT time.
-	// Concurrent EXPUNGE responses can make this stale, but it catches
-	// obviously invalid IDs before hitting the server.
-	for _, id := range params.MessageIDs {
-		if id > mboxData.NumMessages {
-			return nil, &connectors.ValidationError{
-				Message: fmt.Sprintf("message_id %d not found (mailbox has %d messages)", id, mboxData.NumMessages),
-			}
-		}
+	if err := syncUIDValidity(params.Folder, mboxData, req.MailboxUIDValidity, uidValidityVerify); err != nil {
+		return nil, err
 	}
 
-	var seqSet imap.SeqSet
+	var uidSet imap.UIDSet
 	for _, id := range params.MessageIDs {
-		seqSet.AddNum(id)
+		uidSet.AddNum(imap.UID(id))
 	}
 
-	// MOVE messages to the Archive folder (RFC 6851).
-	moveCmd := session.client.Move(seqSet, archiveMailbox)
+	moveCmd := session.client.Move(uidSet, archiveMailbox)
 	if _, err := moveCmd.Wait(); err != nil {
 		imapErr := mapIMAPError(err)
-		// Provide a helpful hint if the Archive folder doesn't exist.
-		if strings.Contains(err.Error(), "TRYCREATE") || strings.Contains(err.Error(), "Mailbox doesn't exist") {
+		errMsg := err.Error()
+		if strings.Contains(errMsg, "TRYCREATE") || strings.Contains(errMsg, "Mailbox doesn't exist") {
 			return nil, &connectors.ExternalError{
 				Message: fmt.Sprintf("Archive folder not found on server — the mailbox %q may not exist. Ensure your local Proton IMAP/SMTP proxy (Bridge or hydroxide) is configured correctly and exposes an Archive folder: %v", archiveMailbox, err),
+			}
+		}
+		if strings.Contains(strings.ToUpper(errMsg), "UID") || strings.Contains(strings.ToLower(errMsg), "not found") {
+			return nil, &connectors.ValidationError{
+				Message: fmt.Sprintf("one or more message UIDs not found in folder %q", params.Folder),
 			}
 		}
 		return nil, imapErr

@@ -19,8 +19,18 @@ If you're currently self-hosting on ARM hardware, we recommend running Permissio
 | `protonmail.send_email` | high | Send mail via SMTP through Bridge |
 | `protonmail.read_inbox` | low | List recent messages in a folder |
 | `protonmail.search_emails` | low | Search by subject, sender, or date |
-| `protonmail.read_email` | low | Read one message by sequence number |
-| `protonmail.archive_email` | medium | Move messages to Archive (IMAP MOVE) |
+| `protonmail.read_email` | low | Read one message by stable IMAP UID |
+| `protonmail.archive_email` | medium | Move messages to Archive (IMAP UID MOVE) |
+
+### Message identifiers (breaking change)
+
+`read_inbox` and `search_emails` return each message's **stable IMAP UID** (with its `folder`) instead of volatile sequence numbers. `read_email` and `archive_email` accept that same UID as `message_id` / `message_ids`, scoped by `folder`.
+
+Sequence numbers shift whenever another message is deleted or moved; UIDs do not. Permission Slip records **UIDVALIDITY** server-side per folder so pending approvals still target the same mailbox generation — if the folder is recreated, execution fails safe instead of acting on the wrong message.
+
+RFC `Message-ID` headers are included in list/read responses as read-only `message_id_header` metadata. They are **not** the operational key for IMAP actions.
+
+Agents or automations that still pass raw IMAP sequence numbers must be updated to use `{folder, uid}` from list/search results.
 
 Calendar, Drive, Contacts, VPN, and Pass are **not** available through Bridge (no CalDAV/WebDAV for those products).
 

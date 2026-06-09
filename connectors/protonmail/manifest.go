@@ -136,7 +136,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:  "protonmail.read_email",
 				Name:        "Read Email",
-				Description: "Fetch a specific email by sequence number with full body",
+				Description: "Fetch a specific email by stable IMAP UID with full body",
 				RiskLevel:   "low",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
@@ -145,7 +145,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						"message_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "The sequence number of the email to read"
+							"description": "Stable IMAP UID of the email within the folder (from read_inbox or search_emails results)"
 						},
 						"folder": {
 							"type": "string",
@@ -170,14 +170,14 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						"message_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "Sequence number of a single email to archive (shorthand for message_ids with one item)"
+							"description": "Stable IMAP UID of a single email to archive (shorthand for message_ids with one item)"
 						},
 						"message_ids": {
 							"type": "array",
 							"items": {"type": "integer", "minimum": 1},
 							"minItems": 1,
 							"maxItems": 50,
-							"description": "Sequence numbers of emails to archive (batch). Combined unique count of message_id + message_ids must not exceed 50."
+							"description": "Stable IMAP UIDs of emails to archive (batch). Combined unique count of message_id + message_ids must not exceed 50."
 						},
 						"folder": {
 							"type": "string",

@@ -131,28 +131,16 @@ func validateLimit(limit *int) error {
 	return nil
 }
 
-// emptyEmailResult returns a JSON result with an empty email list.
-func emptyEmailResult() (*connectors.ActionResult, error) {
-	return connectors.JSONResult(map[string]any{
-		"emails": []emailSummary{},
-		"total":  0,
-	})
-}
+// fetchEnvelopesByUID fetches message envelopes for the given UID set.
+func fetchEnvelopesByUID(session *imapSession, uidSet imap.UIDSet) ([]emailSummary, error) {
+	if len(uidSet) == 0 {
+		return nil, nil
+	}
 
-// emailListResult returns a JSON result wrapping the given email summaries.
-func emailListResult(emails []emailSummary) (*connectors.ActionResult, error) {
-	return connectors.JSONResult(map[string]any{
-		"emails": emails,
-		"total":  len(emails),
-	})
-}
-
-// fetchEnvelopes fetches message envelopes for the given sequence set and
-// returns them as email summaries.
-func fetchEnvelopes(session *imapSession, seqSet imap.SeqSet) ([]emailSummary, error) {
-	fetchCmd := session.client.Fetch(seqSet, &imap.FetchOptions{
+	fetchCmd := session.client.Fetch(uidSet, &imap.FetchOptions{
 		Envelope: true,
 		Flags:    true,
+		UID:      true,
 	})
 	defer fetchCmd.Close()
 
@@ -166,8 +154,36 @@ func fetchEnvelopes(session *imapSession, seqSet imap.SeqSet) ([]emailSummary, e
 		if err != nil {
 			return nil, mapIMAPError(err)
 		}
-		if buf.Envelope != nil {
-			emails = append(emails, envelopeToSummary(buf.SeqNum, buf.Envelope, buf.Flags))
+		if buf.Envelope != nil && buf.UID != 0 {
+			emails = append(emails, envelopeToSummary(buf.UID, buf.Envelope, buf.Flags))
+		}
+	}
+	return emails, nil
+}
+
+// fetchRecentEnvelopesBySeq fetches the last messages by sequence number but
+// returns summaries keyed by stable UID. Sequence numbers are only used to
+// locate recent messages; they are never exposed to agents.
+func fetchRecentEnvelopesBySeq(session *imapSession, seqSet imap.SeqSet) ([]emailSummary, error) {
+	fetchCmd := session.client.Fetch(seqSet, &imap.FetchOptions{
+		Envelope: true,
+		Flags:    true,
+		UID:      true,
+	})
+	defer fetchCmd.Close()
+
+	var emails []emailSummary
+	for {
+		msg := fetchCmd.Next()
+		if msg == nil {
+			break
+		}
+		buf, err := msg.Collect()
+		if err != nil {
+			return nil, mapIMAPError(err)
+		}
+		if buf.Envelope != nil && buf.UID != 0 {
+			emails = append(emails, envelopeToSummary(buf.UID, buf.Envelope, buf.Flags))
 		}
 	}
 	return emails, nil
@@ -175,12 +191,13 @@ func fetchEnvelopes(session *imapSession, seqSet imap.SeqSet) ([]emailSummary, e
 
 // emailSummary is the JSON representation of an email summary.
 type emailSummary struct {
-	SeqNum  uint32   `json:"seq_num"`
-	Subject string   `json:"subject"`
-	From    []string `json:"from"`
-	To      []string `json:"to"`
-	Date    string   `json:"date"`
-	Flags   []string `json:"flags"`
+	UID             uint32   `json:"uid"`
+	Subject         string   `json:"subject"`
+	From            []string `json:"from"`
+	To              []string `json:"to"`
+	Date            string   `json:"date"`
+	Flags           []string `json:"flags"`
+	MessageIDHeader string   `json:"message_id_header,omitempty"`
 }
 
 // formatAddresses formats IMAP addresses as human-readable strings.
@@ -202,18 +219,29 @@ func formatAddresses(addrs []imap.Address) []string {
 }
 
 // envelopeToSummary converts an IMAP envelope to our JSON summary format.
-func envelopeToSummary(seqNum uint32, env *imap.Envelope, flags []imap.Flag) emailSummary {
+func envelopeToSummary(uid imap.UID, env *imap.Envelope, flags []imap.Flag) emailSummary {
 	summary := emailSummary{
-		SeqNum:  seqNum,
-		Subject: env.Subject,
-		Date:    env.Date.Format(time.RFC3339),
-		From:    formatAddresses(env.From),
-		To:      formatAddresses(env.To),
+		UID:             uint32(uid),
+		Subject:         env.Subject,
+		Date:            env.Date.Format(time.RFC3339),
+		From:            formatAddresses(env.From),
+		To:              formatAddresses(env.To),
+		MessageIDHeader: env.MessageID,
 	}
 	for _, f := range flags {
 		summary.Flags = append(summary.Flags, string(f))
 	}
 	return summary
+}
+
+// emailListResultWithFolder returns list results including the folder name so
+// agents can pair returned UIDs with their mailbox scope.
+func emailListResultWithFolder(folder string, emails []emailSummary) (*connectors.ActionResult, error) {
+	return connectors.JSONResult(map[string]any{
+		"folder": folder,
+		"emails": emails,
+		"total":  len(emails),
+	})
 }
 
 // mapIMAPError translates raw IMAP errors into typed connector errors so the
