@@ -50,5 +50,26 @@ func protonmailTemplates() []connectors.ManifestTemplate {
 			Description: "Agent can move emails to the Archive folder.",
 			Parameters:  json.RawMessage(`{"folder":"INBOX","message_id":"*","message_ids":"*"}`),
 		},
+		{
+			ID:          "tpl_protonmail_list_folders",
+			ActionType:  "protonmail.list_folders",
+			Name:        "List mailbox folders",
+			Description: "Agent can list available mailbox folders.",
+			Parameters:  json.RawMessage(`{}`),
+		},
+		{
+			ID:          "tpl_protonmail_mark_read",
+			ActionType:  "protonmail.mark_read",
+			Name:        "Mark emails as read",
+			Description: "Agent can mark emails as read.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","message_id":"*"}`),
+		},
+		{
+			ID:          "tpl_protonmail_move",
+			ActionType:  "protonmail.move_to_folder",
+			Name:        "Move emails between folders",
+			Description: "Agent can move emails to another folder.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","target_folder":"*","message_id":"*"}`),
+		},
 	}
 }

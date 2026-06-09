@@ -133,6 +133,36 @@ describe("buildActionSummary", () => {
     expect(result).toContain("U12345678");
   });
 
+  it("formats protonmail.send_email", () => {
+    const result = buildActionSummary("protonmail.send_email", {
+      to: ["alice@example.com"],
+      subject: "Hello",
+      body: "Body",
+    });
+    expect(result).toContain("Send email to");
+    expect(result).toContain("alice@example.com");
+    expect(result).toContain("Hello");
+  });
+
+  it("formats protonmail.read_inbox", () => {
+    const result = buildActionSummary("protonmail.read_inbox", {
+      folder: "INBOX",
+      limit: 10,
+    });
+    expect(result).toContain("Read 10 most recent in INBOX");
+  });
+
+  it("formats protonmail.search_emails", () => {
+    const result = buildActionSummary("protonmail.search_emails", {
+      folder: "INBOX",
+      subject: "invoice",
+      from: "acme.com",
+    });
+    expect(result).toContain("Search INBOX");
+    expect(result).toContain("invoice");
+    expect(result).toContain("acme.com");
+  });
+
   it("formats protonmail.read_email with enriched metadata", () => {
     const result = buildActionSummary(
       "protonmail.read_email",

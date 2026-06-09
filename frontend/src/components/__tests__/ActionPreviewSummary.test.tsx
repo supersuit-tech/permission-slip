@@ -430,6 +430,63 @@ describe("buildSummary", () => {
 
   // ── Proton Mail ─────────────────────────────────────────────────
 
+  describe("protonmail.send_email", () => {
+    it("shows recipients and subject", () => {
+      const result = buildSummary(
+        "protonmail.send_email",
+        {
+          to: ["alice@example.com", "bob@example.com"],
+          subject: "Project update",
+          body: "Hello",
+        },
+        null,
+        "Send Email",
+      );
+      expect(result).toContain("Send email to");
+      expect(result).toContain("alice@example.com");
+      expect(result).toContain("Project update");
+    });
+  });
+
+  describe("protonmail.read_inbox", () => {
+    it("shows folder and limit", () => {
+      const result = buildSummary(
+        "protonmail.read_inbox",
+        { folder: "INBOX", limit: 10 },
+        null,
+        "Read Inbox",
+      );
+      expect(result).toContain("Read");
+      expect(result).toContain("10");
+      expect(result).toContain("INBOX");
+    });
+
+    it("notes unread-only filter", () => {
+      const result = buildSummary(
+        "protonmail.read_inbox",
+        { folder: "INBOX", limit: 5, unread_only: true },
+        null,
+        "Read Inbox",
+      );
+      expect(result).toContain("unread only");
+    });
+  });
+
+  describe("protonmail.search_emails", () => {
+    it("shows folder and search filters", () => {
+      const result = buildSummary(
+        "protonmail.search_emails",
+        { folder: "INBOX", subject: "invoice", from: "acme.com" },
+        null,
+        "Search Emails",
+      );
+      expect(result).toContain("Search");
+      expect(result).toContain("INBOX");
+      expect(result).toContain("invoice");
+      expect(result).toContain("acme.com");
+    });
+  });
+
   describe("protonmail.read_email", () => {
     it("shows subject and sender from resourceDetails", () => {
       const result = buildSummary(
@@ -525,6 +582,49 @@ describe("buildSummary", () => {
       expect(result).toContain("Reply to");
       expect(result).toContain("Question");
       expect(result).toContain("asker@example.com");
+    });
+  });
+
+  describe("protonmail.mark_read", () => {
+    it("shows enriched subject", () => {
+      const result = buildSummary(
+        "protonmail.mark_read",
+        { message_id: 10, folder: "INBOX" },
+        null,
+        null,
+        undefined,
+        { subject: "Unread notice", from: ["alerts@example.com"] },
+      );
+      expect(result).toContain("Mark as read");
+      expect(result).toContain("Unread notice");
+    });
+  });
+
+  describe("protonmail.move_to_folder", () => {
+    it("shows target folder", () => {
+      const result = buildSummary(
+        "protonmail.move_to_folder",
+        { message_id: 10, folder: "INBOX", target_folder: "Archive" },
+        null,
+        null,
+        undefined,
+        { subject: "Move me" },
+      );
+      expect(result).toContain("Move email");
+      expect(result).toContain("Move me");
+      expect(result).toContain("Archive");
+    });
+  });
+
+  describe("protonmail.list_folders", () => {
+    it("shows list folders label", () => {
+      const result = buildSummary(
+        "protonmail.list_folders",
+        {},
+        null,
+        "List Folders",
+      );
+      expect(result).toBe("List mailbox folders");
     });
   });
 

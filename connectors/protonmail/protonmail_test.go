@@ -30,6 +30,13 @@ func TestProtonMailConnector_Actions(t *testing.T) {
 		"protonmail.search_emails",
 		"protonmail.read_email",
 		"protonmail.archive_email",
+		"protonmail.list_folders",
+		"protonmail.mark_read",
+		"protonmail.mark_unread",
+		"protonmail.flag",
+		"protonmail.unflag",
+		"protonmail.move_to_folder",
+		"protonmail.delete",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -171,22 +178,30 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 	if m.Name != "Proton Mail" {
 		t.Errorf("Manifest().Name = %q, want %q", m.Name, "Proton Mail")
 	}
-	if len(m.Actions) != 6 {
-		t.Fatalf("Manifest().Actions has %d items, want 6", len(m.Actions))
-	}
-
-	actionTypes := make(map[string]bool)
-	for _, a := range m.Actions {
-		actionTypes[a.ActionType] = true
-	}
-	for _, want := range []string{
+	expectedActions := []string{
 		"protonmail.send_email",
 		"protonmail.reply_email",
 		"protonmail.read_inbox",
 		"protonmail.search_emails",
 		"protonmail.read_email",
 		"protonmail.archive_email",
-	} {
+		"protonmail.list_folders",
+		"protonmail.mark_read",
+		"protonmail.mark_unread",
+		"protonmail.flag",
+		"protonmail.unflag",
+		"protonmail.move_to_folder",
+		"protonmail.delete",
+	}
+	if len(m.Actions) != len(expectedActions) {
+		t.Fatalf("Manifest().Actions has %d items, want %d", len(m.Actions), len(expectedActions))
+	}
+
+	actionTypes := make(map[string]bool)
+	for _, a := range m.Actions {
+		actionTypes[a.ActionType] = true
+	}
+	for _, want := range expectedActions {
 		if !actionTypes[want] {
 			t.Errorf("Manifest().Actions missing %q", want)
 		}

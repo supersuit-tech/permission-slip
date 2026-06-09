@@ -378,6 +378,51 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
 
   // ── Proton Mail ─────────────────────────────────────────────────
 
+  "protonmail.send_email": (params) => {
+    const to = formatRecipients(params.to);
+    const subject = strVal(params.subject);
+    if (!to) return null;
+    const parts: SummaryPart[] = [text("Send email to "), val(to)];
+    if (subject) parts.push(text(" — "), val(subject));
+    return parts;
+  },
+
+  "protonmail.read_inbox": (params) => {
+    const folder = strVal(params.folder) ?? "INBOX";
+    const limit =
+      typeof params.limit === "number" && Number.isFinite(params.limit)
+        ? params.limit
+        : 10;
+    const parts: SummaryPart[] = [
+      text("Read "),
+      val(String(limit)),
+      text(" most recent in "),
+      val(folder),
+    ];
+    if (params.unread_only === true) {
+      parts.push(text(" (unread only)"));
+    }
+    return parts;
+  },
+
+  "protonmail.search_emails": (params) => {
+    const folder = strVal(params.folder) ?? "INBOX";
+    const parts: SummaryPart[] = [text("Search "), val(folder)];
+    const filters: string[] = [];
+    const subject = strVal(params.subject);
+    if (subject) filters.push(`'${subject}'`);
+    const from = strVal(params.from);
+    if (from) filters.push(`from ${from}`);
+    const since = strVal(params.since);
+    if (since) filters.push(`since ${since}`);
+    const before = strVal(params.before);
+    if (before) filters.push(`before ${before}`);
+    if (filters.length > 0) {
+      parts.push(text(" for "), val(filters.join(", ")));
+    }
+    return parts;
+  },
+
   "protonmail.read_email": (_params, rd) => {
     if (!rd) return null;
     const summary = protonmailEmailSummaryParts(rd);
@@ -402,6 +447,21 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     if (!summary) return null;
     return [text("Reply to "), ...summary];
   },
+
+  "protonmail.list_folders": () => [text("List mailbox folders")],
+
+  "protonmail.mark_read": (_params, rd) => protonmailUIDActionSummary("Mark as read", rd),
+  "protonmail.mark_unread": (_params, rd) => protonmailUIDActionSummary("Mark as unread", rd),
+  "protonmail.flag": (_params, rd) => protonmailUIDActionSummary("Flag email", rd),
+  "protonmail.unflag": (_params, rd) => protonmailUIDActionSummary("Unflag email", rd),
+
+  "protonmail.move_to_folder": (params, rd) => {
+    const target = strVal(params.target_folder);
+    const summary = protonmailUIDActionSummary("Move email", rd, target ? ` to ${target}` : null);
+    return summary;
+  },
+
+  "protonmail.delete": (_params, rd) => protonmailUIDActionSummary("Delete email", rd),
 };
 
 // ---------------------------------------------------------------------------
@@ -574,6 +634,63 @@ function protonmailInReplyToRecord(
   return null;
 }
 
+function protonmailUIDActionSummary(
+  prefix: string,
+  rd: Record<string, unknown> | null | undefined,
+  suffix?: string | null,
+): SummaryPart[] | null {
+  if (!rd) {
+    if (suffix) return [text(prefix), text(suffix)];
+    return [text(prefix)];
+  }
+  const batch = protonmailBatchEmailSummaryParts(rd);
+  if (batch) {
+    const parts: SummaryPart[] = [text(prefix), ...batch];
+    if (suffix) parts.push(text(suffix));
+    return parts;
+  }
+  const summary = protonmailEmailSummaryParts(rd);
+  if (!summary) {
+    if (suffix) return [text(prefix), text(suffix)];
+    return [text(prefix)];
+  }
+  const parts: SummaryPart[] = [text(`${prefix} `), ...summary];
+  if (suffix) parts.push(text(suffix));
+  return parts;
+}
+
+function protonmailBatchEmailSummaryParts(
+  rd: Record<string, unknown>,
+): SummaryPart[] | null {
+  const rawMessages = rd.messages;
+  if (rawMessages == null || typeof rawMessages !== "object" || Array.isArray(rawMessages)) {
+    return null;
+  }
+  const entries = Object.entries(rawMessages as Record<string, unknown>);
+  if (entries.length <= 1) return null;
+
+  const subjects = entries
+    .map(([, meta]) =>
+      meta != null && typeof meta === "object"
+        ? strVal((meta as Record<string, unknown>).subject)
+        : null,
+    )
+    .filter((s): s is string => s != null);
+  if (subjects.length === 0) return null;
+
+  const parts: SummaryPart[] = [
+    text(" "),
+    val(String(entries.length)),
+    text(" emails"),
+  ];
+  const preview =
+    subjects.length <= 2
+      ? subjects.join("; ")
+      : `${subjects.slice(0, 2).join("; ")} and ${subjects.length - 2} more`;
+  parts.push(text(": "), val(truncate(preview, 80)));
+  return parts;
+}
+
 function protonmailEmailSummaryParts(
   meta: Record<string, unknown>,
 ): SummaryPart[] | null {
@@ -588,34 +705,9 @@ function protonmailEmailSummaryParts(
 function protonmailBatchArchiveSummaryParts(
   rd: Record<string, unknown>,
 ): SummaryPart[] | null {
-  const rawMessages = rd.messages;
-  if (rawMessages == null || typeof rawMessages !== "object" || Array.isArray(rawMessages)) {
-    return null;
-  }
-  const entries = Object.entries(rawMessages as Record<string, unknown>);
-  if (entries.length <= 1) {
-    return null;
-  }
-  const subjects = entries
-    .map(([, meta]) =>
-      meta != null && typeof meta === "object"
-        ? strVal((meta as Record<string, unknown>).subject)
-        : null,
-    )
-    .filter((s): s is string => s != null);
-  if (subjects.length === 0) return null;
-
-  const parts: SummaryPart[] = [
-    text("Archive "),
-    val(String(entries.length)),
-    text(" emails"),
-  ];
-  const preview =
-    subjects.length <= 2
-      ? subjects.join("; ")
-      : `${subjects.slice(0, 2).join("; ")} and ${subjects.length - 2} more`;
-  parts.push(text(": "), val(truncate(preview, 80)));
-  return parts;
+  const batch = protonmailBatchEmailSummaryParts(rd);
+  if (!batch) return null;
+  return [text("Archive"), ...batch];
 }
 
 function formatCurrency(amount: unknown, currency: string): string {

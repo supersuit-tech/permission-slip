@@ -10,6 +10,17 @@ const meta: Meta<typeof MessagePreviewLayout> = {
 export default meta;
 type Story = StoryObj<typeof MessagePreviewLayout>;
 
+export const ProtonEmailRecipients: Story = {
+  args: {
+    parameters: {
+      to: ["alice@example.com", "bob@example.com", "team@example.com"],
+      subject: "Proton send approval preview",
+      body: "This preview renders array recipients from protonmail.send_email.",
+    },
+    fields: { to: "to", subject: "subject", body: "body" },
+  },
+};
+
 export const EmailMessage: Story = {
   args: {
     parameters: {
