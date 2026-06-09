@@ -241,6 +241,9 @@ paths:
 
   /v1/credentials:
     $ref: './components/paths/credentials.yaml#/credentials'
+
+  /v1/credentials/test-connection:
+    $ref: './components/paths/credentials.yaml#/testCredentialConnection'
   
   /v1/credentials/{credential_id}:
     $ref: './components/paths/credentials.yaml#/credentialById'
@@ -415,6 +418,12 @@ components:
       $ref: './components/schemas/credentials.yaml#/UpdateCredentialRequest'
     DeleteCredentialResponse:
       $ref: './components/schemas/credentials.yaml#/DeleteCredentialResponse'
+    TestCredentialConnectionRequest:
+      $ref: './components/schemas/credentials.yaml#/TestCredentialConnectionRequest'
+    TestCredentialConnectionResponse:
+      $ref: './components/schemas/credentials.yaml#/TestCredentialConnectionResponse'
+    BridgeHealthSummary:
+      $ref: './components/schemas/credentials.yaml#/BridgeHealthSummary'
     
     # Connectors
     ConnectorListResponse:

@@ -4,11 +4,28 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 )
+
+// ProtonmailHealthStatus is the last-known Bridge connectivity check result.
+type ProtonmailHealthStatus string
+
+const (
+	ProtonmailHealthOK    ProtonmailHealthStatus = "ok"
+	ProtonmailHealthError ProtonmailHealthStatus = "error"
+)
+
+// ProtonmailHealthState records the outcome of a Bridge connectivity check.
+type ProtonmailHealthState struct {
+	Status    ProtonmailHealthStatus `json:"status"`
+	CheckedAt time.Time              `json:"checked_at"`
+	Message   string                 `json:"message,omitempty"`
+}
 
 // ProtonmailConnectorState holds non-secret Proton Mail sync metadata for a credential.
 type ProtonmailConnectorState struct {
 	Folders map[string]ProtonmailFolderState `json:"folders,omitempty"`
+	Health  *ProtonmailHealthState           `json:"health,omitempty"`
 }
 
 // ProtonmailFolderState records IMAP state for a single mailbox folder.
@@ -35,6 +52,42 @@ func GetProtonmailUIDValidity(ctx context.Context, db DBTX, credentialID, folder
 		return 0, false, nil
 	}
 	return folderState.UIDValidity, true, nil
+}
+
+// GetProtonmailHealth returns the stored Bridge health check, or nil if none recorded.
+func GetProtonmailHealth(ctx context.Context, db DBTX, credentialID string) (*ProtonmailHealthState, error) {
+	state, err := loadCredentialConnectorState(ctx, db, credentialID)
+	if err != nil {
+		return nil, err
+	}
+	if state.Protonmail == nil || state.Protonmail.Health == nil {
+		return nil, nil
+	}
+	health := *state.Protonmail.Health
+	return &health, nil
+}
+
+// SetProtonmailHealth records Bridge connectivity health on the credential.
+func SetProtonmailHealth(ctx context.Context, db DBTX, credentialID string, health ProtonmailHealthState) error {
+	state, err := loadCredentialConnectorState(ctx, db, credentialID)
+	if err != nil {
+		return err
+	}
+	if state.Protonmail == nil {
+		state.Protonmail = &ProtonmailConnectorState{}
+	}
+	state.Protonmail.Health = &health
+
+	raw, err := json.Marshal(state)
+	if err != nil {
+		return fmt.Errorf("marshal connector_state: %w", err)
+	}
+
+	_, err = db.Exec(ctx, `
+		UPDATE credentials
+		SET connector_state = $2
+		WHERE id = $1`, credentialID, raw)
+	return err
 }
 
 // SetProtonmailUIDValidity records UIDVALIDITY for a folder on the credential.

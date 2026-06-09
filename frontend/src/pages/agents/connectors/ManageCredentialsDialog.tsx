@@ -34,6 +34,7 @@ import {
 import type { RequiredCredential } from "@/hooks/useConnectorDetail";
 import { serviceLabel, authTypeLabel } from "@/lib/labels";
 import { useTryAutoAssign } from "@/hooks/useTryAutoAssign";
+import { useTestCredentialConnection } from "@/hooks/useTestCredentialConnection";
 import { AddCredentialDialog } from "./AddCredentialDialog";
 import { EditCredentialDialog } from "./EditCredentialDialog";
 import { RemoveCredentialDialog } from "./RemoveCredentialDialog";
@@ -545,16 +546,38 @@ function StaticCredentialRow({
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<CredentialSummary | null>(null);
   const [removeTarget, setRemoveTarget] = useState<CredentialSummary | null>(null);
+  const [checkingId, setCheckingId] = useState<string | null>(null);
   const { tryAssign } = useTryAutoAssign(agentId, connectorId);
+  const { testConnection } = useTestCredentialConnection();
 
   const isConnected = storedCredentials.length > 0;
+  const isProtonmail = requiredCredential.service === "protonmail";
+  const bridgeHealth = protonBridgeHealthSummary(storedCredentials);
+  const showBridgeWarning =
+    isProtonmail && isConnected && bridgeHealth === "error";
+  const showBridgeHealthy =
+    isProtonmail && isConnected && bridgeHealth === "ok";
+
+  async function handleCheckBridge(cred: CredentialSummary) {
+    setCheckingId(cred.id);
+    try {
+      await testConnection({
+        service: "protonmail",
+        credential_id: cred.id,
+      });
+    } finally {
+      setCheckingId(null);
+    }
+  }
 
   return (
     <>
       <div className="rounded-lg border p-3">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 flex-1 items-center gap-3">
-            {isConnected ? (
+            {showBridgeWarning ? (
+              <AlertTriangle className="size-5 shrink-0 text-amber-600 dark:text-amber-400" />
+            ) : isConnected ? (
               <CheckCircle2 className="size-5 shrink-0 text-green-600 dark:text-green-400" />
             ) : (
               <Circle className="text-muted-foreground size-5 shrink-0" />
@@ -589,12 +612,20 @@ function StaticCredentialRow({
           <div className="flex shrink-0 items-center gap-2 pl-8 sm:pl-0">
             <span
               className={`text-xs font-medium ${
-                isConnected
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-muted-foreground"
+                showBridgeWarning
+                  ? "text-amber-600 dark:text-amber-400"
+                  : isConnected
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-muted-foreground"
               }`}
             >
-              {isConnected ? "Connected" : "Not configured"}
+              {showBridgeWarning
+                ? "Bridge unreachable"
+                : showBridgeHealthy
+                  ? "Bridge reachable"
+                  : isConnected
+                    ? "Connected"
+                    : "Not configured"}
             </span>
             <Button
               variant="outline"
@@ -623,6 +654,21 @@ function StaticCredentialRow({
                   </p>
                 </div>
                 <div className="flex items-center gap-1">
+                  {isProtonmail ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleCheckBridge(cred)}
+                      disabled={checkingId === cred.id}
+                      aria-label={`Check Bridge connection for ${cred.label ?? cred.service}`}
+                    >
+                      {checkingId === cred.id ? (
+                        <Loader2 className="size-4 animate-spin" />
+                      ) : (
+                        <CheckCircle2 className="size-4" />
+                      )}
+                    </Button>
+                  ) : null}
                   <Button
                     variant="ghost"
                     size="sm"
@@ -678,4 +724,19 @@ function StaticCredentialRow({
       )}
     </>
   );
+}
+
+function protonBridgeHealthSummary(
+  storedCredentials: CredentialSummary[],
+): "ok" | "error" | "unknown" {
+  const withHealth = storedCredentials
+    .map((c) => c.bridge_health?.status)
+    .filter((s): s is "ok" | "error" => s === "ok" || s === "error");
+  if (withHealth.length === 0) {
+    return "unknown";
+  }
+  if (withHealth.some((s) => s === "error")) {
+    return "error";
+  }
+  return "ok";
 }

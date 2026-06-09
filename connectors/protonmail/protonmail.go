@@ -31,10 +31,6 @@ const (
 	defaultIMAPPort = "1143"
 )
 
-// validateIMAPConn is the IMAP dial+login used by ValidateCredentials. Tests may
-// replace it to avoid requiring a running local Proton proxy.
-var validateIMAPConn = connectIMAP
-
 // ProtonMailConnector owns the shared configuration for all Proton Mail actions.
 type ProtonMailConnector struct {
 	timeout time.Duration
@@ -76,12 +72,7 @@ func (c *ProtonMailConnector) ValidateCredentials(ctx context.Context, creds con
 		}
 	}
 
-	session, err := validateIMAPConn(creds, timeout)
-	if err != nil {
-		return err
-	}
-	session.close()
-	return nil
+	return TestBridgeConnection(creds, timeout)
 }
 
 func validateCredentialShape(creds connectors.Credentials) error {
