@@ -145,7 +145,7 @@ func (v *SQLiteVault) UpdateSecret(ctx context.Context, tx db.DBTX, secretID str
 	if err != nil {
 		return fmt.Errorf("vault update: %w", err)
 	}
-	if result.RowsAffected() == 0 {
+	if db.RowsAffected(result) == 0 {
 		return fmt.Errorf("vault secret %s not found", secretID)
 	}
 	return nil
