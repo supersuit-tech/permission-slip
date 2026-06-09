@@ -2,7 +2,6 @@ package protonmail
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"fmt"
 	"net"
@@ -176,8 +175,7 @@ func sendMailTLS(ctx context.Context, addr, host string, auth smtp.Auth, from st
 	// Try STARTTLS — Bridge advertises it; hydroxide does not (and this block
 	// is a no-op when the proxy doesn't advertise the extension).
 	if ok, _ := client.Extension("STARTTLS"); ok {
-		tlsConfig := &tls.Config{ServerName: host}
-		if err := client.StartTLS(tlsConfig); err != nil {
+		if err := client.StartTLS(smtpTLSConfig(host)); err != nil {
 			return &connectors.ExternalError{Message: fmt.Sprintf("STARTTLS failed: %v", err)}
 		}
 	}

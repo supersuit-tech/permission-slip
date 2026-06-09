@@ -2,7 +2,6 @@ package protonmail
 
 import (
 	"context"
-	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -48,8 +47,7 @@ var testSMTPConn = func(creds connectors.Credentials, timeout time.Duration) err
 	defer client.Close()
 
 	if ok, _ := client.Extension("STARTTLS"); ok {
-		tlsConfig := &tls.Config{ServerName: host}
-		if err := client.StartTLS(tlsConfig); err != nil {
+		if err := client.StartTLS(smtpTLSConfig(host)); err != nil {
 			return &connectors.ExternalError{Message: fmt.Sprintf("SMTP STARTTLS failed: %v", err)}
 		}
 	}
@@ -100,9 +98,12 @@ func mapDialError(proto string, err error) error {
 	return &connectors.ExternalError{Message: fmt.Sprintf("%s connection failed: %v", proto, err)}
 }
 
+// mapBridgeAuthMessage reports which protocol the proxy rejected and the
+// server's actual response, with the most common cause as a hint — auth can
+// fail for reasons other than a wrong password (e.g. the Bridge instance
+// serving the port has no account logged in), so don't assert one cause.
 func mapBridgeAuthMessage(proto string, err error) string {
-	_ = proto
-	return fmt.Sprintf("Wrong Bridge password (not your Proton account password). Run protonmail-bridge info to get the correct password. (%v)", err)
+	return fmt.Sprintf("%s authentication rejected by Bridge: %v — check that the password is the bridge password from protonmail-bridge info (not your Proton account password) and that this Bridge instance has your account logged in", proto, err)
 }
 
 func mapBridgeError(proto string, err error) error {
