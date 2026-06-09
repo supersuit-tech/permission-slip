@@ -766,4 +766,75 @@ describe("ActionPreviewSummary", () => {
       "Process Data",
     );
   });
+
+  describe("email details unavailable note", () => {
+    it("shows the note for a Proton Mail email action without enrichment", () => {
+      render(
+        <ActionPreviewSummary
+          actionType="protonmail.archive_email"
+          parameters={{ message_ids: [231, 232], folder: "INBOX" }}
+          schema={null}
+          actionName="Archive Email"
+          displayTemplate="Archive email in {{folder}}"
+        />,
+      );
+
+      expect(
+        screen.getByTestId("email-details-unavailable").textContent,
+      ).toBe("Email details unavailable");
+    });
+
+    it("hides the note when enrichment details are present", () => {
+      render(
+        <ActionPreviewSummary
+          actionType="protonmail.archive_email"
+          parameters={{ message_ids: [231, 232], folder: "INBOX" }}
+          schema={null}
+          actionName="Archive Email"
+          resourceDetails={{
+            messages: {
+              "231": { subject: "Hello", from: ["a@example.com"] },
+            },
+          }}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("email-details-unavailable"),
+      ).toBeNull();
+    });
+
+    it("hides the note for reply actions enriched with in_reply_to", () => {
+      render(
+        <ActionPreviewSummary
+          actionType="protonmail.reply_email"
+          parameters={{ in_reply_to_message_id: 10, body: "Thanks!" }}
+          schema={null}
+          actionName="Reply to Email"
+          resourceDetails={{
+            in_reply_to: { subject: "Hello", from: ["a@example.com"] },
+          }}
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("email-details-unavailable"),
+      ).toBeNull();
+    });
+
+    it("does not show the note for non-email actions without details", () => {
+      render(
+        <ActionPreviewSummary
+          actionType="github.create_issue"
+          parameters={{ owner: "acme", repo: "web", title: "Bug" }}
+          schema={null}
+          actionName="Create Issue"
+        />,
+      );
+
+      expect(
+        screen.queryByTestId("email-details-unavailable"),
+      ).toBeNull();
+    });
+  });
 });

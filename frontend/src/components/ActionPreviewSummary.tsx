@@ -33,6 +33,7 @@ import {
   humanizeKey,
   truncate,
 } from "@/lib/formatValues";
+import { emailDetailsUnavailable } from "@/lib/emailEnrichment";
 
 interface ActionPreviewSummaryProps {
   /** Action type identifier, e.g. "github.create_issue". */
@@ -114,9 +115,19 @@ export function ActionPreviewSummary({
   const parts = buildParts(actionType, parameters, schema, actionName, displayTemplate, resourceDetails);
 
   return (
-    <p className="text-sm leading-loose break-words" data-testid="action-preview-summary">
-      {renderRich(parts)}
-    </p>
+    <>
+      <p className="text-sm leading-loose break-words" data-testid="action-preview-summary">
+        {renderRich(parts)}
+      </p>
+      {emailDetailsUnavailable(actionType, resourceDetails) && (
+        <p
+          className="text-muted-foreground mt-1 text-xs italic"
+          data-testid="email-details-unavailable"
+        >
+          Email details unavailable
+        </p>
+      )}
+    </>
   );
 }
 

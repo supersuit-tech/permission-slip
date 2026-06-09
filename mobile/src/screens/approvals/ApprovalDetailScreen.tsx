@@ -58,6 +58,7 @@ import {
   parseEmailThreadDetails,
 } from "./emailThreadUtils";
 import { ProtonInReplyToCard } from "./ProtonInReplyToCard";
+import { emailDetailsUnavailable } from "./emailEnrichment";
 import {
   isProtonReplyAction,
   parseProtonInReplyTo,
@@ -354,6 +355,21 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           contextDescription={approval.context.description}
         />
 
+        {/* Email enrichment fallback — metadata lookup failed at creation */}
+        {emailDetailsUnavailable(
+          approval.action.type,
+          approval.resource_details as Record<string, unknown> | undefined,
+        ) && (
+          <View style={styles.sectionMinor}>
+            <Text
+              style={styles.emailDetailsUnavailableText}
+              testID="email-details-unavailable"
+            >
+              Email details unavailable
+            </Text>
+          </View>
+        )}
+
         {/* High risk warning */}
         {approval.context.risk_level === "high" && (
           <View style={styles.sectionMinor}>
@@ -561,6 +577,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.riskHigh,
     fontWeight: "500",
+  },
+  // --- Email enrichment fallback ---
+  emailDetailsUnavailableText: {
+    fontSize: 13,
+    color: colors.gray400,
+    fontStyle: "italic",
   },
   // --- Footer ---
   footerLabel: {
