@@ -99,7 +99,7 @@ func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, pa
 	if err != nil {
 		return nil, nil
 	}
-	if err := archiveParams.validate(); err != nil {
+	if err := validateArchiveParams(archiveParams); err != nil {
 		return nil, nil
 	}
 

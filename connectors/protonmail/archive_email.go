@@ -18,14 +18,12 @@ type archiveEmailAction struct {
 	conn *ProtonMailConnector
 }
 
-type archiveEmailParams = uidMessageParams
-
-func parseArchiveParams(raw []byte) (*archiveEmailParams, error) {
+func parseArchiveParams(raw []byte) (*uidMessageParams, error) {
 	return parseUIDMessageParams(raw)
 }
 
-func (p *archiveEmailParams) validate() error {
-	if err := (*uidMessageParams)(p).validate(); err != nil {
+func validateArchiveParams(p *uidMessageParams) error {
+	if err := p.validate(); err != nil {
 		return err
 	}
 	if strings.EqualFold(p.Folder, archiveMailbox) {
@@ -39,7 +37,7 @@ func (a *archiveEmailAction) Execute(ctx context.Context, req connectors.ActionR
 	if err != nil {
 		return nil, err
 	}
-	if err := params.validate(); err != nil {
+	if err := validateArchiveParams(params); err != nil {
 		return nil, err
 	}
 
