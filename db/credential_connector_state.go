@@ -58,7 +58,7 @@ func SetProtonmailUIDValidity(ctx context.Context, db DBTX, credentialID, folder
 
 	_, err = db.Exec(ctx, `
 		UPDATE credentials
-		SET connector_state = $2::jsonb
+		SET connector_state = $2
 		WHERE id = $1`, credentialID, raw)
 	return err
 }
