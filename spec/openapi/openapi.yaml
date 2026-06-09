@@ -411,6 +411,8 @@ components:
       $ref: './components/schemas/credentials.yaml#/CredentialListResponse'
     CredentialSummary:
       $ref: './components/schemas/credentials.yaml#/CredentialSummary'
+    UpdateCredentialRequest:
+      $ref: './components/schemas/credentials.yaml#/UpdateCredentialRequest'
     DeleteCredentialResponse:
       $ref: './components/schemas/credentials.yaml#/DeleteCredentialResponse'
     

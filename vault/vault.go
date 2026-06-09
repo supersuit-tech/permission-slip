@@ -24,6 +24,9 @@ type VaultStore interface {
 	// ReadSecret retrieves and decrypts a secret by its vault UUID.
 	ReadSecret(ctx context.Context, tx db.DBTX, secretID string) ([]byte, error)
 
+	// UpdateSecret re-encrypts and overwrites an existing secret in place.
+	UpdateSecret(ctx context.Context, tx db.DBTX, secretID string, secret []byte) error
+
 	// DeleteSecret removes a secret from the vault. Implementations should
 	// be idempotent — deleting a non-existent secret is not an error.
 	DeleteSecret(ctx context.Context, tx db.DBTX, secretID string) error

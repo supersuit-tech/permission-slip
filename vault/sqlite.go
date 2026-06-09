@@ -126,6 +126,31 @@ func (v *SQLiteVault) ReadSecret(ctx context.Context, tx db.DBTX, secretID strin
 	return plain, nil
 }
 
+// UpdateSecret re-encrypts secret with a fresh nonce and updates the existing row.
+func (v *SQLiteVault) UpdateSecret(ctx context.Context, tx db.DBTX, secretID string, secret []byte) error {
+	gcm, err := v.gcm()
+	if err != nil {
+		return err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return fmt.Errorf("nonce: %w", err)
+	}
+	ciphertext := gcm.Seal(nil, nonce, secret, nil)
+
+	result, err := tx.Exec(ctx,
+		`UPDATE vault_secrets SET nonce = $1, ciphertext = $2 WHERE id = $3`,
+		nonce, ciphertext, secretID,
+	)
+	if err != nil {
+		return fmt.Errorf("vault update: %w", err)
+	}
+	if result.RowsAffected() == 0 {
+		return fmt.Errorf("vault secret %s not found", secretID)
+	}
+	return nil
+}
+
 // DeleteSecret removes a row from vault_secrets. Idempotent.
 func (v *SQLiteVault) DeleteSecret(ctx context.Context, tx db.DBTX, secretID string) error {
 	_, err := tx.Exec(ctx, `DELETE FROM vault_secrets WHERE id = $1`, secretID)

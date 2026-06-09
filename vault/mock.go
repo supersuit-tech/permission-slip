@@ -61,6 +61,20 @@ func (m *MockVaultStore) ReadSecret(_ context.Context, _ db.DBTX, secretID strin
 	return out, nil
 }
 
+// UpdateSecret overwrites an existing secret in memory.
+func (m *MockVaultStore) UpdateSecret(_ context.Context, _ db.DBTX, secretID string, secret []byte) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if _, ok := m.secrets[secretID]; !ok {
+		return fmt.Errorf("vault secret %s not found", secretID)
+	}
+	stored := make([]byte, len(secret))
+	copy(stored, secret)
+	m.secrets[secretID] = stored
+	return nil
+}
+
 // DeleteSecret removes a secret from the in-memory store. Idempotent.
 func (m *MockVaultStore) DeleteSecret(_ context.Context, _ db.DBTX, secretID string) error {
 	m.mu.Lock()

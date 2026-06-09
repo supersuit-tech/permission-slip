@@ -1,13 +1,12 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
-
 )
 
 // Credential represents the metadata of a stored credential (secrets are never returned).
@@ -228,6 +227,63 @@ func GetDecryptedCredentials(
 		return nil, fmt.Errorf("unmarshal decrypted credentials: %w", err)
 	}
 	return creds, nil
+}
+
+// OwnedCredential is credential metadata plus the vault secret reference.
+type OwnedCredential struct {
+	Credential
+	VaultSecretID string
+}
+
+// GetOwnedCredential returns credential metadata for a user-owned credential,
+// including vault_secret_id. Returns CredentialErrNotFound when the row is
+// missing or belongs to another user.
+func GetOwnedCredential(ctx context.Context, db DBTX, credID, userID string) (*OwnedCredential, error) {
+	var c Credential
+	var createdAt sql.NullString
+	var vaultSecretID string
+	err := db.QueryRow(ctx, `
+		SELECT id, user_id, service, label, created_at, vault_secret_id
+		FROM credentials
+		WHERE id = $1 AND user_id = $2`,
+		credID, userID,
+	).Scan(&c.ID, &c.UserID, &c.Service, &c.Label, &createdAt, &vaultSecretID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
+	}
+	if err != nil {
+		return nil, err
+	}
+	c.CreatedAt, err = sqliteTimeRequired(createdAt)
+	if err != nil {
+		return nil, err
+	}
+	return &OwnedCredential{
+		Credential:    c,
+		VaultSecretID: vaultSecretID,
+	}, nil
+}
+
+// UpdateCredentialLabel updates the label for a user-owned credential.
+// Pass nil label to clear it back to NULL. Returns CredentialErrNotFound when
+// no owned row matches, or CredentialErrDuplicate on unique constraint violation.
+func UpdateCredentialLabel(ctx context.Context, db DBTX, credID, userID string, label *string) (*Credential, error) {
+	c, err := scanCredential(db.QueryRow(ctx, `
+		UPDATE credentials SET label = $3
+		WHERE id = $1 AND user_id = $2
+		RETURNING id, user_id, service, label, created_at`,
+		credID, userID, label,
+	))
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
+	}
+	if err != nil {
+		if IsUniqueViolation(err) {
+			return nil, &CredentialError{Code: CredentialErrDuplicate, Message: "Credentials already stored for this service with this label"}
+		}
+		return nil, err
+	}
+	return c, nil
 }
 
 // GetCredentialByID returns the credential metadata for the given ID,
