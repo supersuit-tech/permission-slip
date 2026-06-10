@@ -151,7 +151,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						"group_by_thread": {
 							"type": "boolean",
 							"default": true,
-							"description": "Collapse results to one entry per conversation: the latest message, with thread_size and thread_uids covering the fetched window (a long thread may be partially represented when it exceeds the limit). Set to false for a flat per-email listing. To act on a whole conversation (archive, delete, move), pass its thread_uids as the message_ids of the batch action."
+							"description": "Collapse results to one entry per conversation: the latest message, with thread_size and thread_uids covering the fetched window (a long thread may be partially represented when it exceeds the limit). Set to false for a flat per-email listing. archive_email archives the whole conversation by default; for delete or move_to_folder, pass thread_uids as message_ids to act on every message in the fetched window."
 						}
 					}
 				}`)),
@@ -198,7 +198,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						"group_by_thread": {
 							"type": "boolean",
 							"default": true,
-							"description": "Collapse results to one entry per conversation: the latest message, with thread_size and thread_uids covering the fetched window (a long thread may be partially represented when it exceeds the limit). Set to false for a flat per-email listing. To act on a whole conversation (archive, delete, move), pass its thread_uids as the message_ids of the batch action."
+							"description": "Collapse results to one entry per conversation: the latest message, with thread_size and thread_uids covering the fetched window (a long thread may be partially represented when it exceeds the limit). Set to false for a flat per-email listing. archive_email archives the whole conversation by default; for delete or move_to_folder, pass thread_uids as message_ids to act on every message in the fetched window."
 						}
 					}
 				}`)),
@@ -229,7 +229,7 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "protonmail.archive_email",
 				Name:            "Archive Email",
-				Description:     "Move one or more emails to the Archive folder via IMAP MOVE",
+				Description:     "Move one or more emails to the Archive folder via IMAP MOVE, archiving whole conversations by default",
 				RiskLevel:       "medium",
 				DisplayTemplate: "Archive email in {{folder}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
@@ -242,19 +242,24 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 						"message_id": {
 							"type": "integer",
 							"minimum": 1,
-							"description": "Stable IMAP UID of a single email to archive (shorthand for message_ids with one item)"
+							"description": "Stable IMAP UID of a single email to archive. By default the whole conversation is archived (matching Proton's Archive button). Set include_thread to false to archive only this exact UID."
 						},
 						"message_ids": {
 							"type": "array",
 							"items": {"type": "integer", "minimum": 1},
 							"minItems": 1,
 							"maxItems": 50,
-							"description": "Stable IMAP UIDs of emails to archive (batch). Combined unique count of message_id + message_ids must not exceed 50."
+							"description": "Stable IMAP UIDs to archive (batch; combined unique count of message_id + message_ids must not exceed 50). By default each UID's whole conversation is archived. Set include_thread to false to archive only the exact UIDs listed."
 						},
 						"folder": {
 							"type": "string",
 							"default": "INBOX",
 							"description": "Source mailbox folder containing the emails"
+						},
+						"include_thread": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), archive every message in the conversation, not just the listed UIDs — matching Proton's Archive button and Gmail's thread archive. Searches the whole folder by normalized subject and In-Reply-To headers to find older replies outside the listing window. Two distinct conversations sharing a subject line may be merged (recoverable from Archive). Set to false to archive only the exact UIDs provided."
 						}
 					}
 				}`)),

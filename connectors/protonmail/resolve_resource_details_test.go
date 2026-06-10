@@ -129,6 +129,47 @@ func TestResolveResourceDetails_ArchiveEmail_SingleUsesFlatFields(t *testing.T) 
 	}
 }
 
+func TestResolveResourceDetails_ArchiveEmail_ThreadExpansionListsAllMessages(t *testing.T) {
+	origExpand := expandArchiveUIDsForApproval
+	origResolve := resolveMessageEnvelopes
+	t.Cleanup(func() {
+		expandArchiveUIDsForApproval = origExpand
+		resolveMessageEnvelopes = origResolve
+	})
+
+	expandArchiveUIDsForApproval = func(context.Context, *ProtonMailConnector, connectors.Credentials, string, []uint32) ([]uint32, error) {
+		return []uint32{125, 132, 140}, nil
+	}
+	resolveMessageEnvelopes = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ string, uids []uint32, _ connectors.MailboxUIDValidityStore) (map[uint32]emailEnvelopeMetadata, error) {
+		out := make(map[uint32]emailEnvelopeMetadata, len(uids))
+		for _, uid := range uids {
+			out[uid] = emailEnvelopeMetadata{
+				Subject: "Thread message",
+				From:    []string{"from@example.com"},
+				To:      []string{"to@example.com"},
+				Date:    "2026-03-01T09:00:00Z",
+			}
+		}
+		return out, nil
+	}
+
+	conn := New()
+	params, _ := json.Marshal(map[string]any{"message_id": 140})
+	details, err := conn.ResolveResourceDetails(context.Background(), "protonmail.archive_email", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	rawMessages, ok := details["messages"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected messages map after thread expansion, got %T: %v", details["messages"], details)
+	}
+	for _, key := range []string{"125", "132", "140"} {
+		if _, ok := rawMessages[key]; !ok {
+			t.Errorf("missing expanded message %q in details", key)
+		}
+	}
+}
+
 func TestResolveResourceDetails_ArchiveEmail_BatchKeyedByHandle(t *testing.T) {
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
