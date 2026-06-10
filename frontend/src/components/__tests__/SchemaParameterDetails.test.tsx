@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, it, expect } from "vitest";
 import { SchemaParameterDetails } from "../SchemaParameterDetails";
 import type { ParametersSchema } from "@/lib/parameterSchema";
@@ -20,7 +21,7 @@ const schema: ParametersSchema = {
 };
 
 describe("SchemaParameterDetails", () => {
-  it("renders parameter descriptions as labels", () => {
+  it("renders humanized keys as labels, not schema descriptions", () => {
     render(
       <SchemaParameterDetails
         parameters={{ owner: "acme", repo: "widgets" }}
@@ -28,11 +29,37 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    expect(screen.getByText("Repository owner")).toBeInTheDocument();
-    expect(screen.getByText("Repository name")).toBeInTheDocument();
+    expect(screen.getByText("Owner")).toBeInTheDocument();
+    expect(screen.getByText("Repo")).toBeInTheDocument();
+    expect(screen.queryByText("Repository owner")).not.toBeInTheDocument();
   });
 
-  it("renders parameter values", () => {
+  it("uses x-ui label when available", () => {
+    const labeledSchema: ParametersSchema = {
+      type: "object",
+      properties: {
+        message_id: {
+          type: "string",
+          description: "Stable IMAP UID of a single email to archive",
+          "x-ui": { label: "Message" },
+        },
+      },
+    };
+
+    render(
+      <SchemaParameterDetails
+        parameters={{ message_id: "12345" }}
+        schema={labeledSchema}
+      />,
+    );
+
+    expect(screen.getByText("Message")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Stable IMAP UID of a single email to archive"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("renders parameter values in the clean view", () => {
     render(
       <SchemaParameterDetails
         parameters={{ owner: "acme", repo: "widgets" }}
@@ -44,44 +71,7 @@ describe("SchemaParameterDetails", () => {
     expect(screen.getByText("widgets")).toBeInTheDocument();
   });
 
-  it("shows parameter key as secondary label when description exists", () => {
-    render(
-      <SchemaParameterDetails
-        parameters={{ owner: "acme" }}
-        schema={schema}
-      />,
-    );
-
-    // The key is shown as a small code element alongside the description label
-    expect(screen.getByText("owner")).toBeInTheDocument();
-  });
-
-  it("shows 'missing' badge for required parameters not provided", () => {
-    render(
-      <SchemaParameterDetails
-        parameters={{ owner: "acme" }}
-        schema={schema}
-      />,
-    );
-
-    // "repo" is required but not provided
-    expect(screen.getByText("missing")).toBeInTheDocument();
-  });
-
-  it("hides unprovided optional parameters", () => {
-    render(
-      <SchemaParameterDetails
-        parameters={{ owner: "acme", repo: "widgets" }}
-        schema={schema}
-      />,
-    );
-
-    // "title" and "merge_method" are optional and not provided — should be hidden
-    expect(screen.queryByText("not provided")).not.toBeInTheDocument();
-    expect(screen.queryByText("Issue title")).not.toBeInTheDocument();
-  });
-
-  it("shows enum options for enum parameters", () => {
+  it("hides developer chrome from the default view", () => {
     render(
       <SchemaParameterDetails
         parameters={{ owner: "acme", repo: "widgets", merge_method: "squash" }}
@@ -89,10 +79,46 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
+    expect(screen.queryByText("owner")).not.toBeInTheDocument();
+    expect(screen.queryByText("one of: merge, squash, rebase")).not.toBeInTheDocument();
+    expect(screen.queryByText("default")).not.toBeInTheDocument();
+  });
+
+  it("shows full schema details behind the developer toggle", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SchemaParameterDetails
+        parameters={{ owner: "acme" }}
+        schema={schema}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /developer details/i }));
+
+    expect(screen.getByText("Repository owner")).toBeInTheDocument();
+    expect(screen.getByText("owner")).toBeInTheDocument();
+    expect(screen.getByText("missing")).toBeInTheDocument();
+  });
+
+  it("shows enum options in developer details", async () => {
+    const user = userEvent.setup();
+
+    render(
+      <SchemaParameterDetails
+        parameters={{ owner: "acme", repo: "widgets", merge_method: "squash" }}
+        schema={schema}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /developer details/i }));
+
     expect(screen.getByText("one of: merge, squash, rebase")).toBeInTheDocument();
   });
 
-  it("shows 'default' badge when value matches default", () => {
+  it("shows default badge in developer details", async () => {
+    const user = userEvent.setup();
+
     render(
       <SchemaParameterDetails
         parameters={{ owner: "acme", repo: "widgets", merge_method: "merge" }}
@@ -100,7 +126,21 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
+    await user.click(screen.getByRole("button", { name: /developer details/i }));
+
     expect(screen.getByText("default")).toBeInTheDocument();
+  });
+
+  it("hides unprovided optional parameters from the clean view", () => {
+    render(
+      <SchemaParameterDetails
+        parameters={{ owner: "acme", repo: "widgets" }}
+        schema={schema}
+      />,
+    );
+
+    expect(screen.queryByText("Title")).not.toBeInTheDocument();
+    expect(screen.queryByText("not provided")).not.toBeInTheDocument();
   });
 
   it("renders extra parameters not in schema with humanized keys", () => {
@@ -111,7 +151,6 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    // humanizeKey turns "custom_field" into "Custom field"
     expect(screen.getByText("Custom field")).toBeInTheDocument();
     expect(screen.getByText("hello")).toBeInTheDocument();
   });
@@ -124,7 +163,6 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    // humanizeKey capitalizes the first letter
     expect(screen.getByText("Foo")).toBeInTheDocument();
     expect(screen.getByText("bar")).toBeInTheDocument();
     expect(screen.getByText("Count")).toBeInTheDocument();

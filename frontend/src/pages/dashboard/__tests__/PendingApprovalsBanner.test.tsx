@@ -260,6 +260,14 @@ describe("PendingApprovalsBanner", () => {
     await user.click(screen.getByRole("button", { name: "Deny" }));
 
     await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Confirm deny" }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Confirm deny" }));
+
+    await waitFor(() => {
       expect(mockPost).toHaveBeenCalled();
     });
   });

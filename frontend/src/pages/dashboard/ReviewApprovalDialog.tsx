@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { Loader2, Clock, AlertTriangle, CheckCircle, XCircle, Check } from "lucide-react";
+import { Loader2, AlertTriangle, CheckCircle, XCircle, Check } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -40,12 +40,10 @@ import {
   parseProtonBatchEmails,
 } from "@/components/previews/ProtonBatchEmailsPreview";
 import type { components } from "@/api/schema";
-import {
-  useCountdown,
-  formatCountdown,
-  urgencyColor,
-  RiskBadge,
-} from "./approval-components";
+import { TimelineView, type TimelineEntry } from "@/components/TimelineView";
+import { formatAbsoluteTime } from "@/lib/utils";
+import { useCountdown, RiskBadge, CountdownBadge } from "./approval-components";
+import { ApprovalSection } from "./ApprovalSection";
 import { formatConnectorDisplayName } from "./approvalConnectorLabel";
 import { buildCreateStandingApprovalFromApproval } from "./standingApprovalFromApproval";
 
@@ -113,6 +111,36 @@ function ExecutionStatusBanner({ result }: { result: ApproveResult }) {
   );
 }
 
+function buildTimelineEntries(approval: ApprovalSummary): TimelineEntry[] {
+  const entries: TimelineEntry[] = [
+    { label: "Created", value: formatAbsoluteTime(approval.created_at) },
+    { label: "Expires", value: formatAbsoluteTime(approval.expires_at) },
+  ];
+
+  if (approval.approved_at) {
+    entries.push({
+      label: "Approved",
+      value: formatAbsoluteTime(approval.approved_at),
+      dotColor: "success",
+    });
+  }
+  if (approval.denied_at) {
+    entries.push({
+      label: "Denied",
+      value: formatAbsoluteTime(approval.denied_at),
+      dotColor: "error",
+    });
+  }
+  if (approval.cancelled_at) {
+    entries.push({
+      label: "Cancelled",
+      value: formatAbsoluteTime(approval.cancelled_at),
+    });
+  }
+
+  return entries;
+}
+
 export function ReviewApprovalDialog({
   approval,
   agentDisplayName,
@@ -124,7 +152,7 @@ export function ReviewApprovalDialog({
   const [autoApproveFuture, setAutoApproveFuture] = useState(false);
   const [pendingAction, setPendingAction] = useState<"approve" | null>(null);
   const [denialReason, setDenialReason] = useState("");
-  const [paramsOpen, setParamsOpen] = useState(false);
+  const [denyInitiated, setDenyInitiated] = useState(false);
   const isApproved = approveResult !== null;
   const { approveApproval } = useApproveApproval();
   const { denyApproval, isPending: isDenying } = useDenyApproval();
@@ -153,6 +181,10 @@ export function ReviewApprovalDialog({
   const { configs } = useActionConfigs(approval.agent_id);
   const params = approval.action.parameters as Record<string, unknown>;
   const hasParams = Object.keys(params).length > 0;
+  const timelineEntries = useMemo(
+    () => buildTimelineEntries(approval),
+    [approval],
+  );
   const hasExistingStandingApproval = useMemo(
     () =>
       standingApprovals.some(
@@ -246,6 +278,11 @@ export function ReviewApprovalDialog({
   ]);
 
   const handleDeny = useCallback(async () => {
+    if (!denyInitiated) {
+      setDenyInitiated(true);
+      return;
+    }
+
     try {
       const reason = denialReason.trim();
       await denyApproval(approval.approval_id, reason || undefined);
@@ -254,7 +291,7 @@ export function ReviewApprovalDialog({
     } catch {
       toast.error("Failed to deny request. Please try again.");
     }
-  }, [denyApproval, approval.approval_id, denialReason, onOpenChange]);
+  }, [denyApproval, approval.approval_id, denialReason, denyInitiated, onOpenChange]);
 
   function handleClose(nextOpen: boolean) {
     if (!nextOpen) {
@@ -263,19 +300,25 @@ export function ReviewApprovalDialog({
       setAutoApproveFuture(false);
       setPendingAction(null);
       setDenialReason("");
+      setDenyInitiated(false);
     }
     onOpenChange(nextOpen);
   }
 
+  function cancelDeny() {
+    setDenyInitiated(false);
+    setDenialReason("");
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
         {/* Connector header with logo, action name, and connector name */}
         <DialogHeader>
           <div className="flex items-center gap-3">
             {schemaLoading ? (
               <>
-                <Skeleton className="size-10 rounded-lg shrink-0" />
+                <Skeleton className="size-10 shrink-0 rounded-lg" />
                 <div className="min-w-0 flex-1 space-y-2">
                   <DialogTitle className="sr-only">Loading action details…</DialogTitle>
                   <Skeleton className="h-4 w-40" />
@@ -350,37 +393,25 @@ export function ReviewApprovalDialog({
 
             {/* Rich action preview card */}
             <div className="space-y-2">
-              {/* Action header above the card */}
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2">
                   <span className="truncate text-sm font-semibold">
                     {actionName ?? approval.action.type}
                   </span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <RiskBadge level={approval.context.risk_level} />
-                  <span
-                    aria-label={isExpired ? "Request expired" : `Time remaining: ${formatCountdown(remaining)}`}
-                    className={`inline-flex shrink-0 items-center gap-1 text-xs font-medium ${urgencyColor(remaining)}`}
-                  >
-                    <Clock className="size-3" aria-hidden="true" />
-                    {isExpired ? "Expired" : formatCountdown(remaining)}
-                  </span>
-                </div>
+                <RiskBadge level={approval.context.risk_level} />
               </div>
 
-              {/* Context description */}
               {approval.context.description && (
                 <p className="text-muted-foreground text-sm">
                   {approval.context.description}
                 </p>
               )}
 
-              {/* Preview card — show skeleton while connector metadata loads */}
               {schemaLoading ? (
                 <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm space-y-3">
                   <div className="flex items-center gap-3">
-                    <Skeleton className="size-10 rounded-lg shrink-0" />
+                    <Skeleton className="size-10 shrink-0 rounded-lg" />
                     <div className="flex-1 space-y-2">
                       <Skeleton className="h-4 w-3/4" />
                       <Skeleton className="h-3 w-1/2" />
@@ -419,49 +450,39 @@ export function ReviewApprovalDialog({
               )}
             </div>
 
-            {/* Raw parameters (collapsible pill toggle) */}
-            {hasParams && (
-              <div className="space-y-2">
-                <button
-                  type="button"
-                  onClick={() => setParamsOpen((o) => !o)}
-                  className="text-muted-foreground hover:text-foreground hover:bg-muted/50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-                  aria-expanded={paramsOpen}
-                >
-                  <span
-                    className="transition-transform duration-150"
-                    style={{ display: "inline-block", transform: paramsOpen ? "rotate(90deg)" : "rotate(0deg)" }}
-                    aria-hidden="true"
-                  >
-                    &#9656;
-                  </span>
-                  Parameters
-                </button>
-                {paramsOpen && (
-                  <div className="bg-muted/30 overflow-x-auto rounded-xl border p-3 sm:p-4">
-                    <SchemaParameterDetails
-                      parameters={params}
-                      schema={schema}
-                      actionType={approval.action.type}
-                      resourceDetails={
-                        approval.resource_details as Record<string, unknown> | undefined
-                      }
-                    />
-                  </div>
-                )}
+            {/* Expiry */}
+            <ApprovalSection label="Expiry">
+              <div className="flex items-center gap-2">
+                <CountdownBadge expiresAt={approval.expires_at} />
+                <span className="text-muted-foreground text-sm">
+                  {isExpired ? "This request has expired" : "remaining"}
+                </span>
               </div>
+              {isExpired && (
+                <p className="text-muted-foreground mt-2 text-sm" role="alert">
+                  The agent will need to submit a new request if the action is still needed.
+                </p>
+              )}
+            </ApprovalSection>
+
+            {/* Parameters */}
+            {hasParams && (
+              <ApprovalSection label="Parameters">
+                <SchemaParameterDetails
+                  parameters={params}
+                  schema={schema}
+                  actionType={approval.action.type}
+                  resourceDetails={
+                    approval.resource_details as Record<string, unknown> | undefined
+                  }
+                />
+              </ApprovalSection>
             )}
 
-            {/* Expired notice */}
-            {isExpired && (
-              <div role="alert" className="bg-muted/50 flex items-start gap-2 rounded-lg border p-3">
-                <Clock className="text-muted-foreground mt-0.5 size-4 shrink-0" aria-hidden="true" />
-                <p className="text-muted-foreground text-sm">
-                  This request has expired. The agent will need to submit a new
-                  request if the action is still needed.
-                </p>
-              </div>
-            )}
+            {/* Timeline */}
+            <ApprovalSection label="Timeline">
+              <TimelineView entries={timelineEntries} />
+            </ApprovalSection>
 
             {/* High risk warning */}
             {approval.context.risk_level === "high" && (
@@ -474,9 +495,9 @@ export function ReviewApprovalDialog({
               </div>
             )}
 
-            {/* Action buttons — stacked full-width matching mockup */}
-            <div className="space-y-2 pt-2">
-              {showAutoApproveCheckbox && (
+            {/* Action buttons */}
+            <div className="space-y-3 pt-2">
+              {showAutoApproveCheckbox && !denyInitiated && (
                 <div className="flex items-start gap-3 rounded-lg border p-3">
                   <Checkbox
                     id="auto-approve-future"
@@ -497,53 +518,87 @@ export function ReviewApprovalDialog({
                 </div>
               )}
 
-              <div className="space-y-2">
-                <Label htmlFor="denial-reason" className="text-sm font-medium">
-                  Reason for denial (optional)
-                </Label>
-                <textarea
-                  id="denial-reason"
-                  value={denialReason}
-                  onChange={(event) => setDenialReason(event.target.value)}
-                  disabled={isBusy || isExpired}
-                  maxLength={500}
-                  rows={3}
-                  placeholder="Explain why you're denying this request so the agent can adapt."
-                  className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                />
+              {denyInitiated && (
+                <div className="space-y-2">
+                  <Label htmlFor="denial-reason" className="text-sm font-medium">
+                    Reason for denial (optional)
+                  </Label>
+                  <textarea
+                    id="denial-reason"
+                    value={denialReason}
+                    onChange={(event) => setDenialReason(event.target.value)}
+                    disabled={isBusy || isExpired}
+                    maxLength={500}
+                    rows={3}
+                    autoFocus
+                    placeholder="Explain why you're denying this request so the agent can adapt."
+                    className="border-input bg-background ring-offset-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[80px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  />
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 sm:flex-row">
+                {denyInitiated ? (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full sm:flex-1"
+                    disabled={isBusy || isExpired}
+                    onClick={cancelDeny}
+                  >
+                    Cancel
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="w-full border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive sm:flex-1"
+                    disabled={isBusy || isExpired}
+                    onClick={handleDeny}
+                    aria-label={isDenying ? "Denying request…" : undefined}
+                  >
+                    {isDenying ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      "Deny"
+                    )}
+                  </Button>
+                )}
+
+                {denyInitiated ? (
+                  <Button
+                    variant="destructive"
+                    size="lg"
+                    className="w-full sm:flex-1"
+                    disabled={isBusy || isExpired}
+                    onClick={handleDeny}
+                    aria-label={isDenying ? "Confirming denial…" : undefined}
+                  >
+                    {isDenying ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      "Confirm deny"
+                    )}
+                  </Button>
+                ) : (
+                  <Button
+                    size="lg"
+                    className="w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700 sm:flex-1"
+                    disabled={isBusy || isExpired}
+                    onClick={handleApprove}
+                    aria-label={pendingAction === "approve" ? "Approving request…" : undefined}
+                  >
+                    {pendingAction === "approve" ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Check className="mr-1 size-4" />
+                        Approve
+                      </>
+                    )}
+                  </Button>
+                )}
               </div>
-
-              <Button
-                size="lg"
-                className="w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
-                disabled={isBusy || isExpired}
-                onClick={handleApprove}
-                aria-label={pendingAction === "approve" ? "Approving request…" : undefined}
-              >
-                {pendingAction === "approve" ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <>
-                    <Check className="mr-1 size-4" />
-                    Approve
-                  </>
-                )}
-              </Button>
-
-              <Button
-                variant="outline"
-                size="lg"
-                className="w-full"
-                disabled={isBusy || isExpired}
-                onClick={handleDeny}
-                aria-label={isDenying ? "Denying request…" : undefined}
-              >
-                {isDenying ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  "Deny"
-                )}
-              </Button>
             </div>
           </div>
         )}

@@ -32,7 +32,10 @@ import {
   parseProtonBatchEmails,
 } from "@/components/previews/ProtonBatchEmailsPreview";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
-import { RiskBadge } from "./approval-components";
+import { TimelineView } from "@/components/TimelineView";
+import { CountdownBadge, RiskBadge } from "./approval-components";
+import { ApprovalSection } from "./ApprovalSection";
+import { formatAbsoluteTime } from "@/lib/utils";
 import { getInitials } from "@/components/ui/avatar";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 import type { ActionPreviewConfig } from "@/hooks/useActionSchema";
@@ -63,14 +66,14 @@ interface MockApprovalProps {
   preview: ActionPreviewConfig | null;
   displayTemplate?: string | null;
   resourceDetails?: Record<string, unknown>;
-  /** Countdown display text (static for stories). */
-  countdown?: string;
   /** Context description shown above the preview. */
   description?: string;
   /** Whether to show the dialog in an expired state. */
   expired?: boolean;
   /** Override dialog state: "pending" | "approved-success" | "approved-error" | "approved-pending". */
   dialogState?: "pending" | "approved-success" | "approved-error" | "approved-pending";
+  createdAt?: string;
+  expiresAt?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,19 +92,19 @@ function ApprovalDialogStory({
   preview,
   displayTemplate,
   resourceDetails,
-  countdown = "9:30",
   description,
   expired = false,
   dialogState = "pending",
+  createdAt = "2026-03-16T10:00:00Z",
+  expiresAt = "2026-03-16T10:15:00Z",
 }: MockApprovalProps) {
-  const [rawOpen, setRawOpen] = useState(false);
   const hasParams = Object.keys(parameters).length > 0;
   const protonBatchEmails = parseProtonBatchEmails(resourceDetails);
 
   if (dialogState === "approved-success") {
     return (
       <Dialog open>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <ConnectorLogo name={connectorName} logoSvg={connectorLogo} size="lg" />
@@ -131,7 +134,7 @@ function ApprovalDialogStory({
   if (dialogState === "approved-error") {
     return (
       <Dialog open>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <ConnectorLogo name={connectorName} logoSvg={connectorLogo} size="lg" />
@@ -161,7 +164,7 @@ function ApprovalDialogStory({
   if (dialogState === "approved-pending") {
     return (
       <Dialog open>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+        <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
           <DialogHeader>
             <div className="flex items-center gap-3">
               <ConnectorLogo name={connectorName} logoSvg={connectorLogo} size="lg" />
@@ -189,7 +192,7 @@ function ApprovalDialogStory({
 
   return (
     <Dialog open>
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl">
+      <DialogContent className="max-h-[90dvh] w-[calc(100vw-1.5rem)] overflow-y-auto sm:max-w-2xl">
         {/* Connector header */}
         <DialogHeader>
           <div className="flex items-center gap-3">
@@ -226,15 +229,7 @@ function ApprovalDialogStory({
               <div className="flex min-w-0 items-center gap-2">
                 <span className="truncate text-sm font-semibold">{actionName}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <RiskBadge level={riskLevel} />
-                <span
-                  className={`inline-flex shrink-0 items-center gap-1 text-xs font-medium ${expired ? "text-muted-foreground" : "text-muted-foreground"}`}
-                >
-                  <Clock className="size-3" />
-                  {expired ? "Expired" : countdown}
-                </span>
-              </div>
+              <RiskBadge level={riskLevel} />
             </div>
 
             {description && (
@@ -257,42 +252,37 @@ function ApprovalDialogStory({
             )}
           </div>
 
-          {/* Raw parameters (collapsible pill toggle) */}
-          {hasParams && (
-            <div className="space-y-2">
-              <button
-                type="button"
-                onClick={() => setRawOpen((o) => !o)}
-                className="text-muted-foreground hover:text-foreground hover:bg-muted/50 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-                aria-expanded={rawOpen}
-              >
-                <span
-                  className="transition-transform duration-150"
-                  style={{ display: "inline-block", transform: rawOpen ? "rotate(90deg)" : "rotate(0deg)" }}
-                  aria-hidden="true"
-                >
-                  &#9656;
-                </span>
-                Parameters
-              </button>
-              {rawOpen && (
-                <div className="bg-muted/30 overflow-x-auto rounded-xl border p-3 sm:p-4">
-                  <SchemaParameterDetails parameters={parameters} schema={schema} />
-                </div>
-              )}
+          {/* Expiry */}
+          <ApprovalSection label="Expiry">
+            <div className="flex items-center gap-2">
+              <CountdownBadge expiresAt={expiresAt} />
+              <span className="text-muted-foreground text-sm">
+                {expired ? "This request has expired" : "remaining"}
+              </span>
             </div>
+            {expired && (
+              <p className="text-muted-foreground mt-2 text-sm" role="alert">
+                The agent will need to submit a new request if the action is still needed.
+              </p>
+            )}
+          </ApprovalSection>
+
+          {/* Parameters */}
+          {hasParams && (
+            <ApprovalSection label="Parameters">
+              <SchemaParameterDetails parameters={parameters} schema={schema} />
+            </ApprovalSection>
           )}
 
-          {/* Expired notice */}
-          {expired && (
-            <div role="alert" className="bg-muted/50 flex items-start gap-2 rounded-lg border p-3">
-              <Clock className="text-muted-foreground mt-0.5 size-4 shrink-0" />
-              <p className="text-muted-foreground text-sm">
-                This request has expired. The agent will need to submit a new
-                request if the action is still needed.
-              </p>
-            </div>
-          )}
+          {/* Timeline */}
+          <ApprovalSection label="Timeline">
+            <TimelineView
+              entries={[
+                { label: "Created", value: formatAbsoluteTime(createdAt) },
+                { label: "Expires", value: formatAbsoluteTime(expiresAt) },
+              ]}
+            />
+          </ApprovalSection>
 
           {/* High risk warning */}
           {riskLevel === "high" && (
@@ -306,28 +296,23 @@ function ApprovalDialogStory({
           )}
 
           {/* Action buttons */}
-          <div className="space-y-2 pt-2">
+          <div className="flex flex-col gap-2 pt-2 sm:flex-row">
+            <Button
+              variant="outline"
+              size="lg"
+              className="w-full border-destructive/40 text-destructive hover:bg-destructive/5 hover:text-destructive sm:flex-1"
+              disabled={expired}
+            >
+              Deny
+            </Button>
             <Button
               size="lg"
-              className="w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700"
+              className="w-full bg-emerald-600 text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-700 sm:flex-1"
               disabled={expired}
             >
               <Check className="mr-1 size-4" />
               Approve
             </Button>
-            <Button variant="outline" size="lg" className="w-full" disabled={expired}>
-              Deny
-            </Button>
-            {hasParams && (
-              <button
-                className="text-muted-foreground hover:text-foreground flex w-full items-center justify-center gap-1 py-1 text-sm transition-colors"
-                type="button"
-                disabled={expired}
-              >
-                <ShieldCheck className="size-3" />
-                Always allow this action
-              </button>
-            )}
           </div>
         </div>
       </DialogContent>
@@ -404,6 +389,7 @@ export const Expired: Story = {
     preview: null,
     resourceDetails: { title: "Q1 Planning Review", start_time: "2026-03-16T14:00:00-05:00" },
     expired: true,
+    expiresAt: "2020-01-01T00:00:00Z",
   },
 };
 
