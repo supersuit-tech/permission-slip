@@ -215,9 +215,10 @@ describe("buildActionSummary", () => {
         },
       },
     );
+    // Count only — per-email subjects are rendered by ProtonBatchEmailsCard.
     expect(result).toContain("Archive 2 emails");
-    expect(result).toContain("First");
-    expect(result).toContain("Second");
+    expect(result).not.toContain("First");
+    expect(result).not.toContain("Second");
   });
 
   it("falls back to generic summary for unknown types", () => {

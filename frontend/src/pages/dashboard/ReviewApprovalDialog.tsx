@@ -35,6 +35,10 @@ import {
   parseProtonInReplyTo,
 } from "@/components/previews/ProtonInReplyToPreview";
 import { SlackContextPreview } from "@/components/previews/SlackContextPreview";
+import {
+  ProtonBatchEmailsPreview,
+  parseProtonBatchEmails,
+} from "@/components/previews/ProtonBatchEmailsPreview";
 import type { components } from "@/api/schema";
 import {
   useCountdown,
@@ -183,6 +187,14 @@ export function ReviewApprovalDialog({
   );
   const showProtonInReplyToPreview =
     approval.action.type === PROTON_REPLY_ACTION_TYPE;
+
+  const protonBatchEmails = useMemo(
+    () =>
+      parseProtonBatchEmails(
+        approval.resource_details as Record<string, unknown> | undefined,
+      ),
+    [approval.resource_details],
+  );
 
   const slackContext = useMemo(
     () =>
@@ -397,6 +409,11 @@ export function ReviewApprovalDialog({
                     displayTemplate={displayTemplate}
                     resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
                   />
+                  {protonBatchEmails && (
+                    <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
+                      <ProtonBatchEmailsPreview emails={protonBatchEmails} />
+                    </div>
+                  )}
                   {slackContext && <SlackContextPreview slackContext={slackContext} />}
                 </>
               )}

@@ -670,6 +670,8 @@ function protonmailUIDActionSummary(
   return parts;
 }
 
+// Batch summaries show only the count — each email's subject/from/to/date is
+// rendered individually by ProtonBatchEmailsPreview's collapsible rows.
 function protonmailBatchEmailSummaryParts(
   rd: Record<string, unknown>,
 ): SummaryPart[] | null {
@@ -680,26 +682,7 @@ function protonmailBatchEmailSummaryParts(
   const entries = Object.entries(rawMessages as Record<string, unknown>);
   if (entries.length <= 1) return null;
 
-  const subjects = entries
-    .map(([, meta]) =>
-      meta != null && typeof meta === "object"
-        ? strVal((meta as Record<string, unknown>).subject)
-        : null,
-    )
-    .filter((s): s is string => s != null);
-  if (subjects.length === 0) return null;
-
-  const parts: SummaryPart[] = [
-    text(" "),
-    val(String(entries.length)),
-    text(" emails"),
-  ];
-  const preview =
-    subjects.length <= 2
-      ? subjects.join("; ")
-      : `${subjects.slice(0, 2).join("; ")} and ${subjects.length - 2} more`;
-  parts.push(text(": "), val(truncate(preview, 80)));
-  return parts;
+  return [text(" "), val(String(entries.length)), text(" emails")];
 }
 
 function protonmailEmailSummaryParts(

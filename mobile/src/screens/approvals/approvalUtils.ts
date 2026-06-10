@@ -212,6 +212,8 @@ function protonmailEmailSummary(
   return result;
 }
 
+// Batch summaries show only the count \u2014 each email's subject/from/to/date is
+// rendered individually by ProtonBatchEmailsCard's collapsible rows.
 function protonmailBatchEmailSummary(rd: Record<string, unknown>): string | null {
   const rawMessages = rd.messages;
   if (rawMessages == null || typeof rawMessages !== "object" || Array.isArray(rawMessages)) {
@@ -220,20 +222,7 @@ function protonmailBatchEmailSummary(rd: Record<string, unknown>): string | null
   const entries = Object.entries(rawMessages as Record<string, unknown>);
   if (entries.length <= 1) return null;
 
-  const subjects = entries
-    .map(([, meta]) =>
-      meta != null && typeof meta === "object"
-        ? strVal((meta as Record<string, unknown>).subject)
-        : null,
-    )
-    .filter((s): s is string => s != null);
-  if (subjects.length === 0) return null;
-
-  const preview =
-    subjects.length <= 2
-      ? subjects.join("; ")
-      : `${subjects.slice(0, 2).join("; ")} and ${subjects.length - 2} more`;
-  return ` ${String(entries.length)} emails: \u201C${truncate(preview, 80)}\u201D`;
+  return ` ${String(entries.length)} emails`;
 }
 
 function protonmailBatchArchiveSummary(rd: Record<string, unknown>): string | null {

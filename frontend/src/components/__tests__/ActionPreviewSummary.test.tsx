@@ -529,7 +529,7 @@ describe("buildSummary", () => {
       expect(result).toContain("sender@example.com");
     });
 
-    it("shows batch archive subjects", () => {
+    it("shows batch archive count without per-email subjects", () => {
       const result = buildSummary(
         "protonmail.archive_email",
         { message_ids: [10, 11], folder: "INBOX" },
@@ -546,8 +546,10 @@ describe("buildSummary", () => {
       expect(result).toContain("Archive");
       expect(result).toContain("2");
       expect(result).toContain("emails");
-      expect(result).toContain("First");
-      expect(result).toContain("Second");
+      // Per-email subjects are rendered by ProtonBatchEmailsPreview's
+      // collapsible rows, not crammed into the one-line summary.
+      expect(result).not.toContain("First");
+      expect(result).not.toContain("Second");
     });
 
     it("falls back when enrichment is absent", () => {

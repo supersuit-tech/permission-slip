@@ -59,6 +59,8 @@ import {
 } from "./emailThreadUtils";
 import { ProtonInReplyToCard } from "./ProtonInReplyToCard";
 import { emailDetailsUnavailable } from "./emailEnrichment";
+import { ProtonBatchEmailsCard } from "./ProtonBatchEmailsCard";
+import { parseProtonBatchEmails } from "./protonBatchEmailsUtils";
 import {
   isProtonReplyAction,
   parseProtonInReplyTo,
@@ -119,6 +121,14 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const protonInReplyTo = useMemo(
     () =>
       parseProtonInReplyTo(
+        approval.resource_details as Record<string, unknown> | undefined,
+      ),
+    [approval.resource_details],
+  );
+
+  const protonBatchEmails = useMemo(
+    () =>
+      parseProtonBatchEmails(
         approval.resource_details as Record<string, unknown> | undefined,
       ),
     [approval.resource_details],
@@ -397,6 +407,16 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
                 </Text>
               </View>
             </View>
+          </View>
+        )}
+
+        {/* Per-email breakdown for Proton Mail batch actions */}
+        {protonBatchEmails && (
+          <View style={styles.sectionMajor}>
+            <Text style={styles.sectionLabel}>
+              Emails ({protonBatchEmails.length})
+            </Text>
+            <ProtonBatchEmailsCard emails={protonBatchEmails} />
           </View>
         )}
 
