@@ -21,6 +21,10 @@ type searchEmailsParams struct {
 	Since   string `json:"since"`
 	Before  string `json:"before"`
 	Limit   int    `json:"limit"`
+	// GroupByThread collapses results to one entry per conversation (the
+	// latest message). Defaults to true when omitted; nil distinguishes
+	// "omitted" from an explicit false.
+	GroupByThread *bool `json:"group_by_thread"`
 }
 
 func (p *searchEmailsParams) validate() error {
@@ -116,6 +120,9 @@ func (a *searchEmailsAction) Execute(ctx context.Context, req connectors.ActionR
 	emails, err := fetchEnvelopesByUID(session, uidSet)
 	if err != nil {
 		return nil, err
+	}
+	if groupByThreadEnabled(params.GroupByThread) {
+		emails = groupIntoThreads(emails)
 	}
 	return emailListResultWithFolder(params.Folder, emails)
 }

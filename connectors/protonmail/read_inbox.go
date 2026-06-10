@@ -17,6 +17,10 @@ type readInboxParams struct {
 	Folder     string `json:"folder"`
 	Limit      int    `json:"limit"`
 	UnreadOnly bool   `json:"unread_only"`
+	// GroupByThread collapses results to one entry per conversation (the
+	// latest message). Defaults to true when omitted; nil distinguishes
+	// "omitted" from an explicit false.
+	GroupByThread *bool `json:"group_by_thread"`
 }
 
 func (p *readInboxParams) validate() error {
@@ -95,5 +99,8 @@ func (a *readInboxAction) Execute(ctx context.Context, req connectors.ActionRequ
 		}
 	}
 
+	if groupByThreadEnabled(params.GroupByThread) {
+		emails = groupIntoThreads(emails)
+	}
 	return emailListResultWithFolder(params.Folder, emails)
 }

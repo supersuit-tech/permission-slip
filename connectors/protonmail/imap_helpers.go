@@ -198,6 +198,11 @@ type emailSummary struct {
 	Date            string   `json:"date"`
 	Flags           []string `json:"flags"`
 	MessageIDHeader string   `json:"message_id_header,omitempty"`
+	InReplyTo       []string `json:"in_reply_to,omitempty"`
+	// ThreadSize and ThreadUIDs are only set when results are grouped by
+	// thread; ThreadUIDs is ascending and includes this summary's own UID.
+	ThreadSize int      `json:"thread_size,omitempty"`
+	ThreadUIDs []uint32 `json:"thread_uids,omitempty"`
 }
 
 // formatAddresses formats IMAP addresses as human-readable strings.
@@ -227,6 +232,7 @@ func envelopeToSummary(uid imap.UID, env *imap.Envelope, flags []imap.Flag) emai
 		From:            formatAddresses(env.From),
 		To:              formatAddresses(env.To),
 		MessageIDHeader: env.MessageID,
+		InReplyTo:       env.InReplyTo,
 	}
 	for _, f := range flags {
 		summary.Flags = append(summary.Flags, string(f))
