@@ -298,7 +298,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			if cid := strings.SplitN(actionType, ".", 2); len(cid) == 2 {
 				if conn, ok := deps.Connectors.Get(cid[0]); ok {
 					if resolver, ok := conn.(connectors.ResourceDetailResolver); ok {
-						resolveCtx, resolveCancel := context.WithTimeout(r.Context(), 5*time.Second)
+						resolveCtx, resolveCancel := context.WithTimeout(r.Context(), resourceDetailsResolveTimeout)
 						resolveCtx, resolveCreds := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
 						details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCreds)
 						resolveCancel()
@@ -460,16 +460,27 @@ func approvalDenialCooldown(deps *Deps) time.Duration {
 	return db.DefaultDenialCooldown
 }
 
+// resourceDetailsResolveTimeout bounds the best-effort resource detail lookup
+// at approval creation (single and bulk). Generous enough for slow IMAP
+// backends (e.g. Proton Bridge cold starts) while still keeping approval
+// creation responsive.
+const resourceDetailsResolveTimeout = 30 * time.Second
+
 // resolveResourceDetailsContext resolves credentials for resource detail lookup
 // and attaches connector-specific runtime state (e.g. Proton Mail UIDVALIDITY).
 // Returns empty credentials on any failure since resolution is non-fatal.
 func resolveResourceDetailsContext(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string) (context.Context, connectors.Credentials) {
 	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
-	if err != nil || len(reqCreds) == 0 {
+	if err != nil {
+		log.Printf("[%s] ResolveResourceDetails: required credentials lookup for %s: %v", TraceID(ctx), actionType, err)
+		return ctx, connectors.NewCredentials(nil)
+	}
+	if len(reqCreds) == 0 {
 		return ctx, connectors.NewCredentials(nil)
 	}
 	resolved, err := resolveCredentialsForExecution(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
 	if err != nil {
+		log.Printf("[%s] ResolveResourceDetails: credential resolution for %s: %v", TraceID(ctx), actionType, err)
 		return ctx, connectors.NewCredentials(nil)
 	}
 	if connectorID == "protonmail" && resolved.CredentialID != "" {

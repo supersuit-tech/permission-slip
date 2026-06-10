@@ -24,6 +24,10 @@ import { useApprovalDetail } from "@/hooks/useApprovalDetail";
 import { useActionSchema } from "@/hooks/useActionSchema";
 import { ActionPreviewSummary } from "@/components/ActionPreviewSummary";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
+import {
+  ProtonBatchEmailsPreview,
+  parseProtonBatchEmails,
+} from "@/components/previews/ProtonBatchEmailsPreview";
 import { RiskBadge } from "@/pages/dashboard/approval-components";
 import { MetadataLabel } from "@/components/MetadataLabel";
 
@@ -209,6 +213,7 @@ function ApprovalSupplementalContent({
 }) {
   const { schema, actionName, displayTemplate } = useActionSchema(actionType);
   const hasParameters = Object.keys(parameters).length > 0;
+  const protonBatchEmails = parseProtonBatchEmails(resourceDetails);
 
   return (
     <div className="space-y-5">
@@ -242,6 +247,13 @@ function ApprovalSupplementalContent({
               resourceDetails={resourceDetails}
             />
           </div>
+        </div>
+      )}
+
+      {/* Per-email breakdown for Proton Mail batch actions */}
+      {protonBatchEmails && (
+        <div className="bg-muted/50 rounded-lg border p-3">
+          <ProtonBatchEmailsPreview emails={protonBatchEmails} />
         </div>
       )}
 

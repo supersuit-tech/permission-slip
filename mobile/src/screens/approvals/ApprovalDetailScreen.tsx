@@ -58,6 +58,9 @@ import {
   parseEmailThreadDetails,
 } from "./emailThreadUtils";
 import { ProtonInReplyToCard } from "./ProtonInReplyToCard";
+import { emailDetailsUnavailable } from "./emailEnrichment";
+import { ProtonBatchEmailsCard } from "./ProtonBatchEmailsCard";
+import { parseProtonBatchEmails } from "./protonBatchEmailsUtils";
 import {
   isProtonReplyAction,
   parseProtonInReplyTo,
@@ -118,6 +121,14 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const protonInReplyTo = useMemo(
     () =>
       parseProtonInReplyTo(
+        approval.resource_details as Record<string, unknown> | undefined,
+      ),
+    [approval.resource_details],
+  );
+
+  const protonBatchEmails = useMemo(
+    () =>
+      parseProtonBatchEmails(
         approval.resource_details as Record<string, unknown> | undefined,
       ),
     [approval.resource_details],
@@ -354,6 +365,21 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           contextDescription={approval.context.description}
         />
 
+        {/* Email enrichment fallback — metadata lookup failed at creation */}
+        {emailDetailsUnavailable(
+          approval.action.type,
+          approval.resource_details as Record<string, unknown> | undefined,
+        ) && (
+          <View style={styles.sectionMinor}>
+            <Text
+              style={styles.emailDetailsUnavailableText}
+              testID="email-details-unavailable"
+            >
+              Email details unavailable
+            </Text>
+          </View>
+        )}
+
         {/* High risk warning */}
         {approval.context.risk_level === "high" && (
           <View style={styles.sectionMinor}>
@@ -381,6 +407,16 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
                 </Text>
               </View>
             </View>
+          </View>
+        )}
+
+        {/* Per-email breakdown for Proton Mail batch actions */}
+        {protonBatchEmails && (
+          <View style={styles.sectionMajor}>
+            <Text style={styles.sectionLabel}>
+              Emails ({protonBatchEmails.length})
+            </Text>
+            <ProtonBatchEmailsCard emails={protonBatchEmails} />
           </View>
         )}
 
@@ -561,6 +597,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.riskHigh,
     fontWeight: "500",
+  },
+  // --- Email enrichment fallback ---
+  emailDetailsUnavailableText: {
+    fontSize: 13,
+    color: colors.gray400,
+    fontStyle: "italic",
   },
   // --- Footer ---
   footerLabel: {

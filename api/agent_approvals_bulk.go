@@ -483,7 +483,7 @@ func resolveResourceDetailsForBulk(ctx context.Context, deps *Deps, agent *db.Ag
 	if !ok {
 		return nil
 	}
-	resolveCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	resolveCtx, cancel := context.WithTimeout(ctx, resourceDetailsResolveTimeout)
 	defer cancel()
 	resolveCtx, resolveCreds := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
 	details, err := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCreds)

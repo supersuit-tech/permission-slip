@@ -27,6 +27,10 @@ import {
 } from "@/components/ui/dialog";
 import { ConnectorLogo } from "@/components/ConnectorLogo";
 import { ActionPreviewCard } from "@/components/previews/ActionPreviewCard";
+import {
+  ProtonBatchEmailsPreview,
+  parseProtonBatchEmails,
+} from "@/components/previews/ProtonBatchEmailsPreview";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { RiskBadge } from "./approval-components";
 import { getInitials } from "@/components/ui/avatar";
@@ -92,6 +96,7 @@ function ApprovalDialogStory({
 }: MockApprovalProps) {
   const [rawOpen, setRawOpen] = useState(false);
   const hasParams = Object.keys(parameters).length > 0;
+  const protonBatchEmails = parseProtonBatchEmails(resourceDetails);
 
   if (dialogState === "approved-success") {
     return (
@@ -245,6 +250,11 @@ function ApprovalDialogStory({
               displayTemplate={displayTemplate}
               resourceDetails={resourceDetails}
             />
+            {protonBatchEmails && (
+              <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
+                <ProtonBatchEmailsPreview emails={protonBatchEmails} />
+              </div>
+            )}
           </div>
 
           {/* Raw parameters (collapsible pill toggle) */}

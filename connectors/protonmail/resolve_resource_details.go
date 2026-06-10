@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"time"
 
 	"github.com/emersion/go-imap/v2"
@@ -40,18 +41,22 @@ func (c *ProtonMailConnector) ResolveResourceDetails(ctx context.Context, action
 func (c *ProtonMailConnector) resolveReadEmailDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
 	var p readEmailParams
 	if err := json.Unmarshal(params, &p); err != nil {
+		log.Printf("protonmail: resolve read_email details: parse params: %v", err)
 		return nil, nil
 	}
 	if err := p.validate(); err != nil {
+		log.Printf("protonmail: resolve read_email details: invalid params: %v", err)
 		return nil, nil
 	}
 
 	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, p.Folder, []uint32{p.MessageID}, connectors.MailboxUIDValidityFromContext(ctx))
-	if err != nil || len(metaByUID) == 0 {
+	if err != nil {
+		log.Printf("protonmail: resolve read_email details: envelope fetch (folder %q, uid %d): %v", p.Folder, p.MessageID, err)
 		return nil, nil
 	}
 	meta, ok := metaByUID[p.MessageID]
 	if !ok {
+		log.Printf("protonmail: resolve read_email details: uid %d not found in folder %q", p.MessageID, p.Folder)
 		return nil, nil
 	}
 	return meta.asMap(), nil
@@ -63,9 +68,11 @@ func (c *ProtonMailConnector) resolveReplyEmailDetails(ctx context.Context, para
 		Folder             string `json:"folder"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
+		log.Printf("protonmail: resolve reply_email details: parse params: %v", err)
 		return nil, nil
 	}
 	if p.InReplyToMessageID == 0 {
+		log.Printf("protonmail: resolve reply_email details: missing in_reply_to_message_id")
 		return nil, nil
 	}
 	if p.Folder == "" {
@@ -73,11 +80,13 @@ func (c *ProtonMailConnector) resolveReplyEmailDetails(ctx context.Context, para
 	}
 
 	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, p.Folder, []uint32{p.InReplyToMessageID}, connectors.MailboxUIDValidityFromContext(ctx))
-	if err != nil || len(metaByUID) == 0 {
+	if err != nil {
+		log.Printf("protonmail: resolve reply_email details: envelope fetch (folder %q, uid %d): %v", p.Folder, p.InReplyToMessageID, err)
 		return nil, nil
 	}
 	meta, ok := metaByUID[p.InReplyToMessageID]
 	if !ok {
+		log.Printf("protonmail: resolve reply_email details: uid %d not found in folder %q", p.InReplyToMessageID, p.Folder)
 		return nil, nil
 	}
 	return map[string]any{"in_reply_to": meta.asMap()}, nil
@@ -86,9 +95,11 @@ func (c *ProtonMailConnector) resolveReplyEmailDetails(ctx context.Context, para
 func (c *ProtonMailConnector) resolveUIDMessageDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
 	uidParams, err := parseUIDMessageParams(params)
 	if err != nil {
+		log.Printf("protonmail: resolve message details: parse params: %v", err)
 		return nil, nil
 	}
 	if err := uidParams.validate(); err != nil {
+		log.Printf("protonmail: resolve message details: invalid params: %v", err)
 		return nil, nil
 	}
 	return c.resolveMessageDetailsForUIDs(ctx, creds, uidParams.Folder, uidParams.MessageIDs)
@@ -97,9 +108,11 @@ func (c *ProtonMailConnector) resolveUIDMessageDetails(ctx context.Context, para
 func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
 	archiveParams, err := parseArchiveParams(params)
 	if err != nil {
+		log.Printf("protonmail: resolve archive_email details: parse params: %v", err)
 		return nil, nil
 	}
 	if err := validateArchiveParams(archiveParams); err != nil {
+		log.Printf("protonmail: resolve archive_email details: invalid params: %v", err)
 		return nil, nil
 	}
 
@@ -108,7 +121,12 @@ func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, pa
 
 func (c *ProtonMailConnector) resolveMessageDetailsForUIDs(ctx context.Context, creds connectors.Credentials, folder string, messageIDs []uint32) (map[string]any, error) {
 	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, folder, messageIDs, connectors.MailboxUIDValidityFromContext(ctx))
-	if err != nil || len(metaByUID) == 0 {
+	if err != nil {
+		log.Printf("protonmail: resolve message details: envelope fetch (folder %q, %d uids): %v", folder, len(messageIDs), err)
+		return nil, nil
+	}
+	if len(metaByUID) == 0 {
+		log.Printf("protonmail: resolve message details: no envelopes returned (folder %q, %d uids)", folder, len(messageIDs))
 		return nil, nil
 	}
 
@@ -116,6 +134,7 @@ func (c *ProtonMailConnector) resolveMessageDetailsForUIDs(ctx context.Context, 
 		if meta, ok := metaByUID[messageIDs[0]]; ok {
 			return meta.asMap(), nil
 		}
+		log.Printf("protonmail: resolve message details: uid %d not found in folder %q", messageIDs[0], folder)
 		return nil, nil
 	}
 
@@ -126,6 +145,7 @@ func (c *ProtonMailConnector) resolveMessageDetailsForUIDs(ctx context.Context, 
 		}
 	}
 	if len(messages) == 0 {
+		log.Printf("protonmail: resolve message details: none of %d uids found in folder %q", len(messageIDs), folder)
 		return nil, nil
 	}
 	return map[string]any{"messages": messages}, nil
@@ -136,9 +156,11 @@ func resolveMessageEnvelopesIMAP(ctx context.Context, conn *ProtonMailConnector,
 		return nil, nil
 	}
 	if username, ok := creds.Get(credKeyUsername); !ok || username == "" {
+		log.Printf("protonmail: resolve message details: missing IMAP username credential, skipping enrichment")
 		return nil, nil
 	}
 	if password, ok := creds.Get(credKeyPassword); !ok || password == "" {
+		log.Printf("protonmail: resolve message details: missing IMAP password credential, skipping enrichment")
 		return nil, nil
 	}
 

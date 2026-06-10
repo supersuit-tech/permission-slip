@@ -310,3 +310,17 @@ export const SlackScheduleMessageWithResourceDetails: Story = {
     resourceDetails: { channel_name: "#engineering" },
   },
 };
+
+// --- Email enrichment fallback ---
+
+export const ProtonmailArchiveEmailDetailsUnavailable: Story = {
+  name: "protonmail.archive_email (details unavailable)",
+  args: {
+    actionType: "protonmail.archive_email",
+    parameters: { message_ids: [231, 232, 233], folder: "INBOX" },
+    schema: null,
+    actionName: "Archive Email",
+    displayTemplate: "Archive email in {{folder}}",
+    resourceDetails: undefined,
+  },
+};
