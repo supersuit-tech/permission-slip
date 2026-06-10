@@ -515,6 +515,32 @@ describe("buildSummary", () => {
   });
 
   describe("protonmail.archive_email", () => {
+    it("prefers describer over display template when resource_details present", () => {
+      const result = buildSummary(
+        "protonmail.archive_email",
+        { message_id: 10, folder: "INBOX" },
+        null,
+        "Archive Email",
+        'Archive email in {{folder}}',
+        { subject: "Legacy Media litigation", from: ["daniel.rose@littensipe.com"] },
+      );
+      expect(result).toContain("Archive email");
+      expect(result).toContain("Legacy Media litigation");
+      expect(result).toContain("daniel.rose@littensipe.com");
+      expect(result).not.toContain('INBOX');
+    });
+
+    it("falls back to display template when resource_details absent", () => {
+      const result = buildSummary(
+        "protonmail.archive_email",
+        { message_id: 10, folder: "INBOX" },
+        null,
+        "Archive Email",
+        'Archive email in {{folder}}',
+      );
+      expect(result).toBe(`Archive email in ${q("INBOX")}`);
+    });
+
     it("shows enriched single archive", () => {
       const result = buildSummary(
         "protonmail.archive_email",

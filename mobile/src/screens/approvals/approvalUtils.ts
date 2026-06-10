@@ -93,20 +93,20 @@ export function buildActionSummary(
   displayTemplate?: string | null,
   resourceDetails?: Record<string, unknown> | null,
 ): string {
-  // 1. Try display template from manifest.
+  // 1. Try action-specific formatter.
+  const formatter = ACTION_FORMATTERS[actionType];
+  if (formatter) {
+    const result = formatter(parameters, resourceDetails ?? undefined);
+    if (result) return result;
+  }
+
+  // 2. Try display template from manifest.
   // Merge resourceDetails so templates can resolve human-readable names (#862).
   if (displayTemplate) {
     const lookup = resourceDetails
       ? { ...parameters, ...resourceDetails }
       : parameters;
     const result = renderDisplayTemplate(displayTemplate, lookup);
-    if (result) return result;
-  }
-
-  // 2. Try action-specific formatter.
-  const formatter = ACTION_FORMATTERS[actionType];
-  if (formatter) {
-    const result = formatter(parameters, resourceDetails ?? undefined);
     if (result) return result;
   }
 
