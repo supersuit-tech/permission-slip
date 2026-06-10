@@ -147,6 +147,11 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "boolean",
 							"default": false,
 							"description": "Only fetch unread emails"
+						},
+						"group_by_thread": {
+							"type": "boolean",
+							"default": true,
+							"description": "Collapse results to one entry per conversation: the latest message, with thread_size and thread_uids covering the fetched window (a long thread may be partially represented when it exceeds the limit). Set to false for a flat per-email listing. To act on a whole conversation (archive, delete, move), pass its thread_uids as the message_ids of the batch action."
 						}
 					}
 				}`)),
@@ -189,6 +194,11 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 							"maximum": 50,
 							"default": 10,
 							"description": "Maximum number of results to return"
+						},
+						"group_by_thread": {
+							"type": "boolean",
+							"default": true,
+							"description": "Collapse results to one entry per conversation: the latest message, with thread_size and thread_uids covering the fetched window (a long thread may be partially represented when it exceeds the limit). Set to false for a flat per-email listing. To act on a whole conversation (archive, delete, move), pass its thread_uids as the message_ids of the batch action."
 						}
 					}
 				}`)),
