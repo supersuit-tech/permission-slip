@@ -116,7 +116,56 @@ func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, pa
 		return nil, nil
 	}
 
-	return c.resolveMessageDetailsForUIDs(ctx, creds, archiveParams.Folder, archiveParams.MessageIDs)
+	uids := archiveParams.MessageIDs
+	if includeThreadEnabled(archiveParams.IncludeThread) {
+		expanded, err := expandArchiveUIDsForApproval(ctx, c, creds, archiveParams.Folder, archiveParams.MessageIDs)
+		if err != nil {
+			log.Printf("protonmail: resolve archive_email details: thread expansion (folder %q, %d uids): %v", archiveParams.Folder, len(archiveParams.MessageIDs), err)
+			return c.resolveMessageDetailsForUIDs(ctx, creds, archiveParams.Folder, archiveParams.MessageIDs)
+		}
+		uids = expanded
+	}
+
+	return c.resolveMessageDetailsForUIDs(ctx, creds, archiveParams.Folder, uids)
+}
+
+// expandArchiveUIDsForApproval is the IMAP-backed thread expansion used at
+// approval time. Tests may replace it to avoid a live proxy.
+var expandArchiveUIDsForApproval = expandArchiveUIDsForApprovalIMAP
+
+func expandArchiveUIDsForApprovalIMAP(ctx context.Context, conn *ProtonMailConnector, creds connectors.Credentials, folder string, targetUIDs []uint32) ([]uint32, error) {
+	if len(targetUIDs) == 0 {
+		return nil, nil
+	}
+	if username, ok := creds.Get(credKeyUsername); !ok || username == "" {
+		return nil, fmt.Errorf("missing IMAP username credential")
+	}
+	if password, ok := creds.Get(credKeyPassword); !ok || password == "" {
+		return nil, fmt.Errorf("missing IMAP password credential")
+	}
+
+	timeout := conn.timeout
+	if deadline, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(deadline); remaining > 0 && remaining < timeout {
+			timeout = remaining
+		}
+	}
+
+	session, err := connectIMAP(creds, timeout)
+	if err != nil {
+		return nil, err
+	}
+	defer session.close()
+
+	mboxData, err := session.selectMailbox(folder)
+	if err != nil {
+		return nil, err
+	}
+	if err := syncUIDValidity(folder, mboxData, connectors.MailboxUIDValidityFromContext(ctx), uidValidityVerify); err != nil {
+		return nil, err
+	}
+
+	return expandArchiveUIDs(session, targetUIDs)
 }
 
 func (c *ProtonMailConnector) resolveMessageDetailsForUIDs(ctx context.Context, creds connectors.Credentials, folder string, messageIDs []uint32) (map[string]any, error) {

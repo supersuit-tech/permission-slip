@@ -22,6 +22,14 @@ If you're currently self-hosting on ARM hardware, we recommend running Permissio
 | `protonmail.read_email` | low | Read one message by stable IMAP UID |
 | `protonmail.archive_email` | medium | Move messages to Archive (IMAP UID MOVE) |
 
+### Archiving whole conversations
+
+By default, `protonmail.archive_email` archives the **entire conversation**, not just the UID you pass — matching Proton Mail's Archive button and Gmail's thread-level archive. The connector searches the source folder by normalized subject and `In-Reply-To` headers to find older replies that may fall outside a `read_inbox` / `search_emails` listing window.
+
+To archive only the exact UID(s) listed, pass `"include_thread": false`.
+
+The approval card lists every message that will be archived when thread expansion applies. The expanded set is not capped by the 50-message input limit (that cap applies only to the requested `message_id` / `message_ids`).
+
 ### Message identifiers (breaking change)
 
 `read_inbox` and `search_emails` return each message's **stable IMAP UID** (with its `folder`) instead of volatile sequence numbers. `read_email` and `archive_email` accept that same UID as `message_id` / `message_ids`, scoped by `folder`.

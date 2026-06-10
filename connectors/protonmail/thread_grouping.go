@@ -40,56 +40,11 @@ func groupIntoThreads(emails []emailSummary) []emailSummary {
 		return emails
 	}
 
-	parent := make([]int, len(emails))
-	for i := range parent {
-		parent[i] = i
-	}
-	var find func(int) int
-	find = func(i int) int {
-		if parent[i] != i {
-			parent[i] = find(parent[i])
-		}
-		return parent[i]
-	}
-	union := func(a, b int) {
-		ra, rb := find(a), find(b)
-		if ra != rb {
-			parent[ra] = rb
-		}
-	}
-
-	// Header pass: link replies to the message they answer.
-	byMessageID := make(map[string]int, len(emails))
-	for i, e := range emails {
-		if e.MessageIDHeader != "" {
-			byMessageID[e.MessageIDHeader] = i
-		}
-	}
-	for i, e := range emails {
-		for _, ref := range e.InReplyTo {
-			if j, ok := byMessageID[ref]; ok {
-				union(i, j)
-			}
-		}
-	}
-
-	// Subject fallback pass: bridge chains broken by missing parents.
-	bySubject := make(map[string]int, len(emails))
-	for i, e := range emails {
-		subject := normalizeSubject(e.Subject)
-		if subject == "" {
-			continue
-		}
-		if j, ok := bySubject[subject]; ok {
-			union(i, j)
-		} else {
-			bySubject[subject] = i
-		}
-	}
+	uf := buildThreadUnionFind(emails)
 
 	groups := make(map[int][]int)
 	for i := range emails {
-		root := find(i)
+		root := uf.find(i)
 		groups[root] = append(groups[root], i)
 	}
 

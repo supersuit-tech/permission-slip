@@ -48,7 +48,7 @@ func protonmailTemplates() []connectors.ManifestTemplate {
 			ActionType:  "protonmail.archive_email",
 			Name:        "Archive emails",
 			Description: "Agent can move emails to the Archive folder.",
-			Parameters:  json.RawMessage(`{"folder":"INBOX","message_id":"*","message_ids":"*"}`),
+			Parameters:  json.RawMessage(`{"folder":"INBOX","message_id":"*","message_ids":"*","include_thread":"*"}`),
 		},
 		{
 			ID:          "tpl_protonmail_list_folders",
