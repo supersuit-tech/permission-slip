@@ -148,7 +148,7 @@ export function buildSummary(
 
 /**
  * Core formatter: returns structured parts for an action.
- * Priority: template → ACTION_DESCRIBERS → generic fallback.
+ * Priority: ACTION_DESCRIBERS → template → generic fallback.
  */
 function buildParts(
   actionType: string,
@@ -158,7 +158,14 @@ function buildParts(
   displayTemplate?: string | null,
   resourceDetails?: Record<string, unknown> | null,
 ): SummaryPart[] {
-  // 1. Try display template from manifest.
+  // 1. Try action-specific describer (with resource details).
+  const formatter = ACTION_DESCRIBERS[actionType];
+  if (formatter) {
+    const result = formatter(parameters, resourceDetails ?? undefined);
+    if (result) return result;
+  }
+
+  // 2. Try display template from manifest.
   // Merge resourceDetails into the lookup so templates can resolve human-readable
   // names (e.g. {{channel_name}} → "#general") instead of raw IDs (#862).
   if (displayTemplate) {
@@ -167,13 +174,6 @@ function buildParts(
       : parameters;
     const templateParts = renderTemplate(displayTemplate, lookup);
     if (templateParts) return templateParts;
-  }
-
-  // 2. Try action-specific describer (with resource details).
-  const formatter = ACTION_DESCRIBERS[actionType];
-  if (formatter) {
-    const result = formatter(parameters, resourceDetails ?? undefined);
-    if (result) return result;
   }
 
   // 3. Fall back to generic.
