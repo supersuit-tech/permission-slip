@@ -188,6 +188,8 @@ To answer “do I have unread Slack messages?” or load only unread content, us
 
 ### `slack.list_unread`
 
+> **OpenClaw users:** install the [`permission-slip-openclaw-skill-slack`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-slack) skill so your agent handles plain requests like *"check my Slack"* — it lists your unread conversations on your default workspace through this action. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip.
+
 Lists conversations where Slack reports an unread count via `conversations.info` (`unread_count_display` &gt; 0). **Slack only fills those fields for IMs and MPIMs**; public and private channels are not included even when the user has unread messages in the client. Every JSON response includes **`notes`** with the same limitation text, the impracticality of scanning all channels, and that comparing `last_read` to the latest message for **specific** channels via `read_channel_messages` is the supported workaround (manual “mark as unread” in Slack may not move `last_read`).
 
 Uses `users.conversations` to enumerate conversations, then `conversations.info` per channel for `last_read`, `unread_count_display`, and `latest`.
