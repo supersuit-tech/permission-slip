@@ -33,9 +33,12 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 			sa = candidate
 			break
 		}
-		if err := db.ValidateParametersAgainstConfig(candidate.Constraints, params); err != nil {
-			var configErr *db.ConfigValidationError
-			if errors.As(err, &configErr) {
+		if err := validateActionConstraints(r.Context(), deps, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID, candidate.Constraints, params); err != nil {
+			configErr, unresolved := constraintMatchErr(err)
+			if unresolved {
+				continue
+			}
+			if configErr != nil {
 				continue
 			}
 			// Corrupt constraint JSON — log, report to error tracker, and skip

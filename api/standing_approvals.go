@@ -780,6 +780,44 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 	allWildcard := true
 	mutated := false
 	for key, v := range obj {
+		if key == db.MetaNamespaceKey {
+			var metaObj map[string]json.RawMessage
+			if err := json.Unmarshal(v, &metaObj); err != nil {
+				return nil, errors.New("$meta constraints must be a JSON object")
+			}
+			metaMutated := false
+			for metaKey, metaVal := range metaObj {
+				if string(metaVal) == "null" {
+					return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
+				}
+				var s string
+				if json.Unmarshal(metaVal, &s) == nil {
+					if s == "*" {
+						continue
+					}
+					allWildcard = false
+					if strings.Contains(s, "*") {
+						wrapped, err := json.Marshal(map[string]string{db.PatternKey: s})
+						if err != nil {
+							return nil, fmt.Errorf("failed to wrap pattern for %q: %w", metaKey, err)
+						}
+						metaObj[metaKey] = wrapped
+						metaMutated = true
+					}
+				} else {
+					allWildcard = false
+				}
+			}
+			if metaMutated {
+				if normalized, err := json.Marshal(metaObj); err != nil {
+					return nil, fmt.Errorf("failed to normalize $meta constraints: %w", err)
+				} else {
+					obj[key] = normalized
+					mutated = true
+				}
+			}
+			continue
+		}
 		if string(v) == "null" {
 			return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
 		}

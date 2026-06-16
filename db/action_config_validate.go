@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -45,6 +46,15 @@ func IsWildcard(raw json.RawMessage) bool {
 // parameters JSONB column — never as bare strings containing "*". This avoids
 // ambiguity with fixed values that happen to contain the "*" character.
 const PatternKey = "$pattern"
+
+// MetaNamespaceKey is the reserved configuration key for constraints on
+// server-resolved metadata (e.g. verified email sender). Nested fields use the
+// same wildcard/pattern/fixed syntax as regular parameters.
+const MetaNamespaceKey = "$meta"
+
+// ErrMetadataUnresolved indicates $meta constraints are present but verified
+// metadata was not supplied to the constraint engine.
+var ErrMetadataUnresolved = errors.New("constraint metadata unresolved")
 
 // IsPattern reports whether a JSON-encoded parameter value is a glob pattern
 // wrapper: a JSON object of the form {"$pattern": "<glob>"}. The glob string
@@ -128,10 +138,50 @@ func ValidateConfigParameters(params json.RawMessage) error {
 		return fmt.Errorf("parameters must be a JSON object")
 	}
 	for key, raw := range m {
+		if key == MetaNamespaceKey {
+			if err := validateMetaNamespaceConfig(raw); err != nil {
+				return err
+			}
+			continue
+		}
 		if pattern, ok := extractPattern(raw); ok {
 			if !strings.Contains(pattern, "*") {
 				return &ConfigValidationError{
 					Parameter: key,
+					Reason:    fmt.Sprintf("$pattern value %q must contain at least one '*' wildcard; use a plain string for fixed values", pattern),
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func validateMetaNamespaceConfig(raw json.RawMessage) error {
+	if len(raw) == 0 || string(raw) == "null" {
+		return &ConfigValidationError{
+			Parameter: MetaNamespaceKey,
+			Reason:    "must be a JSON object",
+		}
+	}
+	var meta map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &meta); err != nil {
+		return &ConfigValidationError{
+			Parameter: MetaNamespaceKey,
+			Reason:    "must be a JSON object",
+		}
+	}
+	if len(meta) == 0 {
+		return &ConfigValidationError{
+			Parameter: MetaNamespaceKey,
+			Reason:    "must contain at least one metadata constraint",
+		}
+	}
+	for key, value := range meta {
+		param := MetaNamespaceKey + "." + key
+		if pattern, ok := extractPattern(value); ok {
+			if !strings.Contains(pattern, "*") {
+				return &ConfigValidationError{
+					Parameter: param,
 					Reason:    fmt.Sprintf("$pattern value %q must contain at least one '*' wildcard; use a plain string for fixed values", pattern),
 				}
 			}
@@ -163,14 +213,22 @@ func (e *ConfigValidationError) Error() string {
 //   - Missing parameters that are fixed or pattern in the configuration are rejected.
 //   - Missing wildcard parameters are allowed (the agent chose not to provide them).
 //
-// Both configParams and execParams are raw JSONB (JSON objects). Returns nil if
-// validation passes, or a *ConfigValidationError describing the first violation.
-func ValidateParametersAgainstConfig(configParams, execParams json.RawMessage) error {
+// Both configParams and execParams are raw JSONB (JSON objects). When the
+// configuration includes a $meta namespace, resolvedMeta must contain the
+// server-resolved metadata object; otherwise ErrMetadataUnresolved is returned.
+// Returns nil if validation passes, or a *ConfigValidationError describing the
+// first violation.
+func ValidateParametersAgainstConfig(configParams, execParams, resolvedMeta json.RawMessage) error {
 	var config map[string]json.RawMessage
 	if len(configParams) == 0 || string(configParams) == "{}" {
 		config = map[string]json.RawMessage{}
 	} else if err := json.Unmarshal(configParams, &config); err != nil {
 		return fmt.Errorf("invalid configuration parameters: %w", err)
+	}
+
+	metaConstraints, hasMeta := config[MetaNamespaceKey]
+	if hasMeta {
+		delete(config, MetaNamespaceKey)
 	}
 
 	var exec map[string]json.RawMessage
@@ -254,6 +312,109 @@ func ValidateParametersAgainstConfig(configParams, execParams json.RawMessage) e
 		}
 	}
 
+	if hasMeta {
+		if err := validateResolvedMetaConstraints(metaConstraints, resolvedMeta); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func validateResolvedMetaConstraints(metaConstraints, resolvedMeta json.RawMessage) error {
+	var constraints map[string]json.RawMessage
+	if err := json.Unmarshal(metaConstraints, &constraints); err != nil {
+		return fmt.Errorf("invalid $meta constraints: %w", err)
+	}
+	if len(constraints) == 0 {
+		return nil
+	}
+	if len(resolvedMeta) == 0 || string(resolvedMeta) == "null" {
+		return ErrMetadataUnresolved
+	}
+
+	var meta map[string]json.RawMessage
+	if err := json.Unmarshal(resolvedMeta, &meta); err != nil {
+		return fmt.Errorf("invalid resolved metadata: %w", err)
+	}
+
+	for key, configValue := range constraints {
+		param := MetaNamespaceKey + "." + key
+		if err := validateConstraintValueAgainstSource(param, configValue, meta[key]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateConstraintValueAgainstSource(param string, configValue, sourceValue json.RawMessage) error {
+	if IsWildcard(configValue) {
+		return nil
+	}
+
+	if pattern, ok := ExtractPattern(configValue); ok {
+		return validatePatternConstraint(param, pattern, sourceValue)
+	}
+
+	if len(sourceValue) == 0 {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    "required metadata field is missing",
+		}
+	}
+	if !jsonValuesEqual(configValue, sourceValue) {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    "metadata value does not match configured value",
+		}
+	}
+	return nil
+}
+
+func validatePatternConstraint(param, pattern string, sourceValue json.RawMessage) error {
+	if len(sourceValue) == 0 {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    fmt.Sprintf("required metadata field is missing for pattern %q", pattern),
+		}
+	}
+
+	var values []string
+	if err := json.Unmarshal(sourceValue, &values); err == nil {
+		for _, value := range values {
+			if err := validateStringPattern(param, pattern, value); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	var value string
+	if err := json.Unmarshal(sourceValue, &value); err != nil {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    fmt.Sprintf("metadata value must be a string or array of strings matching pattern %q", pattern),
+		}
+	}
+	return validateStringPattern(param, pattern, value)
+}
+
+func validateStringPattern(param, pattern, value string) error {
+	if strings.Contains(pattern, "*") {
+		if !MatchPattern(pattern, value) {
+			return &ConfigValidationError{
+				Parameter: param,
+				Reason:    fmt.Sprintf("metadata value %q does not match pattern %q", value, pattern),
+			}
+		}
+		return nil
+	}
+	if value != pattern {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    fmt.Sprintf("metadata value %q does not match pattern %q", value, pattern),
+		}
+	}
 	return nil
 }
 

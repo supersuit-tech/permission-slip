@@ -52,13 +52,13 @@ func setupConfigValidateTest(t *testing.T, params []byte) (db.DBTX, string, int6
 func TestValidateConfigurationReference_Success(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"repo":"supersuit-tech/webapp","title":"*","body":"*"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	execParams := json.RawMessage(`{"repo":"supersuit-tech/webapp","title":"Fix bug","body":"Details here"}`)
 
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result == nil {
 		t.Fatalf("expected success, got error: %s", w.Body.String())
 	}
@@ -70,7 +70,7 @@ func TestValidateConfigurationReference_Success(t *testing.T) {
 func TestValidateConfigurationReference_WildcardAcceptsAnyValue(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"data":"*"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	// Wildcard should accept string, number, array, object, boolean, null.
 	tests := []struct {
@@ -90,7 +90,7 @@ func TestValidateConfigurationReference_WildcardAcceptsAnyValue(t *testing.T) {
 			// No t.Parallel() — subtests share the same DB transaction.
 			deps, w, r := newTestRequest(tx)
 
-			result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, json.RawMessage(tc.execParams))
+			result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", json.RawMessage(tc.execParams))
 			if result == nil {
 				t.Errorf("expected wildcard to accept %s, got error: %s", tc.name, w.Body.String())
 			}
@@ -107,7 +107,7 @@ func TestValidateConfigurationReference_ConfigNotFound(t *testing.T) {
 
 	deps, w, r := newTestRequest(tx)
 
-	result := ValidateConfigurationReference(w, r, deps, "ac_nonexistent", agentID, "test.action", json.RawMessage(`{}`))
+	result := ValidateConfigurationReference(w, r, deps, "ac_nonexistent", agentID, uid, "test.action", "", json.RawMessage(`{}`))
 	if result != nil {
 		t.Fatal("expected nil result for nonexistent config")
 	}
@@ -138,7 +138,7 @@ func TestValidateConfigurationReference_DisabledConfig(t *testing.T) {
 
 	// Disabled configs are filtered out by GetActiveActionConfigForAgent, so we
 	// expect the same "not found" response as a nonexistent config.
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, json.RawMessage(`{}`))
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", json.RawMessage(`{}`))
 	if result != nil {
 		t.Fatal("expected nil result for disabled config")
 	}
@@ -151,12 +151,12 @@ func TestValidateConfigurationReference_DisabledConfig(t *testing.T) {
 func TestValidateConfigurationReference_ActionTypeMismatch(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"repo":"test/repo"}`)
-	tx, _, agentID, _, _, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, _, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	// Supply a different action type than the config's action_type.
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, "different.action", json.RawMessage(`{"repo":"test/repo"}`))
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, "different.action", "", json.RawMessage(`{"repo":"test/repo"}`))
 	if result != nil {
 		t.Fatal("expected nil result for action type mismatch")
 	}
@@ -169,13 +169,13 @@ func TestValidateConfigurationReference_ActionTypeMismatch(t *testing.T) {
 func TestValidateConfigurationReference_FixedParamMismatch(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"repo":"supersuit-tech/webapp","title":"*"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	// Provide a different repo value.
 	execParams := json.RawMessage(`{"repo":"supersuit-tech/api","title":"Bug fix"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result != nil {
 		t.Fatal("expected nil result for param mismatch")
 	}
@@ -188,13 +188,13 @@ func TestValidateConfigurationReference_FixedParamMismatch(t *testing.T) {
 func TestValidateConfigurationReference_ExtraParam(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"repo":"supersuit-tech/webapp"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	// Provide an extra parameter not in the config.
 	execParams := json.RawMessage(`{"repo":"supersuit-tech/webapp","extra":"value"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result != nil {
 		t.Fatal("expected nil result for extra param")
 	}
@@ -207,13 +207,13 @@ func TestValidateConfigurationReference_ExtraParam(t *testing.T) {
 func TestValidateConfigurationReference_MissingFixedParam(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"repo":"supersuit-tech/webapp","label":"bug"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	// Only provide repo but miss label.
 	execParams := json.RawMessage(`{"repo":"supersuit-tech/webapp"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result != nil {
 		t.Fatal("expected nil result for missing fixed param")
 	}
@@ -236,7 +236,7 @@ func TestValidateConfigurationReference_WrongAgent(t *testing.T) {
 	deps, w, r := newTestRequest(tx)
 
 	// Try to use a config that belongs to a different agent.
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID2, "test.action", json.RawMessage(`{"repo":"test/repo"}`))
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID2, uid2, "test.action", "", json.RawMessage(`{"repo":"test/repo"}`))
 	if result != nil {
 		t.Fatal("expected nil result for wrong agent")
 	}
@@ -252,12 +252,12 @@ func TestValidateConfigurationReference_PatternMatch(t *testing.T) {
 	t.Parallel()
 	// Config uses suffix pattern: email must end with @mycompany.com
 	params := []byte(`{"to":{"$pattern":"*@mycompany.com"},"subject":"*"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	execParams := json.RawMessage(`{"to":"alice@mycompany.com","subject":"Hello"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result == nil {
 		t.Fatalf("expected success for pattern match, got error: %s", w.Body.String())
 	}
@@ -267,12 +267,12 @@ func TestValidateConfigurationReference_PatternPrefixMatch(t *testing.T) {
 	t.Parallel()
 	// Config uses prefix pattern: repo must start with supersuit-tech/
 	params := []byte(`{"repo":{"$pattern":"supersuit-tech/*"},"title":"*"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	execParams := json.RawMessage(`{"repo":"supersuit-tech/webapp","title":"Fix bug"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result == nil {
 		t.Fatalf("expected success for prefix pattern match, got error: %s", w.Body.String())
 	}
@@ -281,13 +281,13 @@ func TestValidateConfigurationReference_PatternPrefixMatch(t *testing.T) {
 func TestValidateConfigurationReference_PatternMismatch(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"to":{"$pattern":"*@mycompany.com"},"subject":"*"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	// Email doesn't match the pattern
 	execParams := json.RawMessage(`{"to":"alice@other.com","subject":"Hello"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result != nil {
 		t.Fatal("expected nil result for pattern mismatch")
 	}
@@ -300,13 +300,13 @@ func TestValidateConfigurationReference_PatternMismatch(t *testing.T) {
 func TestValidateConfigurationReference_PatternMissing(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"repo":{"$pattern":"supersuit-tech/*"},"title":"*"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	// Missing the repo pattern parameter (only providing wildcard title)
 	execParams := json.RawMessage(`{"title":"Fix bug"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result != nil {
 		t.Fatal("expected nil result for missing pattern param")
 	}
@@ -319,13 +319,13 @@ func TestValidateConfigurationReference_PatternMissing(t *testing.T) {
 func TestValidateConfigurationReference_PatternRejectsNonString(t *testing.T) {
 	t.Parallel()
 	params := []byte(`{"tag":{"$pattern":"v*"}}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	// Provide a number instead of a string for a pattern param
 	execParams := json.RawMessage(`{"tag":42}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result != nil {
 		t.Fatal("expected nil result for non-string pattern value")
 	}
@@ -339,12 +339,12 @@ func TestValidateConfigurationReference_MixedFixedPatternWildcard(t *testing.T) 
 	t.Parallel()
 	// All three types: fixed repo org, pattern on branch, wildcard on message
 	params := []byte(`{"repo":"supersuit-tech/webapp","branch":{"$pattern":"release/*"},"message":"*"}`)
-	tx, _, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
+	tx, uid, agentID, _, actionType, configID := setupConfigValidateTest(t, params)
 
 	deps, w, r := newTestRequest(tx)
 
 	execParams := json.RawMessage(`{"repo":"supersuit-tech/webapp","branch":"release/v2.1","message":"Deploy"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, actionType, execParams)
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
 	if result == nil {
 		t.Fatalf("expected success for mixed config, got error: %s", w.Body.String())
 	}
@@ -386,7 +386,7 @@ func setupWildcardConfigTest(t *testing.T) (db.DBTX, string, int64, string, stri
 
 func TestValidateConfigurationReference_WildcardMatchesAnyActionType(t *testing.T) {
 	t.Parallel()
-	tx, _, agentID, connID, configID := setupWildcardConfigTest(t)
+	tx, uid, agentID, connID, configID := setupWildcardConfigTest(t)
 
 	// Wildcard config should accept any action type.
 	actionTypes := []string{
@@ -399,7 +399,7 @@ func TestValidateConfigurationReference_WildcardMatchesAnyActionType(t *testing.
 		t.Run(at, func(t *testing.T) {
 			deps, w, r := newTestRequest(tx)
 			execParams := json.RawMessage(`{"any_param":"any_value"}`)
-			result := ValidateConfigurationReference(w, r, deps, configID, agentID, at, execParams)
+			result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, at, "", execParams)
 			if result == nil {
 				t.Errorf("expected wildcard config to match action type %q, got error: %s", at, w.Body.String())
 			}
@@ -426,7 +426,7 @@ func TestValidateConfigurationReference_WildcardDisabledConfig(t *testing.T) {
 	// A disabled wildcard config should be rejected. The query filters by
 	// status='active', so it returns not-found (400) rather than found-but-disabled (403).
 	deps, w, r := newTestRequest(tx)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, connID+".some_action", json.RawMessage(`{}`))
+	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, connID+".some_action", "", json.RawMessage(`{}`))
 	if result != nil {
 		t.Fatal("expected nil result for disabled wildcard config")
 	}
@@ -438,7 +438,7 @@ func TestValidateConfigurationReference_WildcardDisabledConfig(t *testing.T) {
 
 func TestValidateConfigurationReference_WildcardAcceptsAnyParameters(t *testing.T) {
 	t.Parallel()
-	tx, _, agentID, connID, configID := setupWildcardConfigTest(t)
+	tx, uid, agentID, connID, configID := setupWildcardConfigTest(t)
 
 	// Wildcard config should accept any parameters (including extra ones).
 	tests := []struct {
@@ -455,7 +455,7 @@ func TestValidateConfigurationReference_WildcardAcceptsAnyParameters(t *testing.
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			deps, w, r := newTestRequest(tx)
-			result := ValidateConfigurationReference(w, r, deps, configID, agentID, connID+".some_action", json.RawMessage(tc.execParams))
+			result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, connID+".some_action", "", json.RawMessage(tc.execParams))
 			if result == nil {
 				t.Errorf("expected wildcard config to accept %s, got error: %s", tc.name, w.Body.String())
 			}

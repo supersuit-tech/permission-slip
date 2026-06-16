@@ -373,7 +373,7 @@ func prepareBulkItems(w http.ResponseWriter, r *http.Request, deps *Deps, agent 
 		}
 
 		if item.Configuration != nil {
-			result := ValidateConfigurationReference(w, r, deps, item.Configuration.ConfigurationID, agent.AgentID, actionType, actionParams)
+			result := ValidateConfigurationReference(w, r, deps, item.Configuration.ConfigurationID, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID, actionParams)
 			if result == nil {
 				return nil, fmt.Errorf("invalid configuration")
 			}
@@ -520,7 +520,14 @@ func attemptStandingApprovalForBulk(ctx context.Context, deps *Deps, agent *db.A
 			sa = candidate
 			break
 		}
-		if err := db.ValidateParametersAgainstConfig(candidate.Constraints, item.actionParams); err != nil {
+		if err := validateActionConstraints(ctx, deps, agent.AgentID, agent.ApproverID, item.actionType, item.connectorInstanceID, candidate.Constraints, item.actionParams); err != nil {
+			configErr, unresolved := constraintMatchErr(err)
+			if unresolved || configErr != nil {
+				continue
+			}
+			log.Printf("[%s] BulkRequest standing approval constraint validation for %s: %v",
+				TraceID(ctx), candidate.StandingApprovalID, err)
+			CaptureError(ctx, err)
 			continue
 		}
 		sa = candidate
