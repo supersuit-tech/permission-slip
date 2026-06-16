@@ -1,11 +1,57 @@
 import { describe, it, expect } from "vitest";
 import {
   tryFormatDateTime,
+  formatDateTime,
+  formatDateTimeRange,
   humanizeKey,
   formatHighlightValue,
   formatParameterValue,
   truncate,
 } from "../formatValues";
+
+describe("formatDateTime", () => {
+  it("formats on-the-hour timestamps with full month, year, and @ separator", () => {
+    const result = formatDateTime("2026-06-25T20:00:00");
+    expect(result).toMatch(/June 25 2026 @ 8PM/);
+  });
+
+  it("includes minutes when not on the hour", () => {
+    const result = formatDateTime("2026-06-25T20:30:00");
+    expect(result).toMatch(/June 25 2026 @ 8:30PM/);
+  });
+
+  it("formats all-day date-only strings without timezone shift", () => {
+    const result = formatDateTime("2026-03-15");
+    expect(result).toMatch(/Mar/);
+    expect(result).toMatch(/15/);
+    expect(result).not.toMatch(/@/);
+  });
+
+  it("returns the input for invalid date strings", () => {
+    expect(formatDateTime("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatDateTimeRange", () => {
+  it("collapses the shared date for same-day events", () => {
+    const result = formatDateTimeRange(
+      "2026-06-25T20:00:00",
+      "2026-06-25T21:00:00",
+    );
+    expect(result).toMatch(/June 25 2026 @ 8PM/);
+    expect(result).toMatch(/9PM/);
+    expect(result).toMatch(/\u2013/);
+  });
+
+  it("shows both full timestamps for multi-day events", () => {
+    const result = formatDateTimeRange(
+      "2026-06-25T20:00:00",
+      "2026-06-26T21:00:00",
+    );
+    expect(result).toMatch(/June 25 2026 @ 8PM/);
+    expect(result).toMatch(/June 26 2026 @ 9PM/);
+  });
+});
 
 describe("tryFormatDateTime", () => {
   it("formats an ISO 8601 datetime string", () => {

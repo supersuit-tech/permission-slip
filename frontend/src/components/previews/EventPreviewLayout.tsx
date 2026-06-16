@@ -1,4 +1,5 @@
 import { Calendar } from "lucide-react";
+import { formatDateTimeRange } from "@/lib/formatValues";
 
 interface EventPreviewLayoutProps {
   parameters: Record<string, unknown>;
@@ -7,15 +8,13 @@ interface EventPreviewLayoutProps {
 
 function parseDate(value: unknown): Date | null {
   if (typeof value !== "string") return null;
+  const isDateOnly = /^\d{4}-\d{2}-\d{2}$/.test(value);
+  if (isDateOnly) {
+    const [year, month, day] = value.split("-").map(Number);
+    return new Date(year!, month! - 1, day!);
+  }
   const d = new Date(value);
   return isNaN(d.getTime()) ? null : d;
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-  });
 }
 
 function formatDuration(startDate: Date, endDate: Date): string {
@@ -37,8 +36,12 @@ export function EventPreviewLayout({
     typeof parameters[fields.title ?? ""] === "string"
       ? (parameters[fields.title ?? ""] as string)
       : null;
-  const startDate = parseDate(parameters[fields.start ?? ""]);
-  const endDate = parseDate(parameters[fields.end ?? ""]);
+  const startRaw = parameters[fields.start ?? ""];
+  const endRaw = parameters[fields.end ?? ""];
+  const startDate = parseDate(startRaw);
+  const endDate = parseDate(endRaw);
+  const startIso = typeof startRaw === "string" ? startRaw : null;
+  const endIso = typeof endRaw === "string" ? endRaw : null;
 
   const monthStr = startDate
     ? startDate.toLocaleDateString(undefined, { month: "short" }).toUpperCase()
@@ -46,6 +49,8 @@ export function EventPreviewLayout({
   const dayStr = startDate ? String(startDate.getDate()) : null;
   const duration =
     startDate && endDate ? formatDuration(startDate, endDate) : null;
+  const timeRange =
+    startIso && endIso ? formatDateTimeRange(startIso, endIso) : null;
 
   return (
     <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
@@ -78,10 +83,8 @@ export function EventPreviewLayout({
               {title}
             </p>
           )}
-          {startDate && endDate && (
-            <p className="text-muted-foreground text-sm">
-              {formatTime(startDate)} → {formatTime(endDate)}
-            </p>
+          {timeRange && (
+            <p className="text-muted-foreground text-sm">{timeRange}</p>
           )}
           {duration && (
             <p className="text-muted-foreground text-xs">{duration}</p>

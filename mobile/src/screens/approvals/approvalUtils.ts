@@ -40,6 +40,90 @@ export function formatTimestamp(iso: string): string {
   });
 }
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Formats a Date's clock portion as "8PM" or "8:30PM" (12-hour, no space before AM/PM). */
+function formatClockTime(date: Date): string {
+  const minutes = date.getMinutes();
+  const formatted = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    ...(minutes !== 0 ? { minute: "2-digit" } : {}),
+    hour12: true,
+  });
+  return formatted.replace(/\s+(AM|PM)\b/i, "$1");
+}
+
+/** Formats an all-day calendar date (YYYY-MM-DD) without timezone conversion. */
+function formatAllDayDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(year!, month! - 1, day!);
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: sameYear ? undefined : "numeric",
+  });
+}
+
+function formatTimedDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).formatToParts(date);
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  const year = parts.find((p) => p.type === "year")?.value ?? "";
+  return `${month} ${day} ${year} @ ${formatClockTime(date)}`;
+}
+
+/**
+ * Formats a calendar event start/end timestamp for display.
+ * Example: "June 25 2026 @ 8PM" (minutes shown only when non-zero).
+ */
+export function formatDateTime(iso: string): string {
+  if (DATE_ONLY_RE.test(iso)) {
+    return formatAllDayDate(iso);
+  }
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return iso;
+  return formatTimedDate(date);
+}
+
+/**
+ * Formats a start/end time range, collapsing the shared date when both fall on
+ * the same local calendar day.
+ */
+export function formatDateTimeRange(startIso: string, endIso: string): string {
+  if (DATE_ONLY_RE.test(startIso)) {
+    return formatAllDayDate(startIso);
+  }
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (isNaN(start.getTime())) return startIso;
+  if (isNaN(end.getTime())) return formatDateTime(startIso);
+
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+
+  if (sameDay) {
+    const parts = new Intl.DateTimeFormat(undefined, {
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    }).formatToParts(start);
+    const month = parts.find((p) => p.type === "month")?.value ?? "";
+    const day = parts.find((p) => p.type === "day")?.value ?? "";
+    const year = parts.find((p) => p.type === "year")?.value ?? "";
+    const datePart = `${month} ${day} ${year}`;
+    return `${datePart} @ ${formatClockTime(start)} \u2013 ${formatClockTime(end)}`;
+  }
+  return `${formatDateTime(startIso)} \u2013 ${formatDateTime(endIso)}`;
+}
+
 /** Returns seconds remaining until `expiresAt`, clamped to 0. */
 export function secondsUntil(expiresAt: string): number {
   const diff = new Date(expiresAt).getTime() - Date.now();
@@ -179,13 +263,7 @@ function tryFormatDateTime(value: string): string | null {
   if (!/^\d{4}-\d{2}/.test(value)) return null;
   const d = new Date(value);
   if (isNaN(d.getTime())) return null;
-  return d.toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
+  return formatDateTime(value);
 }
 
 /** Extracts a non-empty string from an unknown value, or returns null. */
