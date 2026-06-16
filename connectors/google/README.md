@@ -70,6 +70,8 @@ Sends an email via the Gmail API.
 
 Lists recent emails from the Gmail inbox with metadata.
 
+> **OpenClaw users:** install the [`permission-slip-openclaw-skill-gmail`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-gmail) skill so your agent handles plain requests like *"check my email"* — it lists your inbox (newest 50) on your default Google account through this action. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip.
+
 **Risk level:** low
 
 **Parameters:**
@@ -204,6 +206,8 @@ Creates a new event on Google Calendar.
 ### `google.list_calendar_events`
 
 Lists upcoming events from Google Calendar.
+
+> **OpenClaw users:** install the [`permission-slip-openclaw-skill-google-calendar`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-google-calendar) skill so your agent handles plain requests like *"check my calendar"* — it lists today's events on your default Google account through this action. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip.
 
 **Risk level:** low
 
@@ -730,6 +734,8 @@ Creates a Google Calendar event with an auto-generated Google Meet conference li
 ### `google.list_drive_files`
 
 Lists or searches files in Google Drive.
+
+> **OpenClaw users:** install the [`permission-slip-openclaw-skill-google-drive`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-google-drive) skill so your agent handles plain requests like *"what's in my Drive?"* — it lists your most recently modified files on your default Google account through this action. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip.
 
 **Risk level:** low
 
