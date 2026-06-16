@@ -3,7 +3,6 @@ package protonmail
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/emersion/go-imap/v2"
