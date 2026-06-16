@@ -60,6 +60,10 @@ Agents or automations that still pass raw IMAP sequence numbers must be updated 
 
 Calendar, Drive, Contacts, VPN, and Pass are **not** available through Bridge (no CalDAV/WebDAV for those products).
 
+## Natural-language access (OpenClaw skill)
+
+If you run an [OpenClaw](https://github.com/supersuit-tech) machine as a Permission Slip agent, you can install the [`permission-slip-openclaw-skill-protonmail`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-protonmail) skill so the agent handles plain requests like *"check my email"* — it reads your inbox (newest 50) through this connector using your default Proton Mail account. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip. Install it on your OpenClaw machine when you're ready.
+
 ## Install and run Bridge
 
 These steps assume a dedicated Linux user (example: `proton`) on the same host as Permission Slip.
