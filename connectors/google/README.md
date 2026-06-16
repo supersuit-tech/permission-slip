@@ -205,6 +205,8 @@ Creates a new event on Google Calendar.
 
 Lists upcoming events from Google Calendar.
 
+> **OpenClaw users:** install the [`permission-slip-openclaw-skill-google-calendar`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-google-calendar) skill so your agent handles plain requests like *"check my calendar"* — it lists today's events on your default Google account through this action. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip.
+
 **Risk level:** low
 
 **Parameters:**
