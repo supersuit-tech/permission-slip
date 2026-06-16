@@ -351,6 +351,33 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				DisplayTemplate:  "Delete email",
 				ParametersSchema: uidMessageParametersSchema(),
 			},
+			{
+				ActionType:       "protonmail.apply_label",
+				Name:             "Apply Label",
+				Description:      "Apply a Proton label to one or more emails via IMAP COPY into the label mailbox (message stays in its source folder)",
+				RiskLevel:        "medium",
+				DisplayTemplate:  "Apply label {{label}} to email in {{folder}}",
+				ParametersSchema: labelMessageParametersSchema(),
+			},
+			{
+				ActionType:       "protonmail.remove_label",
+				Name:             "Remove Label",
+				Description:      "Remove a Proton label from one or more emails via STORE \\Deleted + UID EXPUNGE in the label mailbox",
+				RiskLevel:        "medium",
+				DisplayTemplate:  "Remove label {{label}} from email in {{folder}}",
+				ParametersSchema: labelMessageParametersSchema(),
+			},
+			{
+				ActionType:      "protonmail.list_labels",
+				Name:            "List Labels",
+				Description:     "List Proton labels exposed as IMAP mailboxes under the Labels/ namespace",
+				RiskLevel:       "low",
+				DisplayTemplate: "List Proton labels",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"properties": {}
+				}`)),
+			},
 		},
 
 		RequiredCredentials: []connectors.ManifestCredential{

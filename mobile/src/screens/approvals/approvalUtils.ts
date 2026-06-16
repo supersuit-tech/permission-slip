@@ -380,6 +380,20 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
     return protonmailUIDActionSummary("Move email", rd, suffix);
   },
 
+  "protonmail.apply_label": (params, rd) => {
+    const label = strVal(params.label);
+    const suffix = label ? ` (label ${label})` : null;
+    return protonmailUIDActionSummary("Apply label to email", rd, suffix);
+  },
+
+  "protonmail.remove_label": (params, rd) => {
+    const label = strVal(params.label);
+    const suffix = label ? ` (label ${label})` : null;
+    return protonmailUIDActionSummary("Remove label from email", rd, suffix);
+  },
+
+  "protonmail.list_labels": () => "List Proton labels",
+
   "protonmail.delete": (_params, rd) => protonmailUIDActionSummary("Delete email", rd),
 };
 

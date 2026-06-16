@@ -22,6 +22,21 @@ If you're currently self-hosting on ARM hardware, we recommend running Permissio
 | `protonmail.read_email` | low | Read one message by stable IMAP UID |
 | `protonmail.download_attachment` | low | Download one attachment by MIME part path (`part_id` from `read_email`) |
 | `protonmail.archive_email` | medium | Move messages to Archive (IMAP UID MOVE) |
+| `protonmail.apply_label` | medium | Apply a Proton label via IMAP COPY (message stays in its folder) |
+| `protonmail.remove_label` | medium | Remove a Proton label via STORE \\Deleted + UID EXPUNGE in the label mailbox |
+| `protonmail.list_labels` | low | List Proton labels under the Labels/ IMAP namespace |
+
+### Folders vs labels
+
+Proton Mail Bridge exposes **folders** and **labels** as separate IMAP mailbox hierarchies:
+
+- **Folders** (`Folders/…` plus system mailboxes like `INBOX`, `Archive`, `Trash`) are **exclusive** — a message lives in exactly one folder. Use `protonmail.move_to_folder` or `protonmail.archive_email` to relocate mail.
+- **Labels** (`Labels/…`) are **additive** — applying a label keeps the message in its source folder and adds the label. Use `protonmail.apply_label` (IMAP **COPY** into the label mailbox), not `move_to_folder`.
+- **Discovery** — call `protonmail.list_labels` before apply/remove to discover valid label names. `protonmail.list_folders` is unchanged and still lists all mailboxes (including labels); prefer `list_labels` when you only need labels.
+
+`protonmail.flag` / `protonmail.unflag` set the IMAP `\Flagged` star — that is **not** the same as a Proton label.
+
+By default, `protonmail.apply_label` and `protonmail.remove_label` expand to the **entire conversation** (same thread semantics as `protonmail.archive_email`). Pass `"include_thread": false` to act on only the listed UID(s).
 
 ### Archiving whole conversations
 

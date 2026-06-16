@@ -24,6 +24,8 @@ func (c *ProtonMailConnector) ResolveResourceDetails(ctx context.Context, action
 		return c.resolveReadEmailDetails(ctx, params, creds)
 	case "protonmail.archive_email":
 		return c.resolveArchiveEmailDetails(ctx, params, creds)
+	case "protonmail.apply_label", "protonmail.remove_label":
+		return c.resolveLabelMessageDetails(ctx, params, creds)
 	case "protonmail.reply_email":
 		return c.resolveReplyEmailDetails(ctx, params, creds)
 	case "protonmail.mark_read",
@@ -127,6 +129,30 @@ func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, pa
 	}
 
 	return c.resolveMessageDetailsForUIDs(ctx, creds, archiveParams.Folder, uids)
+}
+
+func (c *ProtonMailConnector) resolveLabelMessageDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
+	labelParams, err := parseLabelMessageParams(params)
+	if err != nil {
+		log.Printf("protonmail: resolve label message details: parse params: %v", err)
+		return nil, nil
+	}
+	if err := labelParams.validate(); err != nil {
+		log.Printf("protonmail: resolve label message details: invalid params: %v", err)
+		return nil, nil
+	}
+
+	uids := labelParams.MessageIDs
+	if includeThreadEnabled(labelParams.IncludeThread) {
+		expanded, err := expandArchiveUIDsForApproval(ctx, c, creds, labelParams.Folder, labelParams.MessageIDs)
+		if err != nil {
+			log.Printf("protonmail: resolve label message details: thread expansion (folder %q, %d uids): %v", labelParams.Folder, len(labelParams.MessageIDs), err)
+			return c.resolveMessageDetailsForUIDs(ctx, creds, labelParams.Folder, labelParams.MessageIDs)
+		}
+		uids = expanded
+	}
+
+	return c.resolveMessageDetailsForUIDs(ctx, creds, labelParams.Folder, uids)
 }
 
 // expandArchiveUIDsForApproval is the IMAP-backed thread expansion used at

@@ -38,6 +38,9 @@ func TestProtonMailConnector_Actions(t *testing.T) {
 		"protonmail.unflag",
 		"protonmail.move_to_folder",
 		"protonmail.delete",
+		"protonmail.apply_label",
+		"protonmail.remove_label",
+		"protonmail.list_labels",
 	}
 	for _, name := range expected {
 		if _, ok := actions[name]; !ok {
@@ -194,6 +197,9 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 		"protonmail.unflag",
 		"protonmail.move_to_folder",
 		"protonmail.delete",
+		"protonmail.apply_label",
+		"protonmail.remove_label",
+		"protonmail.list_labels",
 	}
 	if len(m.Actions) != len(expectedActions) {
 		t.Fatalf("Manifest().Actions has %d items, want %d", len(m.Actions), len(expectedActions))
