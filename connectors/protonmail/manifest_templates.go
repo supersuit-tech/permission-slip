@@ -78,5 +78,26 @@ func protonmailTemplates() []connectors.ManifestTemplate {
 			Description: "Agent can move emails to another folder.",
 			Parameters:  json.RawMessage(`{"folder":"INBOX","target_folder":"*","message_id":"*"}`),
 		},
+		{
+			ID:          "tpl_protonmail_apply_label",
+			ActionType:  "protonmail.apply_label",
+			Name:        "Apply Proton labels",
+			Description: "Agent can apply Proton labels to emails without moving them from their folder.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","label":"*","message_id":"*","message_ids":"*","include_thread":"*"}`),
+		},
+		{
+			ID:          "tpl_protonmail_remove_label",
+			ActionType:  "protonmail.remove_label",
+			Name:        "Remove Proton labels",
+			Description: "Agent can remove Proton labels from emails.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","label":"*","message_id":"*","message_ids":"*","include_thread":"*"}`),
+		},
+		{
+			ID:          "tpl_protonmail_list_labels",
+			ActionType:  "protonmail.list_labels",
+			Name:        "List Proton labels",
+			Description: "Agent can list available Proton labels.",
+			Parameters:  json.RawMessage(`{}`),
+		},
 	}
 }

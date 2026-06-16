@@ -20,6 +20,8 @@ const EMAIL_DETAIL_ACTION_TYPES = new Set([
   "protonmail.unflag",
   "protonmail.move_to_folder",
   "protonmail.delete",
+  "protonmail.apply_label",
+  "protonmail.remove_label",
 ]);
 
 /** Keys enrichment writes: flat single-message fields, batch map, or reply ref. */

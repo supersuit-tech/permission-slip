@@ -3,7 +3,7 @@
 // Mail Bridge (official, x86_64) or hydroxide (open-source, ARM-friendly). Both
 // expose the same loopback IMAP/SMTP surface that this connector targets.
 //
-// Actions: send_email, reply_email (SMTP); read/search/inbox, archive/move/delete, flags, download_attachment (IMAP).
+// Actions: send_email, reply_email (SMTP); read/search/inbox, archive/move/delete, labels, flags, download_attachment (IMAP).
 package protonmail
 
 import (
@@ -63,6 +63,9 @@ func (c *ProtonMailConnector) Actions() map[string]connectors.Action {
 		"protonmail.unflag":              newUnflagAction(c),
 		"protonmail.move_to_folder":      &moveToFolderAction{conn: c},
 		"protonmail.delete":              &deleteEmailAction{conn: c},
+		"protonmail.apply_label":         &applyLabelAction{conn: c},
+		"protonmail.remove_label":        &removeLabelAction{conn: c},
+		"protonmail.list_labels":         &listLabelsAction{conn: c},
 	}
 }
 
