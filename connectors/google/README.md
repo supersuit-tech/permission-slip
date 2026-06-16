@@ -70,6 +70,8 @@ Sends an email via the Gmail API.
 
 Lists recent emails from the Gmail inbox with metadata.
 
+> **OpenClaw users:** install the [`permission-slip-openclaw-skill-gmail`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-gmail) skill so your agent handles plain requests like *"check my email"* — it lists your inbox (newest 50) on your default Google account through this action. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip.
+
 **Risk level:** low
 
 **Parameters:**
