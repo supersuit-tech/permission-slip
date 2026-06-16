@@ -20,6 +20,7 @@ If you're currently self-hosting on ARM hardware, we recommend running Permissio
 | `protonmail.read_inbox` | low | List recent messages in a folder |
 | `protonmail.search_emails` | low | Search by subject, sender, or date |
 | `protonmail.read_email` | low | Read one message by stable IMAP UID |
+| `protonmail.download_attachment` | low | Download one attachment by MIME part path (`part_id` from `read_email`) |
 | `protonmail.archive_email` | medium | Move messages to Archive (IMAP UID MOVE) |
 
 ### Archiving whole conversations
@@ -33,6 +34,8 @@ The approval card lists every message that will be archived when thread expansio
 ### Message identifiers (breaking change)
 
 `read_inbox` and `search_emails` return each message's **stable IMAP UID** (with its `folder`) instead of volatile sequence numbers. `read_email` and `archive_email` accept that same UID as `message_id` / `message_ids`, scoped by `folder`.
+
+`read_email` lists attachment metadata including a `part_id` (MIME part path, e.g. `"2.1"`). Pass that `part_id` to `protonmail.download_attachment` along with the same `message_id` and `folder` to fetch the attachment bytes (base64-encoded in the JSON result). Attachments larger than 1 MB are rejected with a clear error.
 
 Sequence numbers shift whenever another message is deleted or moved; UIDs do not. Permission Slip records **UIDVALIDITY** server-side per folder so pending approvals still target the same mailbox generation — if the folder is recreated, execution fails safe instead of acting on the wrong message.
 

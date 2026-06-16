@@ -227,6 +227,34 @@ func (c *ProtonMailConnector) Manifest() *connectors.ConnectorManifest {
 				}`)),
 			},
 			{
+				ActionType:      "protonmail.download_attachment",
+				Name:            "Download Attachment",
+				Description:     "Download a single attachment from an email by MIME part path",
+				RiskLevel:       "low",
+				DisplayTemplate: "Download attachment from email in {{folder}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["message_id", "attachment_id"],
+					"properties": {
+						"message_id": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "Stable IMAP UID of the email within the folder (from read_inbox or search_emails results)"
+						},
+						"attachment_id": {
+							"type": "string",
+							"minLength": 1,
+							"description": "MIME part path identifying the attachment (from read_email attachments[].part_id, e.g. \"2.1\")"
+						},
+						"folder": {
+							"type": "string",
+							"default": "INBOX",
+							"description": "Mailbox folder containing the email"
+						}
+					}
+				}`)),
+			},
+			{
 				ActionType:      "protonmail.archive_email",
 				Name:            "Archive Email",
 				Description:     "Move one or more emails to the Archive folder via IMAP MOVE, archiving whole conversations by default",
