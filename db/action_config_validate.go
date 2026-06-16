@@ -340,7 +340,11 @@ func validateResolvedMetaConstraints(metaConstraints, resolvedMeta json.RawMessa
 
 	for key, configValue := range constraints {
 		param := MetaNamespaceKey + "." + key
-		if err := validateConstraintValueAgainstSource(param, configValue, meta[key]); err != nil {
+		sourceValue := meta[key]
+		if len(sourceValue) == 0 && key == "sender" {
+			sourceValue = meta["senders"]
+		}
+		if err := validateConstraintValueAgainstSource(param, configValue, sourceValue); err != nil {
 			return err
 		}
 	}
