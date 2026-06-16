@@ -236,7 +236,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 
 		// Optional: validate configuration reference — sees canonical keys after normalization.
 		if req.Configuration != nil {
-			result := ValidateConfigurationReference(w, r, deps, req.Configuration.ConfigurationID, agent.AgentID, actionType, actionParams)
+			result := ValidateConfigurationReference(w, r, deps, req.Configuration.ConfigurationID, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID, actionParams)
 			if result == nil {
 				return // error already written
 			}

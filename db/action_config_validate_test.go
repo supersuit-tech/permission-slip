@@ -2,6 +2,7 @@ package db
 
 import (
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 )
@@ -149,7 +150,7 @@ func TestValidateParametersAgainstConfig_AllFixed(t *testing.T) {
 	config := json.RawMessage(`{"repo":"supersuit-tech/webapp","label":"bug"}`)
 	exec := json.RawMessage(`{"repo":"supersuit-tech/webapp","label":"bug"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
 }
@@ -159,7 +160,7 @@ func TestValidateParametersAgainstConfig_FixedMismatch(t *testing.T) {
 	config := json.RawMessage(`{"repo":"supersuit-tech/webapp"}`)
 	exec := json.RawMessage(`{"repo":"supersuit-tech/api"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for mismatched fixed param")
 	}
@@ -177,7 +178,7 @@ func TestValidateParametersAgainstConfig_WildcardAcceptsAny(t *testing.T) {
 	config := json.RawMessage(`{"repo":"supersuit-tech/webapp","title":"*","body":"*"}`)
 	exec := json.RawMessage(`{"repo":"supersuit-tech/webapp","title":"Fix login bug","body":"The login page crashes"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
 }
@@ -188,7 +189,7 @@ func TestValidateParametersAgainstConfig_WildcardOmittedIsOK(t *testing.T) {
 	config := json.RawMessage(`{"repo":"supersuit-tech/webapp","title":"*","body":"*"}`)
 	exec := json.RawMessage(`{"repo":"supersuit-tech/webapp","title":"My issue"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected no error for omitted wildcard param, got: %v", err)
 	}
 }
@@ -198,7 +199,7 @@ func TestValidateParametersAgainstConfig_MissingFixedParam(t *testing.T) {
 	config := json.RawMessage(`{"repo":"supersuit-tech/webapp","label":"bug"}`)
 	exec := json.RawMessage(`{"repo":"supersuit-tech/webapp"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for missing fixed param")
 	}
@@ -216,7 +217,7 @@ func TestValidateParametersAgainstConfig_ExtraParam(t *testing.T) {
 	config := json.RawMessage(`{"repo":"supersuit-tech/webapp"}`)
 	exec := json.RawMessage(`{"repo":"supersuit-tech/webapp","extra":"value"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for extra param")
 	}
@@ -235,7 +236,7 @@ func TestValidateParametersAgainstConfig_EmptyConfig(t *testing.T) {
 	config := json.RawMessage(`{}`)
 	exec := json.RawMessage(`{}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected no error for empty config and exec, got: %v", err)
 	}
 }
@@ -245,7 +246,7 @@ func TestValidateParametersAgainstConfig_EmptyConfigRejectsExec(t *testing.T) {
 	config := json.RawMessage(`{}`)
 	exec := json.RawMessage(`{"foo":"bar"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for param not in empty config")
 	}
@@ -257,7 +258,7 @@ func TestValidateParametersAgainstConfig_ComplexValues(t *testing.T) {
 	config := json.RawMessage(`{"to":["alice@example.com","bob@example.com"],"subject":"*"}`)
 	exec := json.RawMessage(`{"to":["alice@example.com","bob@example.com"],"subject":"Hello"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected no error for matching complex value, got: %v", err)
 	}
 }
@@ -267,7 +268,7 @@ func TestValidateParametersAgainstConfig_ComplexValueMismatch(t *testing.T) {
 	config := json.RawMessage(`{"to":["alice@example.com"],"subject":"*"}`)
 	exec := json.RawMessage(`{"to":["bob@example.com"],"subject":"Hello"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for mismatched array value")
 	}
@@ -278,7 +279,7 @@ func TestValidateParametersAgainstConfig_NumericValues(t *testing.T) {
 	config := json.RawMessage(`{"amount":9900,"currency":"USD"}`)
 	exec := json.RawMessage(`{"amount":9900,"currency":"USD"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
 }
@@ -288,7 +289,7 @@ func TestValidateParametersAgainstConfig_NumericMismatch(t *testing.T) {
 	config := json.RawMessage(`{"amount":9900}`)
 	exec := json.RawMessage(`{"amount":5000}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for mismatched numeric value")
 	}
@@ -297,7 +298,7 @@ func TestValidateParametersAgainstConfig_NumericMismatch(t *testing.T) {
 func TestValidateParametersAgainstConfig_NullConfig(t *testing.T) {
 	t.Parallel()
 	// Nil/empty config should be treated as empty object.
-	if err := ValidateParametersAgainstConfig(nil, json.RawMessage(`{}`)); err != nil {
+	if err := ValidateParametersAgainstConfig(nil, json.RawMessage(`{}`), nil); err != nil {
 		t.Errorf("expected no error for nil config, got: %v", err)
 	}
 }
@@ -307,7 +308,7 @@ func TestValidateParametersAgainstConfig_BooleanValues(t *testing.T) {
 	config := json.RawMessage(`{"draft":true,"title":"*"}`)
 	exec := json.RawMessage(`{"draft":true,"title":"My PR"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected no error, got: %v", err)
 	}
 }
@@ -332,7 +333,7 @@ func TestValidateParametersAgainstConfig_WildcardWithAnyType(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			if err := ValidateParametersAgainstConfig(config, tc.exec); err != nil {
+			if err := ValidateParametersAgainstConfig(config, tc.exec, nil); err != nil {
 				t.Errorf("expected wildcard to accept %s, got: %v", tc.name, err)
 			}
 		})
@@ -347,7 +348,7 @@ func TestValidateParametersAgainstConfig_PatternSuffix(t *testing.T) {
 	config := json.RawMessage(`{"to":{"$pattern":"*@mycompany.com"},"subject":"*"}`)
 	exec := json.RawMessage(`{"to":"alice@mycompany.com","subject":"Hello"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected pattern suffix to match, got: %v", err)
 	}
 }
@@ -358,7 +359,7 @@ func TestValidateParametersAgainstConfig_PatternPrefix(t *testing.T) {
 	config := json.RawMessage(`{"repo":{"$pattern":"supersuit-tech/*"},"title":"*"}`)
 	exec := json.RawMessage(`{"repo":"supersuit-tech/webapp","title":"Fix bug"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected pattern prefix to match, got: %v", err)
 	}
 }
@@ -369,7 +370,7 @@ func TestValidateParametersAgainstConfig_PatternInfix(t *testing.T) {
 	config := json.RawMessage(`{"env":{"$pattern":"test-*-prod"},"cmd":"*"}`)
 	exec := json.RawMessage(`{"env":"test-us-east-prod","cmd":"deploy"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected pattern infix to match, got: %v", err)
 	}
 }
@@ -379,7 +380,7 @@ func TestValidateParametersAgainstConfig_PatternMismatch(t *testing.T) {
 	config := json.RawMessage(`{"to":{"$pattern":"*@mycompany.com"}}`)
 	exec := json.RawMessage(`{"to":"alice@other.com"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for pattern mismatch")
 	}
@@ -414,7 +415,7 @@ func TestValidateParametersAgainstConfig_PatternRequiresString(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			err := ValidateParametersAgainstConfig(config, tc.exec)
+			err := ValidateParametersAgainstConfig(config, tc.exec, nil)
 			if err == nil {
 				t.Errorf("expected pattern to reject %s value", tc.name)
 			}
@@ -435,7 +436,7 @@ func TestValidateParametersAgainstConfig_PatternMissing(t *testing.T) {
 	config := json.RawMessage(`{"repo":{"$pattern":"supersuit-tech/*"},"title":"*"}`)
 	exec := json.RawMessage(`{"title":"Bug fix"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for missing pattern parameter")
 	}
@@ -457,7 +458,7 @@ func TestValidateParametersAgainstConfig_PatternWithFixedAndWildcard(t *testing.
 	config := json.RawMessage(`{"repo":{"$pattern":"supersuit-tech/*"},"label":"bug","title":"*"}`)
 	exec := json.RawMessage(`{"repo":"supersuit-tech/webapp","label":"bug","title":"Fix login"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected mixed config to pass, got: %v", err)
 	}
 }
@@ -468,7 +469,7 @@ func TestValidateParametersAgainstConfig_PatternMultipleWildcards(t *testing.T) 
 	config := json.RawMessage(`{"env":{"$pattern":"*-*-prod"}}`)
 	exec := json.RawMessage(`{"env":"us-east-prod"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected multi-wildcard pattern to match, got: %v", err)
 	}
 }
@@ -535,7 +536,7 @@ func TestValidateParametersAgainstConfig_PatternWithoutStarExactMatch(t *testing
 	config := json.RawMessage(`{"tag":{"$pattern":"hello"}}`)
 	exec := json.RawMessage(`{"tag":"hello"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected $pattern without * to match exact string, got: %v", err)
 	}
 }
@@ -545,7 +546,7 @@ func TestValidateParametersAgainstConfig_PatternWithoutStarMismatch(t *testing.T
 	config := json.RawMessage(`{"tag":{"$pattern":"hello"}}`)
 	exec := json.RawMessage(`{"tag":"world"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error for mismatched value against $pattern without *")
 	}
@@ -567,7 +568,7 @@ func TestValidateParametersAgainstConfig_PlainStringWithStarIsFixedValue(t *test
 	config := json.RawMessage(`{"tag":"v*-release"}`)
 	exec := json.RawMessage(`{"tag":"v*-release"}`)
 
-	if err := ValidateParametersAgainstConfig(config, exec); err != nil {
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
 		t.Errorf("expected exact match for plain string with star, got: %v", err)
 	}
 }
@@ -579,8 +580,91 @@ func TestValidateParametersAgainstConfig_PlainStringWithStarRejectsGlobMatch(t *
 	config := json.RawMessage(`{"tag":"v*-release"}`)
 	exec := json.RawMessage(`{"tag":"v1.0-release"}`)
 
-	err := ValidateParametersAgainstConfig(config, exec)
+	err := ValidateParametersAgainstConfig(config, exec, nil)
 	if err == nil {
 		t.Fatal("expected error: plain string with * should require exact match, not glob")
+	}
+}
+
+// ── $meta namespace tests ───────────────────────────────────────────────────
+
+func TestValidateParametersAgainstConfig_MetaSenderPatternMatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42,"folder":"INBOX"}`)
+	meta := json.RawMessage(`{"sender":"alice@example.com"}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, meta); err != nil {
+		t.Fatalf("expected match, got: %v", err)
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaSenderPatternMismatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42,"folder":"INBOX"}`)
+	meta := json.RawMessage(`{"sender":"bob@example.com"}`)
+
+	err := ValidateParametersAgainstConfig(config, exec, meta)
+	if err == nil {
+		t.Fatal("expected mismatch error")
+	}
+	cve, ok := err.(*ConfigValidationError)
+	if !ok || cve.Parameter != "$meta.sender" {
+		t.Fatalf("expected $meta.sender error, got %T %v", err, err)
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaSendersArrayAllMustMatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_ids":"*","$meta":{"sender":{"$pattern":"*@alice.com"}}}`)
+	exec := json.RawMessage(`{"message_ids":[1,2]}`)
+	meta := json.RawMessage(`{"senders":["a@alice.com","b@alice.com"]}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, meta); err != nil {
+		t.Fatalf("expected all senders to match, got: %v", err)
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaSendersArrayOneMismatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_ids":"*","$meta":{"sender":{"$pattern":"*@alice.com"}}}`)
+	exec := json.RawMessage(`{"message_ids":[1,2]}`)
+	meta := json.RawMessage(`{"senders":["a@alice.com","b@other.com"]}`)
+
+	err := ValidateParametersAgainstConfig(config, exec, meta)
+	if err == nil {
+		t.Fatal("expected error when one sender does not match")
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaUnresolved(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42}`)
+
+	err := ValidateParametersAgainstConfig(config, exec, nil)
+	if !errors.Is(err, ErrMetadataUnresolved) {
+		t.Fatalf("expected ErrMetadataUnresolved, got %v", err)
+	}
+}
+
+func TestValidateParametersAgainstConfig_SpoofedSenderParamRejected(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42,"folder":"INBOX","sender":"alice@example.com"}`)
+	meta := json.RawMessage(`{"sender":"bob@example.com"}`)
+
+	err := ValidateParametersAgainstConfig(config, exec, meta)
+	if err == nil {
+		t.Fatal("expected failure: spoofed sender in params must not satisfy $meta constraint")
+	}
+}
+
+func TestValidateConfigParameters_AllowsMetaNamespace(t *testing.T) {
+	t.Parallel()
+	params := json.RawMessage(`{"folder":"*","$meta":{"sender":{"$pattern":"*@example.com"}}}`)
+	if err := ValidateConfigParameters(params); err != nil {
+		t.Fatalf("expected valid $meta config, got: %v", err)
 	}
 }

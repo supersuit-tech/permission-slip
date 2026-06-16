@@ -33,7 +33,9 @@ func ValidateConfigurationReference(
 	deps *Deps,
 	configID string,
 	agentID int64,
+	userID string,
 	actionType string,
+	connectorInstanceID string,
 	parameters json.RawMessage,
 ) *ConfigValidationResult {
 	// 1. Look up the configuration for this agent.
@@ -75,7 +77,7 @@ func ValidateConfigurationReference(
 	// Wildcard configs allow any parameters — skip validation entirely.
 	// SECURITY: Safe for the same reason as step 3 — standing approvals gate execution.
 	if ac.ActionType != db.WildcardActionType {
-		if err := db.ValidateParametersAgainstConfig(ac.Parameters, parameters); err != nil {
+		if err := validateActionConstraints(r.Context(), deps, agentID, userID, actionType, connectorInstanceID, ac.Parameters, parameters); err != nil {
 			var configErr *db.ConfigValidationError
 			if errors.As(err, &configErr) {
 				resp := BadRequest(ErrInvalidParameters, "Parameters do not comply with configuration constraints")
@@ -83,6 +85,11 @@ func ValidateConfigurationReference(
 					"parameter":        configErr.Parameter,
 					"constraint_error": configErr.Reason,
 				}
+				RespondError(w, r, http.StatusBadRequest, resp)
+				return nil
+			}
+			if errors.Is(err, db.ErrMetadataUnresolved) {
+				resp := BadRequest(ErrInvalidParameters, "Could not verify action metadata for configuration constraints")
 				RespondError(w, r, http.StatusBadRequest, resp)
 				return nil
 			}
