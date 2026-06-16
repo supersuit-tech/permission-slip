@@ -25,14 +25,13 @@ describe("renderTemplate", () => {
 
   it("renders :datetime directive", () => {
     const parts = renderTemplate("Event on {{start_time:datetime}}", {
-      start_time: "2026-03-15T11:00:00-04:00",
+      start_time: "2026-06-25T20:00:00",
     });
     expect(parts).not.toBeNull();
     expect(parts).toHaveLength(2);
     expect(parts?.[0]).toEqual({ kind: "text", text: "Event on " });
     expect(parts?.[1]?.kind).toBe("value");
-    // Should contain formatted date, not raw ISO string
-    expect(parts?.[1]?.text).toMatch(/Mar/);
+    expect(parts?.[1]?.text).toMatch(/June 25 2026 @ 8PM/);
   });
 
   it("renders :count directive for arrays", () => {

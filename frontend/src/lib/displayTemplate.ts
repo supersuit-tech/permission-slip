@@ -13,7 +13,7 @@
  * inserting entries into FORMATTERS.
  */
 
-import { tryFormatDateTime, formatHighlightValue } from "./formatValues";
+import { formatDateTime, formatHighlightValue } from "./formatValues";
 
 /** A segment of the summary — either plain text or a highlighted value. */
 export type SummaryPart =
@@ -35,7 +35,9 @@ export const FORMATTERS = new Map<
 >();
 
 // Built-in formatters
-FORMATTERS.set("datetime", (value) => tryFormatDateTime(value));
+FORMATTERS.set("datetime", (value) =>
+  typeof value === "string" ? formatDateTime(value) : null,
+);
 
 FORMATTERS.set("count", (value) => {
   if (Array.isArray(value)) return String(value.length);

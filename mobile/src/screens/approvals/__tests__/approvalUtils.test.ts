@@ -11,6 +11,8 @@ import {
   isExpired,
   formatParamValue,
   formatTimestamp,
+  formatDateTime,
+  formatDateTimeRange,
 } from "../approvalUtils";
 
 describe("secondsUntil", () => {
@@ -399,6 +401,37 @@ describe("formatTimestamp", () => {
 
   it("returns input string for invalid date", () => {
     expect(formatTimestamp("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatDateTime", () => {
+  it("formats on-the-hour timestamps with full month, year, and @ separator", () => {
+    const result = formatDateTime("2026-06-25T20:00:00");
+    expect(result).toMatch(/June 25 2026 @ 8PM/);
+  });
+
+  it("includes minutes when not on the hour", () => {
+    const result = formatDateTime("2026-06-25T20:30:00");
+    expect(result).toMatch(/June 25 2026 @ 8:30PM/);
+  });
+
+  it("formats all-day date-only strings without timezone shift", () => {
+    const result = formatDateTime("2026-03-15");
+    expect(result).toMatch(/Mar/);
+    expect(result).toMatch(/15/);
+    expect(result).not.toMatch(/@/);
+  });
+});
+
+describe("formatDateTimeRange", () => {
+  it("collapses the shared date for same-day events", () => {
+    const result = formatDateTimeRange(
+      "2026-06-25T20:00:00",
+      "2026-06-25T21:00:00",
+    );
+    expect(result).toMatch(/June 25 2026 @ 8PM/);
+    expect(result).toMatch(/9PM/);
+    expect(result).toMatch(/\u2013/);
   });
 });
 

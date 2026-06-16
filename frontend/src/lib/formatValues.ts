@@ -6,6 +6,92 @@
  * formatting across the approval UI.
  */
 
+const DATE_ONLY_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Formats a Date's clock portion as "8PM" or "8:30PM" (12-hour, no space before AM/PM). */
+function formatClockTime(date: Date): string {
+  const minutes = date.getMinutes();
+  const formatted = date.toLocaleTimeString(undefined, {
+    hour: "numeric",
+    ...(minutes !== 0 ? { minute: "2-digit" } : {}),
+    hour12: true,
+  });
+  return formatted.replace(/\s+(AM|PM)\b/i, "$1");
+}
+
+/**
+ * Formats an all-day calendar date (YYYY-MM-DD) without timezone conversion.
+ * Preserves the existing abbreviated-month style used before this change.
+ */
+function formatAllDayDate(iso: string): string {
+  const [year, month, day] = iso.split("-").map(Number);
+  const date = new Date(year!, month! - 1, day!);
+  const now = new Date();
+  const sameYear = date.getFullYear() === now.getFullYear();
+  return date.toLocaleDateString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: sameYear ? undefined : "numeric",
+  });
+}
+
+/** Formats the calendar date portion as "June 25 2026" (no comma). */
+function formatDatePart(date: Date): string {
+  const parts = new Intl.DateTimeFormat(undefined, {
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).formatToParts(date);
+  const month = parts.find((p) => p.type === "month")?.value ?? "";
+  const day = parts.find((p) => p.type === "day")?.value ?? "";
+  const year = parts.find((p) => p.type === "year")?.value ?? "";
+  return `${month} ${day} ${year}`;
+}
+
+function formatTimedDate(date: Date): string {
+  return `${formatDatePart(date)} @ ${formatClockTime(date)}`;
+}
+
+/**
+ * Formats a calendar event start/end timestamp for display.
+ * Example: "June 25 2026 @ 8PM" (minutes shown only when non-zero).
+ * All-day date-only strings (YYYY-MM-DD) are formatted without a time component
+ * and without timezone conversion.
+ */
+export function formatDateTime(iso: string): string {
+  if (DATE_ONLY_RE.test(iso)) {
+    return formatAllDayDate(iso);
+  }
+  const date = new Date(iso);
+  if (isNaN(date.getTime())) return iso;
+  return formatTimedDate(date);
+}
+
+/**
+ * Formats a start/end time range, collapsing the shared date when both fall on
+ * the same local calendar day. Example: "June 25 2026 @ 8PM – 9PM".
+ */
+export function formatDateTimeRange(startIso: string, endIso: string): string {
+  if (DATE_ONLY_RE.test(startIso)) {
+    return formatAllDayDate(startIso);
+  }
+  const start = new Date(startIso);
+  const end = new Date(endIso);
+  if (isNaN(start.getTime())) return startIso;
+  if (isNaN(end.getTime())) return formatDateTime(startIso);
+
+  const sameDay =
+    start.getFullYear() === end.getFullYear() &&
+    start.getMonth() === end.getMonth() &&
+    start.getDate() === end.getDate();
+
+  if (sameDay) {
+    const datePart = formatDatePart(start);
+    return `${datePart} @ ${formatClockTime(start)} \u2013 ${formatClockTime(end)}`;
+  }
+  return `${formatDateTime(startIso)} \u2013 ${formatDateTime(endIso)}`;
+}
+
 /**
  * Attempts to parse a string as an ISO 8601 / RFC 3339 datetime and
  * return a human-readable representation. Returns null if the value
