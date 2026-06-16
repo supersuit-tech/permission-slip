@@ -590,7 +590,7 @@ func TestValidateParametersAgainstConfig_PlainStringWithStarRejectsGlobMatch(t *
 
 func TestValidateParametersAgainstConfig_MetaSenderPatternMatch(t *testing.T) {
 	t.Parallel()
-	config := json.RawMessage(`{"folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	config := json.RawMessage(`{"message_id":"*","folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
 	exec := json.RawMessage(`{"message_id":42,"folder":"INBOX"}`)
 	meta := json.RawMessage(`{"sender":"alice@example.com"}`)
 
@@ -601,7 +601,7 @@ func TestValidateParametersAgainstConfig_MetaSenderPatternMatch(t *testing.T) {
 
 func TestValidateParametersAgainstConfig_MetaSenderPatternMismatch(t *testing.T) {
 	t.Parallel()
-	config := json.RawMessage(`{"folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	config := json.RawMessage(`{"message_id":"*","folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
 	exec := json.RawMessage(`{"message_id":42,"folder":"INBOX"}`)
 	meta := json.RawMessage(`{"sender":"bob@example.com"}`)
 
@@ -617,7 +617,7 @@ func TestValidateParametersAgainstConfig_MetaSenderPatternMismatch(t *testing.T)
 
 func TestValidateParametersAgainstConfig_MetaSendersArrayAllMustMatch(t *testing.T) {
 	t.Parallel()
-	config := json.RawMessage(`{"$meta":{"sender":{"$pattern":"*@alice.com"}}}`)
+	config := json.RawMessage(`{"message_ids":"*","$meta":{"sender":{"$pattern":"*@alice.com"}}}`)
 	exec := json.RawMessage(`{"message_ids":[1,2]}`)
 	meta := json.RawMessage(`{"senders":["a@alice.com","b@alice.com"]}`)
 
@@ -628,7 +628,7 @@ func TestValidateParametersAgainstConfig_MetaSendersArrayAllMustMatch(t *testing
 
 func TestValidateParametersAgainstConfig_MetaSendersArrayOneMismatch(t *testing.T) {
 	t.Parallel()
-	config := json.RawMessage(`{"$meta":{"sender":{"$pattern":"*@alice.com"}}}`)
+	config := json.RawMessage(`{"message_ids":"*","$meta":{"sender":{"$pattern":"*@alice.com"}}}`)
 	exec := json.RawMessage(`{"message_ids":[1,2]}`)
 	meta := json.RawMessage(`{"senders":["a@alice.com","b@other.com"]}`)
 
@@ -640,7 +640,7 @@ func TestValidateParametersAgainstConfig_MetaSendersArrayOneMismatch(t *testing.
 
 func TestValidateParametersAgainstConfig_MetaUnresolved(t *testing.T) {
 	t.Parallel()
-	config := json.RawMessage(`{"$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	config := json.RawMessage(`{"message_id":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
 	exec := json.RawMessage(`{"message_id":42}`)
 
 	err := ValidateParametersAgainstConfig(config, exec, nil)
@@ -651,7 +651,7 @@ func TestValidateParametersAgainstConfig_MetaUnresolved(t *testing.T) {
 
 func TestValidateParametersAgainstConfig_SpoofedSenderParamRejected(t *testing.T) {
 	t.Parallel()
-	config := json.RawMessage(`{"folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	config := json.RawMessage(`{"message_id":"*","folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
 	exec := json.RawMessage(`{"message_id":42,"folder":"INBOX","sender":"alice@example.com"}`)
 	meta := json.RawMessage(`{"sender":"bob@example.com"}`)
 
