@@ -20,7 +20,8 @@ import (
 const maxBodySize = 1024 * 1024
 
 // readEmailAction fetches a single email by stable UID, returning the full
-// body, headers, and attachment metadata (but not attachment content).
+// body, headers, and attachment metadata (including part_id for download_attachment,
+// but not attachment content).
 type readEmailAction struct {
 	conn *ProtonMailConnector
 }
@@ -57,6 +58,7 @@ type emailDetail struct {
 }
 
 type attachmentInfo struct {
+	PartID      string `json:"part_id"`
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type"`
 	Size        uint32 `json:"size"`
@@ -144,6 +146,7 @@ func (a *readEmailAction) Execute(ctx context.Context, req connectors.ActionRequ
 			if sp, ok := part.(*imap.BodyStructureSinglePart); ok {
 				if fn := sp.Filename(); fn != "" {
 					detail.Attachments = append(detail.Attachments, attachmentInfo{
+						PartID:      formatPartPath(path),
 						Filename:    fn,
 						ContentType: sp.MediaType(),
 						Size:        sp.Size,

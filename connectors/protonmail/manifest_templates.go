@@ -44,6 +44,13 @@ func protonmailTemplates() []connectors.ManifestTemplate {
 			Parameters:  json.RawMessage(`{"folder":"INBOX","message_id":"*"}`),
 		},
 		{
+			ID:          "tpl_protonmail_download_attachment",
+			ActionType:  "protonmail.download_attachment",
+			Name:        "Download an email attachment",
+			Description: "Agent can download the content of an email attachment.",
+			Parameters:  json.RawMessage(`{"folder":"INBOX","message_id":"*","attachment_id":"*"}`),
+		},
+		{
 			ID:          "tpl_protonmail_archive",
 			ActionType:  "protonmail.archive_email",
 			Name:        "Archive emails",

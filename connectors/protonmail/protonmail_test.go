@@ -29,6 +29,7 @@ func TestProtonMailConnector_Actions(t *testing.T) {
 		"protonmail.read_inbox",
 		"protonmail.search_emails",
 		"protonmail.read_email",
+		"protonmail.download_attachment",
 		"protonmail.archive_email",
 		"protonmail.list_folders",
 		"protonmail.mark_read",
@@ -184,6 +185,7 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 		"protonmail.read_inbox",
 		"protonmail.search_emails",
 		"protonmail.read_email",
+		"protonmail.download_attachment",
 		"protonmail.archive_email",
 		"protonmail.list_folders",
 		"protonmail.mark_read",
@@ -282,7 +284,7 @@ func TestProtonMailConnector_Manifest(t *testing.T) {
 			if a.RiskLevel != "medium" {
 				t.Errorf("%s risk_level = %q, want medium", a.ActionType, a.RiskLevel)
 			}
-		case "protonmail.read_inbox", "protonmail.search_emails", "protonmail.read_email":
+		case "protonmail.read_inbox", "protonmail.search_emails", "protonmail.read_email", "protonmail.download_attachment":
 			if a.RiskLevel != "low" {
 				t.Errorf("%s risk_level = %q, want low", a.ActionType, a.RiskLevel)
 			}
