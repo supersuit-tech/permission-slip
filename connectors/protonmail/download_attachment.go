@@ -92,7 +92,7 @@ func fetchAttachmentContentFromIMAP(
 	ctx context.Context,
 	conn *ProtonMailConnector,
 	creds connectors.Credentials,
-	mailboxUIDValidity map[string]uint32,
+	mailboxUIDValidity connectors.MailboxUIDValidityStore,
 	folder string,
 	messageID uint32,
 	partPath []int,

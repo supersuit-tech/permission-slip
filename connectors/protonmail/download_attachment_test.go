@@ -15,7 +15,7 @@ func TestDownloadAttachment_Success(t *testing.T) {
 	t.Parallel()
 
 	old := fetchAttachmentContent
-	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ map[string]uint32, folder string, messageID uint32, partPath []int) (*fetchedAttachment, error) {
+	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ connectors.MailboxUIDValidityStore, folder string, messageID uint32, partPath []int) (*fetchedAttachment, error) {
 		if folder != "INBOX" || messageID != 42 || formatPartPath(partPath) != "2.1" {
 			return nil, fmt.Errorf("unexpected fetch args: folder=%q messageID=%d path=%v", folder, messageID, partPath)
 		}
@@ -72,7 +72,7 @@ func TestDownloadAttachment_MessageNotFound(t *testing.T) {
 	t.Parallel()
 
 	old := fetchAttachmentContent
-	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ map[string]uint32, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
+	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ connectors.MailboxUIDValidityStore, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
 		return nil, &connectors.ValidationError{Message: `message uid 99 not found in folder "INBOX"`}
 	}
 	t.Cleanup(func() { fetchAttachmentContent = old })
@@ -102,7 +102,7 @@ func TestDownloadAttachment_AttachmentNotFound(t *testing.T) {
 	t.Parallel()
 
 	old := fetchAttachmentContent
-	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ map[string]uint32, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
+	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ connectors.MailboxUIDValidityStore, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
 		return nil, &connectors.ValidationError{Message: `attachment "9.9" not found on message uid 42 in folder "INBOX"`}
 	}
 	t.Cleanup(func() { fetchAttachmentContent = old })
@@ -132,7 +132,7 @@ func TestDownloadAttachment_Oversized(t *testing.T) {
 	t.Parallel()
 
 	old := fetchAttachmentContent
-	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ map[string]uint32, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
+	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ connectors.MailboxUIDValidityStore, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
 		return nil, &connectors.ValidationError{
 			Message: fmt.Sprintf("attachment %q exceeds maximum size of %d bytes", "2.1", maxBodySize),
 		}
