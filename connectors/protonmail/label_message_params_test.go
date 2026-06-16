@@ -1,7 +1,6 @@
 package protonmail
 
 import (
-	"encoding/json"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
