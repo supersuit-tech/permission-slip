@@ -3,7 +3,6 @@ package imessage
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
