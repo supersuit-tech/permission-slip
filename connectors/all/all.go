@@ -60,6 +60,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip/connectors/stripe"
 	_ "github.com/supersuit-tech/permission-slip/connectors/supabase"
 	_ "github.com/supersuit-tech/permission-slip/connectors/trello"
+	_ "github.com/supersuit-tech/permission-slip/connectors/tresorit"
 	_ "github.com/supersuit-tech/permission-slip/connectors/twilio"
 	_ "github.com/supersuit-tech/permission-slip/connectors/vercel"
 	_ "github.com/supersuit-tech/permission-slip/connectors/walmart"
