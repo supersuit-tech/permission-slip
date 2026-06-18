@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors/s3sigv4"
 )
 
 // createPresignedURLAction implements connectors.Action for aws.create_presigned_url.
@@ -69,7 +70,7 @@ func (a *createPresignedURLAction) Execute(_ context.Context, req connectors.Act
 	host := s3Host(params.Region)
 	// URI-encode each path segment per SigV4 rules, preserving "/" separators.
 	// S3 object keys can contain spaces, +, ?, # and other reserved characters.
-	objectPath := "/" + uriEncodePath(params.Bucket+"/"+params.Key)
+	objectPath := "/" + s3sigv4.URIEncodePath(params.Bucket+"/"+params.Key)
 	credentialScope := datestamp + "/" + params.Region + "/s3/aws4_request"
 
 	// Build canonical query string for presigned URL.
@@ -99,12 +100,12 @@ func (a *createPresignedURLAction) Execute(_ context.Context, req connectors.Act
 		"AWS4-HMAC-SHA256",
 		amzdate,
 		credentialScope,
-		sha256Hex([]byte(canonicalRequest)),
+		s3sigv4.SHA256Hex([]byte(canonicalRequest)),
 	}, "\n")
 
 	// Derive signing key using the shared helper from aws.go.
-	signingKey := deriveSigningKey(secretKey, datestamp, params.Region, "s3")
-	signature := hex.EncodeToString(hmacSHA256(signingKey, []byte(stringToSign)))
+	signingKey := s3sigv4.DeriveSigningKey(secretKey, datestamp, params.Region, "s3")
+	signature := hex.EncodeToString(s3sigv4.HMACSHA256(signingKey, []byte(stringToSign)))
 
 	presignedURL := fmt.Sprintf("https://%s%s?%s&X-Amz-Signature=%s",
 		host, objectPath, canonicalQuerystring, signature)

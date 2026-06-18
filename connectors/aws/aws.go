@@ -7,20 +7,17 @@ package aws
 import (
 	"bytes"
 	"context"
-	"crypto/hmac"
-	"crypto/sha256"
 	_ "embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors/s3sigv4"
 )
 
 const defaultTimeout = 30 * time.Second
@@ -440,113 +437,17 @@ func (c *AWSConnector) do(ctx context.Context, creds connectors.Credentials, met
 func (c *AWSConnector) signV4(req *http.Request, creds connectors.Credentials, payload []byte) error {
 	accessKey, _ := creds.Get("access_key_id")
 	secretKey, _ := creds.Get("secret_access_key")
+	sessionToken, _ := creds.Get("session_token")
 
-	now := time.Now().UTC()
-	datestamp := now.Format("20060102")
-	amzdate := now.Format("20060102T150405Z")
-
-	// Extract service and region from the host.
-	// Host format: <service>.<region>.amazonaws.com
-	service, region := parseServiceHost(req.Host)
-
-	req.Header.Set("X-Amz-Date", amzdate)
-	req.Header.Set("Host", req.Host)
-
-	// Add security token header if session token is present.
-	sessionToken, hasToken := creds.Get("session_token")
-	if hasToken && sessionToken != "" {
-		req.Header.Set("X-Amz-Security-Token", sessionToken)
-	}
-
-	// Compute payload hash and set X-Amz-Content-Sha256 header.
-	// S3 requires this header for Signature V4 Authorization-header requests.
-	payloadHash := sha256Hex(payload)
-	req.Header.Set("X-Amz-Content-Sha256", payloadHash)
-	canonicalHeaders, signedHeaders := buildCanonicalHeaders(req)
-	canonicalQuerystring := ""
-	if req.URL.RawQuery != "" {
-		canonicalQuerystring = req.URL.RawQuery
-	}
-	canonicalRequest := strings.Join([]string{
-		req.Method,
-		req.URL.Path,
-		canonicalQuerystring,
-		canonicalHeaders,
-		signedHeaders,
-		payloadHash,
-	}, "\n")
-
-	// Create string to sign.
-	credentialScope := datestamp + "/" + region + "/" + service + "/aws4_request"
-	stringToSign := strings.Join([]string{
-		"AWS4-HMAC-SHA256",
-		amzdate,
-		credentialScope,
-		sha256Hex([]byte(canonicalRequest)),
-	}, "\n")
-
-	// Calculate signature.
-	signingKey := deriveSigningKey(secretKey, datestamp, region, service)
-	signature := hex.EncodeToString(hmacSHA256(signingKey, []byte(stringToSign)))
-
-	// Set authorization header.
-	authHeader := fmt.Sprintf("AWS4-HMAC-SHA256 Credential=%s/%s, SignedHeaders=%s, Signature=%s",
-		accessKey, credentialScope, signedHeaders, signature)
-	req.Header.Set("Authorization", authHeader)
-
-	return nil
-}
-
-// parseServiceHost extracts service and region from an AWS hostname.
-// For standard hosts like "ec2.us-east-1.amazonaws.com", returns ("ec2", "us-east-1").
-// For S3 path-style "s3.us-east-1.amazonaws.com", returns ("s3", "us-east-1").
-// For global endpoints like "monitoring.us-east-1.amazonaws.com", returns ("monitoring", "us-east-1").
-func parseServiceHost(host string) (service, region string) {
-	host = strings.TrimSuffix(host, ".amazonaws.com")
-	parts := strings.SplitN(host, ".", 2)
-	if len(parts) == 2 {
-		return parts[0], parts[1]
-	}
-	return host, "us-east-1"
-}
-
-func sha256Hex(data []byte) string {
-	h := sha256.Sum256(data)
-	return hex.EncodeToString(h[:])
-}
-
-func hmacSHA256(key, data []byte) []byte {
-	h := hmac.New(sha256.New, key)
-	h.Write(data)
-	return h.Sum(nil)
-}
-
-func deriveSigningKey(secret, datestamp, region, service string) []byte {
-	kDate := hmacSHA256([]byte("AWS4"+secret), []byte(datestamp))
-	kRegion := hmacSHA256(kDate, []byte(region))
-	kService := hmacSHA256(kRegion, []byte(service))
-	return hmacSHA256(kService, []byte("aws4_request"))
+	service, region := s3sigv4.ParseServiceHost(req.Host)
+	return s3sigv4.SignRequest(req, s3sigv4.Credentials{
+		AccessKeyID:     accessKey,
+		SecretAccessKey: secretKey,
+		SessionToken:    sessionToken,
+	}, payload, s3sigv4.SigningConfig{
+		Region:  region,
+		Service: service,
+	})
 }
 
 func ptrBool(b bool) *bool { return &b }
-
-func buildCanonicalHeaders(req *http.Request) (canonicalHeaders, signedHeaders string) {
-	headers := make(map[string]string)
-	var names []string
-	for name := range req.Header {
-		lower := strings.ToLower(name)
-		if lower == "host" || lower == "content-type" || strings.HasPrefix(lower, "x-amz-") {
-			headers[lower] = strings.TrimSpace(req.Header.Get(name))
-			names = append(names, lower)
-		}
-	}
-	sort.Strings(names)
-
-	var canonical, signed []string
-	for _, name := range names {
-		canonical = append(canonical, name+":"+headers[name])
-		signed = append(signed, name)
-	}
-
-	return strings.Join(canonical, "\n") + "\n", strings.Join(signed, ";")
-}

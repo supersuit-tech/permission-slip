@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors/s3sigv4"
 )
 
 // validBucketName matches S3 bucket naming rules: 3-63 lowercase alphanumeric
@@ -65,15 +66,9 @@ func validateInstanceID(id string) error {
 	return nil
 }
 
-// uriEncodePath encodes a path string per AWS SigV4 rules: each segment is
-// percent-encoded but "/" separators are preserved. This is necessary because
-// S3 object keys can contain spaces, +, ?, # and other reserved characters.
+// uriEncodePath encodes a path string per AWS SigV4 rules.
 func uriEncodePath(path string) string {
-	segments := strings.Split(path, "/")
-	for i, seg := range segments {
-		segments[i] = url.PathEscape(seg)
-	}
-	return strings.Join(segments, "/")
+	return s3sigv4.URIEncodePath(path)
 }
 
 // validateBucketName checks that an S3 bucket name follows AWS naming rules:

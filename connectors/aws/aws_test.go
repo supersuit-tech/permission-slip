@@ -184,31 +184,3 @@ func TestAWSConnector_ImplementsInterface(t *testing.T) {
 	var _ connectors.Connector = (*AWSConnector)(nil)
 	var _ connectors.ManifestProvider = (*AWSConnector)(nil)
 }
-
-func TestParseServiceHost(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		host        string
-		wantService string
-		wantRegion  string
-	}{
-		{"ec2.us-east-1.amazonaws.com", "ec2", "us-east-1"},
-		{"s3.us-west-2.amazonaws.com", "s3", "us-west-2"},
-		{"monitoring.eu-west-1.amazonaws.com", "monitoring", "eu-west-1"},
-		{"rds.ap-southeast-1.amazonaws.com", "rds", "ap-southeast-1"},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.host, func(t *testing.T) {
-			t.Parallel()
-			service, region := parseServiceHost(tt.host)
-			if service != tt.wantService {
-				t.Errorf("service = %q, want %q", service, tt.wantService)
-			}
-			if region != tt.wantRegion {
-				t.Errorf("region = %q, want %q", region, tt.wantRegion)
-			}
-		})
-	}
-}
