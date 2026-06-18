@@ -126,5 +126,5 @@ func HandlesFromRaws(raws []string) ([]Handle, error) {
 		}
 		handles = append(handles, h)
 	}
-	return handles, nil
+	return NormalizeHandles(handles)
 }
