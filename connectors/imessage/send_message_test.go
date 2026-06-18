@@ -9,10 +9,9 @@ import (
 func TestSendMessageParams_Validate(t *testing.T) {
 	t.Parallel()
 	p := sendMessageParams{
-		To:            []Handle{{Type: "phone", Value: "+15551234567"}},
-		Text:          "hello",
-		Service:       "imessage",
-		NoSMSFallback: boolPtr(true),
+		To:      []Handle{{Type: "phone", Value: "+15551234567"}},
+		Text:    "hello",
+		Service: "auto",
 	}
 	if err := p.validate(); err != nil {
 		t.Fatalf("validate: %v", err)
@@ -44,16 +43,18 @@ func TestSendMessageParams_Validate(t *testing.T) {
 func TestBuildSendRPCParams(t *testing.T) {
 	t.Parallel()
 	params := buildSendRPCParams(sendMessageParams{
-		To:            []Handle{{Type: "phone", Value: "+15551234567"}},
-		Text:          "hello",
-		Service:       "imessage",
-		NoSMSFallback: boolPtr(true),
+		To:      []Handle{{Type: "phone", Value: "+15551234567"}},
+		Text:    "hello",
+		Service: "auto",
 	})
 	if params["to"] != "+15551234567" {
 		t.Fatalf("to = %v", params["to"])
 	}
-	if params["no_sms_fallback"] != true {
-		t.Fatalf("no_sms_fallback = %v", params["no_sms_fallback"])
+	if params["service"] != "auto" {
+		t.Fatalf("service = %v", params["service"])
+	}
+	if _, ok := params["no_sms_fallback"]; ok {
+		t.Fatalf("no_sms_fallback should be omitted by default")
 	}
 }
 
@@ -76,4 +77,16 @@ func TestSendMessageParams_InvalidService(t *testing.T) {
 	}
 }
 
-func boolPtr(b bool) *bool { return &b }
+func TestSendMessageParams_DefaultServiceAuto(t *testing.T) {
+	t.Parallel()
+	p := sendMessageParams{
+		To:   []Handle{{Type: "phone", Value: "+15551234567"}},
+		Text: "hi",
+	}
+	if err := p.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if p.Service != "auto" {
+		t.Fatalf("service = %q", p.Service)
+	}
+}

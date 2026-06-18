@@ -30,7 +30,7 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 	return &connectors.ConnectorManifest{
 		ID:          "imessage",
 		Name:        "iMessage",
-		Description: "Read and send iMessages via openclaw/imsg on a Mac. Requires imsg (brew install steipete/tap/imsg), Full Disk Access for reads, and Automation permission for sends.",
+		Description: "Read and send Messages.app conversations (iMessage and SMS) via openclaw/imsg on a Mac. Requires the same Apple ID on Mac and iPhone, imsg (brew install steipete/tap/imsg), Full Disk Access for reads, and Automation permission for sends.",
 		Status:      "early_preview",
 		LogoSVG:     logoSVG,
 		Actions: []connectors.ManifestAction{
@@ -158,9 +158,9 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:      "imessage.send_message",
 				OperationType:   "write",
 				Name:            "Send Message",
-				Description:     "Send an iMessage or SMS via Messages.app (approval required)",
+				Description:     "Send an iMessage or SMS via Messages.app (approval required). Defaults to auto service with SMS fallback.",
 				RiskLevel:       "high",
-				DisplayTemplate: "Send iMessage",
+				DisplayTemplate: "Send message",
 				Preview: &connectors.ActionPreview{
 					Layout: "message",
 					Fields: map[string]string{"to": "to", "body": "text"},
@@ -203,13 +203,17 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 						"service": {
 							"type": "string",
 							"enum": ["imessage", "sms", "auto"],
-							"default": "imessage",
-							"description": "Delivery service. Default imessage keeps sends on iMessage when possible."
+							"default": "auto",
+							"description": "Delivery service. Default auto picks iMessage or SMS based on the chat; SMS fallback applies for new recipients unless no_sms_fallback is true."
 						},
 						"no_sms_fallback": {
 							"type": "boolean",
-							"default": true,
-							"description": "When true, do not fall back to SMS when iMessage is unavailable"
+							"default": false,
+							"description": "When true, do not fall back to SMS when iMessage is unavailable (opt-in strict iMessage-only)"
+						},
+						"retry_guid": {
+							"type": "string",
+							"description": "Optional message GUID from a prior send attempt. When set, skips sending if that message already reached sent/delivered state (idempotent retry)."
 						}
 					}
 				}`)),
@@ -265,15 +269,15 @@ func imessageTemplates() []connectors.ManifestTemplate {
 			ID:          "tpl_imessage_send_any",
 			ActionType:  "imessage.send_message",
 			Name:        "Send messages freely",
-			Description: "Agent can send to any recipient from any signed-in account.",
-			Parameters:  json.RawMessage(`{"to":` + handleArray + `,"from":` + handleArray + `,"text":"*","service":"imessage","no_sms_fallback":true}`),
+			Description: "Agent can send to any recipient from any signed-in account (auto service with SMS fallback).",
+			Parameters:  json.RawMessage(`{"to":` + handleArray + `,"from":` + handleArray + `,"text":"*","service":"auto","no_sms_fallback":false}`),
 		},
 		{
 			ID:          "tpl_imessage_send_to_contact",
 			ActionType:  "imessage.send_message",
 			Name:        "Send to specific contact",
 			Description: "Locks the recipient handle. Agent chooses the message text.",
-			Parameters:  json.RawMessage(`{"to":[{"type":"phone","value":"+15555550123"}],"from":"*","text":"*","service":"imessage","no_sms_fallback":true}`),
+			Parameters:  json.RawMessage(`{"to":[{"type":"phone","value":"+15555550123"}],"from":"*","text":"*","service":"auto","no_sms_fallback":false}`),
 		},
 		{
 			ID:          "tpl_imessage_send_imessage_only",

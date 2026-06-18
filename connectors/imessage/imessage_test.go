@@ -104,6 +104,49 @@ func TestSendMessageAction_Execute(t *testing.T) {
 	}
 }
 
+func TestSendMessageAction_IdempotentRetry(t *testing.T) {
+	mock := newMockIMsg(t)
+	defer mock.Close()
+
+	c := New()
+	c.client = mock.client
+	creds := connectors.NewCredentials(map[string]string{credKeyCLIPath: mock.path})
+
+	result, err := c.Actions()["imessage.send_message"].Execute(context.Background(), connectors.ActionRequest{
+		ActionType:  "imessage.send_message",
+		Parameters:  json.RawMessage(`{"to":[{"type":"phone","value":"+15551234567"}],"text":"hello","retry_guid":"PRIOR-GUID"}`),
+		Credentials: creds,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	var payload map[string]any
+	if err := json.Unmarshal(result.Data, &payload); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if payload["idempotent"] != true {
+		t.Fatalf("payload = %#v", payload)
+	}
+}
+
+func TestResolveResourceDetails_SendMessage(t *testing.T) {
+	mock := newMockIMsg(t)
+	defer mock.Close()
+
+	c := New()
+	c.client = mock.client
+	creds := connectors.NewCredentials(map[string]string{credKeyCLIPath: mock.path})
+
+	details, err := c.ResolveResourceDetails(context.Background(), "imessage.send_message",
+		json.RawMessage(`{"chat_id":42,"text":"hi"}`), creds)
+	if err != nil {
+		t.Fatalf("ResolveResourceDetails: %v", err)
+	}
+	if details["delivery_disclosure"] == "" {
+		t.Fatalf("details = %#v", details)
+	}
+}
+
 func TestGetChatAction_Execute(t *testing.T) {
 	mock := newMockIMsg(t)
 	defer mock.Close()
@@ -191,6 +234,9 @@ case "$cmd" in
           ;;
         send)
           result='{"ok":true,"guid":"ABC"}'
+          ;;
+        message.send_status)
+          result='{"ok":true,"guid":"ABC","send_state":"delivered","service":"iMessage"}'
           ;;
         *)
           result='{}'

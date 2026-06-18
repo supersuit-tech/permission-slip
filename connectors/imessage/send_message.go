@@ -23,6 +23,7 @@ type sendMessageParams struct {
 	File           string   `json:"file"`
 	Service        string   `json:"service"`
 	NoSMSFallback  *bool    `json:"no_sms_fallback"`
+	RetryGUID      string   `json:"retry_guid"`
 }
 
 func (p *sendMessageParams) validate() error {
@@ -53,7 +54,7 @@ func (p *sendMessageParams) validate() error {
 		return &connectors.ValidationError{Message: "at least one of text or file is required"}
 	}
 	if p.Service == "" {
-		p.Service = "imessage"
+		p.Service = defaultSendService
 	}
 	switch p.Service {
 	case "imessage", "sms", "auto":
@@ -75,12 +76,37 @@ func (a *sendMessageAction) Execute(ctx context.Context, req connectors.ActionRe
 	actionCtx, cancel := a.conn.actionTimeout(ctx)
 	defer cancel()
 
+	if params.RetryGUID != "" {
+		if existing, ok, err := tryIdempotentSend(actionCtx, a.conn.client, req.Credentials, params.RetryGUID); err != nil {
+			return nil, err
+		} else if ok {
+			return connectors.JSONResult(existing)
+		}
+	}
+
 	rpcParams := buildSendRPCParams(params)
 	var result sendResult
 	if err := a.conn.client.rpcCall(actionCtx, req.Credentials, "send", rpcParams, &result); err != nil {
 		return nil, err
 	}
-	return connectors.JSONResult(result)
+
+	response := map[string]any{
+		"ok":   result.OK,
+		"id":   result.ID,
+		"guid": result.GUID,
+	}
+	if result.GUID != "" {
+		delivery, err := verifySendDelivery(actionCtx, a.conn.client, req.Credentials, result.GUID)
+		if err != nil {
+			return nil, err
+		}
+		if delivery != nil {
+			response["send_state"] = delivery.SendState
+			response["service"] = delivery.Service
+			response["delivery"] = delivery
+		}
+	}
+	return connectors.JSONResult(response)
 }
 
 func buildSendRPCParams(p sendMessageParams) map[string]any {
@@ -100,14 +126,12 @@ func buildSendRPCParams(p sendMessageParams) map[string]any {
 	if p.File != "" {
 		params["file"] = p.File
 	}
-	if p.Service != "" {
-		params["service"] = p.Service
+	service := p.Service
+	if service == "" {
+		service = defaultSendService
 	}
-	noFallback := true
-	if p.NoSMSFallback != nil {
-		noFallback = *p.NoSMSFallback
-	}
-	if noFallback {
+	params["service"] = service
+	if p.NoSMSFallback != nil && *p.NoSMSFallback {
 		params["no_sms_fallback"] = true
 	}
 	return params
