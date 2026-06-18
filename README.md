@@ -98,6 +98,7 @@ These connectors are wired up but have not yet been end-to-end verified. If you 
 | Square | 🔴 Untested |
 | Stripe | 🔴 Untested |
 | Supabase | 🔴 Untested |
+| Tresorit | 🔴 Untested |
 | Trello | 🔴 Untested |
 | Twilio | 🔴 Untested |
 | Vercel | 🔴 Untested |
