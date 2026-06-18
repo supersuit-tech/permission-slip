@@ -30,6 +30,7 @@ import (
 	_ "github.com/supersuit-tech/permission-slip/connectors/github"
 	_ "github.com/supersuit-tech/permission-slip/connectors/google"
 	_ "github.com/supersuit-tech/permission-slip/connectors/hubspot"
+	_ "github.com/supersuit-tech/permission-slip/connectors/imessage"
 	_ "github.com/supersuit-tech/permission-slip/connectors/instacart"
 	_ "github.com/supersuit-tech/permission-slip/connectors/intercom"
 	_ "github.com/supersuit-tech/permission-slip/connectors/jira"
