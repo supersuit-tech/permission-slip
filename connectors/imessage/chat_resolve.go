@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 // resolveChatForSend loads chat metadata when the send targets an existing thread.
