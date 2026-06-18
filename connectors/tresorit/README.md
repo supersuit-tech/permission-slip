@@ -40,7 +40,7 @@ Saving credentials runs a live `ListBuckets` against the gateway. If the contain
 | Action | Risk | Description |
 |--------|------|-------------|
 | `tresorit.list_files` | low | List files/folders in a Tresor (`tresor` = bucket name), optional `prefix` |
-| `tresorit.download_file` | low | Download a file; content returned as base64 |
+| `tresorit.download_file` | medium | Download a file; content returned as base64 |
 | `tresorit.upload_file` | medium | Upload a file from base64 `content` |
 | `tresorit.create_folder` | medium | Create a folder (S3 prefix marker) |
 | `tresorit.delete_file` | high | Permanently delete a file |

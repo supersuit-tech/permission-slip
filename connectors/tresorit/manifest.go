@@ -49,7 +49,7 @@ func (c *TresoritConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:  "tresorit.download_file",
 				Name:        "Download File",
 				Description: "Download a file from a Tresor (content returned as base64)",
-				RiskLevel:   "low",
+				RiskLevel:   "medium",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["tresor", "key"],
