@@ -8,14 +8,13 @@ import (
 
 func TestSendMessageParams_Validate(t *testing.T) {
 	t.Parallel()
-	noFallback := true
-	valid := sendMessageParams{
+	p := sendMessageParams{
 		To:            []Handle{{Type: "phone", Value: "+15551234567"}},
-		Text:          "hi",
+		Text:          "hello",
 		Service:       "imessage",
-		NoSMSFallback: &noFallback,
+		NoSMSFallback: boolPtr(true),
 	}
-	if err := valid.validate(); err != nil {
+	if err := p.validate(); err != nil {
 		t.Fatalf("validate: %v", err)
 	}
 
@@ -48,7 +47,7 @@ func TestBuildSendRPCParams(t *testing.T) {
 		To:            []Handle{{Type: "phone", Value: "+15551234567"}},
 		Text:          "hello",
 		Service:       "imessage",
-		NoSMSFallback: ptrBool(true),
+		NoSMSFallback: boolPtr(true),
 	})
 	if params["to"] != "+15551234567" {
 		t.Fatalf("to = %v", params["to"])
@@ -64,9 +63,6 @@ func TestSendPreviewTarget(t *testing.T) {
 		t.Fatalf("got %q", got)
 	}
 }
-
-func ptrBool(b bool) *bool { return &b }
-
 func TestSendMessageParams_InvalidService(t *testing.T) {
 	t.Parallel()
 	p := sendMessageParams{
@@ -79,3 +75,5 @@ func TestSendMessageParams_InvalidService(t *testing.T) {
 		t.Fatalf("got %v", err)
 	}
 }
+
+func boolPtr(b bool) *bool { return &b }
