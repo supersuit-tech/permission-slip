@@ -15,6 +15,7 @@ type chat struct {
 	AccountID           string   `json:"account_id,omitempty"`
 	AccountLogin        string   `json:"account_login,omitempty"`
 	LastAddressedHandle string   `json:"last_addressed_handle,omitempty"`
+	UnreadCount         int      `json:"unread_count,omitempty"`
 }
 
 // message mirrors the imsg Message JSON object.
@@ -38,6 +39,8 @@ type message struct {
 	Reactions            []reaction   `json:"reactions,omitempty"`
 	AccountID            string       `json:"account_id,omitempty"`
 	AccountLogin         string       `json:"account_login,omitempty"`
+	IsRead               bool         `json:"is_read,omitempty"`
+	DateRead             string       `json:"date_read,omitempty"`
 }
 
 type attachment struct {

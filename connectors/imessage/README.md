@@ -23,11 +23,18 @@ SMS relay routes through Apple's push servers (APNs), not the local Wi‑Fi netw
 
 | Action | Approval | Description |
 |--------|----------|-------------|
-| `imessage.list_chats` | No | Recent conversations (iMessage and SMS when forwarding is on) |
+| `imessage.list_chats` | No | Recent conversations with optional `unread_only` filter and per-chat `unread_count` (when imsg supports it) |
 | `imessage.get_chat` | No | Single chat + participants |
-| `imessage.read_history` | No | Messages in a chat (supports `since_guid` / `since_rowid`) |
+| `imessage.read_history` | No | Messages in a chat (supports `since_guid` / `since_rowid`; per-message `is_read` / `date_read` when imsg supports it) |
 | `imessage.search` | No | Search local history |
 | `imessage.send_message` | Yes | Send text or file attachment |
+
+## Unread state (read-only)
+
+1. Call **`imessage.list_chats`** with `unread_only: true` to list chats that have unread inbound messages. Each chat includes `unread_count` when the installed imsg build supports it ([openclaw/imsg#151](https://github.com/openclaw/imsg/issues/151)).
+2. Call **`imessage.read_history`** on a chat to inspect individual messages. Inbound rows may include `is_read` and `date_read` when imsg emits them.
+
+Mark-as-read is intentionally unsupported — persisting read state requires IMCore injection (SIP off), which Permission Slip does not use.
 
 ## Send policy (service / fallback)
 
