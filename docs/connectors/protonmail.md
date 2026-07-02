@@ -8,9 +8,9 @@ Proton Mail does not offer a public Gmail-style API for third-party apps on free
 
 ## Supported hosts
 
-Bridge is officially distributed for **x86_64 Linux, macOS, and Windows**. Proton does not publish an ARM build, so Raspberry Pi and other ARM boards are not supported hosts for the Proton Mail connector.
+Bridge is officially distributed for **x86_64 Linux, macOS (Apple Silicon and Intel), and Windows**. Proton does not publish an ARM build for Linux, so Raspberry Pi and other Linux ARM boards are not supported hosts for the Proton Mail connector.
 
-If you're currently self-hosting on ARM hardware, we recommend running Permission Slip (and Bridge) on a small **x86_64 mini PC** with the specs you need. Any model that fits your budget and footprint will work; the connector only requires that Bridge itself is supported on the host OS.
+This is one reason the [self-hosted deployment guide](../deployment-self-hosted.md) recommends a **Mac Mini** as the default host: Bridge's native Apple Silicon build means there's no architecture restriction to work around, unlike Linux ARM. If you're self-hosting on Linux ARM hardware and want Proton Mail, run Permission Slip (and Bridge) on a small **x86_64 mini PC** instead — see the [Linux deployment guide](../deployment-self-hosted-linux.md).
 
 ## What the connector supports
 
@@ -64,7 +64,66 @@ Calendar, Drive, Contacts, VPN, and Pass are **not** available through Bridge (n
 
 If you run an [OpenClaw](https://github.com/supersuit-tech) machine as a Permission Slip agent, you can install the [`permission-slip-openclaw-skill-protonmail`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-protonmail) skill so the agent handles plain requests like *"check my email"* — it reads your inbox (newest 50) through this connector using your default Proton Mail account. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip. Install it on your OpenClaw machine when you're ready.
 
-## Install and run Bridge
+## Install and run Bridge (macOS)
+
+On a Mac Mini, Bridge runs as a normal signed macOS app under your own user account — there's no dedicated service user, no GPG/`pass` keychain setup, and no systemd. Two options, depending on whether you want a persistent GUI session or a headless one:
+
+### Option A: GUI, start at login (simplest, recommended)
+
+1. Download Proton Mail Bridge for macOS from [proton.me/mail/bridge](https://proton.me/mail/bridge) and install it.
+2. Launch Bridge, sign in with your Proton account, and complete 2FA.
+3. In Bridge's **Settings**, enable the option to start Bridge automatically at login (exact wording varies slightly by Bridge version).
+4. Click your account in Bridge to open the **Mailbox configuration** panel — it shows the bridge password and the IMAP/SMTP host and port (defaults `127.0.0.1:1143` / `127.0.0.1:1025`), the values you'll enter in Permission Slip below.
+
+Since a Mac Mini is meant to run unattended, enable **automatic login** for this user under **System Settings → Users & Groups → Login Options** (same setting used in [Step 4 of the deployment guide](../deployment-self-hosted.md#step-4-run-on-boot-launchd)) so Bridge's login item starts it after every reboot without anyone present.
+
+### Option B: Headless via launchd
+
+If you'd rather not keep a logged-in GUI session around, Bridge ships the same underlying CLI as the Linux build and supports a `--cli` (interactive login) and `--noninteractive` (headless service) mode. The app bundle's exact binary name can vary slightly by version — confirm it first:
+
+```bash
+ls "/Applications/Proton Mail Bridge.app/Contents/MacOS/"
+```
+
+Then, using whatever binary name that lists (commonly `Proton Mail Bridge` or `bridge`):
+
+```bash
+# One-time interactive login — replace BRIDGE_BIN with the path from `ls` above:
+BRIDGE_BIN="/Applications/Proton Mail Bridge.app/Contents/MacOS/Proton Mail Bridge"
+"$BRIDGE_BIN" --cli
+# Log in, complete 2FA, note the bridge password and IMAP/SMTP host+port, then: exit
+
+mkdir -p ~/Library/LaunchAgents
+cat > ~/Library/LaunchAgents/com.protonmail.bridge.plist <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.protonmail.bridge</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>$BRIDGE_BIN</string>
+        <string>--noninteractive</string>
+    </array>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+</dict>
+</plist>
+EOF
+
+launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.protonmail.bridge.plist
+```
+
+Quit the GUI app first — a GUI instance and the headless LaunchAgent can't both bind ports 1143/1025 at once. Restart it the same way as Permission Slip itself: `launchctl kickstart -k gui/$(id -u)/com.protonmail.bridge`.
+
+> This flag-based `--cli` / `--noninteractive` split is verified on the Linux build (used below); this doc hasn't been battle-tested against every recent macOS Bridge release, so if `--noninteractive` behaves differently for your version, run `"$BRIDGE_BIN" --help` to check, or fall back to Option A.
+
+---
+
+## Install and run Bridge (Linux)
 
 These steps assume a dedicated Linux user (example: `proton`) on the same host as Permission Slip.
 
@@ -254,6 +313,8 @@ systemctl --user stop protonmail-bridge
 protonmail-bridge --cli      # type: info   (note username + bridge password), then: exit
 systemctl --user start protonmail-bridge
 ```
+
+**On macOS:** click the account in Bridge's GUI mailbox configuration panel to see the same `username` / bridge password / host / port values (Option A above) — no stop/start dance needed. Only the headless launchd setup (Option B) needs the stop → `--cli info` → restart sequence, using `launchctl kickstart` in place of `systemctl --user`.
 
 Saving credentials runs a real **IMAP LOGIN** against Bridge. Bridge must be running at save time.
 
