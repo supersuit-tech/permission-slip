@@ -2,6 +2,7 @@ package imessage
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"time"
 
@@ -87,15 +88,20 @@ func isTerminalSendState(state string) bool {
 }
 
 // verifySendDelivery polls message.send_status until delivery completes or times out.
+// Returns an error only for explicit delivery failure or request cancellation.
+// Transport errors during polling are treated as non-fatal (caller should report unknown state).
 func verifySendDelivery(ctx context.Context, client *imsgClient, creds connectors.Credentials, guid string) (*sendStatusResult, error) {
 	var last *sendStatusResult
 	for attempt := 0; attempt < deliveryPollMaxAttempts; attempt++ {
 		if err := ctx.Err(); err != nil {
-			return last, err
+			if errors.Is(err, context.Canceled) {
+				return last, &connectors.CanceledError{Message: err.Error()}
+			}
+			return last, nil
 		}
 		status, err := fetchSendStatus(ctx, client, creds, guid)
 		if err != nil {
-			return nil, err
+			return last, nil
 		}
 		last = status
 		if status.SendState == sendStatusFailed {
@@ -109,7 +115,10 @@ func verifySendDelivery(ctx context.Context, client *imsgClient, creds connector
 		if attempt+1 < deliveryPollMaxAttempts {
 			select {
 			case <-ctx.Done():
-				return last, ctx.Err()
+				if errors.Is(ctx.Err(), context.Canceled) {
+					return last, &connectors.CanceledError{Message: ctx.Err().Error()}
+				}
+				return last, nil
 			case <-time.After(deliveryPollInterval):
 			}
 		}

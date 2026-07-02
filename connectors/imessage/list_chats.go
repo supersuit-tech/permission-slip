@@ -43,5 +43,9 @@ func (a *listChatsAction) Execute(ctx context.Context, req connectors.ActionRequ
 	}, &result); err != nil {
 		return nil, err
 	}
-	return connectors.JSONResult(map[string]any{"chats": result.Chats})
+	chats := result.Chats
+	if chats == nil {
+		chats = []chat{}
+	}
+	return connectors.JSONResult(map[string]any{"chats": chats})
 }

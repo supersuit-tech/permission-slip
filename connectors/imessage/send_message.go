@@ -100,10 +100,12 @@ func (a *sendMessageAction) Execute(ctx context.Context, req connectors.ActionRe
 		if err != nil {
 			return nil, err
 		}
-		if delivery != nil {
+		if delivery != nil && delivery.SendState != "" {
 			response["send_state"] = delivery.SendState
 			response["service"] = delivery.Service
 			response["delivery"] = delivery
+		} else {
+			response["send_state"] = "unknown"
 		}
 	}
 	return connectors.JSONResult(response)

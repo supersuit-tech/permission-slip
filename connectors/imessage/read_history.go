@@ -65,25 +65,39 @@ func (a *readHistoryAction) Execute(ctx context.Context, req connectors.ActionRe
 		return nil, err
 	}
 
-	messages := filterMessagesSince(result.Messages, params.SinceGUID, params.SinceRowID)
-	return connectors.JSONResult(map[string]any{
+	messages, cursorMiss := filterMessagesSince(result.Messages, params.SinceGUID, params.SinceRowID)
+	out := map[string]any{
 		"messages": messages,
 		"count":    len(messages),
-	})
+	}
+	if cursorMiss {
+		out["cursor_miss"] = true
+		out["cursor_miss_reason"] = "since_guid not found in fetched window; increase limit or pass since_rowid"
+	}
+	return connectors.JSONResult(out)
 }
 
 // filterMessagesSince returns only messages newer than the given cursor.
-func filterMessagesSince(messages []message, sinceGUID string, sinceRowID int) []message {
+// The bool is true when since_guid was provided but not found in the window
+// (and since_rowid is zero), so callers can avoid treating the full window as new.
+func filterMessagesSince(messages []message, sinceGUID string, sinceRowID int) ([]message, bool) {
 	if sinceGUID == "" && sinceRowID <= 0 {
-		return messages
+		return messages, false
 	}
 
 	cutoffID := sinceRowID
+	guidFound := sinceGUID == ""
 	if sinceGUID != "" {
 		for _, m := range messages {
-			if m.GUID == sinceGUID && m.ID > cutoffID {
-				cutoffID = m.ID
+			if m.GUID == sinceGUID {
+				guidFound = true
+				if m.ID > cutoffID {
+					cutoffID = m.ID
+				}
 			}
+		}
+		if !guidFound && sinceRowID <= 0 {
+			return []message{}, true
 		}
 	}
 
@@ -97,5 +111,5 @@ func filterMessagesSince(messages []message, sinceGUID string, sinceRowID int) [
 		}
 		out = append(out, m)
 	}
-	return out
+	return out, false
 }

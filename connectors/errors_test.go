@@ -16,6 +16,15 @@ func TestExternalError(t *testing.T) {
 	}
 }
 
+func TestExternalError_ZeroStatus(t *testing.T) {
+	t.Parallel()
+	err := &ExternalError{Message: "Internal error"}
+
+	if err.Error() != "external service error: Internal error" {
+		t.Errorf("unexpected error message: %s", err.Error())
+	}
+}
+
 func TestAuthError(t *testing.T) {
 	t.Parallel()
 	err := &AuthError{Message: "invalid API key"}

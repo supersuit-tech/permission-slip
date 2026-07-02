@@ -301,7 +301,7 @@ func TestResolveSendConstraintMetadata(t *testing.T) {
 }
 
 func TestMapRPCError_FullDiskAccess(t *testing.T) {
-	err := mapRPCError(&rpcError{Message: "authorization denied: unable to open database file"})
+	err := mapRPCError(&rpcError{Message: "authorization denied: unable to open database file"}, "")
 	if !connectors.IsAuthError(err) {
 		t.Fatalf("got %T", err)
 	}
