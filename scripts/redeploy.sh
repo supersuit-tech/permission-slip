@@ -1,18 +1,24 @@
 #!/usr/bin/env bash
 #
 # Update a self-hosted Permission Slip install to the latest main and restart
-# the systemd service — one command, nothing to remember.
+# the running service — one command, nothing to remember. Restarts a systemd
+# unit on Linux or a launchd LaunchAgent on macOS, whichever is present.
 #
 #   make redeploy           # from the repo root (preferred)
 #   scripts/redeploy.sh     # or run it directly
 #
-# Override the systemd unit name if you didn't call it "permission-slip":
+# Linux (systemd) — override the unit name if you didn't call it "permission-slip":
 #
 #   PS_SERVICE=my-unit scripts/redeploy.sh
 #
 # Target a user-level unit (systemctl --user) instead of a system unit:
 #
 #   PS_SYSTEMCTL_ARGS=--user scripts/redeploy.sh
+#
+# macOS (launchd) — override the LaunchAgent label if you didn't use the one
+# from docs/deployment-self-hosted.md ("com.permissionslip.server"):
+#
+#   PS_LAUNCHD_LABEL=com.example.permission-slip scripts/redeploy.sh
 #
 # Safety: the running server is only ever replaced by a SUCCESSFUL build. A
 # failed `git pull` (e.g. a transient network blip) or a failed dependency
@@ -22,6 +28,7 @@
 set -euo pipefail
 
 SERVICE="${PS_SERVICE:-permission-slip}"
+LAUNCHD_LABEL="${PS_LAUNCHD_LABEL:-com.permissionslip.server}"
 
 # Resolve the repo root from this script's location so it works from anywhere.
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -49,8 +56,8 @@ echo "==> Building frontend + server"
 # currently-running service untouched.
 make build
 
-echo "==> Restarting service: $SERVICE"
 if command -v systemctl >/dev/null 2>&1; then
+  echo "==> Restarting service: $SERVICE"
   # Use sudo only when not already root and sudo is available — restarting a
   # system unit needs root, but a root deploy job (or a passwordless-sudo-less
   # box) shouldn't trip over a hardcoded `sudo`.
@@ -61,8 +68,17 @@ if command -v systemctl >/dev/null 2>&1; then
   # PS_SYSTEMCTL_ARGS lets you target a user unit, e.g.
   #   PS_SYSTEMCTL_ARGS=--user scripts/redeploy.sh
   $SUDO systemctl ${PS_SYSTEMCTL_ARGS:-} restart "$SERVICE"
+elif command -v launchctl >/dev/null 2>&1; then
+  echo "==> Restarting service: $LAUNCHD_LABEL"
+  # Per-user LaunchAgent, as set up in docs/deployment-self-hosted.md Step 4.
+  DOMAIN="gui/$(id -u)"
+  if launchctl print "$DOMAIN/$LAUNCHD_LABEL" >/dev/null 2>&1; then
+    launchctl kickstart -k "$DOMAIN/$LAUNCHD_LABEL"
+  else
+    echo "    WARNING: launchd service '$LAUNCHD_LABEL' isn't loaded in $DOMAIN — restart your server process manually, or bootstrap it as described in docs/deployment-self-hosted.md Step 4." >&2
+  fi
 else
-  echo "    systemctl not found — restart your server process manually." >&2
+  echo "    Neither systemctl nor launchctl found — restart your server process manually." >&2
 fi
 
 SHA="$(git rev-parse --short HEAD)"

@@ -1,10 +1,14 @@
-# Self-Hosted Deployment Guide
+# Self-Hosted Deployment Guide — Linux
+
+> **Looking for the default recommendation?** Most self-hosters should use the **[Mac Mini / macOS guide](deployment-self-hosted.md)** instead — it's simpler to keep on 24/7 and runs every connector (including Proton Mail) natively regardless of chip. Use this Linux guide if you'd rather run on a mini PC, Raspberry Pi, VM, or VPS.
 
 Permission Slip ships as a **single Go binary** with the React frontend embedded. You'll run it on your own machine and reach it privately over Tailscale — no port forwarding, no manual TLS, your own HTTPS hostname. Your instance is **only reachable from devices on your tailnet**, never exposed to the public internet.
 
-> **Recommended hardware: Mac Mini.** A Mac Mini (Apple Silicon or Intel) is the recommended host — it's small, silent, sips power, and stays on 24/7 without complaint. Unlike a Linux ARM board, it runs **every connector natively, including Proton Mail** (Proton ships a native Apple Silicon build of Bridge — no x86_64-only restriction). This guide walks through a native macOS install.
+> **Recommended Linux hardware:**
+> - **x86_64 mini PC (amd64)** — e.g. an Intel N100/NUC-class box. Silent, always-on, and **the only Linux option if you want the Proton Mail connector**, since Proton Bridge's Linux build is x86_64 only (no ARM). Pick this if in doubt.
+> - **Raspberry Pi 5 (4GB+)** — cheaper and lower-power, but ARM-only, so it **cannot run the Proton Mail connector** on Linux (see [Email: Proton Mail](#email-proton-mail-bridge)).
 >
-> **Prefer Linux instead?** — e.g. a mini PC, Raspberry Pi, VM, or VPS you already have — see the **[Linux deployment guide](deployment-self-hosted-linux.md)**. Both guides produce an equivalent, fully-featured install; pick whichever OS you're more comfortable operating. You need **Go 1.24+** and **Node.js 20+** to build from source either way.
+> The steps below work on any Linux machine, VM, or VPS. Where the Go install differs by CPU architecture, both **amd64** (mini PC / most desktops & VMs) and **arm64** (Raspberry Pi) commands are shown — run the one that matches your hardware (`uname -m` prints `x86_64` for amd64, `aarch64` for arm64). You need **Go 1.24+** and **Node.js 20+** to build from source.
 
 ```
  ┌──────────────┐
@@ -34,15 +38,28 @@ Permission Slip ships as a **single Go binary** with the React frontend embedded
 
 You need a **[Tailscale account](https://login.tailscale.com/start)** — the free personal plan covers up to 3 users and 100 devices, which is plenty for a personal Permission Slip instance. No domain registration, DNS configuration, or port forwarding required.
 
-You also need **[Homebrew](https://brew.sh)** installed, and the Xcode Command Line Tools (Homebrew's installer prompts for these automatically if they're missing).
-
 ---
 
 ## Step 1: Get the Binary
 
 ```bash
-# Install Go and Node.js via Homebrew
-brew install go node
+# Install Go — pick the line that matches your CPU (run `uname -m` to check)
+
+# amd64 / x86_64 (mini PC, most desktops & VMs):
+wget https://go.dev/dl/go1.24.1.linux-amd64.tar.gz
+sudo tar -C /usr/local -xzf go1.24.1.linux-amd64.tar.gz
+
+# arm64 / aarch64 (Raspberry Pi):
+# wget https://go.dev/dl/go1.24.1.linux-arm64.tar.gz
+# sudo tar -C /usr/local -xzf go1.24.1.linux-arm64.tar.gz
+
+echo 'export PATH=$PATH:/usr/local/go/bin' >> ~/.bashrc
+source ~/.bashrc
+
+# Install Node.js 22 via nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.bashrc
+nvm install 22 && nvm use 22
 
 # Clone and build
 git clone https://github.com/supersuit-tech/permission-slip.git
@@ -51,44 +68,40 @@ make install
 make build
 ```
 
-This builds a native binary for whichever chip you're on (Apple Silicon or Intel) — no cross-architecture flags needed, since you're building directly on the Mac Mini that will run it.
-
-> **Building on a different Mac?** Cross-compile and copy the binary over:
+> **Faster build:** Cross-compile on a beefier development machine and copy the binary over. Set `GOARCH` to match the target host:
 > ```bash
-> # Apple Silicon (M-series) target:
-> GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 make build
-> scp bin/server user@mac-mini.local:~/permission-slip/bin/server
+> # Target an amd64 / x86_64 mini PC:
+> GOOS=linux GOARCH=amd64 CGO_ENABLED=0 make build
+> scp bin/server user@minipc.local:~/permission-slip/bin/server
 >
-> # Intel target:
-> GOOS=darwin GOARCH=amd64 CGO_ENABLED=0 make build
-> scp bin/server user@mac-mini.local:~/permission-slip/bin/server
+> # Target an arm64 Raspberry Pi:
+> GOOS=linux GOARCH=arm64 CGO_ENABLED=0 make build
+> scp bin/server pi@raspberrypi.local:~/permission-slip/bin/server
 > ```
 
 ---
 
 ## Step 2: Set Up Tailscale Serve
 
-Install Tailscale:
+Install Tailscale on the server:
 
 ```bash
-brew install --cask tailscale-app
+curl -fsSL https://tailscale.com/install.sh | sh
 ```
 
-Open the Tailscale app once from `/Applications` — macOS will prompt you to approve its system extension under **System Settings → Privacy & Security**; click **Allow**, then reopen Tailscale. This one-time approval is required before `tailscale up` will work.
-
-Sign in and join your tailnet (this prints a browser URL — open it and authenticate). No `sudo` needed — the standalone app's CLI talks to the already-privileged background daemon over a local socket instead of touching the network stack directly:
+Sign in and join your tailnet (this prints a browser URL — open it and authenticate):
 
 ```bash
-tailscale up
+sudo tailscale up
 ```
 
-> **Headless Mac Mini (no display)?** If you're setting this up over SSH with no monitor attached, generate a one-time auth key at [login.tailscale.com/admin/settings/keys](https://login.tailscale.com/admin/settings/keys) — leave **Reusable** off (single-use), leave **Ephemeral** off (so the server stays registered when offline), then run:
+> **Headless server? Use an auth key instead.** If the machine has no browser (or you're scripting the setup), generate a one-time auth key at [login.tailscale.com/admin/settings/keys](https://login.tailscale.com/admin/settings/keys) — leave **Reusable** off (single-use), leave **Ephemeral** off (so the server stays registered when offline), then run:
 >
 > ```bash
-> tailscale up --authkey=tskey-auth-xxxxx --hostname=permissions
+> sudo tailscale up --authkey=tskey-auth-xxxxx --hostname=permissions
 > ```
 >
-> You still need to open the Tailscale app locally at least once (or via screen sharing) to approve the system extension before this works. Once registered, open [Machines](https://login.tailscale.com/admin/machines) → click the machine → **Disable key expiry** so you don't have to re-authenticate every ~180 days. The auth key itself is only needed for this one-time bootstrap — don't bake it into a config file or launchd plist.
+> Once registered, open [Machines](https://login.tailscale.com/admin/machines) → click the machine → **Disable key expiry** so you don't have to re-authenticate every ~180 days. The auth key itself is only needed for this one-time bootstrap — don't bake it into a config file or systemd unit.
 
 **Enable HTTPS for your tailnet.** In the [Tailscale admin console](https://login.tailscale.com/admin/dns), under **DNS**, click **Enable HTTPS**. This unlocks free Let's Encrypt certificates on your `<tailnet-name>.ts.net` domain.
 
@@ -101,12 +114,12 @@ export PS_HOSTNAME=$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.
 echo "Permission Slip will be reachable at: https://$PS_HOSTNAME"
 ```
 
-> No `jq`? `brew install jq` first. These shell variables are **only needed during setup** — they get written into config files and aren't referenced again. No need to add them to `.zshrc`.
+> These shell variables are **only needed during setup** — they get written into config files and aren't referenced again. No need to add them to `.bashrc`.
 
 Expose Permission Slip on that hostname over HTTPS:
 
 ```bash
-tailscale serve --bg --https=443 8080
+sudo tailscale serve --bg --https=443 8080
 ```
 
 This proxies `https://$PS_HOSTNAME` to local port 8080 (where Permission Slip will run in the next step). `--bg` runs it in the background and persists the configuration across reboots. Verify:
@@ -139,65 +152,46 @@ JWT_SIGNING_SECRET=replace-me
 INVITE_HMAC_KEY=replace-me
 EOF
 
-# Fill in the secrets (macOS/BSD sed needs the empty '' arg after -i)
-sed -i '' "s|SECRET_ENCRYPTION_KEY=replace-me|SECRET_ENCRYPTION_KEY=$(openssl rand -base64 32)|" ~/permission-slip/.env
-sed -i '' "s|JWT_SIGNING_SECRET=replace-me|JWT_SIGNING_SECRET=$(openssl rand -base64 32)|" ~/permission-slip/.env
-sed -i '' "s|INVITE_HMAC_KEY=replace-me|INVITE_HMAC_KEY=$(openssl rand -hex 32)|" ~/permission-slip/.env
+# Fill in the secrets
+sed -i "s|SECRET_ENCRYPTION_KEY=replace-me|SECRET_ENCRYPTION_KEY=$(openssl rand -base64 32)|" ~/permission-slip/.env
+sed -i "s|JWT_SIGNING_SECRET=replace-me|JWT_SIGNING_SECRET=$(openssl rand -base64 32)|" ~/permission-slip/.env
+sed -i "s|INVITE_HMAC_KEY=replace-me|INVITE_HMAC_KEY=$(openssl rand -hex 32)|" ~/permission-slip/.env
 ```
 
 That's it — `BASE_URL` is your tailnet HTTPS hostname, and `ALLOWED_ORIGINS` doesn't need to be set (the server allows the origin the browser used).
 
 ---
 
-## Step 4: Run on Boot (launchd)
-
-On macOS, `launchd` is the equivalent of systemd. Create a per-user **LaunchAgent** so Permission Slip starts automatically at login and restarts if it crashes:
+## Step 4: Run on Boot (systemd)
 
 ```bash
-mkdir -p ~/Library/LaunchAgents
-cat > ~/Library/LaunchAgents/com.permissionslip.server.plist <<EOF
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0">
-<dict>
-    <key>Label</key>
-    <string>com.permissionslip.server</string>
-    <key>ProgramArguments</key>
-    <array>
-        <string>$HOME/permission-slip/bin/server</string>
-    </array>
-    <key>WorkingDirectory</key>
-    <string>$HOME/permission-slip</string>
-    <key>RunAtLoad</key>
-    <true/>
-    <key>KeepAlive</key>
-    <true/>
-    <key>StandardOutPath</key>
-    <string>$HOME/permission-slip/server.log</string>
-    <key>StandardErrorPath</key>
-    <string>$HOME/permission-slip/server.log</string>
-</dict>
-</plist>
+sudo tee /etc/systemd/system/permission-slip.service > /dev/null <<EOF
+[Unit]
+Description=Permission Slip
+After=network.target tailscaled.service
+
+[Service]
+Type=simple
+User=$(whoami)
+WorkingDirectory=$HOME/permission-slip
+EnvironmentFile=$HOME/permission-slip/.env
+ExecStart=$HOME/permission-slip/bin/server
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
 EOF
 
-launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.permissionslip.server.plist
+sudo systemctl daemon-reload
+sudo systemctl enable --now permission-slip
 ```
-
-> No explicit env-file directive is needed: the server loads `.env` from its current directory on startup, and `WorkingDirectory` above points there.
-
-> **For this to survive a reboot with nobody logged in**, turn on **automatic login** for this user under **System Settings → Users & Groups → Login Options**, and disable sleep (**System Settings → Energy** → set "Prevent automatic sleeping" / turn off display sleep on Mac Mini desktops, which have no battery to worry about).
 
 Verify both services are healthy:
 
 ```bash
 curl http://localhost:8080/api/health           # local check
 curl https://$PS_HOSTNAME/api/health            # through Tailscale (run from any tailnet device)
-```
-
-To restart the service manually after config changes:
-
-```bash
-launchctl kickstart -k gui/$(id -u)/com.permissionslip.server
 ```
 
 ---
@@ -212,25 +206,25 @@ make redeploy
 ```
 
 This pulls `origin/main`, reinstalls dependencies, rebuilds the frontend and
-server, restarts the `launchd` service set up in Step 4, and prints the build
-it's now running (the same short SHA shown in the app footer, so you can
-confirm the update took effect). New connector fields, manifest changes, and
-migrations are picked up on the restart — there's nothing else to remember.
-
-> **Named the LaunchAgent something other than `com.permissionslip.server`?** Pass it through:
-> ```bash
-> PS_LAUNCHD_LABEL=my.custom.label make redeploy
-> ```
+server, restarts the systemd service, and prints the build it's now running
+(the same short SHA shown in the app footer, so you can confirm the update took
+effect). New connector fields, manifest changes, and migrations are picked up on
+the restart — there's nothing else to remember.
 
 > The running server is only ever replaced by a **successful** build. If the
 > build fails, `make redeploy` stops before restarting and your service keeps
 > serving the previous working binary. A transient `git pull` failure is
 > non-fatal — it rebuilds the current checkout instead.
 
+> **Named the service something other than `permission-slip`?** Pass it through:
+> ```bash
+> PS_SERVICE=my-unit make redeploy
+> ```
+
 > **Cross-compiling on a beefier box?** `make redeploy` builds and restarts on
 > the machine it runs on. If you build elsewhere and `scp bin/server` over (see
 > the build note in Step 1), pull + build there, copy the binary, then restart
-> on the host with `launchctl kickstart -k gui/$(id -u)/com.permissionslip.server`.
+> on the host with `sudo systemctl restart permission-slip`.
 
 ---
 
@@ -268,7 +262,7 @@ Permission Slip's Google connector handles Gmail and Calendar actions. To enable
    ```
 6. Restart Permission Slip:
    ```bash
-   launchctl kickstart -k gui/$(id -u)/com.permissionslip.server
+   sudo systemctl restart permission-slip
    ```
 
 ---
@@ -303,7 +297,7 @@ Slack uses [OAuth 2.0 with the V2 flow](https://api.slack.com/authentication/oau
    ```
 5. Restart Permission Slip:
    ```bash
-   launchctl kickstart -k gui/$(id -u)/com.permissionslip.server
+   sudo systemctl restart permission-slip
    ```
 
 When a user connects Slack from Permission Slip, they'll complete Slack's OAuth consent and install the app to their workspace.
@@ -314,9 +308,9 @@ When a user connects Slack from Permission Slip, they'll complete Slack's OAuth 
 
 Gmail is covered by the [Google connector](#step-5-connect-google) (OAuth). **Proton Mail** is a built-in connector that uses [Proton Mail Bridge](https://proton.me/mail/bridge) — Proton's official local IMAP/SMTP proxy — on the same machine as Permission Slip. There is no cloud OAuth flow.
 
-Proton ships a native macOS build of Bridge for both Apple Silicon and Intel, so a Mac Mini runs the Proton Mail connector with no architecture caveats (unlike Linux, where Bridge is x86_64-only).
+Bridge's Linux build is x86_64 only — Proton does not publish an ARM build for Linux, so Raspberry Pi and other ARM boards can't run the Proton Mail connector under this Linux guide. If you're on ARM and want Proton Mail, either switch to an x86_64 mini PC here, or use the **[Mac Mini / macOS guide](deployment-self-hosted.md)** instead, since Proton ships a native Apple Silicon build of Bridge for macOS.
 
-1. Install and run Bridge. Full steps, including a headless `launchd` option: **[Proton Mail connector guide](connectors/protonmail.md)**.
+1. Install and run Bridge headless (systemd user unit). Full steps: **[Proton Mail connector guide](connectors/protonmail.md)**.
 2. In the Permission Slip UI, add **Proton Mail** credentials with your Proton address and the bridge password printed by Bridge.
 3. Grant agent permissions using the Proton templates (send, read inbox, search, read message, archive).
 
@@ -336,13 +330,7 @@ To build your own connector for a service Permission Slip doesn't yet support, s
 
 Because your Permission Slip instance is private to your tailnet, **any machine that runs Openclaw (or any other tool that calls the Permission Slip API) also needs Tailscale installed** — otherwise it can't reach `https://$PS_HOSTNAME`.
 
-- **macOS machines:**
-  ```bash
-  brew install --cask tailscale-app
-  # then open Tailscale.app once to approve the system extension, as in Step 2
-  tailscale up
-  ```
-- **Linux machines (laptop, dev box):**
+- **Interactive machines (laptop, dev box):**
   ```bash
   curl -fsSL https://tailscale.com/install.sh | sh
   sudo tailscale up
