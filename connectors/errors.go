@@ -14,6 +14,9 @@ type ExternalError struct {
 }
 
 func (e *ExternalError) Error() string {
+	if e.StatusCode == 0 {
+		return fmt.Sprintf("external service error: %s", e.Message)
+	}
 	return fmt.Sprintf("external service error (status %d): %s", e.StatusCode, e.Message)
 }
 

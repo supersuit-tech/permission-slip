@@ -2,6 +2,7 @@ package imessage
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,8 +17,9 @@ import (
 )
 
 const (
-	defaultCLIPath = "imsg"
-	maxRPCResponse = 10 << 20 // 10 MiB
+	defaultCLIPath   = "imsg"
+	maxRPCResponse   = 10 << 20 // 10 MiB
+	maxStderrCapture = 8 << 10  // 8 KiB
 )
 
 // commandConfig describes how to reach the imsg binary (local or over SSH).
@@ -26,10 +28,14 @@ type commandConfig struct {
 	RemoteHost string
 }
 
-func commandConfigFromCreds(creds connectors.Credentials) commandConfig {
+func commandConfigFromCreds(creds connectors.Credentials) (commandConfig, error) {
 	path, _ := creds.Get(credKeyCLIPath)
 	host, _ := creds.Get(credKeyRemoteHost)
-	return commandConfig{CLIPath: path, RemoteHost: host}
+	cfg := commandConfig{CLIPath: path, RemoteHost: host}
+	if err := validateCommandConfig(cfg); err != nil {
+		return commandConfig{}, err
+	}
+	return cfg, nil
 }
 
 func (c commandConfig) cliPath() string {
@@ -37,6 +43,43 @@ func (c commandConfig) cliPath() string {
 		return defaultCLIPath
 	}
 	return strings.TrimSpace(c.CLIPath)
+}
+
+func validateCommandConfig(cfg commandConfig) error {
+	host := strings.TrimSpace(cfg.RemoteHost)
+	if host != "" {
+		if strings.HasPrefix(host, "-") {
+			return &connectors.ValidationError{Message: "remote_host must not start with '-'"}
+		}
+		for _, r := range host {
+			if !isRemoteHostChar(r) {
+				return &connectors.ValidationError{Message: "remote_host contains invalid characters"}
+			}
+		}
+	}
+
+	path := strings.TrimSpace(cfg.CLIPath)
+	if path == "" {
+		return nil
+	}
+	if strings.HasPrefix(path, "-") {
+		return &connectors.ValidationError{Message: "cli_path must not start with '-'"}
+	}
+	if strings.ContainsAny(path, ";|&$`\"'<>(){}[]*?~!#\\") {
+		return &connectors.ValidationError{Message: "cli_path contains invalid characters"}
+	}
+	return nil
+}
+
+func isRemoteHostChar(r rune) bool {
+	switch {
+	case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9':
+		return true
+	case r == '-', r == '_', r == '.', r == '@', r == ':':
+		return true
+	default:
+		return false
+	}
 }
 
 type rpcRequest struct {
@@ -54,8 +97,9 @@ type rpcResponse struct {
 }
 
 type rpcError struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
+	Code    int             `json:"code"`
+	Message string          `json:"message"`
+	Data    json.RawMessage `json:"data,omitempty"`
 }
 
 func (e *rpcError) Error() string {
@@ -65,6 +109,33 @@ func (e *rpcError) Error() string {
 	return e.Message
 }
 
+// boundedStderr keeps the tail of subprocess stderr for diagnostics.
+type boundedStderr struct {
+	mu  sync.Mutex
+	buf []byte
+	max int
+}
+
+func newBoundedStderr(max int) *boundedStderr {
+	return &boundedStderr{max: max}
+}
+
+func (b *boundedStderr) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	b.buf = append(b.buf, p...)
+	if len(b.buf) > b.max {
+		b.buf = append([]byte(nil), b.buf[len(b.buf)-b.max:]...)
+	}
+	return len(p), nil
+}
+
+func (b *boundedStderr) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return strings.TrimSpace(string(b.buf))
+}
+
 // rpcSession keeps a persistent imsg rpc subprocess alive for reuse.
 type rpcSession struct {
 	mu     sync.Mutex
@@ -72,12 +143,13 @@ type rpcSession struct {
 	cmd    *exec.Cmd
 	stdin  io.WriteCloser
 	stdout *bufio.Reader
+	stderr *boundedStderr
 	nextID atomic.Int64
-	closed bool
+	closed atomic.Bool
 }
 
 func newRPCSession(cfg commandConfig) (*rpcSession, error) {
-	s := &rpcSession{cfg: cfg}
+	s := &rpcSession{cfg: cfg, stderr: newBoundedStderr(maxStderrCapture)}
 	if err := s.start(); err != nil {
 		return nil, err
 	}
@@ -88,7 +160,7 @@ func (s *rpcSession) start() error {
 	var cmd *exec.Cmd
 	path := s.cfg.cliPath()
 	if s.cfg.RemoteHost != "" {
-		cmd = exec.Command("ssh", "-T", s.cfg.RemoteHost, path, "rpc")
+		cmd = exec.Command("ssh", "-T", "--", s.cfg.RemoteHost, path, "rpc")
 	} else {
 		cmd = exec.Command(path, "rpc")
 	}
@@ -102,7 +174,7 @@ func (s *rpcSession) start() error {
 		stdin.Close()
 		return fmt.Errorf("imsg rpc stdout pipe: %w", err)
 	}
-	cmd.Stderr = io.Discard
+	cmd.Stderr = s.stderr
 
 	if err := cmd.Start(); err != nil {
 		stdin.Close()
@@ -112,8 +184,22 @@ func (s *rpcSession) start() error {
 	s.cmd = cmd
 	s.stdin = stdin
 	s.stdout = bufio.NewReader(stdout)
-	s.closed = false
+	s.closed.Store(false)
 	return nil
+}
+
+func (s *rpcSession) tearDownLocked() {
+	s.closed.Store(true)
+	if s.stdin != nil {
+		_ = s.stdin.Close()
+		s.stdin = nil
+	}
+	if s.cmd != nil && s.cmd.Process != nil {
+		_ = s.cmd.Process.Kill()
+		_ = s.cmd.Wait()
+		s.cmd = nil
+	}
+	s.stdout = nil
 }
 
 func mapStartError(err error) error {
@@ -141,23 +227,17 @@ func mapStartError(err error) error {
 func (s *rpcSession) close() {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed {
+	if s.closed.Load() {
 		return
 	}
-	s.closed = true
-	if s.stdin != nil {
-		_ = s.stdin.Close()
-	}
-	if s.cmd != nil && s.cmd.Process != nil {
-		_ = s.cmd.Process.Kill()
-	}
+	s.tearDownLocked()
 }
 
 func (s *rpcSession) call(ctx context.Context, method string, params any, result any) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	if s.closed {
+	if s.closed.Load() {
 		if err := s.start(); err != nil {
 			return err
 		}
@@ -172,21 +252,21 @@ func (s *rpcSession) call(ctx context.Context, method string, params any, result
 	payload = append(payload, '\n')
 
 	if err := ctx.Err(); err != nil {
-		return &connectors.CanceledError{Message: err.Error()}
+		return mapContextError(err)
 	}
 
 	if _, err := s.stdin.Write(payload); err != nil {
-		s.closed = true
+		s.tearDownLocked()
 		return &connectors.ExternalError{Message: fmt.Sprintf("imsg rpc write failed: %v", err)}
 	}
 
 	resp, err := readRPCResponse(ctx, s.stdout, id)
 	if err != nil {
-		s.closed = true
+		s.tearDownLocked()
 		return err
 	}
 	if resp.Error != nil {
-		return mapRPCError(resp.Error)
+		return mapRPCError(resp.Error, s.stderr.String())
 	}
 	if result == nil {
 		return nil
@@ -200,6 +280,26 @@ func (s *rpcSession) call(ctx context.Context, method string, params any, result
 	return nil
 }
 
+func readLineLimited(r *bufio.Reader, max int) ([]byte, error) {
+	var line []byte
+	for {
+		b, err := r.ReadByte()
+		if err != nil {
+			if err == io.EOF && len(line) > 0 {
+				return line, nil
+			}
+			return nil, err
+		}
+		if b == '\n' {
+			return line, nil
+		}
+		if len(line)+1 > max {
+			return nil, fmt.Errorf("line exceeds %d bytes", max)
+		}
+		line = append(line, b)
+	}
+}
+
 func readRPCResponse(ctx context.Context, r *bufio.Reader, wantID int) (*rpcResponse, error) {
 	type result struct {
 		resp *rpcResponse
@@ -208,13 +308,9 @@ func readRPCResponse(ctx context.Context, r *bufio.Reader, wantID int) (*rpcResp
 	ch := make(chan result, 1)
 	go func() {
 		for {
-			line, err := r.ReadBytes('\n')
+			line, err := readLineLimited(r, maxRPCResponse)
 			if err != nil {
 				ch <- result{err: err}
-				return
-			}
-			if len(line) > maxRPCResponse {
-				ch <- result{err: &connectors.ExternalError{Message: "imsg rpc response too large"}}
 				return
 			}
 			trimmed := strings.TrimSpace(string(line))
@@ -236,14 +332,14 @@ func readRPCResponse(ctx context.Context, r *bufio.Reader, wantID int) (*rpcResp
 
 	select {
 	case <-ctx.Done():
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return nil, &connectors.TimeoutError{Message: "imsg rpc request timed out"}
-		}
-		return nil, &connectors.CanceledError{Message: ctx.Err().Error()}
+		return nil, mapContextError(ctx.Err())
 	case res := <-ch:
 		if res.err != nil {
 			if connectors.IsTimeout(res.err) {
 				return nil, &connectors.TimeoutError{Message: fmt.Sprintf("imsg rpc read failed: %v", res.err)}
+			}
+			if strings.Contains(res.err.Error(), "line exceeds") {
+				return nil, &connectors.ExternalError{Message: "imsg rpc response too large"}
 			}
 			return nil, &connectors.ExternalError{Message: fmt.Sprintf("imsg rpc read failed: %v", res.err)}
 		}
@@ -251,26 +347,64 @@ func readRPCResponse(ctx context.Context, r *bufio.Reader, wantID int) (*rpcResp
 	}
 }
 
-func mapRPCError(err *rpcError) error {
+func formatRPCErrorMessage(err *rpcError, stderr string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "imsg rpc error %d: %s", err.Code, err.Message)
+	if len(err.Data) > 0 {
+		data := strings.TrimSpace(string(err.Data))
+		if data != "" {
+			fmt.Fprintf(&b, " (data: %s)", data)
+		}
+	}
+	if stderr != "" {
+		fmt.Fprintf(&b, " (stderr: %s)", stderr)
+	}
+	return b.String()
+}
+
+func classifyRPCFailureText(parts ...string) string {
+	var b strings.Builder
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(strings.ToLower(p))
+	}
+	return b.String()
+}
+
+func mapRPCError(err *rpcError, stderr string) error {
 	if err == nil {
 		return &connectors.ExternalError{Message: "imsg rpc error"}
 	}
-	msg := strings.ToLower(err.Message)
+	msg := formatRPCErrorMessage(err, stderr)
+	lower := classifyRPCFailureText(err.Message, string(err.Data), stderr)
 	switch {
-	case strings.Contains(msg, "authorization denied"),
-		strings.Contains(msg, "unable to open database"),
-		strings.Contains(msg, "full disk access"):
+	case strings.Contains(lower, "authorization denied"),
+		strings.Contains(lower, "unable to open database"),
+		strings.Contains(lower, "full disk access"):
 		return &connectors.AuthError{
 			Message: "imsg cannot read Messages database — grant Full Disk Access to the process running Permission Slip (and imsg) in System Settings → Privacy & Security",
 		}
-	case strings.Contains(msg, "automation"),
-		strings.Contains(msg, "not authorized to send"):
+	case strings.Contains(lower, "automation"),
+		strings.Contains(lower, "not authorized to send"):
 		return &connectors.AuthError{
 			Message: "imsg cannot send messages — grant Automation permission for Messages.app in System Settings → Privacy & Security",
 		}
 	default:
-		return &connectors.ExternalError{Message: err.Message}
+		return &connectors.ExternalError{Message: msg}
 	}
+}
+
+func mapContextError(err error) error {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return &connectors.TimeoutError{Message: "imsg rpc request timed out"}
+	}
+	return &connectors.CanceledError{Message: err.Error()}
 }
 
 // sessionPool reuses rpc sessions per command configuration.
@@ -291,7 +425,7 @@ func (p *sessionPool) get(cfg commandConfig) (*rpcSession, error) {
 	key := p.sessionKey(cfg)
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	if s, ok := p.sessions[key]; ok && !s.closed {
+	if s, ok := p.sessions[key]; ok && !s.closed.Load() {
 		return s, nil
 	}
 	s, err := newRPCSession(cfg)
@@ -321,7 +455,10 @@ func newIMsgClient() *imsgClient {
 }
 
 func (c *imsgClient) rpcCall(ctx context.Context, creds connectors.Credentials, method string, params any, result any) error {
-	cfg := commandConfigFromCreds(creds)
+	cfg, err := commandConfigFromCreds(creds)
+	if err != nil {
+		return err
+	}
 	s, err := c.pool.get(cfg)
 	if err != nil {
 		return err
@@ -331,20 +468,26 @@ func (c *imsgClient) rpcCall(ctx context.Context, creds connectors.Credentials, 
 
 // runCLI executes a one-shot imsg subcommand and returns newline-delimited JSON objects.
 func (c *imsgClient) runCLI(ctx context.Context, creds connectors.Credentials, args ...string) ([]json.RawMessage, error) {
-	cfg := commandConfigFromCreds(creds)
+	cfg, err := commandConfigFromCreds(creds)
+	if err != nil {
+		return nil, err
+	}
 	path := cfg.cliPath()
 
 	var cmd *exec.Cmd
 	if cfg.RemoteHost != "" {
-		remoteArgs := append([]string{"-T", cfg.RemoteHost, path}, args...)
+		remoteArgs := append([]string{"-T", "--", cfg.RemoteHost, path}, args...)
 		cmd = exec.CommandContext(ctx, "ssh", remoteArgs...)
 	} else {
 		cmd = exec.CommandContext(ctx, path, args...)
 	}
 
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
+
 	stdout, err := cmd.Output()
 	if err != nil {
-		return nil, mapCLIError(err)
+		return nil, mapCLIError(err, stderrBuf.String())
 	}
 	if len(stdout) > maxRPCResponse {
 		return nil, &connectors.ExternalError{Message: "imsg output too large"}
@@ -362,17 +505,20 @@ func (c *imsgClient) runCLI(ctx context.Context, creds connectors.Credentials, a
 	return out, nil
 }
 
-func mapCLIError(err error) error {
+func mapCLIError(err error, stderr string) error {
 	if connectors.IsTimeout(err) {
 		return &connectors.TimeoutError{Message: fmt.Sprintf("imsg command timed out: %v", err)}
 	}
 	var exitErr *exec.ExitError
 	if errors.As(err, &exitErr) {
-		stderr := strings.TrimSpace(string(exitErr.Stderr))
-		lower := strings.ToLower(stderr)
+		if stderr == "" {
+			stderr = strings.TrimSpace(string(exitErr.Stderr))
+		}
+		lower := classifyRPCFailureText(stderr)
 		switch {
 		case strings.Contains(lower, "authorization denied"),
-			strings.Contains(lower, "unable to open database"):
+			strings.Contains(lower, "unable to open database"),
+			strings.Contains(lower, "full disk access"):
 			return &connectors.AuthError{
 				Message: "imsg cannot read Messages database — grant Full Disk Access in System Settings → Privacy & Security",
 			}
