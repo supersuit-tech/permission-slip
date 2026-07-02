@@ -41,8 +41,13 @@ You also need **[Homebrew](https://brew.sh)** installed, and the Xcode Command L
 ## Step 1: Get the Binary
 
 ```bash
-# Install Go and Node.js via Homebrew
-brew install go node
+# Install Go via Homebrew
+brew install go
+
+# Install Node.js 22 via nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+source ~/.zshrc   # macOS's default shell is zsh; use ~/.bash_profile instead if you use bash
+nvm install 22 && nvm use 22
 
 # Clone and build
 git clone https://github.com/supersuit-tech/permission-slip.git
