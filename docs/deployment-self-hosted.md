@@ -212,13 +212,14 @@ make redeploy
 ```
 
 This pulls `origin/main`, reinstalls dependencies, rebuilds the frontend and
-server, and prints the build it's now running (the same short SHA shown in
-the app footer, so you can confirm the update took effect). New connector
-fields, manifest changes, and migrations are picked up on restart.
+server, restarts the `launchd` service set up in Step 4, and prints the build
+it's now running (the same short SHA shown in the app footer, so you can
+confirm the update took effect). New connector fields, manifest changes, and
+migrations are picked up on the restart — there's nothing else to remember.
 
-> `scripts/redeploy.sh` currently only auto-restarts a **systemd** service. On macOS it builds successfully but skips the restart step — finish the update yourself with:
+> **Named the LaunchAgent something other than `com.permissionslip.server`?** Pass it through:
 > ```bash
-> launchctl kickstart -k gui/$(id -u)/com.permissionslip.server
+> PS_LAUNCHD_LABEL=my.custom.label make redeploy
 > ```
 
 > The running server is only ever replaced by a **successful** build. If the

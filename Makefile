@@ -102,9 +102,9 @@ docker-build:
 		--build-arg GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) \
 		-t permission-slip .
 
-# Update a self-hosted (systemd) install in one step: pull latest, reinstall
-# deps, rebuild, and restart the service. See scripts/redeploy.sh for details.
-# Override the unit name with PS_SERVICE=<name> if it isn't "permission-slip".
+# Update a self-hosted install in one step: pull latest, reinstall deps,
+# rebuild, and restart the service (systemd on Linux, launchd on macOS). See
+# scripts/redeploy.sh for details and override env vars (PS_SERVICE, PS_LAUNCHD_LABEL).
 redeploy:
 	./scripts/redeploy.sh
 
