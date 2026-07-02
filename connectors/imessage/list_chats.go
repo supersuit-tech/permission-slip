@@ -12,7 +12,8 @@ type listChatsAction struct {
 }
 
 type listChatsParams struct {
-	Limit int `json:"limit"`
+	Limit      int  `json:"limit"`
+	UnreadOnly bool `json:"unread_only"`
 }
 
 func (p *listChatsParams) validate() error {
@@ -37,15 +38,49 @@ func (a *listChatsAction) Execute(ctx context.Context, req connectors.ActionRequ
 	actionCtx, cancel := a.conn.actionTimeout(ctx)
 	defer cancel()
 
+	fetchLimit := params.Limit
+	if params.UnreadOnly {
+		// Over-fetch when filtering client-side so we can still return up to limit
+		// unread chats even when many recent chats are already read.
+		fetchLimit = params.Limit * 5
+		if fetchLimit > 100 {
+			fetchLimit = 100
+		}
+	}
+
+	rpcParams := map[string]any{
+		"limit": fetchLimit,
+	}
+	if params.UnreadOnly {
+		rpcParams["unread_only"] = true
+	}
+
 	var result chatsListResult
-	if err := a.conn.client.rpcCall(actionCtx, req.Credentials, "chats.list", map[string]any{
-		"limit": params.Limit,
-	}, &result); err != nil {
+	if err := a.conn.client.rpcCall(actionCtx, req.Credentials, "chats.list", rpcParams, &result); err != nil {
 		return nil, err
 	}
 	chats := result.Chats
 	if chats == nil {
 		chats = []chat{}
 	}
+	if params.UnreadOnly {
+		chats = filterUnreadChats(chats, params.Limit)
+	}
 	return connectors.JSONResult(map[string]any{"chats": chats})
+}
+
+// filterUnreadChats keeps chats with unread_count > 0, capped at limit.
+// When imsg omits unread_count (older builds), the zero value is treated as no unreads.
+func filterUnreadChats(chats []chat, limit int) []chat {
+	out := make([]chat, 0, limit)
+	for _, c := range chats {
+		if c.UnreadCount <= 0 {
+			continue
+		}
+		out = append(out, c)
+		if len(out) >= limit {
+			break
+		}
+	}
+	return out
 }

@@ -38,9 +38,9 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:      "imessage.list_chats",
 				OperationType:   "read",
 				Name:            "List Chats",
-				Description:     "List recent iMessage and SMS conversations",
+				Description:     "List recent iMessage and SMS conversations. Each chat includes unread_count when imsg supports it. Set unread_only to return only chats with unread messages.",
 				RiskLevel:       "low",
-				DisplayTemplate: "List {{limit:count}} recent chats",
+				DisplayTemplate: "List {{limit:count}} chats",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -50,6 +50,11 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 							"maximum": 100,
 							"default": 20,
 							"description": "Maximum number of chats to return"
+						},
+						"unread_only": {
+							"type": "boolean",
+							"default": false,
+							"description": "When true, return only chats with unread messages (unread_count > 0)"
 						}
 					}
 				}`)),
