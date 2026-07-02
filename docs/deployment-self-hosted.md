@@ -329,6 +329,31 @@ The proxy must be running when you save credentials; validation performs a real 
 
 ---
 
+## Setup iMessage connector
+
+Permission Slip includes a built-in **iMessage** connector that talks to Messages.app via [openclaw/imsg](https://github.com/openclaw/imsg) — no cloud OAuth, no Apple sign-in flow, just local automation against the same Mac. Because this guide already targets a Mac Mini, the connector runs natively with no extra hardware.
+
+### Prerequisites
+
+- **Same Apple ID** signed into Messages.app on this Mac and on your iPhone — a separate "agent" Apple ID won't see your conversations.
+- macOS 14+ with Messages.app signed in.
+- [imsg](https://github.com/openclaw/imsg): `brew install steipete/tap/imsg`
+- **Full Disk Access** (for reading `chat.db`) and **Automation** permission (for sending via Messages.app) — macOS prompts for both under **System Settings → Privacy & Security** the first time `imsg` runs.
+- **Text Message Forwarding** enabled on your iPhone (**Settings → Messages → Text Message Forwarding**), pointed at this Mac — required to see and send green-bubble SMS/MMS threads.
+- (Recommended) **Messages in iCloud** turned on for full history sync across devices.
+
+SMS relay routes through Apple's push servers (APNs), not your Wi-Fi/LAN — Tailscale is neither required nor sufficient for SMS forwarding.
+
+### Configure credentials in Permission Slip
+
+Once `imsg` is installed and both permissions are granted, add **iMessage** credentials in the UI. The defaults work when `imsg` runs on this same Mac. If you're running Permission Slip on Linux instead and want a Mac to act as the iMessage gateway, set `remote_host` to an SSH alias that runs `imsg` on that Mac (e.g. `ssh -T messages-mac imsg`) — see the [Linux deployment guide](deployment-self-hosted-linux.md).
+
+Saving credentials runs a real read probe (`chats.list`); `imsg` and Messages.app must be reachable at save time.
+
+For the full action list, send policy (iMessage vs. SMS fallback), and permission granularity, see the [iMessage connector README](../connectors/imessage/README.md).
+
+---
+
 ## Other Connectors
 
 Permission Slip ships with 15+ more OAuth providers — Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, PayPal, Stripe, and X (Twitter). See the [OAuth setup guide](oauth-setup.md) for per-provider instructions.
