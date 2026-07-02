@@ -62,6 +62,14 @@ jest.mock("../../../hooks/useAgents", () => ({
   getAgentDisplayName: mockGetAgentDisplayName,
 }));
 
+jest.mock("../../../hooks/useActionSchema", () => ({
+  useActionSchema: () => ({
+    displayTemplate: null,
+    actionName: null,
+    isLoading: false,
+  }),
+}));
+
 jest.mock("../../../auth/AuthContext", () => ({
   useAuth: () => ({
     signOut: jest.fn().mockResolvedValue({ error: null }),

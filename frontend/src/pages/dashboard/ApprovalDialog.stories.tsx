@@ -16,9 +16,11 @@ import {
   ShieldCheck,
   CheckCircle,
   XCircle,
+  Bot,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -26,6 +28,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { ConnectorLogo } from "@/components/ConnectorLogo";
+import { buildSummary } from "@/components/ActionPreviewSummary";
 import { ActionPreviewCard } from "@/components/previews/ActionPreviewCard";
 import {
   ProtonBatchEmailsPreview,
@@ -1879,5 +1882,166 @@ export const UIConceptA: Story = {
 export const UIConceptB: Story = {
   name: "UI Concept B: Boxed Section",
   render: () => <ConceptB />,
+  args: {} as never,
+};
+
+// ---------------------------------------------------------------------------
+// Bulk approval dialog — mirrors ReviewBulkApprovalDialog
+// ---------------------------------------------------------------------------
+
+interface BulkItem {
+  approvalId: string;
+  summary: string;
+  riskLevel: "low" | "medium" | "high";
+  parameters: Record<string, unknown>;
+}
+
+interface BulkApprovalStoryProps {
+  actionType: string;
+  actionName: string;
+  agentName: string;
+  displayTemplate: string;
+  schema: ParametersSchema;
+  items: BulkItem[];
+}
+
+function BulkApprovalDialogStory({
+  actionType,
+  actionName,
+  agentName,
+  displayTemplate,
+  schema,
+  items,
+}: BulkApprovalStoryProps) {
+  return (
+    <Dialog open>
+      <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex flex-wrap items-center gap-2">
+            <Bot className="size-5" />
+            Bulk approval — {actionType}
+            <Badge variant="secondary">{items.length} items</Badge>
+          </DialogTitle>
+        </DialogHeader>
+
+        <p className="text-muted-foreground text-sm">
+          From {agentName}. Each item defaults to approve — toggle off any you
+          want to deny, then submit once.
+        </p>
+
+        <div className="flex gap-2">
+          <Button type="button" variant="outline" size="sm">
+            Approve all
+          </Button>
+          <Button type="button" variant="outline" size="sm">
+            Deny all
+          </Button>
+        </div>
+
+        <ul className="space-y-3">
+          {items.map((item) => {
+            const summaryText = buildSummary(
+              actionType,
+              item.parameters,
+              schema,
+              actionName,
+              displayTemplate,
+            );
+            return (
+              <li key={item.approvalId} className="rounded-lg border p-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <RiskBadge level={item.riskLevel} />
+                    </div>
+                    <p
+                      className="text-muted-foreground line-clamp-2 text-xs break-words"
+                      title={summaryText}
+                    >
+                      {summaryText}
+                    </p>
+                  </div>
+                  <label className="flex shrink-0 cursor-pointer items-center gap-2 text-sm">
+                    <Checkbox checked />
+                    Approve
+                  </label>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+
+        <div className="flex justify-end gap-2 pt-2">
+          <Button type="button" variant="ghost">
+            Cancel
+          </Button>
+          <Button type="button">Submit review</Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+const GOOGLE_CALENDAR_BULK_SCHEMA: ParametersSchema = {
+  type: "object",
+  required: ["summary", "start_time", "end_time"],
+  properties: {
+    summary: { type: "string", description: "Event title" },
+    start_time: { type: "string", description: "Start time in RFC 3339 format" },
+    end_time: { type: "string", description: "End time in RFC 3339 format" },
+    calendar_id: { type: "string", description: "Calendar ID", default: "primary" },
+    attendees: { type: "array", description: "List of attendee email addresses" },
+  },
+};
+
+export const BulkGoogleCalendarEvents: Story = {
+  name: "Bulk: Google Calendar Events",
+  render: () => (
+    <BulkApprovalDialogStory
+      actionType="google.create_calendar_event"
+      actionName="Create Calendar Event"
+      agentName="Chiedobot"
+      displayTemplate="Create event {{summary}} on {{start_time:datetime}} with {{attendees:count}} attendees"
+      schema={GOOGLE_CALENDAR_BULK_SCHEMA}
+      items={[
+        {
+          approvalId: "appr_1",
+          summary: "Team offsite",
+          riskLevel: "medium",
+          parameters: {
+            calendar_id: "primary",
+            summary: "Team offsite",
+            start_time: "2026-10-03T00:00:00-04:00",
+            end_time: "2026-10-31T00:00:00-04:00",
+            attendees: [],
+          },
+        },
+        {
+          approvalId: "appr_2",
+          summary: "Sprint planning",
+          riskLevel: "medium",
+          parameters: {
+            calendar_id: "primary",
+            summary: "Sprint planning",
+            start_time: "2026-10-10T00:00:00-04:00",
+            end_time: "2026-10-10T01:00:00-04:00",
+            attendees: ["alice@example.com"],
+          },
+        },
+        {
+          approvalId: "appr_3",
+          summary: "1:1 with manager",
+          riskLevel: "low",
+          parameters: {
+            calendar_id: "primary",
+            summary: "1:1 with manager",
+            start_time: "2026-10-17T14:00:00-04:00",
+            end_time: "2026-10-17T14:30:00-04:00",
+            attendees: ["bob@example.com"],
+          },
+        },
+      ]}
+    />
+  ),
   args: {} as never,
 };

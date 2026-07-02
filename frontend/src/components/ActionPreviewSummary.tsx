@@ -535,6 +535,16 @@ interface Highlight {
   displayVal: string;
 }
 
+/** Parameter keys that carry the most human-meaningful label in summaries. */
+const TITLE_LIKE_KEYS = ["summary", "title", "subject", "name"] as const;
+
+function titleLikeSortKey(key: string): number {
+  const idx = TITLE_LIKE_KEYS.indexOf(
+    key as (typeof TITLE_LIKE_KEYS)[number],
+  );
+  return idx >= 0 ? idx : TITLE_LIKE_KEYS.length;
+}
+
 /**
  * Selects the most informative parameter key-value pairs for a summary.
  * Prefers required parameters and string/number values, limited to 3.
@@ -560,8 +570,12 @@ function pickHighlights(
         )
       : null;
 
-  // Sort: required first, then by schema property order, then alphabetical
+  // Sort: title-like keys first, then required, then schema property order, then alphabetical
   const sorted = [...entries].sort(([a], [b]) => {
+    const aTitle = titleLikeSortKey(a);
+    const bTitle = titleLikeSortKey(b);
+    if (aTitle !== bTitle) return aTitle - bTitle;
+
     const aReq = requiredSet.has(a) ? 0 : 1;
     const bReq = requiredSet.has(b) ? 0 : 1;
     if (aReq !== bReq) return aReq - bReq;

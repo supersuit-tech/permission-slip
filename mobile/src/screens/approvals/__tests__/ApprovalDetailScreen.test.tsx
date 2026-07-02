@@ -69,6 +69,14 @@ jest.mock("../../../hooks/useAgents", () => ({
   getAgentDisplayName: mockGetAgentDisplayName,
 }));
 
+jest.mock("../../../hooks/useActionSchema", () => ({
+  useActionSchema: () => ({
+    displayTemplate: null,
+    actionName: null,
+    isLoading: false,
+  }),
+}));
+
 jest.mock("react-native-safe-area-context", () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,

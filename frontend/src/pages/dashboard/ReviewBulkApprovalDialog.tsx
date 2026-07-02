@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { buildSummary } from "@/components/ActionPreviewSummary";
+import { useActionSchema } from "@/hooks/useActionSchema";
+import type { ParametersSchema } from "@/lib/parameterSchema";
 import { useApprovalBulkGroup } from "@/hooks/useApprovalBulkGroup";
 import { useBulkDecideApprovalGroup } from "@/hooks/useBulkDecideApprovalGroup";
 import type { ApprovalSummary } from "@/hooks/useApprovals";
@@ -34,6 +36,9 @@ export function ReviewBulkApprovalDialog({
 }: ReviewBulkApprovalDialogProps) {
   const { data: group, isLoading, error } = useApprovalBulkGroup(
     open ? bulkGroupId : undefined,
+  );
+  const { schema, actionName, displayTemplate } = useActionSchema(
+    group?.action_type ?? "",
   );
   const { decideBulkGroup, isPending, result } = useBulkDecideApprovalGroup();
 
@@ -133,6 +138,9 @@ export function ReviewBulkApprovalDialog({
                 <BulkItemRow
                   key={item.approval_id}
                   item={item}
+                  schema={schema}
+                  actionName={actionName}
+                  displayTemplate={displayTemplate}
                   decision={decisions[item.approval_id] ?? "approve"}
                   onDecisionChange={(d) =>
                     setDecisions((prev) => ({ ...prev, [item.approval_id]: d }))
@@ -188,19 +196,25 @@ export function ReviewBulkApprovalDialog({
 
 function BulkItemRow({
   item,
+  schema,
+  actionName,
+  displayTemplate,
   decision,
   onDecisionChange,
 }: {
   item: ApprovalSummary;
+  schema: ParametersSchema | null;
+  actionName: string | null;
+  displayTemplate: string | null;
   decision: ItemDecision;
   onDecisionChange: (d: ItemDecision) => void;
 }) {
   const summary = buildSummary(
     item.action.type,
     item.action.parameters as Record<string, unknown>,
-    null,
-    null,
-    undefined,
+    schema,
+    actionName,
+    displayTemplate,
     item.resource_details as Record<string, unknown> | undefined,
   );
   const isPending = item.status === "pending";
@@ -215,7 +229,10 @@ function BulkItemRow({
               <Badge variant="outline">{item.status}</Badge>
             )}
           </div>
-          <p className="text-muted-foreground truncate text-xs" title={summary}>
+          <p
+            className="text-muted-foreground line-clamp-2 text-xs break-words"
+            title={summary}
+          >
             {summary}
           </p>
         </div>
