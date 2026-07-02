@@ -15,6 +15,7 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useApprovalBulkGroup } from "../../hooks/useApprovalBulkGroup";
 import { useBulkDecideApprovalGroup } from "../../hooks/useBulkDecideApprovalGroup";
+import { useActionSchema } from "../../hooks/useActionSchema";
 import { colors } from "../../theme/colors";
 import { buildActionSummary } from "./approvalUtils";
 
@@ -25,6 +26,7 @@ type ItemDecision = "approve" | "deny";
 export default function BulkApprovalGroupScreen({ route, navigation }: Props) {
   const { bulkGroupId } = route.params;
   const { data: group, isLoading, error } = useApprovalBulkGroup(bulkGroupId);
+  const { displayTemplate } = useActionSchema(group?.action_type ?? "");
   const decide = useBulkDecideApprovalGroup();
   const [decisions, setDecisions] = useState<Record<string, ItemDecision>>({});
 
@@ -102,6 +104,8 @@ export default function BulkApprovalGroupScreen({ route, navigation }: Props) {
             {buildActionSummary(
               item.action.type,
               item.action.parameters as Record<string, unknown>,
+              displayTemplate,
+              item.resource_details as Record<string, unknown> | undefined,
             )}
           </Text>
           {item.status === "pending" && (

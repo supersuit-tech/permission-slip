@@ -489,6 +489,16 @@ function humanizeKey(key: string): string {
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** Parameter keys that carry the most human-meaningful label in summaries. */
+const TITLE_LIKE_KEYS = ["summary", "title", "subject", "name"] as const;
+
+function titleLikeSortKey(key: string): number {
+  const idx = TITLE_LIKE_KEYS.indexOf(
+    key as (typeof TITLE_LIKE_KEYS)[number],
+  );
+  return idx >= 0 ? idx : TITLE_LIKE_KEYS.length;
+}
+
 /**
  * Fallback summary builder when no action-specific formatter matches.
  * Constructs a label from the action type plus up to 3 parameter highlights.
@@ -513,11 +523,16 @@ function buildGenericSummary(
   const merged = resourceDetails
     ? { ...filtered, ...resourceDetails }
     : parameters;
-  const entries = Object.entries(merged);
-  if (entries.length === 0) return label;
+  const sortedEntries = [...Object.entries(merged)].sort(([a], [b]) => {
+    const aTitle = titleLikeSortKey(a);
+    const bTitle = titleLikeSortKey(b);
+    if (aTitle !== bTitle) return aTitle - bTitle;
+    return a.localeCompare(b);
+  });
+  if (sortedEntries.length === 0) return label;
 
   const highlights: string[] = [];
-  for (const [key, value] of entries) {
+  for (const [key, value] of sortedEntries) {
     if (highlights.length >= 3) break;
     if (value == null) continue;
     const display = formatValue(value);
@@ -557,7 +572,10 @@ export function getAvatarColors(name: string): { bg: string; text: string } {
 
 /** Formats an unknown value as a short display string for generic summaries. */
 function formatValue(value: unknown): string | null {
-  if (typeof value === "string") return truncate(value, 40);
+  if (typeof value === "string") {
+    const formatted = tryFormatDateTime(value) ?? value;
+    return truncate(formatted, 40);
+  }
   if (typeof value === "number" || typeof value === "boolean")
     return String(value);
   if (Array.isArray(value)) {

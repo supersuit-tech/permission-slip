@@ -147,8 +147,11 @@ export function formatHighlightValue(
   value: unknown,
   maxLen = 60,
 ): string | null {
-  if (typeof value === "string")
-    return truncate(redactSlackOpaqueIdsInString(value), maxLen);
+  if (typeof value === "string") {
+    const formatted =
+      tryFormatDateTime(value) ?? redactSlackOpaqueIdsInString(value);
+    return truncate(formatted, maxLen);
+  }
   if (typeof value === "number" || typeof value === "boolean")
     return String(value);
   if (Array.isArray(value)) {

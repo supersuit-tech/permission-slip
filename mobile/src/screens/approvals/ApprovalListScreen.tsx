@@ -24,6 +24,7 @@ import {
   type StandingApprovalRequestSummary,
 } from "../../hooks/useStandingApprovalRequests";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
+import { useActionSchema } from "../../hooks/useActionSchema";
 import { colors } from "../../theme/colors";
 import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime, formatLastUpdated } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
@@ -332,10 +333,11 @@ const ApprovalRow = memo(function ApprovalRow({
   agentName: string;
   onPress: () => void;
 }) {
+  const { displayTemplate } = useActionSchema(approval.action.type);
   const summary = buildActionSummary(
     approval.action.type,
     safeParams(approval.action.parameters),
-    undefined,
+    displayTemplate,
     approval.resource_details as Record<string, unknown> | undefined,
   );
   const expired = checkExpired(approval.status, approval.expires_at);

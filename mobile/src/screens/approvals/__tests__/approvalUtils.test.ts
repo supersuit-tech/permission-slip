@@ -257,6 +257,38 @@ describe("buildActionSummary", () => {
   it("returns humanized label for empty parameters", () => {
     expect(buildActionSummary("email.send", {})).toBe("Send");
   });
+
+  describe("google.create_calendar_event", () => {
+    const calendarParams = {
+      calendar_id: "primary",
+      summary: "Team offsite",
+      start_time: "2026-10-03T00:00:00-04:00",
+      end_time: "2026-10-31T00:00:00-04:00",
+      attendees: [] as string[],
+    };
+    const calendarTemplate =
+      "Create event {{summary}} on {{start_time:datetime}} with {{attendees:count}} attendees";
+
+    it("uses display template with human-readable dates", () => {
+      const result = buildActionSummary(
+        "google.create_calendar_event",
+        calendarParams,
+        calendarTemplate,
+      );
+      expect(result).toContain("Team offsite");
+      expect(result).not.toContain("2026-10-03T00:00:00");
+    });
+
+    it("generic fallback prioritizes summary and formats datetimes", () => {
+      const result = buildActionSummary(
+        "google.create_calendar_event",
+        calendarParams,
+      );
+      expect(result).toMatch(/^Create calendar event: Summary: Team offsite/);
+      expect(result).not.toContain("2026-10-03T00:00:00");
+      expect(result).toContain("October");
+    });
+  });
 });
 
 describe("formatRelativeTime", () => {

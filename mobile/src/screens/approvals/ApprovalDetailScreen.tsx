@@ -29,6 +29,7 @@ import {
   type StandingApproval,
 } from "../../hooks/useStandingApprovals";
 import { useCreateStandingApproval } from "../../hooks/useCreateStandingApproval";
+import { useActionSchema } from "../../hooks/useActionSchema";
 import {
   useActionConfigs,
   type ActionConfiguration,
@@ -167,7 +168,13 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const showAutoApproveCheckbox =
     !standingApprovalsLoading && !hasExistingStandingApproval;
 
-  const summary = buildActionSummary(approval.action.type, parameters, undefined, approval.resource_details as Record<string, unknown> | undefined);
+  const { displayTemplate } = useActionSchema(approval.action.type);
+  const summary = buildActionSummary(
+    approval.action.type,
+    parameters,
+    displayTemplate,
+    approval.resource_details as Record<string, unknown> | undefined,
+  );
   const actionName = humanizeActionType(approval.action.type);
   const instanceLabel = connectorInstanceLabelFromAction(
     approval.action as {
