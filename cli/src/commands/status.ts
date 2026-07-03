@@ -51,7 +51,18 @@ export function statusCommand(program: Command): void {
 
         const result = await client.approvalStatus(approvalId!);
         if (isPendingApprovalStatus(result.status)) {
-          output({ ...result, ...pendingWaitFields(result.approval_id) }, outputOpts);
+          output(
+            {
+              ...result,
+              ...pendingWaitFields(
+                result.approval_id,
+                Boolean(
+                  (result as { push_wake_configured?: boolean }).push_wake_configured,
+                ),
+              ),
+            },
+            outputOpts,
+          );
         } else {
           output(result, outputOpts);
         }

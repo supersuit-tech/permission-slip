@@ -227,6 +227,7 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 		// Keep approval_resolved for backward compatibility (frontend listens for it).
 		notifyApprovalChange(deps, profile.ID, "approval_resolved", appr.ApprovalID)
 		notifyApprovalExecuted(deps, profile.ID, appr.ApprovalID, execStatus)
+		notifyAgentApprovalResolved(deps, appr)
 
 		resp := approveResponse{
 			ApprovalID:       appr.ApprovalID,
@@ -338,6 +339,7 @@ func handleDenyApproval(deps *Deps) http.HandlerFunc {
 
 		// Notify any connected SSE clients (e.g. other browser tabs).
 		notifyApprovalChange(deps, profile.ID, "approval_resolved", appr.ApprovalID)
+		notifyAgentApprovalResolved(deps, appr)
 
 		RespondJSON(w, http.StatusOK, denyResponse{
 			ApprovalID: appr.ApprovalID,

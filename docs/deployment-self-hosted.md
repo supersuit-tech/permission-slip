@@ -440,6 +440,72 @@ Once Tailscale is up on the agent host, point Openclaw at `https://$PS_HOSTNAME`
 
 ---
 
+## OpenClaw push wakes
+
+For reliable non-blocking approvals, register the OpenClaw gateway **hooks** endpoint so Permission Slip can push a wake when a human resolves an approval (instead of relying on a detached `permission-slip watch` process).
+
+### 1. Enable hooks on the OpenClaw gateway
+
+In your OpenClaw config (on the agent machine), enable hooks with a long random token:
+
+```json5
+{
+  hooks: {
+    enabled: true,
+    token: "<your-hooks-token>",
+    path: "/hooks",
+    allowRequestSessionKey: true,
+    allowedSessionKeyPrefixes: ["agent:", "hook:"],
+  },
+}
+```
+
+Restart the gateway after changing config.
+
+### 2. Note the hooks base URL
+
+Typical tailnet URL: `http://100.x.x.x:18789/hooks` (use your gateway's tailnet IP and port).
+
+Verify from the **Permission Slip server host** (must reach the agent machine over tailnet):
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  -H "Authorization: Bearer <your-hooks-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"ping","mode":"now"}' \
+  http://100.x.x.x:18789/hooks/wake
+```
+
+Expect `200`. Non-2xx means fix tailnet routing, gateway listen address, or token before continuing.
+
+### 3. Register the webhook from the agent machine
+
+On the machine where the agent runs (with CLI registered):
+
+```bash
+permission-slip webhook set \
+  --url http://100.x.x.x:18789/hooks \
+  --token <your-hooks-token>
+```
+
+Registration rejects public URLs — only private/tailnet addresses are allowed.
+
+### 4. Verify end-to-end
+
+```bash
+permission-slip webhook status --test
+```
+
+Success means the server reached your gateway and the test wake was accepted. If this fails, re-check step 2 from the server host.
+
+### 5. Confirm heartbeat sweep
+
+Ensure OpenClaw heartbeat is enabled. The agent should run `permission-slip pending` each beat as a backstop if a push is missed.
+
+See [OpenClaw integration](../integrations/openclaw.md) for the full three-layer flow (push → sweep → watcher fallback).
+
+---
+
 ## Mobile Push Notifications
 
 The mobile app delivers approval request notifications via [Expo's push service](https://docs.expo.dev/push-notifications/overview/), which routes through APNs (iOS) or FCM (Android). Two things are required on the server side:

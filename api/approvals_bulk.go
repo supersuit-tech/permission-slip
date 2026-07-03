@@ -228,6 +228,7 @@ func approveBulkItem(r *http.Request, deps *Deps, userID, approvalID string) bul
 	emitApprovalAuditEvent(r.Context(), deps.DB, userID, appr, agentMeta)
 	notifyApprovalChange(deps, userID, "approval_resolved", appr.ApprovalID)
 	notifyApprovalExecuted(deps, userID, appr.ApprovalID, execStatus)
+	notifyAgentApprovalResolved(deps, appr)
 
 	result := bulkDecisionResult{
 		ApprovalID:       appr.ApprovalID,
@@ -254,6 +255,7 @@ func denyBulkItem(r *http.Request, deps *Deps, userID, approvalID string) bulkDe
 
 	emitApprovalAuditEvent(r.Context(), deps.DB, userID, appr, agentMeta)
 	notifyApprovalChange(deps, userID, "approval_resolved", appr.ApprovalID)
+	notifyAgentApprovalResolved(deps, appr)
 
 	return bulkDecisionResult{
 		ApprovalID: appr.ApprovalID,

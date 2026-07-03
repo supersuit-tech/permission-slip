@@ -16,6 +16,12 @@ describe("waitHint", () => {
     expect(fields.wait_command).toBe("permission-slip watch appr_x");
   });
 
+  it("pendingWaitFields uses push wake hint when configured", () => {
+    const fields = pendingWaitFields("appr_x", true);
+    expect(fields.wait_hint).toContain("push wake webhook");
+    expect(fields.wait_command).toBe("permission-slip watch appr_x");
+  });
+
   it("WAIT_HINT instructs agents to pass session key for session-routed wake channels", () => {
     expect(WAIT_HINT).toContain("--session-key");
     expect(WAIT_HINT).toContain("OpenClaw");

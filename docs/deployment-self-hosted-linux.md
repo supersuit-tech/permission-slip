@@ -351,6 +351,51 @@ Once Tailscale is up on the agent host, point Openclaw at `https://$PS_HOSTNAME`
 
 ---
 
+## OpenClaw push wakes
+
+For reliable non-blocking approvals, register the OpenClaw gateway **hooks** endpoint so Permission Slip can push a wake when a human resolves an approval.
+
+### 1. Enable hooks on the OpenClaw gateway
+
+```json5
+{
+  hooks: {
+    enabled: true,
+    token: "<your-hooks-token>",
+    path: "/hooks",
+    allowRequestSessionKey: true,
+    allowedSessionKeyPrefixes: ["agent:", "hook:"],
+  },
+}
+```
+
+Restart the gateway after changing config.
+
+### 2. Verify reachability from the Permission Slip server
+
+```bash
+curl -sS -o /dev/null -w "%{http_code}\n" \
+  -H "Authorization: Bearer <your-hooks-token>" \
+  -H "Content-Type: application/json" \
+  -d '{"text":"ping","mode":"now"}' \
+  http://100.x.x.x:18789/hooks/wake
+```
+
+Expect `200` from the server host over tailnet.
+
+### 3. Register and test
+
+```bash
+permission-slip webhook set --url http://100.x.x.x:18789/hooks --token <your-hooks-token>
+permission-slip webhook status --test
+```
+
+### 4. Heartbeat backstop
+
+Enable OpenClaw heartbeat and run `permission-slip pending` each beat. See [OpenClaw integration](../integrations/openclaw.md).
+
+---
+
 ## Mobile Push Notifications
 
 The mobile app delivers approval request notifications via [Expo's push service](https://docs.expo.dev/push-notifications/overview/), which routes through APNs (iOS) or FCM (Android). Two things are required on the server side:

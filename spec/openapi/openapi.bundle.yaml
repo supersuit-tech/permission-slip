@@ -1032,6 +1032,108 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/agent/webhook:
+    put:
+      operationId: setAgentWebhook
+      summary: Register Agent Wake Webhook
+      description: |
+        Register the OpenClaw gateway hooks URL and token for server-push approval wakes.
+        The URL must resolve to a private network address (RFC1918, Tailscale/CGNAT, or loopback).
+        Performs a test delivery before saving.
+      tags:
+        - Agents
+      security:
+        - PermissionSlipSignature: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetAgentWebhookRequest'
+      responses:
+        '200':
+          description: Webhook saved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentWebhookConfig'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      operationId: getAgentWebhook
+      summary: Get Agent Wake Webhook
+      description: |
+        Returns the configured hooks URL. Pass `?test=true` to fire a test wake.
+      tags:
+        - Agents
+      security:
+        - PermissionSlipSignature: []
+      parameters:
+        - name: test
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '200':
+          description: Webhook status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentWebhookConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    delete:
+      operationId: clearAgentWebhook
+      summary: Clear Agent Wake Webhook
+      tags:
+        - Agents
+      security:
+        - PermissionSlipSignature: []
+      responses:
+        '200':
+          description: Webhook cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  cleared:
+                    type: boolean
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/agent/approvals:
+    get:
+      operationId: agentApprovalSweep
+      summary: Agent Approval Heartbeat Sweep
+      description: |
+        Returns the calling agent's pending approvals and those resolved since
+        `resolved_since` (default 24 hours ago). Used by OpenClaw heartbeat sweeps.
+      tags:
+        - Approvals
+      security:
+        - PermissionSlipSignature: []
+      parameters:
+        - name: resolved_since
+          in: query
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Sweep results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AgentApprovalSweepResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
   /v1/agents/{agent_id}/capabilities:
     get:
       operationId: getAgentCapabilities
@@ -11303,6 +11405,81 @@ components:
             next page. Only present when `has_more` is true. Do not construct
             or parse cursor values — they may change format without notice.
           example: 2026-02-11T13:15:00.123456Z,42
+    AgentWebhookTestResult:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        success:
+          type: boolean
+        message:
+          type: string
+        webhook_url:
+          type: string
+        latency_ms:
+          type: integer
+          format: int64
+    AgentWebhookConfig:
+      type: object
+      properties:
+        configured:
+          type: boolean
+        webhook_url:
+          type: string
+        test:
+          $ref: '#/components/schemas/AgentWebhookTestResult'
+    SetAgentWebhookRequest:
+      type: object
+      required:
+        - url
+        - token
+      properties:
+        url:
+          type: string
+          description: OpenClaw gateway hooks base URL (private network only)
+          example: http://100.64.0.5:18789/hooks
+        token:
+          type: string
+          description: Hooks bearer token from OpenClaw configuration
+    AgentApprovalSweepItem:
+      type: object
+      required:
+        - approval_id
+        - status
+        - expires_at
+      properties:
+        approval_id:
+          type: string
+        status:
+          type: string
+          enum:
+            - pending
+            - approved
+            - denied
+            - cancelled
+            - expired
+        expires_at:
+          type: string
+          format: date-time
+        resolved_at:
+          type: string
+          format: date-time
+        denial_reason:
+          type: string
+    AgentApprovalSweepResponse:
+      type: object
+      required:
+        - pending
+        - resolved
+      properties:
+        pending:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentApprovalSweepItem'
+        resolved:
+          type: array
+          items:
+            $ref: '#/components/schemas/AgentApprovalSweepItem'
     ConnectorInstanceCapability:
       type: object
       required:

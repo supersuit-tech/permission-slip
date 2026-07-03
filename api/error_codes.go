@@ -72,4 +72,7 @@ const (
 
 	// Notification channels (e.g. web push when not enabled for this deployment)
 	ErrChannelNotConfigured ErrorCode = "channel_not_configured"
+
+	// Agent wake webhooks (OpenClaw gateway hooks)
+	ErrInvalidWebhookURL ErrorCode = "invalid_webhook_url"
 )
