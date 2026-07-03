@@ -11,6 +11,7 @@ import { ApiClient } from "../api/client.js";
 import { findRegistration } from "../config/store.js";
 import { requireServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
+import { isPendingApprovalStatus, pendingWaitFields } from "../approvals/waitHint.js";
 
 export function statusCommand(program: Command): void {
   program
@@ -49,7 +50,11 @@ export function statusCommand(program: Command): void {
         }
 
         const result = await client.approvalStatus(approvalId!);
-        output(result, outputOpts);
+        if (isPendingApprovalStatus(result.status)) {
+          output({ ...result, ...pendingWaitFields(result.approval_id) }, outputOpts);
+        } else {
+          output(result, outputOpts);
+        }
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
         process.exit(1);
