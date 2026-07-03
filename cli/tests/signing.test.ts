@@ -109,4 +109,45 @@ describe("buildSignatureHeader", () => {
     const header2 = buildSignatureHeader(opts);
     expect(header1).toBe(header2);
   });
+
+  it("signs path and query as separate canonical fields", () => {
+    const privKeyFile = process.env["PS_CLI_TEST_PRIVATE_KEY"]!;
+    const pubKeyFile = process.env["PS_CLI_TEST_PUBLIC_KEY"]!;
+    const privPem = fs.readFileSync(privKeyFile);
+    const pubPem = fs.readFileSync(pubKeyFile, "utf-8").trim();
+    const parts = pubPem.split(/\s+/);
+    const pubKeyBuf = Buffer.from(parts[1]!, "base64");
+    const keyTypeLen = pubKeyBuf.readUInt32BE(0);
+    const rawKeyOffset = 4 + keyTypeLen + 4;
+    const rawPubKey = pubKeyBuf.slice(rawKeyOffset);
+    const pubKeyObj = crypto.createPublicKey({
+      key: {
+        kty: "OKP",
+        crv: "Ed25519",
+        x: rawPubKey.toString("base64url"),
+      },
+      format: "jwk",
+    });
+
+    const timestamp = 1708617600;
+    const header = buildSignatureHeader({
+      agentId: 42,
+      method: "GET",
+      path: "/agent/webhook",
+      query: "test=true",
+      timestamp,
+    });
+
+    const sigMatch = header.match(/signature="([^"]+)"/);
+    expect(sigMatch).not.toBeNull();
+    const sigB64 = sigMatch![1];
+    const sigBuf = Buffer.from(sigB64!.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+
+    const emptyBodyHash =
+      "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855";
+    const canonical = `GET\n/agent/webhook\ntest=true\n${timestamp}\n${emptyBodyHash}`;
+
+    const valid = crypto.verify(null, Buffer.from(canonical, "utf-8"), pubKeyObj, sigBuf);
+    expect(valid).toBe(true);
+  });
 });

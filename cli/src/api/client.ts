@@ -67,6 +67,8 @@ interface RequestOptions {
   method: "GET" | "POST" | "PUT" | "DELETE";
   routerPath: string; // e.g. /agents/42/verify (used for signing)
   apiPath?: string;   // e.g. /api/v1/agents/42/verify (used for HTTP, defaults to /api/v1 + routerPath)
+  /** Raw query string without leading "?" — signed separately from path */
+  query?: string;
   body?: unknown;
   /** Override agentId just for this request (e.g. REGISTRATION_AGENT_ID) */
   agentIdOverride?: number | string;
@@ -109,13 +111,16 @@ export class ApiClient {
         agentId,
         method: opts.method,
         path: signingPath(opts.routerPath),
+        query: opts.query,
         body: bodyStr,
       });
     }
 
     const fullPath =
       opts.apiPath ?? `/api/v1${opts.routerPath}`;
-    const url = `${this.base}${fullPath}`;
+    const url = opts.query
+      ? `${this.base}${fullPath}?${opts.query}`
+      : `${this.base}${fullPath}`;
 
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30_000);
@@ -356,9 +361,6 @@ export class ApiClient {
 
   /** GET /agent/approvals — heartbeat sweep of pending and recently resolved approvals */
   async agentApprovalSweep(resolvedSince?: string) {
-    const query = resolvedSince
-      ? `?resolved_since=${encodeURIComponent(resolvedSince)}`
-      : "";
     return this.request<{
       pending: Array<{
         approval_id: string;
@@ -374,7 +376,10 @@ export class ApiClient {
       }>;
     }>({
       method: "GET",
-      routerPath: `/agent/approvals${query}`,
+      routerPath: "/agent/approvals",
+      query: resolvedSince
+        ? `resolved_since=${encodeURIComponent(resolvedSince)}`
+        : undefined,
     });
   }
 
@@ -398,7 +403,6 @@ export class ApiClient {
 
   /** GET /agent/webhook — show webhook config; pass test=true to fire a test wake */
   async getAgentWebhook(test = false) {
-    const query = test ? "?test=true" : "";
     return this.request<{
       configured: boolean;
       webhook_url?: string;
@@ -410,7 +414,8 @@ export class ApiClient {
       };
     }>({
       method: "GET",
-      routerPath: `/agent/webhook${query}`,
+      routerPath: "/agent/webhook",
+      query: test ? "test=true" : undefined,
     });
   }
 
