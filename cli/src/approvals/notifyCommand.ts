@@ -9,11 +9,20 @@
 import { execSync } from "node:child_process";
 
 export const DEFAULT_NOTIFY_CMD_TEMPLATE =
-  'openclaw system event --text "Permission Slip {id} resolved: {status} — continue the task" --mode now';
+  'openclaw system event --text "{message}" --mode now';
 
-/** Replaces `{id}` and `{status}` placeholders in a notify command template. */
-export function expandNotifyCmd(template: string, approvalId: string, status: string): string {
-  return template.replace(/\{id\}/g, approvalId).replace(/\{status\}/g, status);
+/** Replaces `{id}`, `{status}`, and `{message}` placeholders in a notify command template. */
+export function expandNotifyCmd(
+  template: string,
+  approvalId: string,
+  status: string,
+  message?: string,
+): string {
+  const resolvedMessage = message ?? wakeMessage(approvalId, status);
+  return template
+    .replace(/\{id\}/g, approvalId)
+    .replace(/\{status\}/g, status)
+    .replace(/\{message\}/g, resolvedMessage);
 }
 
 /** Returns true when `openclaw` is available on PATH. */

@@ -61,9 +61,10 @@ async function fireNotify(
   template: string,
   approvalId: string,
   status: string,
+  message: string,
   runNotify: (cmd: string) => Promise<void>,
 ): Promise<boolean> {
-  const cmd = expandNotifyCmd(template, approvalId, status);
+  const cmd = expandNotifyCmd(template, approvalId, status, message);
   try {
     await runNotify(cmd);
     return true;
@@ -91,6 +92,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
         opts.notifyCmdTemplate,
         opts.approvalId,
         "not_found",
+        wake_message,
         runNotify,
       );
       return {
@@ -117,6 +119,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
         opts.notifyCmdTemplate,
         opts.approvalId,
         pollResult.status,
+        wake_message,
         runNotify,
       );
       return {
@@ -139,6 +142,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
     opts.notifyCmdTemplate,
     opts.approvalId,
     "expired",
+    wake_message,
     runNotify,
   );
   return {

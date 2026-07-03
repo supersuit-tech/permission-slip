@@ -6,13 +6,19 @@ import {
 } from "../src/approvals/notifyCommand.js";
 
 describe("notifyCommand", () => {
-  it("expandNotifyCmd replaces id and status placeholders", () => {
+  it("expandNotifyCmd replaces id, status, and message placeholders", () => {
     const cmd = expandNotifyCmd(
-      'echo "{id}" "{status}"',
+      'echo "{id}" "{status}" "{message}"',
       "appr_1",
       "approved",
+      "custom wake text",
     );
-    expect(cmd).toBe('echo "appr_1" "approved"');
+    expect(cmd).toBe('echo "appr_1" "approved" "custom wake text"');
+  });
+
+  it("expandNotifyCmd defaults message from id and status", () => {
+    const cmd = expandNotifyCmd('"{message}"', "appr_1", "denied");
+    expect(cmd).toBe('"Permission Slip appr_1 resolved: denied — continue the task"');
   });
 
   it("wake messages include approval_id and outcome", () => {

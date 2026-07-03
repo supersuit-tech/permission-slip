@@ -85,11 +85,7 @@ permission-slip watch <approval_id> [--interval 5s] [--notify-cmd '<cmd with {id
 
 Designed to run as a detached background process. Prints one JSON line and exits on any terminal outcome.
 
-Default notify (when `openclaw` is on PATH):
-
-```bash
-openclaw system event --text "Permission Slip {id} resolved: {status} — continue the task" --mode now
-```
+Default notify (when `openclaw` is on PATH) sends the wake message via `openclaw system event --text "{message}" --mode now` (resolved, expired, or not-found text).
 
 ### Status (redirect)
 

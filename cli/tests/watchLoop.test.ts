@@ -2,7 +2,7 @@ import { runWatchLoop } from "../src/approvals/watchLoop.js";
 
 describe("runWatchLoop", () => {
   const approvalId = "appr_test";
-  const notifyTemplate = 'notify "{id}" "{status}"';
+  const notifyTemplate = 'notify "{message}"';
 
   it("exits on terminal status and fires notify", async () => {
     const notified: string[] = [];
@@ -27,7 +27,9 @@ describe("runWatchLoop", () => {
 
     expect(result.status).toBe("approved");
     expect(result.notified).toBe(true);
-    expect(notified).toEqual(['notify "appr_test" "approved"']);
+    expect(notified).toEqual([
+      'notify "Permission Slip appr_test resolved: approved — continue the task"',
+    ]);
     expect(result.wake_message).toContain("appr_test");
     expect(result.wake_message).toContain("approved");
   });
@@ -49,7 +51,9 @@ describe("runWatchLoop", () => {
 
     expect(result.status).toBe("not_found");
     expect(result.notified).toBe(true);
-    expect(notified).toEqual(['notify "appr_test" "not_found"']);
+    expect(notified).toEqual([
+      'notify "Permission Slip appr_test not found — may have been deleted"',
+    ]);
   });
 
   it("exits on expiry and fires notify", async () => {
@@ -78,7 +82,7 @@ describe("runWatchLoop", () => {
 
     expect(result.status).toBe("expired");
     expect(result.notified).toBe(true);
-    expect(notified).toEqual(['notify "appr_test" "expired"']);
+    expect(notified).toEqual(['notify "Permission Slip appr_test expired unanswered"']);
     expect(result.wake_message).toContain("expired");
   });
 
@@ -111,7 +115,9 @@ describe("runWatchLoop", () => {
 
     expect(result.status).toBe("denied");
     expect(polls).toBe(3);
-    expect(notified).toEqual(['notify "appr_test" "denied"']);
+    expect(notified).toEqual([
+      'notify "Permission Slip appr_test resolved: denied — continue the task"',
+    ]);
   });
 
   it("reports notified false when notify command fails", async () => {

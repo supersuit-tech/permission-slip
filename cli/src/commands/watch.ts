@@ -31,7 +31,7 @@ export function watchCommand(program: Command): void {
     .argument("<approval_id>", "Approval ID returned by `request`")
     .option(
       "--notify-cmd <cmd>",
-      "Shell command to run on exit; use {id} and {status} placeholders " +
+      "Shell command to run on exit; use {id}, {status}, and/or {message} placeholders " +
         "(default: openclaw system event when openclaw is on PATH)",
     )
     .option("--interval <duration>", "Poll interval (e.g. 5s, 30s)", "5s")
