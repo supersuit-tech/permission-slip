@@ -20,6 +20,11 @@
 #
 #   PS_LAUNCHD_LABEL=com.example.permission-slip scripts/redeploy.sh
 #
+# macOS (persistent Full Disk Access) — sign bin/server with a stable identity
+# so FDA survives redeploys (see docs/deployment-self-hosted.md):
+#
+#   PS_CODESIGN_IDENTITY="Permission Slip Signing" make redeploy
+#
 # Safety: the running server is only ever replaced by a SUCCESSFUL build. A
 # failed `git pull` (e.g. a transient network blip) or a failed dependency
 # install is non-fatal — the script falls back to rebuilding the current
