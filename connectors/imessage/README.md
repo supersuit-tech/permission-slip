@@ -7,7 +7,7 @@ Built-in connector that wraps [openclaw/imsg](https://github.com/openclaw/imsg) 
 - **Same Apple ID** on the Mac (where `imsg` runs) and the user's iPhone — not a separate agent Apple ID.
 - macOS 14+ with Messages.app signed in on the Mac.
 - [imsg](https://github.com/openclaw/imsg): `brew install steipete/tap/imsg`
-- **Full Disk Access** for reads (`chat.db`)
+- **Full Disk Access** for reads (`chat.db`) — grant this to **`bin/server`**, not just `imsg`. macOS attributes subprocess file access to the **responsible process**; when the server spawns `imsg`, TCC checks the server's signature. See [Persistent Full Disk Access](../../docs/deployment-self-hosted.md#persistent-full-disk-access-optional-recommended-for-imessage) to keep the grant across redeploys.
 - **Automation** permission for sends (Messages.app)
 - **Text Message Forwarding** enabled on the iPhone, pointed at this Mac — required for the Mac to see and send green-bubble SMS/MMS threads.
 - **Messages in iCloud** recommended for full history sync across devices.

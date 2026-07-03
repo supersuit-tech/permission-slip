@@ -1,4 +1,4 @@
-.PHONY: dev dev-backend dev-frontend build build-ci run install install-build-deps setup \
+.PHONY: dev dev-backend dev-frontend build build-ci codesign-server run install install-build-deps setup \
        test test-backend test-frontend test-integration typecheck \
        mobile-install mobile-start mobile-test mobile-typecheck \
        mobile-build-dev mobile-build-preview mobile-build-prod \
@@ -76,6 +76,7 @@ build: generate
 	cd frontend && VITE_GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) VITE_GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) npm run build
 	touch frontend/dist/.gitkeep
 	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
+	@$(MAKE) codesign-server
 
 # CI / slim server build: expects bundle + generate-frontend-from-bundle already
 # (see install-build-deps). Does not install mobile or CLI npm dependencies.
@@ -83,6 +84,12 @@ build-ci:
 	cd frontend && VITE_GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) VITE_GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) npm run build
 	touch frontend/dist/.gitkeep
 	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
+	@$(MAKE) codesign-server
+
+# Optional macOS codesign: when PS_CODESIGN_IDENTITY is set on Darwin, re-sign
+# bin/server so Full Disk Access survives redeploys (see docs/deployment-self-hosted.md).
+codesign-server:
+	@./scripts/codesign-server.sh
 
 # Run the production binary
 run:
@@ -106,7 +113,7 @@ docker-build:
 # rebuild, restart the service (systemd on Linux, launchd on macOS), and
 # publish an EAS mobile update when configured (skipped gracefully otherwise).
 # See scripts/redeploy.sh for details and override env vars (PS_SERVICE,
-# PS_LAUNCHD_LABEL).
+# PS_LAUNCHD_LABEL, PS_CODESIGN_IDENTITY).
 redeploy:
 	./scripts/redeploy.sh
 

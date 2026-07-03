@@ -244,6 +244,52 @@ still completes normally.
 
 ---
 
+## Persistent Full Disk Access (optional, recommended for iMessage)
+
+On macOS, **Full Disk Access** is keyed to a binary's **code signature**, not its path. `make build` produces `bin/server` with an ad-hoc signature (Go auto-signs on Apple Silicon with no certificate), so TCC pins the grant to that build's exact **cdhash**. Every rebuild produces a new cdhash, the stored grant stops matching, and iMessage reads silently fail — even though the FDA toggle in System Settings still looks enabled.
+
+When `bin/server` is signed with a stable identity, TCC stores the **designated requirement** ("identifier X signed by cert Y"), which every future build signed with the same identity satisfies. Grant FDA once and it survives `make redeploy`.
+
+> **Which grant matters for the iMessage connector?** TCC attributes a subprocess's file access to its **responsible process**. When the launchd-run server spawns `imsg`, the check is against the **server's** signature — not `imsg`'s. The `imsg` FDA entry only matters for standalone or Terminal runs.
+
+### One-time setup
+
+1. **Create a code-signing certificate** in Keychain Access:
+   - Open **Keychain Access → Certificate Assistant → Create a Certificate…**
+   - Name: e.g. `Permission Slip Signing`
+   - Identity Type: **Self Signed Root**
+   - Certificate Type: **Code Signing**
+   - Click **Create**, then **Continue** through the trust prompts.
+   - (Alternatively, use an existing **Apple Development** certificate from Xcode.)
+
+2. **Set the identity for builds and redeploys** — use the certificate's exact name as shown in Keychain Access:
+   ```bash
+   export PS_CODESIGN_IDENTITY="Permission Slip Signing"
+   ```
+   Add that line to `~/.zshrc` (or pass it inline) so `make build` and `make redeploy` pick it up automatically.
+
+3. **Build once with signing enabled**, then verify:
+   ```bash
+   make build
+   codesign -dv bin/server 2>&1 | grep -E 'Identifier=|Authority='
+   ```
+   You should see `Identifier=com.permissionslip.server` and your signing identity.
+
+4. **Grant Full Disk Access once** to `bin/server`:
+   - **System Settings → Privacy & Security → Full Disk Access**
+   - Remove any stale `bin/server` entry from prior unsigned builds, then add the newly signed `~/permission-slip/bin/server`.
+   - Quit and relaunch is not needed for launchd — the next `make redeploy` restart picks up the signed binary.
+
+5. **Confirm persistence** — run `make redeploy` twice and verify iMessage reads still work with no System Settings visit.
+
+### Caveats
+
+- **Back up the certificate.** Export it from Keychain Access (`.p12`). A new cert means one more FDA re-grant.
+- **Keychain must be unlocked** for `codesign` during non-interactive redeploys. Auto-login handles this for most Mac Minis. For SSH redeploys before login, run `security unlock-keychain ~/Library/Keychains/login.keychain-db` first.
+- **Linux / CI builds are unchanged.** Signing is a no-op unless the host is Darwin and `PS_CODESIGN_IDENTITY` is set.
+
+---
+
 ## Step 5: Connect Google
 
 Permission Slip's Google connector handles Gmail and Calendar actions. To enable it, register an OAuth client in Google Cloud:
@@ -343,7 +389,8 @@ Permission Slip includes a built-in **iMessage** connector that talks to Message
 - **Same Apple ID** signed into Messages.app on this Mac and on your iPhone — a separate "agent" Apple ID won't see your conversations.
 - macOS 14+ with Messages.app signed in.
 - [imsg](https://github.com/openclaw/imsg): `brew install steipete/tap/imsg`
-- **Full Disk Access** (for reading `chat.db`) and **Automation** permission (for sending via Messages.app) — macOS prompts for both under **System Settings → Privacy & Security** the first time `imsg` runs.
+- **Full Disk Access** for reads (`chat.db`) — grant this to **`bin/server`**, not just `imsg`. macOS attributes subprocess file access to the **responsible process**; when the server spawns `imsg`, TCC checks the server's signature. See [Persistent Full Disk Access](../docs/deployment-self-hosted.md#persistent-full-disk-access-optional-recommended-for-imessage) to keep the grant across redeploys.
+- **Automation** permission for sends (Messages.app) — macOS prompts for both under **System Settings → Privacy & Security** the first time `imsg` runs.
 - **Text Message Forwarding** enabled on your iPhone (**Settings → Messages → Text Message Forwarding**), pointed at this Mac — required to see and send green-bubble SMS/MMS threads.
 - (Recommended) **Messages in iCloud** turned on for full history sync across devices.
 
