@@ -6,6 +6,29 @@ about new capabilities since their last use.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.20] - 2026-07-03
+
+### Added
+
+- **`watch --session-key`** — target a specific OpenClaw session when the approval
+  resolves. Without this flag, the default notify command wakes the agent's default
+  session, which can miss the session that spawned the watcher (e.g. an iMessage
+  session parked in `sessions_yield`).
+  ```bash
+  permission-slip watch appr_xxxxxxxx --session-key agent:main:imessage
+  ```
+  Custom `--notify-cmd` templates can use a `{session_key}` placeholder (shell-quoted).
+
+### Changed
+
+- **Pending wait hints** — `wait_hint` on `request` / `status` now tells agents to
+  append `--session-key` when their wake channel routes by session.
+
+### Agent guidance
+
+- When spawning `watch` after a pending `request`, pass your OpenClaw session key via
+  `--session-key` so the approval wake returns to the session that opened it.
+
 ## [0.1.19] - 2026-07-03
 
 ### Added

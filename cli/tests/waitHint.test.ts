@@ -16,6 +16,11 @@ describe("waitHint", () => {
     expect(fields.wait_command).toBe("permission-slip watch appr_x");
   });
 
+  it("WAIT_HINT instructs agents to pass session key for session-routed wake channels", () => {
+    expect(WAIT_HINT).toContain("--session-key");
+    expect(WAIT_HINT).toContain("OpenClaw");
+  });
+
   it("isPendingApprovalStatus is true only for pending", () => {
     expect(isPendingApprovalStatus("pending")).toBe(true);
     expect(isPendingApprovalStatus("approved")).toBe(false);

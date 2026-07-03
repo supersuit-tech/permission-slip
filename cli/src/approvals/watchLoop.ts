@@ -27,6 +27,7 @@ export interface WatchLoopOptions {
   expiresAt: Date;
   intervalMs: number;
   notifyCmdTemplate: string;
+  sessionKey?: string;
   poll: () => Promise<PollResult>;
   sleep?: (ms: number) => Promise<void>;
   now?: () => Date;
@@ -62,9 +63,10 @@ async function fireNotify(
   approvalId: string,
   status: string,
   message: string,
+  sessionKey: string | undefined,
   runNotify: (cmd: string) => Promise<void>,
 ): Promise<boolean> {
-  const cmd = expandNotifyCmd(template, approvalId, status, message);
+  const cmd = expandNotifyCmd(template, approvalId, status, message, sessionKey);
   try {
     await runNotify(cmd);
     return true;
@@ -93,6 +95,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
         opts.approvalId,
         "not_found",
         wake_message,
+        opts.sessionKey,
         runNotify,
       );
       return {
@@ -120,6 +123,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
         opts.approvalId,
         pollResult.status,
         wake_message,
+        opts.sessionKey,
         runNotify,
       );
       return {
@@ -143,6 +147,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
     opts.approvalId,
     "expired",
     wake_message,
+    opts.sessionKey,
     runNotify,
   );
   return {

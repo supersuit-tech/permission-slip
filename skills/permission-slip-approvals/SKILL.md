@@ -23,7 +23,8 @@ If `request` returns `executed: true` or `status: approved`, the action already 
 permission-slip request --action email.send --params '{"to":"user@example.com","subject":"Hi"}'
 
 # When pending — spawn watcher in background, then end your turn:
-permission-slip watch appr_xxxxxxxx
+# Pass --session-key when your wake channel routes by session (e.g. OpenClaw iMessage):
+permission-slip watch appr_xxxxxxxx --session-key <your session key>
 
 # After wake — fetch the outcome:
 permission-slip status appr_xxxxxxxx
@@ -37,15 +38,17 @@ Run **one** `permission-slip watch <id>` per pending approval. At personal-use s
 
 - **Gateway restarted while watching** — the watcher process may be orphaned. On next wake, run `permission-slip status <id>` or re-run `permission-slip watch <id>`.
 - **Accidentally polling `status` in a loop** — the first pending `status` response includes the same `wait_hint` / `wait_command`; switch to the watcher pattern.
+- **Wake fired but wrong session answered** — pass `--session-key <your session key>` so the notify targets the session that opened the approval.
 
 ## Flags (advanced)
 
 ```bash
 permission-slip watch appr_x --interval 5s
-permission-slip watch appr_x --notify-cmd 'openclaw system event --text "done {id} {status}" --mode now'
+permission-slip watch appr_x --session-key agent:main:imessage
+permission-slip watch appr_x --notify-cmd 'openclaw system event --text "done {id} {status}" --mode now --session-key {session_key}'
 ```
 
-Default notify uses `openclaw system event` when `openclaw` is on PATH.
+Default notify uses `openclaw system event` when `openclaw` is on PATH. With `--session-key`, the default template appends `--session-key <key>` so the wake targets your session.
 
 ## Further reading
 

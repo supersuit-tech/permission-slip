@@ -2,27 +2,60 @@
  * Notify-command helpers for the approval watcher.
  *
  * Default: auto-detect `openclaw` on PATH and fire a system event that wakes
- * the main OpenClaw session. Override with --notify-cmd using {id} and {status}
- * placeholders.
+ * the main OpenClaw session. Override with --notify-cmd using {id}, {status},
+ * {message}, and/or {session_key} placeholders.
  */
 
 import { execSync } from "node:child_process";
+import { shellQuote } from "../util/shell.js";
 
 export const DEFAULT_NOTIFY_CMD_TEMPLATE =
   'openclaw system event --text "{message}" --mode now';
 
-/** Replaces `{id}`, `{status}`, and `{message}` placeholders in a notify command template. */
+/**
+ * Fails when a template references `{session_key}` but no session key was provided.
+ */
+export function validateNotifyCmdTemplate(
+  template: string,
+  sessionKey?: string,
+): void {
+  if (/\{session_key\}/.test(template) && !sessionKey) {
+    throw new Error(
+      "Notify command template contains {session_key} but no --session-key was provided.",
+    );
+  }
+}
+
+/**
+ * Appends `--session-key` to the default openclaw template when a session key
+ * is provided. Custom templates should use the `{session_key}` placeholder instead.
+ */
+export function applySessionKeyToDefaultTemplate(
+  template: string,
+  sessionKey?: string,
+): string {
+  if (!sessionKey || template !== DEFAULT_NOTIFY_CMD_TEMPLATE) {
+    return template;
+  }
+  return `${template} --session-key ${shellQuote(sessionKey)}`;
+}
+
+/** Replaces `{id}`, `{status}`, `{message}`, and `{session_key}` placeholders in a notify command template. */
 export function expandNotifyCmd(
   template: string,
   approvalId: string,
   status: string,
   message?: string,
+  sessionKey?: string,
 ): string {
+  validateNotifyCmdTemplate(template, sessionKey);
   const resolvedMessage = message ?? wakeMessage(approvalId, status);
+  const sessionKeyReplacement = sessionKey ? shellQuote(sessionKey) : "";
   return template
     .replace(/\{id\}/g, approvalId)
     .replace(/\{status\}/g, status)
-    .replace(/\{message\}/g, resolvedMessage);
+    .replace(/\{message\}/g, resolvedMessage)
+    .replace(/\{session_key\}/g, sessionKeyReplacement);
 }
 
 /** Returns true when `openclaw` is available on PATH. */
