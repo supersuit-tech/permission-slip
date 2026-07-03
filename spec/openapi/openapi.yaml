@@ -137,6 +137,12 @@ paths:
   /v1/agents/me:
     $ref: './components/paths/agents.yaml#/agentMe'
 
+  /v1/agent/webhook:
+    $ref: './components/paths/agent_webhook.yaml#/agentWebhook'
+
+  /v1/agent/approvals:
+    $ref: './components/paths/agent_webhook.yaml#/agentApprovalSweep'
+
   /v1/agents/{agent_id}/capabilities:
     $ref: './components/paths/capabilities.yaml#/agentCapabilities'
 

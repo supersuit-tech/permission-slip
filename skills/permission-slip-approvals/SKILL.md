@@ -1,6 +1,6 @@
 ---
 name: permission-slip-approvals
-description: Non-blocking approval flow for Permission Slip — request, spawn a detached watcher, end your turn, and continue when woken by a system event.
+description: Non-blocking approval flow for Permission Slip — request, optional push wake or detached watcher, heartbeat sweep backstop, end your turn, continue when woken.
 ---
 
 # Permission Slip Approvals (OpenClaw)
@@ -9,10 +9,12 @@ Use this skill when you need human approval for a Permission Slip action and mus
 
 ## The pattern
 
-1. **Request** — run `permission-slip request ...`. If the response is `pending`, read `wait_hint` and `wait_command` from the JSON output.
-2. **Watch in background** — run `wait_command` as a **detached background process** (one watcher per pending approval). Do **not** poll `permission-slip status` in a loop inside your turn.
-3. **End your turn** — the main session stays responsive while the human reviews on the dashboard.
-4. **On wake** — when OpenClaw delivers a system event like `Permission Slip appr_x resolved: approved — continue the task`, run `permission-slip status appr_x` (or use fields from the request response) to fetch `execution_result` and continue the task.
+1. **Request** — run `permission-slip request ...`. If the response is `pending`, read `wait_hint`, `wait_command`, and `push_wake_configured` from the JSON output.
+2. **Push wake (when configured)** — if `push_wake_configured` is true, the Permission Slip server POSTs to your OpenClaw gateway hooks on resolution. You may **skip** spawning a watcher and end your turn immediately.
+3. **Watch in background (fallback)** — when no webhook is configured (or as extra safety), run `wait_command` as a **detached background process**. Do **not** poll `permission-slip status` in a loop inside your turn.
+4. **Heartbeat sweep (every beat)** — run `permission-slip pending` on every OpenClaw heartbeat. Act on any items in `resolved`; this catches push wakes that were missed.
+5. **End your turn** — the main session stays responsive while the human reviews on the dashboard.
+6. **On wake** — when OpenClaw delivers a system event like `Permission Slip appr_x resolved: approved — continue the task`, run `permission-slip status appr_x` to fetch `execution_result` and continue the task.
 
 If `request` returns `executed: true` or `status: approved`, the action already ran — skip watching.
 
@@ -22,35 +24,39 @@ If `request` returns `executed: true` or `status: approved`, the action already 
 # Submit an action (auto-executes when a standing approval matches)
 permission-slip request --action email.send --params '{"to":"user@example.com","subject":"Hi"}'
 
-# When pending — spawn watcher in background, then end your turn:
-# Pass --session-key when your wake channel routes by session (e.g. OpenClaw iMessage):
+# Heartbeat backstop — run on every OpenClaw heartbeat:
+permission-slip pending
+
+# When pending without push_wake_configured — spawn watcher in background:
 permission-slip watch appr_xxxxxxxx --session-key <your session key>
 
 # After wake — fetch the outcome:
 permission-slip status appr_xxxxxxxx
+
+# One-time setup for push wakes (private tailnet URL + hooks token):
+permission-slip webhook set --url http://<host>:18789/hooks --token <token>
+permission-slip webhook status --test
 ```
 
 ## Multiple pending approvals
 
-Run **one** `permission-slip watch <id>` per pending approval. At personal-use scale, N small background processes is fine.
+Run **one** `permission-slip watch <id>` per pending approval when using the watcher fallback. At personal-use scale, N small background processes is fine. With push wakes configured, heartbeat `pending` alone is usually enough.
 
 ## Recovery
 
-- **Gateway restarted while watching** — the watcher process may be orphaned. On next wake, run `permission-slip status <id>` or re-run `permission-slip watch <id>`.
-- **Accidentally polling `status` in a loop** — the first pending `status` response includes the same `wait_hint` / `wait_command`; switch to the watcher pattern.
-- **Wake fired but wrong session answered** — pass `--session-key <your session key>` so the notify targets the session that opened the approval.
+- **Gateway restarted while watching** — the watcher process may be orphaned. Heartbeat `pending` or `permission-slip status <id>` recovers.
+- **Push wake missed** — heartbeat sweep picks up resolved approvals within one beat interval.
+- **Accidentally polling `status` in a loop** — use `pending` on heartbeat or the watcher pattern instead.
 
-## Flags (advanced)
+## OpenClaw notify details
 
 ```bash
-permission-slip watch appr_x --interval 5s
 permission-slip watch appr_x --session-key agent:main:imessage
-permission-slip watch appr_x --notify-cmd 'openclaw system event --text "done {id} {status}" --mode now --session-key {session_key}'
 ```
 
 Default notify uses `openclaw system event` when `openclaw` is on PATH. With `--session-key`, the default template uses `--mode next-heartbeat --session-key {session_key}` for a reliable targeted wake (not `--mode now`, which can return ok without resuming an idle session).
 
-## Further reading
+## Related docs
 
 - [OpenClaw integration docs](../../docs/integrations/openclaw.md)
-- [Agent integration guide](../../docs/agents.md)
+- [Self-hosted OpenClaw push wake setup](../../docs/deployment-self-hosted.md#openclaw-push-wakes)

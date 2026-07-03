@@ -13,6 +13,8 @@
  *   connectors    List available connectors
  *   request        Request approval for an action (auto-approves if standing approval matches)
  *   watch          Poll a pending approval in the background and wake the session on resolve
+ *   pending        Heartbeat sweep — list pending and recently resolved approvals
+ *   webhook        Configure OpenClaw gateway push wakes (set / status / clear)
  *   request-bulk   Request bulk approval for N same-type actions (one notification)
  *   request-status Check the status/outcome of an approval request
  *   changelog      Show CLI updates since your last session (read before multi-step work)
@@ -36,6 +38,8 @@ import { configCommand } from "./commands/config.js";
 import { whoamiCommand } from "./commands/whoami.js";
 import { autoApproveRequestCommand } from "./commands/autoApproveRequest.js";
 import { watchCommand } from "./commands/watch.js";
+import { pendingCommand } from "./commands/pending.js";
+import { webhookCommand } from "./commands/webhook.js";
 import { printUnreadChangelogNotice, currentCliVersion } from "./changelog.js";
 
 const program = new Command();
@@ -63,6 +67,8 @@ capabilitiesCommand(program);
 connectorsCommand(program);
 requestCommand(program);
 watchCommand(program);
+pendingCommand(program);
+webhookCommand(program);
 requestBulkCommand(program);
 requestStatusCommand(program);
 changelogCommand(program);

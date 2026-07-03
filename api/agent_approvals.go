@@ -49,6 +49,9 @@ type agentRequestApprovalResponse struct {
 	// retryable is false for all approval outcomes — agents must not blindly re-request.
 	Retryable bool `json:"retryable"`
 
+	// push_wake_configured is true when the agent has registered an OpenClaw gateway webhook.
+	PushWakeConfigured bool `json:"push_wake_configured,omitempty"`
+
 	// ── Auto-approved fields (status="approved") ──
 	// Present only when a standing approval matched and the action was
 	// executed immediately. No polling needed — the result is inline.
@@ -358,14 +361,17 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 
 		approvalURL := fmt.Sprintf("%s/approve/%s", deps.BaseURL, approval.ApprovalID)
 
+		pushWake, _ := db.AgentHasWebhook(r.Context(), deps.DB, agent.AgentID)
+
 		RespondJSON(w, http.StatusOK, agentRequestApprovalResponse{
-			ApprovalID:  approval.ApprovalID,
-			ApprovalURL: approvalURL,
-			Status:      approval.Status,
-			Terminal:    false,
-			Retryable:   false,
-			ExpiresAt:   &approval.ExpiresAt,
-			CreatedAt:   &approval.CreatedAt,
+			ApprovalID:         approval.ApprovalID,
+			ApprovalURL:        approvalURL,
+			Status:             approval.Status,
+			Terminal:           false,
+			Retryable:          false,
+			PushWakeConfigured: pushWake,
+			ExpiresAt:          &approval.ExpiresAt,
+			CreatedAt:          &approval.CreatedAt,
 		})
 	}
 }
@@ -398,6 +404,7 @@ func handleAgentCancelApproval(deps *Deps) http.HandlerFunc {
 
 		// Notify any connected SSE clients for this approver.
 		notifyApprovalChange(deps, agent.ApproverID, "approval_cancelled", appr.ApprovalID)
+		notifyAgentApprovalResolved(deps, appr)
 
 		RespondJSON(w, http.StatusOK, agentCancelApprovalResponse{
 			ApprovalID:  appr.ApprovalID,
@@ -414,6 +421,7 @@ type agentApprovalStatusResponse struct {
 	Status          string           `json:"status"`
 	Terminal        bool             `json:"terminal"`
 	Retryable       bool             `json:"retryable"`
+	PushWakeConfigured bool          `json:"push_wake_configured,omitempty"`
 	Reason          *string          `json:"reason,omitempty"`
 	ExecutionStatus *string          `json:"execution_status,omitempty"`
 	ExecutionResult *json.RawMessage `json:"execution_result,omitempty"`
@@ -443,7 +451,7 @@ func handleAgentApprovalStatus(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		respondAgentApprovalStatus(w, r, appr)
+		respondAgentApprovalStatus(w, r, deps, appr)
 	}
 }
 

@@ -11,16 +11,17 @@ Polling `permission-slip status` inside the agent's turn is a poor fit for LLM a
 - **Busy-polling** makes the session appear hung while waiting.
 - **Ending the turn and checking later** means the user may approve, but the agent does not notice until it happens to wake again.
 
-The Permission Slip dashboard has realtime SSE for approvers, but agents had no push channel — until the detached watcher pattern.
+The Permission Slip dashboard has realtime SSE for approvers, but agents need their own delivery path.
 
-## The solution: detached watcher + local wake
+## The solution: three layers
 
-OpenClaw provides:
+Reliable wake delivery uses independent layers so no single failure strand leaves approvals unnoticed:
 
-- **Background exec** — spawn a process that outlives the agent's turn.
-- **`openclaw system event --text "..." --mode now`** — enqueue a system event on the local gateway socket to wake the main session immediately. No HTTP hooks, no webhook configuration.
-
-### Flow
+| Layer | Mechanism | Latency |
+|-------|-----------|---------|
+| **1 — Push (primary)** | Server POSTs to OpenClaw `hooks/wake` / `hooks/agent` on resolution | ~1s |
+| **2 — Heartbeat sweep (backstop)** | `permission-slip pending` on every heartbeat | ≤ heartbeat interval |
+| **3 — Detached watcher (fallback)** | `permission-slip watch` when no webhook is configured | ~5s poll |
 
 ```mermaid
 sequenceDiagram
@@ -28,93 +29,90 @@ sequenceDiagram
   participant CLI as permission-slip CLI
   participant PS as Permission Slip
   participant Human
-  participant Watcher as watch (background)
   participant GW as OpenClaw gateway
 
   Agent->>CLI: request --action ...
   CLI->>PS: POST /approvals/request
-  PS-->>CLI: pending + approval_id
-  CLI-->>Agent: wait_hint + wait_command
-  Agent->>Watcher: spawn watch appr_x (detached)
-  Agent->>Agent: end turn (session free)
-  loop every ~5s
-    Watcher->>PS: GET /approvals/appr_x/status
-  end
+  PS-->>CLI: pending + push_wake_configured
+  Agent->>Agent: end turn (optional watch fallback)
   Human->>PS: approve
-  Watcher->>GW: openclaw system event (resolved)
-  GW->>Agent: wake main session
+  PS->>GW: POST /hooks/agent (push wake)
+  GW->>Agent: wake session
+  Note over Agent,GW: If push missed, heartbeat runs pending sweep
+  Agent->>CLI: pending (heartbeat)
+  CLI-->>Agent: resolved items + wait_hint
   Agent->>CLI: status appr_x
   CLI-->>Agent: execution_result
 ```
 
-1. Agent runs `permission-slip request ...` → gets `pending`, `approval_id`, `wait_command`.
-2. Agent spawns `permission-slip watch <approval_id>` as a **detached background process** and **ends its turn**.
-3. The watcher polls `GET /approvals/{id}/status` every ~5 seconds.
-4. On terminal status (approved, denied, cancelled, etc.), expiry, or 404, the watcher runs the notify command (default: `openclaw system event`) and exits.
-5. The gateway wakes the main session; the agent fetches the result with `permission-slip status <id>` and continues.
-
-Wake latency is roughly one poll interval after the human acts (~5 seconds by default).
-
 ## Setup
 
 1. Install and register the CLI per [agents.md](../agents.md).
-2. Ensure `openclaw` is on PATH (default notify command), or pass `--notify-cmd` to `watch`.
-3. Optional: install the [permission-slip-approvals skill](../../skills/permission-slip-approvals/SKILL.md) so the pattern is pre-taught — but **the CLI output is the primary discovery path** (`wait_hint` / `wait_command` on pending `request` and `status` responses).
+2. **Push wakes (recommended):** enable OpenClaw gateway hooks, then:
+   ```bash
+   permission-slip webhook set --url http://<tailnet-host>:18789/hooks --token <hooks-token>
+   permission-slip webhook status --test
+   ```
+   See [Self-hosted deployment — OpenClaw push wakes](../deployment-self-hosted.md#openclaw-push-wakes).
+3. **Heartbeat backstop:** ensure OpenClaw heartbeat is enabled; the skill instructs running `permission-slip pending` each beat.
+4. **Watcher fallback:** when no webhook is configured, pending `request` / `status` output still includes `wait_hint` + `wait_command` for `permission-slip watch`.
 
 ## Commands
 
+### Webhook registration
+
+```bash
+permission-slip webhook set --url http://100.x.x.x:18789/hooks --token <token>
+permission-slip webhook status          # show config
+permission-slip webhook status --test   # fire test wake
+permission-slip webhook clear           # remove config
+```
+
+The hooks URL must resolve to a **private** address (RFC1918, Tailscale `100.64.0.0/10`, or loopback). Public URLs are rejected at registration.
+
+### Heartbeat sweep
+
+```bash
+permission-slip pending
+permission-slip pending --resolved-since 2026-07-03T12:00:00Z
+```
+
+Returns `pending` and `resolved` arrays. When `resolved` is non-empty, a `wait_hint` tells the agent to fetch outcomes with `permission-slip status`.
+
 ### Request (pending output)
 
-When status is `pending`, JSON includes:
+When status is `pending`, JSON includes `push_wake_configured` when a webhook is registered:
 
 ```json
 {
   "status": "pending",
   "approval_id": "appr_x",
-  "expires_at": "2026-07-03T12:00:00Z",
-  "wait_hint": "Do NOT poll in a loop and do NOT block. Run the following command AS A DETACHED BACKGROUND PROCESS, then end your turn; you will be woken with the outcome when the human responds:",
+  "push_wake_configured": true,
+  "wait_hint": "A push wake webhook is configured — the server will wake your OpenClaw gateway when the human responds (watcher optional)...",
   "wait_command": "permission-slip watch appr_x"
 }
 ```
 
-### Watch
+### Watch (fallback)
 
 ```bash
-permission-slip watch <approval_id> [--interval 5s] [--session-key <key>] [--notify-cmd '<cmd with {id} {status} {session_key}>']
+permission-slip watch <approval_id> [--session-key <key>]
 ```
 
-Designed to run as a detached background process. Prints one JSON line and exits on any terminal outcome.
-
-Default notify (when `openclaw` is on PATH) sends the wake message via `openclaw system event --text "{message}" --mode now` on the main session. When `--session-key` is set, the default switches to `--mode next-heartbeat --session-key <key>` because OpenClaw treats that combination as an immediate targeted wake that reliably resumes idle/yielded sessions (`--mode now --session-key` can return RPC ok without waking the session).
-
-`watch` JSON output includes `notify_attempts` with the shell command(s) run and whether each exited successfully. `notified: true` only means the notify command did not throw — it does not confirm the gateway delivered a new agent turn.
-
-### Status (redirect)
-
-If an agent polls `permission-slip status <id>` while still pending, the same `wait_hint` and `wait_command` fields are included to redirect it to the watcher pattern.
-
-## Multiple pending approvals
-
-Use **one watcher per approval**. N pending approvals ⇒ N small background processes. This is acceptable at personal-use scale.
+Use when no webhook is configured, or as an extra safety net. See [permission-slip-approvals skill](../../skills/permission-slip-approvals/SKILL.md).
 
 ## Troubleshooting
 
 | Symptom | Likely cause | Recovery |
 |--------|--------------|----------|
-| Agent never wakes after approve | Watcher not running, notify failed, or OpenClaw targeted wake issue | Check watcher process and `notify_attempts` in watch JSON; re-run `permission-slip watch <id> --session-key <key>` |
-| `notified: true` but session stays idle | Gateway RPC ok ≠ session resumed (common with `--mode now --session-key`) | Use default notify with `--session-key` (uses `--mode next-heartbeat` since 0.1.21) or pass a custom `--notify-cmd` |
-| Wake fired but a different/stale session answered | Watcher used default session instead of the waiting session | Re-run `watch` with `--session-key <your session key>` |
-| Watcher orphaned after gateway restart | Background process lost | On next interaction, `permission-slip status <id>` or re-run `watch` |
-| `No notify command available` | `openclaw` not on PATH and no `--notify-cmd` | Install OpenClaw CLI or pass `--notify-cmd` |
-| Session hung while waiting | Agent polling in-loop instead of using `watch` | Read `wait_hint` from `request` / `status` output |
-
-## Non-goals (this integration)
-
-- **`status --wait` / long-poll** — deferred; the sleep-loop watcher is sufficient at this scale.
-- **Server-side webhook callbacks** — rejected; no extra exposed HTTP surface.
-- **Agent-authenticated SSE** — not implemented; local system events are preferred for OpenClaw.
+| Agent never wakes after approve | Webhook not registered, gateway down, or bad token | `permission-slip webhook status --test`; check gateway logs |
+| Push missed but heartbeat works | Transient network blip | Expected — sweep picks it up; verify heartbeat runs `pending` |
+| `invalid_webhook_url` at registration | Public URL or DNS to public IP | Use tailnet / LAN address only |
+| `webhook status --test` fails | Gateway unreachable from server host | `curl` hooks URL from server over tailnet |
+| No webhook configured | Normal — watcher path unchanged | Run `wait_command` or register webhook |
 
 ## Related
 
 - [OpenClaw integration guide (full API)](../agents.md)
 - [permission-slip-approvals skill](../../skills/permission-slip-approvals/SKILL.md)
+- [Self-hosted deployment — OpenClaw push wakes](../deployment-self-hosted.md#openclaw-push-wakes)

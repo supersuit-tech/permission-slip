@@ -23,8 +23,12 @@ func approvalStateFlags(status string) (terminal, retryable bool) {
 	}
 }
 
-func respondAgentApprovalStatus(w http.ResponseWriter, r *http.Request, appr *db.Approval) {
+func respondAgentApprovalStatus(w http.ResponseWriter, r *http.Request, deps *Deps, appr *db.Approval) {
 	status := resolvedApprovalStatus(*appr)
+	pushWake := false
+	if deps != nil && deps.DB != nil {
+		pushWake, _ = db.AgentHasWebhook(r.Context(), deps.DB, appr.AgentID)
+	}
 
 	switch status {
 	case "denied":
@@ -45,7 +49,7 @@ func respondAgentApprovalStatus(w http.ResponseWriter, r *http.Request, appr *db
 	}
 
 	terminal, retryable := approvalStateFlags(status)
-	resp := buildAgentApprovalStatusResponse(appr, status, terminal, retryable)
+	resp := buildAgentApprovalStatusResponse(appr, status, terminal, retryable, pushWake)
 	RespondJSON(w, http.StatusOK, resp)
 }
 
@@ -77,14 +81,15 @@ func terminalApprovalErrorDetails(appr *db.Approval, status string) map[string]a
 	return details
 }
 
-func buildAgentApprovalStatusResponse(appr *db.Approval, status string, terminal, retryable bool) agentApprovalStatusResponse {
+func buildAgentApprovalStatusResponse(appr *db.Approval, status string, terminal, retryable, pushWake bool) agentApprovalStatusResponse {
 	resp := agentApprovalStatusResponse{
-		ApprovalID: appr.ApprovalID,
-		Status:     status,
-		Terminal:   terminal,
-		Retryable:  retryable,
-		ExpiresAt:  appr.ExpiresAt,
-		CreatedAt:  appr.CreatedAt,
+		ApprovalID:         appr.ApprovalID,
+		Status:             status,
+		Terminal:           terminal,
+		Retryable:          retryable,
+		PushWakeConfigured: pushWake,
+		ExpiresAt:          appr.ExpiresAt,
+		CreatedAt:          appr.CreatedAt,
 	}
 	if appr.DenialReason != nil && *appr.DenialReason != "" {
 		resp.Reason = appr.DenialReason

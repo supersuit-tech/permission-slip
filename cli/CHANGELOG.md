@@ -6,6 +6,22 @@ about new capabilities since their last use.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.22] - 2026-07-03
+
+### Added
+
+- **`permission-slip pending`** — heartbeat sweep listing pending approvals and those
+  resolved since `--resolved-since` (default last 24h). Run on every OpenClaw heartbeat
+  as a backstop when push wakes are missed ([#1371](https://github.com/supersuit-tech/permission-slip/issues/1371)).
+- **`permission-slip webhook set|status|clear`** — register the OpenClaw gateway hooks
+  URL + token on the agent record for server-push approval wakes. `webhook set` and
+  `webhook status --test` fire a test delivery so misconfiguration is caught at setup.
+
+### Changed
+
+- **Pending `wait_hint`** — when `push_wake_configured` is true on `request` / `status`
+  output, the hint notes that a push wake is configured and the detached watcher is optional.
+
 ## [0.1.21] - 2026-07-03
 
 ### Fixed

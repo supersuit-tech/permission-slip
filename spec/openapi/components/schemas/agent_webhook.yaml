@@ -1,0 +1,79 @@
+AgentWebhookConfig:
+  type: object
+  properties:
+    configured:
+      type: boolean
+    webhook_url:
+      type: string
+    test:
+      $ref: '#/AgentWebhookTestResult'
+
+SetAgentWebhookRequest:
+  type: object
+  required:
+    - url
+    - token
+  properties:
+    url:
+      type: string
+      description: OpenClaw gateway hooks base URL (private network only)
+      example: "http://100.64.0.5:18789/hooks"
+    token:
+      type: string
+      description: Hooks bearer token from OpenClaw configuration
+
+AgentWebhookTestResult:
+  type: object
+  properties:
+    configured:
+      type: boolean
+    success:
+      type: boolean
+    message:
+      type: string
+    webhook_url:
+      type: string
+    latency_ms:
+      type: integer
+      format: int64
+
+AgentApprovalSweepItem:
+  type: object
+  required:
+    - approval_id
+    - status
+    - expires_at
+  properties:
+    approval_id:
+      type: string
+    status:
+      type: string
+      enum:
+        - pending
+        - approved
+        - denied
+        - cancelled
+        - expired
+    expires_at:
+      type: string
+      format: date-time
+    resolved_at:
+      type: string
+      format: date-time
+    denial_reason:
+      type: string
+
+AgentApprovalSweepResponse:
+  type: object
+  required:
+    - pending
+    - resolved
+  properties:
+    pending:
+      type: array
+      items:
+        $ref: '#/AgentApprovalSweepItem'
+    resolved:
+      type: array
+      items:
+        $ref: '#/AgentApprovalSweepItem'

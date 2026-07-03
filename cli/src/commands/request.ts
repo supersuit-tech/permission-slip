@@ -143,7 +143,12 @@ export function requestCommand(program: Command): void {
           output(
             {
               ...result,
-              ...pendingWaitFields(result.approval_id),
+              ...pendingWaitFields(
+                result.approval_id,
+                Boolean(
+                  (result as { push_wake_configured?: boolean }).push_wake_configured,
+                ),
+              ),
             },
             outputOpts,
           );

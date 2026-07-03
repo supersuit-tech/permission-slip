@@ -64,7 +64,7 @@ function signingPath(routerPath: string): string {
 }
 
 interface RequestOptions {
-  method: "GET" | "POST" | "DELETE";
+  method: "GET" | "POST" | "PUT" | "DELETE";
   routerPath: string; // e.g. /agents/42/verify (used for signing)
   apiPath?: string;   // e.g. /api/v1/agents/42/verify (used for HTTP, defaults to /api/v1 + routerPath)
   body?: unknown;
@@ -351,6 +351,74 @@ export class ApiClient {
       method: "POST",
       routerPath: "/approvals/bulk-request",
       body: { items },
+    });
+  }
+
+  /** GET /agent/approvals — heartbeat sweep of pending and recently resolved approvals */
+  async agentApprovalSweep(resolvedSince?: string) {
+    const query = resolvedSince
+      ? `?resolved_since=${encodeURIComponent(resolvedSince)}`
+      : "";
+    return this.request<{
+      pending: Array<{
+        approval_id: string;
+        status: string;
+        expires_at: string;
+      }>;
+      resolved: Array<{
+        approval_id: string;
+        status: string;
+        expires_at: string;
+        resolved_at?: string;
+        denial_reason?: string;
+      }>;
+    }>({
+      method: "GET",
+      routerPath: `/agent/approvals${query}`,
+    });
+  }
+
+  /** PUT /agent/webhook — register OpenClaw gateway hooks URL and token */
+  async setAgentWebhook(url: string, token: string) {
+    return this.request<{
+      configured: boolean;
+      webhook_url?: string;
+      test?: {
+        configured: boolean;
+        success: boolean;
+        message: string;
+        latency_ms?: number;
+      };
+    }>({
+      method: "PUT",
+      routerPath: "/agent/webhook",
+      body: { url, token },
+    });
+  }
+
+  /** GET /agent/webhook — show webhook config; pass test=true to fire a test wake */
+  async getAgentWebhook(test = false) {
+    const query = test ? "?test=true" : "";
+    return this.request<{
+      configured: boolean;
+      webhook_url?: string;
+      test?: {
+        configured: boolean;
+        success: boolean;
+        message: string;
+        latency_ms?: number;
+      };
+    }>({
+      method: "GET",
+      routerPath: `/agent/webhook${query}`,
+    });
+  }
+
+  /** DELETE /agent/webhook — remove webhook configuration */
+  async clearAgentWebhook() {
+    return this.request<{ cleared: boolean }>({
+      method: "DELETE",
+      routerPath: "/agent/webhook",
     });
   }
 }
