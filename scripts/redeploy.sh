@@ -41,6 +41,9 @@ LAUNCHD_LABEL="${PS_LAUNCHD_LABEL:-com.permissionslip.server}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Loud macOS reminder: iMessage reads need Full Disk Access on the server and imsg.
+"$REPO_ROOT/scripts/print-macos-full-disk-access-notice.sh"
+
 # nvm-installed node isn't always on PATH for non-interactive shells; pull it in
 # so `make build` (which runs npm) doesn't fail with "node: command not found".
 if ! command -v node >/dev/null 2>&1 && [ -s "$HOME/.nvm/nvm.sh" ]; then
