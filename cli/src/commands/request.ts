@@ -18,11 +18,18 @@ import {
   parseAvailableInstances,
 } from "../util/connectorInstance.js";
 import { promptConnectorInstanceChoice } from "../util/promptConnectorInstance.js";
+import { isPendingApprovalStatus, pendingWaitFields } from "../approvals/waitHint.js";
+
+const REQUEST_HELP =
+  "Request approval for an action (auto-approves if a standing approval matches). " +
+  "When the result is pending, the JSON output includes wait_hint and wait_command — run " +
+  "wait_command as a detached background process and end your turn instead of polling " +
+  "status in a loop.";
 
 export function requestCommand(program: Command): void {
   program
     .command("request")
-    .description("Request approval for an action (auto-approves if a standing approval matches)")
+    .description(REQUEST_HELP)
     .requiredOption("--action <action_id>", "Action type (e.g. email.send)")
     .option(
       "--instance <name_or_uuid>",
@@ -129,6 +136,17 @@ export function requestCommand(program: Command): void {
 
         if (result.status === "approved") {
           output({ ...result, executed: true }, outputOpts);
+        } else if (
+          isPendingApprovalStatus(result.status) &&
+          result.approval_id
+        ) {
+          output(
+            {
+              ...result,
+              ...pendingWaitFields(result.approval_id),
+            },
+            outputOpts,
+          );
         } else {
           output(
             {

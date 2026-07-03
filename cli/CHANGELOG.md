@@ -6,6 +6,28 @@ about new capabilities since their last use.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.19] - 2026-07-03
+
+### Added
+
+- **`watch` command** — poll a pending approval in a detached background process and
+  wake your OpenClaw session via `openclaw system event` when the human responds.
+  Run after `request` returns `pending` instead of busy-polling `status` in your turn.
+  ```bash
+  permission-slip watch appr_xxxxxxxx
+  ```
+  Flags: `--interval 5s`, `--notify-cmd '<cmd with {id} {status} placeholders>'`.
+
+- **Non-blocking wait hints on pending approvals** — `request` and `status` JSON output
+  now include `wait_hint` and `wait_command` when status is `pending`, teaching agents
+  to spawn `watch` in the background and end their turn.
+
+### Agent guidance
+
+- When `request` returns `pending`, run `wait_command` as a detached background process,
+  then end your turn. On system event wake, run `status <approval_id>` for the result.
+- See [OpenClaw integration docs](../docs/integrations/openclaw.md).
+
 ## [0.1.18] - 2026-06-08
 
 ### Fixed

@@ -483,24 +483,20 @@ The user receives a notification and reviews the request on their dashboard.
 
 The user reviews and approves (or denies) the request. After approving, they see a confirmation code and share it with you.
 
-The Permission Slip CLI always returns immediately — every command is non-blocking. Use `permission-slip request` to submit an approval, then check the result later with `permission-slip status <approval_id>`.
+The Permission Slip CLI always returns immediately — every command is non-blocking. When `request` returns `pending`, the JSON includes `wait_hint` and `wait_command`. **Do not poll `status` in a loop inside your turn.** Spawn `permission-slip watch <approval_id>` as a detached background process, end your turn, and continue when OpenClaw wakes you with a system event. See [OpenClaw non-blocking approvals](integrations/openclaw.md).
 
 ```bash
-# Submit approval request (returns immediately with approval_id)
+# Submit approval request (returns immediately; pending responses include wait_command)
 permission-slip request --action email.send --params '{"to":["alice@example.com"]}'
 
-# Check result (returns immediately with current status):
-permission-slip status <approval_id>
+# When pending — run wait_command in background, then end your turn:
+permission-slip watch <approval_id>
 
-# Agent pattern: request, do other work, then check status
-APPROVAL_ID=$(permission-slip request --action email.send --params '{}' | jq -r '.approval_id')
-# ... do other work ...
-permission-slip status "$APPROVAL_ID"
+# After wake — fetch execution result:
+permission-slip status <approval_id>
 ```
 
-If your agent needs to wait for approval, implement your own polling loop externally. This gives you full control over timing, cancellation, and concurrency.
-
-Poll `GET /approvals/{approval_id}/status` and treat the HTTP status code as authoritative:
+For API-level polling (non-OpenClaw agents), poll `GET /approvals/{approval_id}/status` and treat the HTTP status code as authoritative:
 
 | Outcome | HTTP | `error.code` (if non-200) | Agent action |
 |---|---|---|---|
