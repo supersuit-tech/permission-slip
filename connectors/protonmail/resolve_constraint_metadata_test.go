@@ -29,7 +29,6 @@ func TestPrimarySenderAddress(t *testing.T) {
 }
 
 func TestResolveArchiveConstraintMetadata_SingleMessage(t *testing.T) {
-	t.Parallel()
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
@@ -54,7 +53,6 @@ func TestResolveArchiveConstraintMetadata_SingleMessage(t *testing.T) {
 }
 
 func TestResolveArchiveConstraintMetadata_ThreadExpansionUsesAllSenders(t *testing.T) {
-	t.Parallel()
 	origEnvelopes := resolveMessageEnvelopes
 	origExpand := expandArchiveUIDsForApproval
 	t.Cleanup(func() {
