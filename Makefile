@@ -103,8 +103,10 @@ docker-build:
 		-t permission-slip .
 
 # Update a self-hosted install in one step: pull latest, reinstall deps,
-# rebuild, and restart the service (systemd on Linux, launchd on macOS). See
-# scripts/redeploy.sh for details and override env vars (PS_SERVICE, PS_LAUNCHD_LABEL).
+# rebuild, restart the service (systemd on Linux, launchd on macOS), and
+# publish an EAS mobile update when configured (skipped gracefully otherwise).
+# See scripts/redeploy.sh for details and override env vars (PS_SERVICE,
+# PS_LAUNCHD_LABEL).
 redeploy:
 	./scripts/redeploy.sh
 

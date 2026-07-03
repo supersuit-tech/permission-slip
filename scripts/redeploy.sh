@@ -25,6 +25,13 @@
 # install is non-fatal — the script falls back to rebuilding the current
 # checkout. If the build itself fails, the script aborts BEFORE restarting, so
 # the service keeps serving the last known-good binary.
+#
+# After a successful server restart, the script also publishes an over-the-air
+# mobile update via EAS (`npx eas-cli@latest update --channel production` from
+# mobile/). If EAS isn't configured (no mobile/ dir, no node/npx, no eas.json,
+# or no EXPO_TOKEN / eas login), it prints a note and skips — never failing or
+# rolling back the server redeploy. An unexpected EAS failure is likewise
+# non-fatal: a warning is printed and the script still exits 0.
 set -euo pipefail
 
 SERVICE="${PS_SERVICE:-permission-slip}"
@@ -79,6 +86,21 @@ elif command -v launchctl >/dev/null 2>&1; then
   fi
 else
   echo "    Neither systemctl nor launchctl found — restart your server process manually." >&2
+fi
+
+# Publish an OTA mobile update when EAS is configured. Additive only — never
+# affects the server redeploy above or the script's exit code.
+if [ ! -d "$REPO_ROOT/mobile" ] || [ ! -f "$REPO_ROOT/mobile/eas.json" ]; then
+  echo "NOTE: mobile is not configured in this environment — skipping EAS update."
+elif ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; then
+  echo "NOTE: mobile is not configured in this environment — skipping EAS update."
+elif [ -z "${EXPO_TOKEN:-}" ] && ! (cd "$REPO_ROOT/mobile" && npx eas-cli@latest whoami >/dev/null 2>&1); then
+  echo "NOTE: mobile is not configured in this environment — skipping EAS update."
+else
+  echo "==> Publishing EAS update (production channel)"
+  if ! (cd "$REPO_ROOT/mobile" && npx eas-cli@latest update --channel production); then
+    echo "    WARNING: EAS update failed — server redeploy completed successfully." >&2
+  fi
 fi
 
 SHA="$(git rev-parse --short HEAD)"
