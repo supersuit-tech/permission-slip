@@ -7,7 +7,7 @@
 
 /** Shown when status is `pending` on `request` and `status` output. */
 export const WAIT_HINT =
-  "Do NOT poll in a loop and do NOT block. Run the following command AS A DETACHED BACKGROUND PROCESS, then end your turn; you will be woken with the outcome when the human responds:";
+  "Do NOT poll in a loop and do NOT block. Run the following command AS A DETACHED BACKGROUND PROCESS, then end your turn; you will be woken with the outcome when the human responds. If your wake channel routes by session (e.g. OpenClaw), append --session-key <your session key> to the watch command so the wake targets the session that opened the approval, not the default session:";
 
 /** Builds the `permission-slip watch` command string for a pending approval. */
 export function buildWaitCommand(approvalId: string): string {

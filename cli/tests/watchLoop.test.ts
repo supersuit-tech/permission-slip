@@ -120,6 +120,28 @@ describe("runWatchLoop", () => {
     ]);
   });
 
+  it("exits on terminal status and fires notify with session key in custom template", async () => {
+    const notified: string[] = [];
+
+    const result = await runWatchLoop({
+      approvalId,
+      expiresAt: new Date(Date.now() + 60_000),
+      intervalMs: 1,
+      notifyCmdTemplate: 'notify --session-key {session_key} "{message}"',
+      sessionKey: "agent:main:imessage",
+      poll: async () => ({ kind: "status", status: "approved" }),
+      sleep: async () => {},
+      runNotify: async (cmd) => {
+        notified.push(cmd);
+      },
+    });
+
+    expect(result.status).toBe("approved");
+    expect(notified).toEqual([
+      "notify --session-key 'agent:main:imessage' \"Permission Slip appr_test resolved: approved — continue the task\"",
+    ]);
+  });
+
   it("reports notified false when notify command fails", async () => {
     const result = await runWatchLoop({
       approvalId,

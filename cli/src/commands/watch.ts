@@ -9,7 +9,11 @@
 
 import type { Command } from "commander";
 import { ApiClient, PermissionSlipApiError } from "../api/client.js";
-import { resolveNotifyCmdTemplate } from "../approvals/notifyCommand.js";
+import {
+  applySessionKeyToDefaultTemplate,
+  resolveNotifyCmdTemplate,
+  validateNotifyCmdTemplate,
+} from "../approvals/notifyCommand.js";
 import { runWatchLoop, type PollResult } from "../approvals/watchLoop.js";
 import { requireServerUrl } from "../config/serverUrl.js";
 import { output, type OutputOptions } from "../output.js";
@@ -31,8 +35,12 @@ export function watchCommand(program: Command): void {
     .argument("<approval_id>", "Approval ID returned by `request`")
     .option(
       "--notify-cmd <cmd>",
-      "Shell command to run on exit; use {id}, {status}, and/or {message} placeholders " +
+      "Shell command to run on exit; use {id}, {status}, {message}, and/or {session_key} placeholders " +
         "(default: openclaw system event when openclaw is on PATH)",
+    )
+    .option(
+      "--session-key <key>",
+      "OpenClaw session key to wake when the approval resolves (targets the session that spawned the watcher)",
     )
     .option("--interval <duration>", "Poll interval (e.g. 5s, 30s)", "5s")
     .option(
@@ -49,6 +57,7 @@ export function watchCommand(program: Command): void {
       approvalId: string,
       opts: {
         notifyCmd?: string;
+        sessionKey?: string;
         interval: string;
         expiresAt?: string;
         server?: string;
@@ -58,13 +67,18 @@ export function watchCommand(program: Command): void {
     ) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
-        const notifyTemplate = resolveNotifyCmdTemplate(opts.notifyCmd);
-        if (!notifyTemplate) {
+        const baseTemplate = resolveNotifyCmdTemplate(opts.notifyCmd);
+        if (!baseTemplate) {
           throw new Error(
             "No notify command available. Install openclaw on PATH or pass --notify-cmd " +
               "with {id} and {status} placeholders.",
           );
         }
+        validateNotifyCmdTemplate(baseTemplate, opts.sessionKey);
+        const notifyTemplate = applySessionKeyToDefaultTemplate(
+          baseTemplate,
+          opts.sessionKey,
+        );
 
         const intervalMs = parseDurationToSeconds(opts.interval) * 1000;
         const { url: server } = requireServerUrl({ serverFlag: opts.server });
@@ -115,6 +129,7 @@ export function watchCommand(program: Command): void {
           expiresAt,
           intervalMs,
           notifyCmdTemplate: notifyTemplate,
+          sessionKey: opts.sessionKey,
           poll,
         });
         output(result, outputOpts);

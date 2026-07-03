@@ -80,12 +80,12 @@ When status is `pending`, JSON includes:
 ### Watch
 
 ```bash
-permission-slip watch <approval_id> [--interval 5s] [--notify-cmd '<cmd with {id} {status}>']
+permission-slip watch <approval_id> [--interval 5s] [--session-key <key>] [--notify-cmd '<cmd with {id} {status} {session_key}>']
 ```
 
 Designed to run as a detached background process. Prints one JSON line and exits on any terminal outcome.
 
-Default notify (when `openclaw` is on PATH) sends the wake message via `openclaw system event --text "{message}" --mode now` (resolved, expired, or not-found text).
+Default notify (when `openclaw` is on PATH) sends the wake message via `openclaw system event --text "{message}" --mode now` (resolved, expired, or not-found text). When `--session-key` is set, `--session-key <key>` is appended so the wake targets the session that spawned the watcher instead of the default session.
 
 ### Status (redirect)
 
@@ -100,6 +100,7 @@ Use **one watcher per approval**. N pending approvals ⇒ N small background pro
 | Symptom | Likely cause | Recovery |
 |--------|--------------|----------|
 | Agent never wakes after approve | Watcher not running or notify failed | Check watcher process; re-run `permission-slip watch <id>` |
+| Wake fired but a different/stale session answered | Watcher used default session instead of the waiting session | Re-run `watch` with `--session-key <your session key>` |
 | Watcher orphaned after gateway restart | Background process lost | On next interaction, `permission-slip status <id>` or re-run `watch` |
 | `No notify command available` | `openclaw` not on PATH and no `--notify-cmd` | Install OpenClaw CLI or pass `--notify-cmd` |
 | Session hung while waiting | Agent polling in-loop instead of using `watch` | Read `wait_hint` from `request` / `status` output |
