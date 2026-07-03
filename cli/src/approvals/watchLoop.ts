@@ -38,7 +38,19 @@ export interface WatchLoopResult {
   approval_id: string;
   status: string;
   wake_message: string;
+  /** True when at least one notify shell command exited successfully. */
   notified: boolean;
+  /**
+   * Per-command notify results. Gateway RPC success does not guarantee the
+   * target session actually resumed — see notify_attempts[].ok.
+   */
+  notify_attempts?: NotifyAttempt[];
+}
+
+export interface NotifyAttempt {
+  command: string;
+  ok: boolean;
+  error?: string;
 }
 
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
@@ -65,14 +77,20 @@ async function fireNotify(
   message: string,
   sessionKey: string | undefined,
   runNotify: (cmd: string) => Promise<void>,
-): Promise<boolean> {
+): Promise<{ notified: boolean; notify_attempts: NotifyAttempt[] }> {
   const cmd = expandNotifyCmd(template, approvalId, status, message, sessionKey);
+  const notify_attempts: NotifyAttempt[] = [];
   try {
     await runNotify(cmd);
-    return true;
-  } catch {
-    return false;
+    notify_attempts.push({ command: cmd, ok: true });
+  } catch (err) {
+    const error = err instanceof Error ? err.message : String(err);
+    notify_attempts.push({ command: cmd, ok: false, error });
   }
+  return {
+    notified: notify_attempts.some((attempt) => attempt.ok),
+    notify_attempts,
+  };
 }
 
 /**
@@ -90,7 +108,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
 
     if (pollResult.kind === "not_found") {
       const wake_message = notFoundWakeMessage(opts.approvalId);
-      const notified = await fireNotify(
+      const notify = await fireNotify(
         opts.notifyCmdTemplate,
         opts.approvalId,
         "not_found",
@@ -102,7 +120,8 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
         approval_id: opts.approvalId,
         status: "not_found",
         wake_message,
-        notified,
+        notified: notify.notified,
+        notify_attempts: notify.notify_attempts,
       };
     }
 
@@ -118,7 +137,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
 
     if (!isPendingApprovalStatus(pollResult.status)) {
       const wake_message = wakeMessage(opts.approvalId, pollResult.status);
-      const notified = await fireNotify(
+      const notify = await fireNotify(
         opts.notifyCmdTemplate,
         opts.approvalId,
         pollResult.status,
@@ -130,7 +149,8 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
         approval_id: opts.approvalId,
         status: pollResult.status,
         wake_message,
-        notified,
+        notified: notify.notified,
+        notify_attempts: notify.notify_attempts,
       };
     }
 
@@ -142,7 +162,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
   }
 
   const wake_message = expiredWakeMessage(opts.approvalId);
-  const notified = await fireNotify(
+  const notify = await fireNotify(
     opts.notifyCmdTemplate,
     opts.approvalId,
     "expired",
@@ -154,6 +174,7 @@ export async function runWatchLoop(opts: WatchLoopOptions): Promise<WatchLoopRes
     approval_id: opts.approvalId,
     status: "expired",
     wake_message,
-    notified,
+    notified: notify.notified,
+    notify_attempts: notify.notify_attempts,
   };
 }

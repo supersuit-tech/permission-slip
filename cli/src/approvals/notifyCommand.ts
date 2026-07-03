@@ -13,6 +13,17 @@ export const DEFAULT_NOTIFY_CMD_TEMPLATE =
   'openclaw system event --text "{message}" --mode now';
 
 /**
+ * Default notify template when `--session-key` is set.
+ *
+ * OpenClaw treats `--mode next-heartbeat` with `--session-key` as an immediate
+ * targeted wake (heartbeat intent `immediate`) that bypasses the runner's not-due
+ * gate. `--mode now --session-key` can return RPC ok without resuming an
+ * idle/yielded session — see permission-slip#1365.
+ */
+export const DEFAULT_NOTIFY_CMD_TEMPLATE_WITH_SESSION_KEY =
+  'openclaw system event --text "{message}" --mode next-heartbeat --session-key {session_key}';
+
+/**
  * Fails when a template references `{session_key}` but no session key was provided.
  */
 export function validateNotifyCmdTemplate(
@@ -27,7 +38,7 @@ export function validateNotifyCmdTemplate(
 }
 
 /**
- * Appends `--session-key` to the default openclaw template when a session key
+ * Switches the default openclaw template to the session-key variant when a key
  * is provided. Custom templates should use the `{session_key}` placeholder instead.
  */
 export function applySessionKeyToDefaultTemplate(
@@ -37,7 +48,15 @@ export function applySessionKeyToDefaultTemplate(
   if (!sessionKey || template !== DEFAULT_NOTIFY_CMD_TEMPLATE) {
     return template;
   }
-  return `${template} --session-key ${shellQuote(sessionKey)}`;
+  return DEFAULT_NOTIFY_CMD_TEMPLATE_WITH_SESSION_KEY;
+}
+
+/** True when the template is one of the built-in openclaw defaults. */
+export function isDefaultOpenclawNotifyTemplate(template: string): boolean {
+  return (
+    template === DEFAULT_NOTIFY_CMD_TEMPLATE ||
+    template === DEFAULT_NOTIFY_CMD_TEMPLATE_WITH_SESSION_KEY
+  );
 }
 
 /** Replaces `{id}`, `{status}`, `{message}`, and `{session_key}` placeholders in a notify command template. */

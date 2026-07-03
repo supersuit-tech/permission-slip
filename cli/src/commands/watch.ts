@@ -25,8 +25,10 @@ const WATCH_HELP =
   "Run this as a detached background process after `request` returns pending — do NOT poll " +
   "`status` in a loop inside your turn. The watcher exits on approval/denial/cancel, expiry, " +
   "or if the approval is deleted (404), firing a notify command each time (default: " +
-  "`openclaw system event` when openclaw is on PATH). One watcher per approval; N pending " +
-  "approvals means N small background processes.";
+  "`openclaw system event` when openclaw is on PATH). With `--session-key`, the default notify " +
+  "uses `--mode next-heartbeat` for a reliable targeted wake. JSON output includes " +
+  "`notify_attempts` because gateway RPC ok does not guarantee the session resumed. " +
+  "One watcher per approval; N pending approvals means N small background processes.";
 
 export function watchCommand(program: Command): void {
   program

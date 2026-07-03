@@ -48,7 +48,7 @@ permission-slip watch appr_x --session-key agent:main:imessage
 permission-slip watch appr_x --notify-cmd 'openclaw system event --text "done {id} {status}" --mode now --session-key {session_key}'
 ```
 
-Default notify uses `openclaw system event` when `openclaw` is on PATH. With `--session-key`, the default template appends `--session-key <key>` so the wake targets your session.
+Default notify uses `openclaw system event` when `openclaw` is on PATH. With `--session-key`, the default template uses `--mode next-heartbeat --session-key {session_key}` for a reliable targeted wake (not `--mode now`, which can return ok without resuming an idle session).
 
 ## Further reading
 
