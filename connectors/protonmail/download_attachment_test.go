@@ -12,8 +12,6 @@ import (
 )
 
 func TestDownloadAttachment_Success(t *testing.T) {
-	t.Parallel()
-
 	old := fetchAttachmentContent
 	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ connectors.MailboxUIDValidityStore, folder string, messageID uint32, partPath []int) (*fetchedAttachment, error) {
 		if folder != "INBOX" || messageID != 42 || formatPartPath(partPath) != "2.1" {
@@ -69,8 +67,6 @@ func TestDownloadAttachment_Success(t *testing.T) {
 }
 
 func TestDownloadAttachment_MessageNotFound(t *testing.T) {
-	t.Parallel()
-
 	old := fetchAttachmentContent
 	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ connectors.MailboxUIDValidityStore, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
 		return nil, &connectors.ValidationError{Message: `message uid 99 not found in folder "INBOX"`}
@@ -99,8 +95,6 @@ func TestDownloadAttachment_MessageNotFound(t *testing.T) {
 }
 
 func TestDownloadAttachment_AttachmentNotFound(t *testing.T) {
-	t.Parallel()
-
 	old := fetchAttachmentContent
 	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ connectors.MailboxUIDValidityStore, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
 		return nil, &connectors.ValidationError{Message: `attachment "9.9" not found on message uid 42 in folder "INBOX"`}
@@ -129,8 +123,6 @@ func TestDownloadAttachment_AttachmentNotFound(t *testing.T) {
 }
 
 func TestDownloadAttachment_Oversized(t *testing.T) {
-	t.Parallel()
-
 	old := fetchAttachmentContent
 	fetchAttachmentContent = func(_ context.Context, _ *ProtonMailConnector, _ connectors.Credentials, _ connectors.MailboxUIDValidityStore, _ string, _ uint32, _ []int) (*fetchedAttachment, error) {
 		return nil, &connectors.ValidationError{

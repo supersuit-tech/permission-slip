@@ -12,8 +12,6 @@ import (
 )
 
 func TestReplyEmail_Success(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveSourceForReply
 	t.Cleanup(func() { resolveSourceForReply = orig })
 
@@ -82,8 +80,6 @@ func TestReplyEmail_Success(t *testing.T) {
 }
 
 func TestReplyEmail_ExplicitToAndSubject(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveSourceForReply
 	t.Cleanup(func() { resolveSourceForReply = orig })
 
@@ -151,8 +147,6 @@ func TestReplyEmail_MissingInReplyToMessageID(t *testing.T) {
 }
 
 func TestReplyEmail_SourceNotFound(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveSourceForReply
 	t.Cleanup(func() { resolveSourceForReply = orig })
 
@@ -178,8 +172,6 @@ func TestReplyEmail_SourceNotFound(t *testing.T) {
 }
 
 func TestReplyEmail_MissingMessageIDHeader(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveSourceForReply
 	t.Cleanup(func() { resolveSourceForReply = orig })
 
@@ -209,8 +201,6 @@ func TestReplyEmail_MissingMessageIDHeader(t *testing.T) {
 }
 
 func TestReplyEmail_HeaderInjectionPrevented(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveSourceForReply
 	t.Cleanup(func() { resolveSourceForReply = orig })
 
@@ -257,8 +247,6 @@ func TestReplyEmail_HeaderInjectionPrevented(t *testing.T) {
 }
 
 func TestReplyEmail_SMTPError(t *testing.T) {
-	t.Parallel()
-
 	orig := resolveSourceForReply
 	t.Cleanup(func() { resolveSourceForReply = orig })
 
