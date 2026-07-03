@@ -25,6 +25,11 @@
 #
 #   PS_CODESIGN_IDENTITY="Permission Slip Signing" make redeploy
 #
+# When redeploying over SSH with PS_CODESIGN_IDENTITY set, the script prompts
+# for your macOS login password to unlock the login keychain before building —
+# codesign can't use the signing key from a locked keychain and fails with
+# 'errSecInternalComponent' otherwise. GUI sessions skip the prompt.
+#
 # Safety: the running server is only ever replaced by a SUCCESSFUL build. A
 # failed `git pull` (e.g. a transient network blip) or a failed dependency
 # install is non-fatal — the script falls back to rebuilding the current
@@ -64,6 +69,23 @@ fi
 echo "==> Refreshing dependencies"
 if ! make install; then
   echo "    WARNING: dependency install failed — continuing with existing dependencies." >&2
+fi
+
+# codesign needs the login keychain unlocked to use PS_CODESIGN_IDENTITY's
+# private key. GUI logins unlock it automatically, but SSH sessions don't —
+# codesign then fails with the cryptic 'errSecInternalComponent'. Prompt for
+# the login password up front so `make redeploy` over SSH just works.
+LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+if [ "$(uname -s)" = "Darwin" ] && [ -n "${PS_CODESIGN_IDENTITY:-}" ] \
+  && [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ] && [ -f "$LOGIN_KEYCHAIN" ]; then
+  if [ -t 0 ]; then
+    echo "==> Unlocking login keychain for codesign (SSH session detected)"
+    if ! security unlock-keychain "$LOGIN_KEYCHAIN"; then
+      echo "    WARNING: keychain unlock failed — codesign may fail with errSecInternalComponent." >&2
+    fi
+  else
+    echo "    WARNING: SSH session without a TTY — can't prompt to unlock the login keychain; codesign may fail unless it's already unlocked." >&2
+  fi
 fi
 
 echo "==> Building frontend + server"
