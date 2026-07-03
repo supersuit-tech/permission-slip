@@ -6,6 +6,23 @@ about new capabilities since their last use.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.21] - 2026-07-03
+
+### Fixed
+
+- **`watch` targeted session wake** — when `--session-key` is set, the default notify
+  command now uses `openclaw system event --mode next-heartbeat --session-key …`
+  instead of `--mode now --session-key …`. OpenClaw treats the former as an
+  immediate targeted wake that bypasses the runner's not-due gate; the latter could
+  return RPC ok without resuming an idle/yielded session ([#1365](https://github.com/supersuit-tech/permission-slip/issues/1365)).
+
+### Changed
+
+- **`watch` notify diagnostics** — JSON output now includes `notify_attempts` with
+  each shell command run and whether it exited successfully. `notified: true` only
+  means the notify shell command did not throw, not that the gateway delivered a
+  new agent turn.
+
 ## [0.1.20] - 2026-07-03
 
 ### Added

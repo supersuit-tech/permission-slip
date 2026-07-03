@@ -27,6 +27,12 @@ describe("runWatchLoop", () => {
 
     expect(result.status).toBe("approved");
     expect(result.notified).toBe(true);
+    expect(result.notify_attempts).toEqual([
+      {
+        command: 'notify "Permission Slip appr_test resolved: approved — continue the task"',
+        ok: true,
+      },
+    ]);
     expect(notified).toEqual([
       'notify "Permission Slip appr_test resolved: approved — continue the task"',
     ]);
@@ -157,5 +163,12 @@ describe("runWatchLoop", () => {
 
     expect(result.status).toBe("approved");
     expect(result.notified).toBe(false);
+    expect(result.notify_attempts).toEqual([
+      {
+        command: 'notify "Permission Slip appr_test resolved: approved — continue the task"',
+        ok: false,
+        error: "notify failed",
+      },
+    ]);
   });
 });

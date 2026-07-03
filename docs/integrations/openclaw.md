@@ -85,7 +85,9 @@ permission-slip watch <approval_id> [--interval 5s] [--session-key <key>] [--not
 
 Designed to run as a detached background process. Prints one JSON line and exits on any terminal outcome.
 
-Default notify (when `openclaw` is on PATH) sends the wake message via `openclaw system event --text "{message}" --mode now` (resolved, expired, or not-found text). When `--session-key` is set, `--session-key <key>` is appended so the wake targets the session that spawned the watcher instead of the default session.
+Default notify (when `openclaw` is on PATH) sends the wake message via `openclaw system event --text "{message}" --mode now` on the main session. When `--session-key` is set, the default switches to `--mode next-heartbeat --session-key <key>` because OpenClaw treats that combination as an immediate targeted wake that reliably resumes idle/yielded sessions (`--mode now --session-key` can return RPC ok without waking the session).
+
+`watch` JSON output includes `notify_attempts` with the shell command(s) run and whether each exited successfully. `notified: true` only means the notify command did not throw — it does not confirm the gateway delivered a new agent turn.
 
 ### Status (redirect)
 
@@ -99,7 +101,8 @@ Use **one watcher per approval**. N pending approvals ⇒ N small background pro
 
 | Symptom | Likely cause | Recovery |
 |--------|--------------|----------|
-| Agent never wakes after approve | Watcher not running or notify failed | Check watcher process; re-run `permission-slip watch <id>` |
+| Agent never wakes after approve | Watcher not running, notify failed, or OpenClaw targeted wake issue | Check watcher process and `notify_attempts` in watch JSON; re-run `permission-slip watch <id> --session-key <key>` |
+| `notified: true` but session stays idle | Gateway RPC ok ≠ session resumed (common with `--mode now --session-key`) | Use default notify with `--session-key` (uses `--mode next-heartbeat` since 0.1.21) or pass a custom `--notify-cmd` |
 | Wake fired but a different/stale session answered | Watcher used default session instead of the waiting session | Re-run `watch` with `--session-key <your session key>` |
 | Watcher orphaned after gateway restart | Background process lost | On next interaction, `permission-slip status <id>` or re-run `watch` |
 | `No notify command available` | `openclaw` not on PATH and no `--notify-cmd` | Install OpenClaw CLI or pass `--notify-cmd` |
