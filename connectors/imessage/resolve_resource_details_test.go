@@ -164,18 +164,33 @@ func TestResolveResourceDetails_SendMessage_ToAddressedFallback(t *testing.T) {
 
 func assertParticipants(t *testing.T, details map[string]any, want []string) {
 	t.Helper()
-	raw, ok := details["participants"].([]any)
-	if !ok {
-		t.Fatalf("participants = %#v, want []string", details["participants"])
+	got := stringSliceFromAny(details["participants"])
+	if len(got) != len(want) {
+		t.Fatalf("participants = %#v, want %v", got, want)
 	}
-	if len(raw) != len(want) {
-		t.Fatalf("participants = %#v, want %v", raw, want)
-	}
-	for i, v := range raw {
-		s, ok := v.(string)
-		if !ok || s != want[i] {
-			t.Fatalf("participants[%d] = %#v, want %q", i, v, want[i])
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("participants[%d] = %q, want %q", i, got[i], want[i])
 		}
+	}
+}
+
+func stringSliceFromAny(v any) []string {
+	switch raw := v.(type) {
+	case []string:
+		return raw
+	case []any:
+		out := make([]string, 0, len(raw))
+		for _, item := range raw {
+			s, ok := item.(string)
+			if !ok {
+				return nil
+			}
+			out = append(out, s)
+		}
+		return out
+	default:
+		return nil
 	}
 }
 
