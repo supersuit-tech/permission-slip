@@ -47,7 +47,7 @@ func TestRequestApproval_AutoApprove_DataWindowInjectsStart(t *testing.T) {
 
 	var params []byte
 	err = tx.QueryRow(context.Background(),
-		`SELECT parameters FROM standing_approval_executions WHERE standing_approval_id = $1 ORDER BY execution_id DESC LIMIT 1`,
+		`SELECT parameters FROM standing_approval_executions WHERE standing_approval_id = $1 ORDER BY id DESC LIMIT 1`,
 		saID,
 	).Scan(&params)
 	if err != nil {
