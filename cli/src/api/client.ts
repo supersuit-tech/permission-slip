@@ -294,6 +294,7 @@ export class ApiClient {
     max_executions?: number;
     expires_in_seconds?: number;
     source_action_configuration_id?: string;
+    connector_instance?: string;
   }) {
     return this.request<{
       request_id: string;
