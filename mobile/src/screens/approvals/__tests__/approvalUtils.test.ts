@@ -3,6 +3,8 @@ import {
   formatCountdown,
   humanizeActionType,
   humanizeConnectorPrefix,
+  connectorIdFromActionType,
+  formatConnectorDisplayName,
   connectorInstanceLabelFromAction,
   buildActionSummary,
   formatRelativeTime,
@@ -506,6 +508,46 @@ describe("formatDateTimeRange", () => {
 describe("humanizeConnectorPrefix", () => {
   it("title-cases the first segment", () => {
     expect(humanizeConnectorPrefix("slack.send_message")).toBe("Slack");
+  });
+});
+
+describe("connectorIdFromActionType", () => {
+  it("returns the prefix before the first dot", () => {
+    expect(connectorIdFromActionType("protonmail.read_email")).toBe("protonmail");
+  });
+
+  it("returns the full string when no dot is present", () => {
+    expect(connectorIdFromActionType("deploy")).toBe("deploy");
+  });
+});
+
+describe("formatConnectorDisplayName", () => {
+  it("uses connector name when available", () => {
+    expect(
+      formatConnectorDisplayName({
+        connectorName: "Proton Mail",
+        actionType: "protonmail.read_email",
+      }),
+    ).toBe("Proton Mail");
+  });
+
+  it("falls back to humanized prefix when connector name is missing", () => {
+    expect(
+      formatConnectorDisplayName({
+        connectorName: null,
+        actionType: "protonmail.read_email",
+      }),
+    ).toBe("Protonmail");
+  });
+
+  it("appends instance display in parentheses when present", () => {
+    expect(
+      formatConnectorDisplayName({
+        connectorName: "Proton Mail",
+        actionType: "protonmail.read_email",
+        instanceDisplay: "Personal",
+      }),
+    ).toBe("Proton Mail (Personal)");
   });
 });
 

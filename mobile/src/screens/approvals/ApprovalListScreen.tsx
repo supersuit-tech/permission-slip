@@ -25,6 +25,7 @@ import {
 } from "../../hooks/useStandingApprovalRequests";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
 import { useActionSchema } from "../../hooks/useActionSchema";
+import { useConnectorDisplayName } from "../../hooks/useConnectorDisplayName";
 import { colors } from "../../theme/colors";
 import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkExpired, formatRelativeTime, formatLastUpdated } from "./approvalUtils";
 import { RiskBadge } from "./RiskBadge";
@@ -312,13 +313,17 @@ const RuleProposalRow = memo(function RuleProposalRow({
   agentName: string;
   onPress: () => void;
 }) {
+  const { connectorDisplayName } = useConnectorDisplayName(request.action_type);
+
   return (
     <TouchableOpacity style={styles.ruleRow} onPress={onPress} accessibilityRole="button">
       <View style={styles.ruleBadge}>
         <Text style={styles.ruleBadgeText}>Rule proposal</Text>
       </View>
       <Text style={styles.rowTitle}>{humanizeActionType(request.action_type)}</Text>
-      <Text style={styles.rowSubtitle}>{agentName}</Text>
+      <Text style={styles.rowSubtitle}>
+        {connectorDisplayName} · {agentName}
+      </Text>
     </TouchableOpacity>
   );
 });
