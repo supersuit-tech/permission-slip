@@ -21,3 +21,9 @@ type ConstraintMetadataResolver interface {
 	// in a "senders" array) so callers can enforce fail-closed matching.
 	ResolveConstraintMetadata(ctx context.Context, actionType string, params json.RawMessage, creds Credentials) (map[string]any, error)
 }
+
+// ConstraintMetadataCapabilities optionally reports which action types support
+// verified $meta resolution and which metadata field keys are valid constraints.
+type ConstraintMetadataCapabilities interface {
+	ConstraintMetadataActionSupport(actionType string) (fields []string, supported bool)
+}

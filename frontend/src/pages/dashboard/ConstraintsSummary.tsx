@@ -1,36 +1,17 @@
 import { useState } from "react";
-import { Asterisk, Lock, Regex } from "lucide-react";
+import { Asterisk, Lock, Regex, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { isPatternWrapper } from "@/lib/constraints";
+import {
+  type ConstraintMode,
+  type ParsedConstraint,
+  parseStandingApprovalConstraints,
+} from "@/lib/constraints";
 
 /** Maximum number of constraints shown before collapsing with "+N more". */
 const VISIBLE_LIMIT = 2;
 
 /** Maximum characters for a constraint value before truncating. */
 const VALUE_TRUNCATE_LENGTH = 24;
-
-type ConstraintMode = "fixed" | "pattern" | "wildcard";
-
-interface ParsedConstraint {
-  name: string;
-  mode: ConstraintMode;
-  value: string;
-}
-
-function parseConstraints(
-  constraints: Record<string, unknown> | null | undefined,
-): ParsedConstraint[] {
-  if (!constraints || typeof constraints !== "object") return [];
-  return Object.entries(constraints).map(([name, raw]) => {
-    if (raw === "*") {
-      return { name, mode: "wildcard" as const, value: "*" };
-    }
-    if (isPatternWrapper(raw)) {
-      return { name, mode: "pattern" as const, value: raw.$pattern };
-    }
-    return { name, mode: "fixed" as const, value: String(raw) };
-  });
-}
 
 const modeIcon: Record<ConstraintMode, React.ReactNode> = {
   fixed: <Lock className="size-3" />,
@@ -44,6 +25,7 @@ function truncate(value: string, max: number): string {
 }
 
 function ConstraintBadge({ constraint }: { constraint: ParsedConstraint }) {
+  const isVerified = constraint.name.startsWith("Verified ");
   const displayValue =
     constraint.mode === "wildcard"
       ? "any"
@@ -55,7 +37,7 @@ function ConstraintBadge({ constraint }: { constraint: ParsedConstraint }) {
       className="gap-1 font-mono text-xs"
       title={`${constraint.name}: ${constraint.value} (${constraint.mode})`}
     >
-      {modeIcon[constraint.mode]}
+      {isVerified ? <ShieldCheck className="size-3" /> : modeIcon[constraint.mode]}
       <span className="font-sans font-medium">{constraint.name}</span>
       <span className="text-muted-foreground">{displayValue}</span>
     </Badge>
@@ -68,7 +50,7 @@ interface ConstraintsSummaryProps {
 
 export function ConstraintsSummary({ constraints }: ConstraintsSummaryProps) {
   const [expanded, setExpanded] = useState(false);
-  const parsed = parseConstraints(constraints);
+  const parsed = parseStandingApprovalConstraints(constraints);
 
   if (parsed.length === 0) {
     return (

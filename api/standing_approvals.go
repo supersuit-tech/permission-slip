@@ -248,7 +248,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 				constraintsBytes = nil
 			} else {
 				var cErr error
-				constraintsBytes, cErr = validateStandingApprovalConstraints(req.Constraints)
+				constraintsBytes, cErr = validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, req.ActionType, req.Constraints)
 				if cErr != nil {
 					resp := BadRequest(ErrInvalidConstraints, cErr.Error())
 					resp.Error.Details = map[string]any{
@@ -260,7 +260,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			}
 		} else {
 			var cErr error
-			constraintsBytes, cErr = validateStandingApprovalConstraints(req.Constraints)
+			constraintsBytes, cErr = validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, req.ActionType, req.Constraints)
 			if cErr != nil {
 				resp := BadRequest(ErrInvalidConstraints, cErr.Error())
 				resp.Error.Details = map[string]any{
@@ -676,7 +676,7 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			req.ExpiresAt = existing.ExpiresAt
 		}
 
-		constraintsBytes, err := validateStandingApprovalConstraints(req.Constraints)
+		constraintsBytes, err := validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, existing.ActionType, req.Constraints)
 		if err != nil {
 			resp := BadRequest(ErrInvalidConstraints, err.Error())
 			resp.Error.Details = map[string]any{

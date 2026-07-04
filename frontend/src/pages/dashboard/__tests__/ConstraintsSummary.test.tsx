@@ -90,4 +90,18 @@ describe("ConstraintsSummary", () => {
     expect(screen.queryByText("owner")).not.toBeInTheDocument();
     expect(screen.getByText("+1 more")).toBeInTheDocument();
   });
+
+  it("renders $meta verified sender constraints with a clear label", () => {
+    render(
+      <ConstraintsSummary
+        constraints={{
+          message_id: "*",
+          $meta: { from: { $pattern: "auto-confirm@amazon.com" } },
+        }}
+      />,
+    );
+    expect(screen.getByText("Verified sender")).toBeInTheDocument();
+    expect(screen.getByText("auto-confirm@amazon.com")).toBeInTheDocument();
+    expect(screen.getByText("message_id")).toBeInTheDocument();
+  });
 });

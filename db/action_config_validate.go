@@ -255,32 +255,8 @@ func ValidateParametersAgainstConfig(configParams, execParams, resolvedMeta json
 				}
 			}
 
-			// The execution value must be a string.
-			var execStr string
-			if err := json.Unmarshal(execValue, &execStr); err != nil {
-				return &ConfigValidationError{
-					Parameter: key,
-					Reason:    fmt.Sprintf("value must be a string matching pattern %q", pattern),
-				}
-			}
-
-			if strings.Contains(pattern, "*") {
-				// Glob pattern: match against the pattern.
-				if !MatchPattern(pattern, execStr) {
-					return &ConfigValidationError{
-						Parameter: key,
-						Reason:    fmt.Sprintf("value %q does not match pattern %q", execStr, pattern),
-					}
-				}
-			} else {
-				// Malformed $pattern without "*" — treat as exact string match
-				// so it doesn't silently compare against the raw JSON wrapper.
-				if execStr != pattern {
-					return &ConfigValidationError{
-						Parameter: key,
-						Reason:    fmt.Sprintf("value %q does not match pattern %q", execStr, pattern),
-					}
-				}
+			if err := validateExecPatternConstraint(key, pattern, execValue); err != nil {
+				return err
 			}
 			continue
 		}
@@ -338,17 +314,104 @@ func validateResolvedMetaConstraints(metaConstraints, resolvedMeta json.RawMessa
 		return fmt.Errorf("invalid resolved metadata: %w", err)
 	}
 
+	if messagesRaw, ok := meta["messages"]; ok && len(messagesRaw) > 0 && string(messagesRaw) != "null" {
+		var messages []map[string]json.RawMessage
+		if err := json.Unmarshal(messagesRaw, &messages); err != nil {
+			return fmt.Errorf("invalid resolved messages metadata: %w", err)
+		}
+		return validatePerMessageMetaConstraints(constraints, messages)
+	}
+
 	for key, configValue := range constraints {
 		param := MetaNamespaceKey + "." + key
-		sourceValue := meta[key]
-		if len(sourceValue) == 0 && key == "sender" {
-			sourceValue = meta["senders"]
-		}
-		if err := validateConstraintValueAgainstSource(param, configValue, sourceValue); err != nil {
+		sourceValue := flatMetaSourceValue(key, meta)
+		if err := validateMetaFieldConstraint(param, key, configValue, sourceValue); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func validatePerMessageMetaConstraints(constraints map[string]json.RawMessage, messages []map[string]json.RawMessage) error {
+	if len(messages) == 0 {
+		return ErrMetadataUnresolved
+	}
+	for _, msg := range messages {
+		for key, configValue := range constraints {
+			param := MetaNamespaceKey + "." + key
+			sourceValue := perMessageMetaSourceValue(key, msg)
+			if err := validateMetaFieldConstraint(param, key, configValue, sourceValue); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func flatMetaSourceValue(key string, meta map[string]json.RawMessage) json.RawMessage {
+	switch key {
+	case "sender":
+		if v := meta["sender"]; len(v) > 0 {
+			return v
+		}
+		return meta["senders"]
+	case "from":
+		if v := meta["from"]; len(v) > 0 {
+			return v
+		}
+		return meta["sender"]
+	default:
+		return meta[key]
+	}
+}
+
+func perMessageMetaSourceValue(key string, msg map[string]json.RawMessage) json.RawMessage {
+	switch key {
+	case "sender", "senders":
+		return msg["from"]
+	case "from":
+		return msg["from"]
+	default:
+		return msg[key]
+	}
+}
+
+func isRecipientMetaKey(key string) bool {
+	return key == "to" || key == "cc" || key == "bcc"
+}
+
+func validateMetaFieldConstraint(param, key string, configValue, sourceValue json.RawMessage) error {
+	if isRecipientMetaKey(key) {
+		return validateRecipientMetaConstraint(param, configValue, sourceValue)
+	}
+	return validateConstraintValueAgainstSource(param, configValue, sourceValue)
+}
+
+func validateExecPatternConstraint(param, pattern string, execValue json.RawMessage) error {
+	var values []string
+	if err := json.Unmarshal(execValue, &values); err == nil {
+		if len(values) == 0 {
+			return &ConfigValidationError{
+				Parameter: param,
+				Reason:    fmt.Sprintf("value must be a non-empty string or array of strings matching pattern %q", pattern),
+			}
+		}
+		for _, value := range values {
+			if err := validateStringPattern(param, pattern, value); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+
+	var execStr string
+	if err := json.Unmarshal(execValue, &execStr); err != nil {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    fmt.Sprintf("value must be a string or array of strings matching pattern %q", pattern),
+		}
+	}
+	return validateStringPattern(param, pattern, execStr)
 }
 
 func validateConstraintValueAgainstSource(param string, configValue, sourceValue json.RawMessage) error {
@@ -401,6 +464,84 @@ func validatePatternConstraint(param, pattern string, sourceValue json.RawMessag
 		}
 	}
 	return validateStringPattern(param, pattern, value)
+}
+
+func validateRecipientMetaConstraint(param string, configValue, sourceValue json.RawMessage) error {
+	if IsWildcard(configValue) {
+		return nil
+	}
+
+	if pattern, ok := ExtractPattern(configValue); ok {
+		return validateRecipientPatternConstraint(param, pattern, sourceValue)
+	}
+
+	if len(sourceValue) == 0 {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    "required metadata field is missing",
+		}
+	}
+
+	var values []string
+	if err := json.Unmarshal(sourceValue, &values); err != nil {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    "metadata value must be an array of recipient addresses",
+		}
+	}
+	if len(values) == 0 {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    "required metadata field is missing",
+		}
+	}
+
+	var expected string
+	if err := json.Unmarshal(configValue, &expected); err != nil {
+		return fmt.Errorf("invalid recipient metadata constraint for %s: %w", param, err)
+	}
+	for _, value := range values {
+		if value == expected {
+			return nil
+		}
+	}
+	return &ConfigValidationError{
+		Parameter: param,
+		Reason:    "metadata value does not match configured value",
+	}
+}
+
+func validateRecipientPatternConstraint(param, pattern string, sourceValue json.RawMessage) error {
+	if len(sourceValue) == 0 {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    fmt.Sprintf("required metadata field is missing for pattern %q", pattern),
+		}
+	}
+
+	var values []string
+	if err := json.Unmarshal(sourceValue, &values); err != nil {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    fmt.Sprintf("metadata value must be an array of strings matching pattern %q", pattern),
+		}
+	}
+	if len(values) == 0 {
+		return &ConfigValidationError{
+			Parameter: param,
+			Reason:    fmt.Sprintf("required metadata field is missing for pattern %q", pattern),
+		}
+	}
+
+	for _, value := range values {
+		if err := validateStringPattern(param, pattern, value); err == nil {
+			return nil
+		}
+	}
+	return &ConfigValidationError{
+		Parameter: param,
+		Reason:    fmt.Sprintf("no recipient address matches pattern %q", pattern),
+	}
 }
 
 func validateStringPattern(param, pattern, value string) error {

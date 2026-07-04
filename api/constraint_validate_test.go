@@ -189,3 +189,67 @@ func TestValidateConfigurationReference_MetaSenderEnforced(t *testing.T) {
 		t.Errorf("expected 400, got %d", w2.Code)
 	}
 }
+
+func TestRequestApproval_AutoApprove_ReadEmailMetaFromMatch(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	testhelper.InsertConnector(t, tx, "protonmail")
+	testhelper.InsertConnectorAction(t, tx, "protonmail", "protonmail.read_email", "Read Email")
+
+	saID := testhelper.GenerateID(t, "sa_")
+	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:  "protonmail.read_email",
+		Constraints: []byte(`{"message_id":"*","folder":"*","$meta":{"from":{"$pattern":"auto-confirm@amazon.com"}}}`),
+	})
+
+	action := &mockAction{result: &connectors.ActionResult{Data: json.RawMessage(`{"uid":42}`)}}
+	metaConn := &mockMetadataConnector{
+		mockConnector: mockConnector{
+			id:      "protonmail",
+			actions: map[string]connectors.Action{"protonmail.read_email": action},
+		},
+		metadata: map[string]any{
+			"messages": []map[string]any{{
+				"from": "auto-confirm@amazon.com",
+				"to":   []string{"me@example.com"},
+				"cc":   []string{},
+				"bcc":  []string{},
+			}},
+			"senders": []string{"auto-confirm@amazon.com"},
+			"sender":  "auto-confirm@amazon.com",
+		},
+	}
+	registry := connectors.NewRegistry()
+	registry.Register(metaConn)
+
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"read-email-meta-match-001","action":{"type":"protonmail.read_email","parameters":{"message_id":42,"folder":"INBOX"}},"context":{"description":"read"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "approved" {
+		t.Errorf("expected approved, got %q", resp.Status)
+	}
+	if resp.StandingApprovalID != saID {
+		t.Errorf("expected standing approval %q, got %q", saID, resp.StandingApprovalID)
+	}
+}

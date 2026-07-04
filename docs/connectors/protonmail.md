@@ -60,6 +60,39 @@ Agents or automations that still pass raw IMAP sequence numbers must be updated 
 
 Calendar, Drive, Contacts, VPN, and Pass are **not** available through Bridge (no CalDAV/WebDAV for those products).
 
+### Standing approval constraints (`$meta`)
+
+For actions that target specific messages by IMAP UID, standing approvals can pin constraints to **verified envelope metadata** under a reserved `$meta` namespace. Matching uses server-fetched From/To/Cc/Bcc headers — never agent-supplied parameter values.
+
+| Action | `$meta` fields | Notes |
+|--------|----------------|-------|
+| `protonmail.read_email` | `from`, `to`, `cc`, `bcc` | `sender` / `senders` are aliases for `from` |
+| `protonmail.download_attachment` | same | Resolves the target message envelope |
+| `protonmail.reply_email` | same | Constraints apply to the **source** message (`in_reply_to_message_id`) |
+| `protonmail.archive_email` | same | Thread expansion (`include_thread`, default on) includes every message in the conversation |
+| `protonmail.mark_read`, `mark_unread`, `flag`, `unflag` | same | Single UID or `message_ids` batch |
+| `protonmail.move_to_folder`, `delete` | same | Batch via `message_ids` |
+| `protonmail.apply_label`, `remove_label` | same | Thread expansion applies when `include_thread` is enabled (default) |
+
+**Semantics (fail-closed):**
+
+- **`$meta.from`** (or legacy `sender` / `senders`) — the message's primary From address must match (fixed value or `{"$pattern":"*@example.com"}` glob).
+- **`$meta.to` / `$meta.cc` / `$meta.bcc`** — satisfied when **at least one** address in that field matches. Batch/thread actions require **every** message in the effective set to satisfy **all** `$meta` constraints.
+- **`$meta.bcc` on received mail** — IMAP envelopes on inbox messages typically omit Bcc. A non-wildcard `$meta.bcc` constraint will not match received mail and the request falls through to manual approval. Use Bcc rules only on sent/draft mail, or treat as intentionally fail-closed.
+- **`protonmail.send_email`** — no source message; use plain `to` / `cc` / `bcc` param constraints (array patterns require every recipient to match).
+
+Example standing approval constraint:
+
+```json
+{
+  "message_id": "*",
+  "folder": "*",
+  "$meta": {
+    "from": { "$pattern": "auto-confirm@amazon.com" }
+  }
+}
+```
+
 ## Natural-language access (OpenClaw skill)
 
 If you run an [OpenClaw](https://github.com/supersuit-tech) machine as a Permission Slip agent, you can install the [`permission-slip-openclaw-skill-protonmail`](https://github.com/supersuit-tech/permission-slip-openclaw-skill-protonmail) skill so the agent handles plain requests like *"check my email"* — it reads your inbox (newest 50) through this connector using your default Proton Mail account. The skill is a thin layer over the `permission-slip` CLI; all auth and approval enforcement stay in Permission Slip. Install it on your OpenClaw machine when you're ready.

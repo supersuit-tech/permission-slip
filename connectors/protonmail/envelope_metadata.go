@@ -14,6 +14,8 @@ type emailEnvelopeMetadata struct {
 	Subject string   `json:"subject"`
 	From    []string `json:"from"`
 	To      []string `json:"to"`
+	Cc      []string `json:"cc"`
+	Bcc     []string `json:"bcc"`
 	Date    string   `json:"date"`
 }
 
@@ -33,6 +35,8 @@ func envelopeToMetadata(env *imap.Envelope) emailEnvelopeMetadata {
 		Date:    env.Date.Format(time.RFC3339),
 		From:    formatAddresses(env.From),
 		To:      formatAddresses(env.To),
+		Cc:      formatAddresses(env.Cc),
+		Bcc:     formatAddresses(env.Bcc),
 	}
 }
 
@@ -41,6 +45,8 @@ func (m emailEnvelopeMetadata) asMap() map[string]any {
 		"subject": m.Subject,
 		"from":    m.From,
 		"to":      m.To,
+		"cc":      m.Cc,
+		"bcc":     m.Bcc,
 		"date":    m.Date,
 	}
 }
