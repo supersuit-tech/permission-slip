@@ -120,15 +120,40 @@ fi
 
 # Publish an OTA mobile update when EAS is configured. Additive only — never
 # affects the server redeploy above or the script's exit code.
+EAS_AUTH_CHECK_TIMEOUT="${PS_EAS_AUTH_CHECK_TIMEOUT:-30}"
+
+# Return 0 when EAS credentials are available (EXPO_TOKEN or eas-cli login).
+# Uses npx --yes and a closed stdin so install/login prompts can't block forever;
+# optional timeout (PS_EAS_AUTH_CHECK_TIMEOUT, default 30s) caps slow networks.
+eas_is_authenticated() {
+  if [ -n "${EXPO_TOKEN:-}" ]; then
+    return 0
+  fi
+
+  local run_whoami=(
+    npx --yes eas-cli@latest whoami
+  )
+  if command -v timeout >/dev/null 2>&1; then
+    run_whoami=(timeout "$EAS_AUTH_CHECK_TIMEOUT" "${run_whoami[@]}")
+  elif command -v gtimeout >/dev/null 2>&1; then
+    run_whoami=(gtimeout "$EAS_AUTH_CHECK_TIMEOUT" "${run_whoami[@]}")
+  fi
+
+  (
+    cd "$REPO_ROOT/mobile"
+    "${run_whoami[@]}"
+  ) </dev/null >/dev/null 2>&1
+}
+
 if [ ! -d "$REPO_ROOT/mobile" ] || [ ! -f "$REPO_ROOT/mobile/eas.json" ]; then
   echo "NOTE: mobile is not configured in this environment — skipping EAS update."
 elif ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; then
   echo "NOTE: mobile is not configured in this environment — skipping EAS update."
-elif [ -z "${EXPO_TOKEN:-}" ] && ! (cd "$REPO_ROOT/mobile" && npx eas-cli@latest whoami >/dev/null 2>&1); then
-  echo "NOTE: mobile is not configured in this environment — skipping EAS update."
+elif ! eas_is_authenticated; then
+  echo "NOTE: EAS update skipped — not logged in. Run 'npx eas-cli login' or set EXPO_TOKEN, then re-run 'make redeploy' to publish the OTA update."
 else
   echo "==> Publishing EAS update (production channel)"
-  if ! (cd "$REPO_ROOT/mobile" && npx eas-cli@latest update --channel production); then
+  if ! (cd "$REPO_ROOT/mobile" && npx --yes eas-cli@latest update --channel production); then
     echo "    WARNING: EAS update failed — server redeploy completed successfully." >&2
   fi
 fi
