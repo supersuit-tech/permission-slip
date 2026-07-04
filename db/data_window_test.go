@@ -65,12 +65,12 @@ func TestApplyDataWindowToParams_InjectWhenAbsent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply: %v", err)
 	}
-	var m map[string]string
+	var m map[string]any
 	if err := json.Unmarshal(out, &m); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
 	if m["start"] != floor.Format(time.RFC3339) {
-		t.Fatalf("start = %q, want %q", m["start"], floor.Format(time.RFC3339))
+		t.Fatalf("start = %v, want %q", m["start"], floor.Format(time.RFC3339))
 	}
 }
 
@@ -86,10 +86,10 @@ func TestApplyDataWindowToParams_ClampOlderStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply: %v", err)
 	}
-	var m map[string]string
+	var m map[string]any
 	_ = json.Unmarshal(out, &m)
 	if m["start"] != floor.Format(time.RFC3339) {
-		t.Fatalf("start = %q, want clamped floor", m["start"])
+		t.Fatalf("start = %v, want clamped floor", m["start"])
 	}
 }
 
@@ -106,10 +106,10 @@ func TestApplyDataWindowToParams_PassThroughNarrowerStart(t *testing.T) {
 	if err != nil {
 		t.Fatalf("apply: %v", err)
 	}
-	var m map[string]string
+	var m map[string]any
 	_ = json.Unmarshal(out, &m)
 	if m["start"] != agentStart.Format(time.RFC3339) {
-		t.Fatalf("start = %q, want agent value", m["start"])
+		t.Fatalf("start = %v, want agent value", m["start"])
 	}
 }
 
