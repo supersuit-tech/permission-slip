@@ -22,6 +22,7 @@ func TestResolveResourceDetails_ReadHistory_NamedGroup(t *testing.T) {
 	if details["chat_name"] != "Family 🏠" {
 		t.Fatalf("chat_name = %#v", details["chat_name"])
 	}
+	assertParticipants(t, details, []string{"+15551111111", "+15552222222"})
 }
 
 func TestResolveResourceDetails_GetChat_NamedGroup(t *testing.T) {
@@ -46,6 +47,7 @@ func TestResolveResourceDetails_ReadHistory_DMWithContactName(t *testing.T) {
 	if details["chat_name"] != "with Jane Appleseed" {
 		t.Fatalf("chat_name = %#v", details["chat_name"])
 	}
+	assertParticipants(t, details, []string{"+15551234567"})
 }
 
 func TestResolveResourceDetails_ReadHistory_DMWithoutContactName(t *testing.T) {
@@ -147,6 +149,33 @@ func TestResolveResourceDetails_SendMessage_UsesChatDisplayLabel(t *testing.T) {
 	}
 	if details["delivery_disclosure"] == "" {
 		t.Fatalf("details = %#v", details)
+	}
+	assertParticipants(t, details, []string{"+15551234567"})
+}
+
+func TestResolveResourceDetails_SendMessage_ToAddressedFallback(t *testing.T) {
+	mock := newMockIMsgForResolver(t, resolverMockConfig{})
+	defer mock.Close()
+
+	details := resolveChatDetails(t, mock, "imessage.send_message",
+		`{"to":[{"type":"phone","value":"+15559876543"}],"text":"hi"}`)
+	assertParticipants(t, details, []string{"+15559876543"})
+}
+
+func assertParticipants(t *testing.T, details map[string]any, want []string) {
+	t.Helper()
+	raw, ok := details["participants"].([]any)
+	if !ok {
+		t.Fatalf("participants = %#v, want []string", details["participants"])
+	}
+	if len(raw) != len(want) {
+		t.Fatalf("participants = %#v, want %v", raw, want)
+	}
+	for i, v := range raw {
+		s, ok := v.(string)
+		if !ok || s != want[i] {
+			t.Fatalf("participants[%d] = %#v, want %q", i, v, want[i])
+		}
 	}
 }
 

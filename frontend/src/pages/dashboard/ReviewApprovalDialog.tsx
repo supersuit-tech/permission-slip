@@ -39,6 +39,7 @@ import {
   ProtonBatchEmailsPreview,
   parseProtonBatchEmails,
 } from "@/components/previews/ProtonBatchEmailsPreview";
+import { ImessageParticipantsRow } from "@/components/previews/ImessageParticipantsRow";
 import type { components } from "@/api/schema";
 import { TimelineView, type TimelineEntry } from "@/components/TimelineView";
 import { formatAbsoluteTime } from "@/lib/utils";
@@ -445,6 +446,11 @@ export function ReviewApprovalDialog({
                       <ProtonBatchEmailsPreview emails={protonBatchEmails} />
                     </div>
                   )}
+                  <ImessageParticipantsRow
+                    resourceDetails={
+                      approval.resource_details as Record<string, unknown> | undefined
+                    }
+                  />
                   {slackContext && <SlackContextPreview slackContext={slackContext} />}
                 </>
               )}

@@ -34,6 +34,7 @@ import {
   ProtonBatchEmailsPreview,
   parseProtonBatchEmails,
 } from "@/components/previews/ProtonBatchEmailsPreview";
+import { ImessageParticipantsRow } from "@/components/previews/ImessageParticipantsRow";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { TimelineView } from "@/components/TimelineView";
 import { CountdownBadge, RiskBadge } from "./approval-components";
@@ -253,6 +254,7 @@ function ApprovalDialogStory({
                 <ProtonBatchEmailsPreview emails={protonBatchEmails} />
               </div>
             )}
+            <ImessageParticipantsRow resourceDetails={resourceDetails} />
           </div>
 
           {/* Expiry */}
@@ -1981,6 +1983,37 @@ function BulkApprovalDialogStory({
     </Dialog>
   );
 }
+
+export const ImessageSendMessageWithParticipants: Story = {
+  name: "iMessage: Send Message (resolved contact + raw handles)",
+  args: {
+    connectorName: "iMessage",
+    connectorLogo: undefined,
+    actionName: "Send Message",
+    actionType: "imessage.send_message",
+    agentName: "Chiedobot",
+    riskLevel: "medium",
+    displayTemplate: "Send message to {{chat_name}}",
+    preview: null,
+    parameters: { chat_id: 1, text: "Hey, are we still on for lunch?" },
+    schema: {
+      type: "object",
+      required: ["text"],
+      properties: {
+        chat_id: { type: "integer", description: "Existing chat ID" },
+        text: { type: "string", description: "Message body" },
+      },
+    },
+    resourceDetails: {
+      chat_name: "with Ben Kilmer",
+      chat_service: "iMessage",
+      participants: ["+15551234567"],
+      to: "chat:1",
+      delivery_service: "imessage",
+      delivery_disclosure: "Will be sent via iMessage",
+    },
+  },
+};
 
 const GOOGLE_CALENDAR_BULK_SCHEMA: ParametersSchema = {
   type: "object",

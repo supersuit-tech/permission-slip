@@ -331,3 +331,74 @@ describe("ReviewApprovalDialog — auto-approve future requests", () => {
     ).not.toBeInTheDocument();
   });
 });
+
+describe("ReviewApprovalDialog — iMessage participants", () => {
+  let wrapper: ReturnType<typeof createAuthWrapper>;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    resetClientMocks();
+    wrapper = createAuthWrapper();
+    setupMocks();
+  });
+
+  it("shows participants row when resource_details includes handles", async () => {
+    render(
+      <ReviewApprovalDialog
+        approval={makeApproval({
+          action: {
+            type: "imessage.send_message",
+            version: "1",
+            parameters: { chat_id: 1, text: "Hello" },
+          },
+          resource_details: {
+            chat_name: "with Ben Kilmer",
+            participants: ["+15551234567"],
+          },
+        })}
+        agentDisplayName="Test Bot"
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await settleAuthHydration();
+
+    await waitFor(() => {
+      expect(screen.getByTestId("imessage-participants-row")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Participants")).toBeInTheDocument();
+    expect(screen.getByTestId("imessage-participants-row")).toHaveTextContent(
+      "+15551234567",
+    );
+  });
+
+  it("omits participants row when handles are absent", async () => {
+    render(
+      <ReviewApprovalDialog
+        approval={makeApproval({
+          action: {
+            type: "imessage.send_message",
+            version: "1",
+            parameters: { chat_id: 1, text: "Hello" },
+          },
+          resource_details: {
+            chat_name: "with Ben Kilmer",
+          },
+        })}
+        agentDisplayName="Test Bot"
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await settleAuthHydration();
+
+    await waitFor(() => {
+      expect(screen.getByText("Parameters")).toBeInTheDocument();
+    });
+    expect(screen.queryByTestId("imessage-participants-row")).not.toBeInTheDocument();
+  });
+});

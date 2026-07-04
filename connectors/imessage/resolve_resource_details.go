@@ -46,7 +46,11 @@ func (c *IMessageConnector) resolveChatIDDetails(ctx context.Context, params jso
 	if label == "" {
 		return nil, nil
 	}
-	return map[string]any{"chat_name": label}, nil
+	details := map[string]any{"chat_name": label}
+	if participants := participantsFromChat(chatObj); len(participants) > 0 {
+		details["participants"] = participants
+	}
+	return details, nil
 }
 
 func (c *IMessageConnector) resolveSendMessageDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
@@ -79,7 +83,37 @@ func (c *IMessageConnector) resolveSendMessageDetails(ctx context.Context, param
 	if label := chatDisplayLabel(ctx, c.client, creds, displayChat); label != "" {
 		details["chat_name"] = label
 	}
+	participants := participantsFromChat(displayChat)
+	if len(participants) == 0 {
+		participants = participantsFromToHandles(sendParams.To)
+	}
+	if len(participants) > 0 {
+		details["participants"] = participants
+	}
 	return details, nil
+}
+
+func participantsFromChat(ch *chat) []string {
+	if ch == nil || len(ch.Participants) == 0 {
+		return nil
+	}
+	return ch.Participants
+}
+
+func participantsFromToHandles(handles []Handle) []string {
+	if len(handles) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(handles))
+	for _, h := range handles {
+		if h.Value != "" {
+			out = append(out, h.Value)
+		}
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
 }
 
 // chatForDisplayLabel prefers chats.list metadata (contact names) over group CLI output.
