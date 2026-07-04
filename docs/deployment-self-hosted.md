@@ -390,15 +390,31 @@ Permission Slip includes a built-in **iMessage** connector that talks to Message
 - macOS 14+ with Messages.app signed in.
 - [imsg](https://github.com/openclaw/imsg): `brew install steipete/tap/imsg`
 - **Full Disk Access** for reads (`chat.db`) — grant this to **`bin/server`**, not just `imsg`. macOS attributes subprocess file access to the **responsible process**; when the server spawns `imsg`, TCC checks the server's signature. See [Persistent Full Disk Access](../docs/deployment-self-hosted.md#persistent-full-disk-access-optional-recommended-for-imessage) to keep the grant across redeploys.
-- **Automation** permission for sends (Messages.app) — macOS prompts for both under **System Settings → Privacy & Security** the first time `imsg` runs.
+- **Automation** permission for sends (Messages.app) — see [Verify Automation permission](#verify-automation-permission-required-for-sends) below. The credential save probe is read-only and does **not** trigger this prompt.
 - **Text Message Forwarding** enabled on your iPhone (**Settings → Messages → Text Message Forwarding**), pointed at this Mac — required to see and send green-bubble SMS/MMS threads.
 - (Recommended) **Messages in iCloud** turned on for full history sync across devices.
 
 SMS relay routes through Apple's push servers (APNs), not your Wi-Fi/LAN — Tailscale is neither required nor sufficient for SMS forwarding.
 
+### Verify Automation permission (required for sends)
+
+Saving iMessage credentials runs a **read-only** probe (`chats.list`) that exercises Full Disk Access. It does **not** trigger the Automation prompt — that only appears on the first real **send**.
+
+While you are at the Mac (or screen-sharing into it), run a test send:
+
+```bash
+imsg send --to <your-own-number-or-email> --text "setup test"
+```
+
+When macOS prompts for **Automation** (Messages.app), click **Allow** and confirm the message arrives.
+
+> **Which process needs Automation?** Like Full Disk Access, TCC attributes the grant to the **responsible process**. When the launchd-run server spawns `imsg`, the Automation entry is tied to the **server's** context — not a standalone Terminal run of `imsg`. Rebuilds with ad-hoc signatures can invalidate the grant after `make redeploy` or a macOS update; re-run the test send to verify.
+
+**If you skip this step**, sends hang or time out later with no obvious error. The TCC prompt renders only in a **logged-in GUI session** — on a headless or locked Mac Mini, or when sends are triggered remotely while nobody is watching the screen, the AppleScript call blocks silently and looks like a network failure. If you previously denied the prompt, macOS will not ask again — re-enable under **System Settings → Privacy & Security → Automation**, or run `tccutil reset AppleEvents` to force fresh prompts.
+
 ### Configure credentials in Permission Slip
 
-Once `imsg` is installed and both permissions are granted, add **iMessage** credentials in the UI. The defaults work when `imsg` runs on this same Mac. If you're running Permission Slip on Linux instead and want a Mac to act as the iMessage gateway, set `remote_host` to an SSH alias that runs `imsg` on that Mac (e.g. `ssh -T messages-mac imsg`) — see the [Linux deployment guide](deployment-self-hosted-linux.md).
+Once `imsg` is installed, Full Disk Access is granted, and you have [verified Automation with a test send](#verify-automation-permission-required-for-sends), add **iMessage** credentials in the UI. The defaults work when `imsg` runs on this same Mac. If you're running Permission Slip on Linux instead and want a Mac to act as the iMessage gateway, set `remote_host` to an SSH alias that runs `imsg` on that Mac (e.g. `messages-mac`) — see the [Linux deployment guide](deployment-self-hosted-linux.md#imessage-gateway-mac).
 
 Saving credentials runs a real read probe (`chats.list`); `imsg` and Messages.app must be reachable at save time.
 

@@ -323,6 +323,58 @@ The proxy must be running when you save credentials; validation performs a real 
 
 ---
 
+## iMessage gateway (Mac)
+
+Permission Slip on Linux cannot run `imsg` natively — iMessage reads and sends require macOS and Messages.app. You can point the built-in **iMessage** connector at a separate Mac that acts as a gateway over SSH.
+
+### Mac gateway prerequisites
+
+On the Mac (not the Linux host):
+
+- **Same Apple ID** signed into Messages.app on the Mac and on your iPhone.
+- macOS 14+ with Messages.app signed in.
+- [imsg](https://github.com/openclaw/imsg): `brew install steipete/tap/imsg`
+- **Full Disk Access** for reads — grant this to the process that runs `imsg` over SSH (typically `sshd` / `/usr/sbin/sshd` when Permission Slip connects remotely). See the [macOS deployment guide](deployment-self-hosted.md#persistent-full-disk-access-optional-recommended-for-imessage) for signing and persistence notes if the Mac also runs Permission Slip.
+- **Automation** permission for sends (Messages.app) — see the verification step below.
+- **Text Message Forwarding** enabled on your iPhone, pointed at this Mac.
+- Tailscale (or another private route) so the Linux host can reach the Mac over SSH.
+
+### SSH access from the Linux host
+
+1. On the Mac, enable **Remote Login** (**System Settings → General → Sharing → Remote Login**).
+2. On the Linux host, add an SSH config alias (e.g. `~/.ssh/config`):
+   ```
+   Host messages-mac
+     HostName 100.x.x.x
+     User your-mac-username
+     IdentityFile ~/.ssh/id_ed25519
+   ```
+   Use the Mac's tailnet IP (or LAN address). Confirm key-based login works:
+   ```bash
+   ssh -T messages-mac imsg --version
+   ```
+3. In Permission Slip, add **iMessage** credentials with **Remote SSH host** set to `messages-mac` (just the alias — Permission Slip runs `ssh -T messages-mac imsg …` internally).
+
+Saving credentials runs a read-only probe (`chats.list`) over SSH. That exercises Full Disk Access but does **not** trigger the Automation prompt.
+
+### Verify Automation at the Mac's desktop (required for sends)
+
+The Automation TCC prompt appears only on the **Mac's GUI session**, not in your SSH terminal on the Linux box. While physically at the Mac (or screen-sharing into it), run:
+
+```bash
+imsg send --to <your-own-number-or-email> --text "setup test"
+```
+
+Click **Allow** when macOS prompts for Automation (Messages.app) and confirm the message arrives.
+
+When Permission Slip on Linux triggers sends over SSH, the responsible process on the Mac is the SSH session context — verify Automation is granted for the process that actually runs `imsg` (check **System Settings → Privacy & Security → Automation** after the test send).
+
+**If you skip this step**, sends from the Linux host hang or time out with no visible error on either machine. The TCC prompt blocks in the Mac's GUI only; if nobody is logged in or watching that screen, the send looks like a network failure. If you previously denied the prompt, macOS will not ask again — re-enable under **System Settings → Privacy & Security → Automation**, or run `tccutil reset AppleEvents` on the Mac to force fresh prompts.
+
+For action details, send policy, and permission granularity, see the [iMessage connector README](../connectors/imessage/README.md).
+
+---
+
 ## Other Connectors
 
 Permission Slip ships with 15+ more OAuth providers — Atlassian (Jira), Datadog, Dropbox, Figma, GitHub, HubSpot, Linear, Meta (Facebook/Instagram), Microsoft, Notion, PagerDuty, Square, PayPal, Stripe, and X (Twitter). See the [OAuth setup guide](oauth-setup.md) for per-provider instructions.

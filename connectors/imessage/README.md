@@ -8,7 +8,7 @@ Built-in connector that wraps [openclaw/imsg](https://github.com/openclaw/imsg) 
 - macOS 14+ with Messages.app signed in on the Mac.
 - [imsg](https://github.com/openclaw/imsg): `brew install steipete/tap/imsg`
 - **Full Disk Access** for reads (`chat.db`) — grant this to **`bin/server`**, not just `imsg`. macOS attributes subprocess file access to the **responsible process**; when the server spawns `imsg`, TCC checks the server's signature. See [Persistent Full Disk Access](../../docs/deployment-self-hosted.md#persistent-full-disk-access-optional-recommended-for-imessage) to keep the grant across redeploys.
-- **Automation** permission for sends (Messages.app)
+- **Automation** permission for sends (Messages.app) — the credential save probe is read-only and does not trigger this prompt; run a test send during setup. See [Verify Automation permission](../../docs/deployment-self-hosted.md#verify-automation-permission-required-for-sends) in the deployment guide.
 - **Text Message Forwarding** enabled on the iPhone, pointed at this Mac — required for the Mac to see and send green-bubble SMS/MMS threads.
 - **Messages in iCloud** recommended for full history sync across devices.
 
@@ -17,7 +17,7 @@ SMS relay routes through Apple's push servers (APNs), not the local Wi‑Fi netw
 ## Deployment topologies
 
 1. **Mac host:** Run Permission Slip on the same Mac as `imsg`. Leave connector credentials at defaults.
-2. **Linux + Mac gateway:** Run Permission Slip on Linux; set `remote_host` to an SSH alias that runs `imsg` on the Mac (e.g. `ssh -T messages-mac imsg`).
+2. **Linux + Mac gateway:** Run Permission Slip on Linux; set `remote_host` to an SSH alias that runs `imsg` on the Mac (e.g. `messages-mac`). See [iMessage gateway](../../docs/deployment-self-hosted-linux.md#imessage-gateway-mac) for SSH setup and Automation verification.
 
 ## Actions
 
