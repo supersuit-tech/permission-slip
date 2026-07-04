@@ -23,6 +23,45 @@ func resolveStandingApprovalRequestDisplay(
 	out := standingApprovalRequestDisplay{}
 
 	connectorIDPtr := connectorIDFromActionType(actionType)
+	if connectorIDPtr == nil && sourceConfigID == nil {
+		return out
+	}
+
+	if sourceConfigID != nil {
+		configID := strings.TrimSpace(*sourceConfigID)
+		if configID != "" {
+			ac, err := db.GetActionConfigByID(ctx, d, configID, userID)
+			if err == nil && ac != nil && ac.AgentID == agentID {
+				if conn, err := db.GetConnectorByID(ctx, d, ac.ConnectorID); err == nil && conn != nil {
+					out.ConnectorName = strings.TrimSpace(conn.Name)
+				}
+				out.ConnectorInstanceDisplay = resolveConnectorInstanceDisplayFromActionConfig(
+					ctx, d, agentID, userID, ac,
+				)
+				return out
+			}
+		}
+	}
+
+	if connectorIDPtr != nil {
+		if conn, err := db.GetConnectorByID(ctx, d, *connectorIDPtr); err == nil && conn != nil {
+			out.ConnectorName = strings.TrimSpace(conn.Name)
+		}
+	}
+
+	return out
+}
+
+func resolveStandingApprovalRequestDisplayLegacy(
+	ctx context.Context,
+	d db.DBTX,
+	agentID int64,
+	userID, actionType string,
+	sourceConfigID *string,
+) standingApprovalRequestDisplay {
+	out := standingApprovalRequestDisplay{}
+
+	connectorIDPtr := connectorIDFromActionType(actionType)
 	if connectorIDPtr == nil {
 		return out
 	}
