@@ -15,6 +15,8 @@ import (
 	"github.com/supersuit-tech/permission-slip/vault"
 )
 
+const standingApprovalRequestTestConstraints = `{"scope":"test-scope","ping":"*"}`
+
 type standingApprovalRequestMISetup struct {
 	tx          db.DBTX
 	deps        *Deps
@@ -138,7 +140,7 @@ func TestAgentCreateStandingApprovalRequest_ExplicitInstanceUUID(t *testing.T) {
 	t.Parallel()
 	s := setupStandingApprovalRequestMultiInstance(t)
 
-	body := `{"action_type":"` + s.actionType + `","constraints":{},"source_action_configuration_id":"` + s.configID + `","connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"source_action_configuration_id":"` + s.configID + `","connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
 	code, createResp := postStandingApprovalRequest(t, s, body)
 	if code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", code)
@@ -157,7 +159,7 @@ func TestAgentCreateStandingApprovalRequest_DisplayNameSelector(t *testing.T) {
 	t.Parallel()
 	s := setupStandingApprovalRequestMultiInstance(t)
 
-	body := `{"action_type":"` + s.actionType + `","constraints":{},"connector_instance":"Sales"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"connector_instance":"Sales"}`
 	code, createResp := postStandingApprovalRequest(t, s, body)
 	if code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", code)
@@ -195,7 +197,7 @@ func TestAgentCreateStandingApprovalRequest_AmbiguousDisplayName(t *testing.T) {
 		t.Fatalf("rebind other with shared label: %v", err)
 	}
 
-	body := `{"action_type":"` + s.actionType + `","constraints":{},"connector_instance":"` + sharedLabel + `"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"connector_instance":"` + sharedLabel + `"}`
 	r := signedJSONRequest(t, http.MethodPost, "/standing-approvals/request", body, s.privKey, s.agentID)
 	w := httptest.NewRecorder()
 	s.router.ServeHTTP(w, r)
@@ -220,7 +222,7 @@ func TestAgentCreateStandingApprovalRequest_ConflictsWithPinnedConfig(t *testing
 		Name:       "Pinned default",
 	})
 
-	body := `{"action_type":"` + s.actionType + `","constraints":{},"source_action_configuration_id":"` + pinnedConfigID + `","connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"source_action_configuration_id":"` + pinnedConfigID + `","connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
 	r := signedJSONRequest(t, http.MethodPost, "/standing-approvals/request", body, s.privKey, s.agentID)
 	w := httptest.NewRecorder()
 	s.router.ServeHTTP(w, r)
@@ -236,7 +238,7 @@ func TestAgentCreateStandingApprovalRequest_OmittedSelectorWithMultipleInstances
 	t.Parallel()
 	s := setupStandingApprovalRequestMultiInstance(t)
 
-	body := `{"action_type":"` + s.actionType + `","constraints":{},"source_action_configuration_id":"` + s.configID + `"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"source_action_configuration_id":"` + s.configID + `"}`
 	code, createResp := postStandingApprovalRequest(t, s, body)
 	if code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", code)
@@ -255,7 +257,7 @@ func TestApproveStandingApprovalRequest_PropagatesConnectorInstanceID(t *testing
 	t.Parallel()
 	s := setupStandingApprovalRequestMultiInstance(t)
 
-	body := `{"action_type":"` + s.actionType + `","constraints":{},"connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
 	code, createResp := postStandingApprovalRequest(t, s, body)
 	if code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d", code)
@@ -291,7 +293,7 @@ func TestStandingApprovalRequest_InstanceScopedAutoApprove_EndToEnd(t *testing.T
 	t.Parallel()
 	s := setupStandingApprovalRequestMultiInstance(t)
 
-	body := `{"action_type":"` + s.actionType + `","constraints":{},"connector_instance":"Sales"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"connector_instance":"Sales"}`
 	code, createResp := postStandingApprovalRequest(t, s, body)
 	if code != http.StatusOK {
 		t.Fatalf("create: expected 200, got %d", code)
@@ -310,7 +312,7 @@ func TestStandingApprovalRequest_InstanceScopedAutoApprove_EndToEnd(t *testing.T
 	}
 	saID := approveResp.ResultingStandingApprovalID
 
-	matchBody := `{"request_id":"req_sa_match","action":{"type":"` + s.actionType + `","parameters":{"connector_instance":"Sales"}},"context":{"description":"match"}}`
+	matchBody := `{"request_id":"req_sa_match","action":{"type":"` + s.actionType + `","parameters":{"connector_instance":"Sales","scope":"test-scope"}},"context":{"description":"match"}}`
 	rMatch := signedJSONRequest(t, http.MethodPost, "/approvals/request", matchBody, s.privKey, s.agentID)
 	wMatch := httptest.NewRecorder()
 	s.router.ServeHTTP(wMatch, rMatch)
@@ -329,7 +331,7 @@ func TestStandingApprovalRequest_InstanceScopedAutoApprove_EndToEnd(t *testing.T
 	}
 	testhelper.RequireStandingApprovalExecutionCount(t, s.tx, saID, 1)
 
-	otherBody := `{"request_id":"req_sa_other","action":{"type":"` + s.actionType + `","parameters":{"connector_instance":"Default"}},"context":{"description":"other"}}`
+	otherBody := `{"request_id":"req_sa_other","action":{"type":"` + s.actionType + `","parameters":{"connector_instance":"Default","scope":"test-scope"}},"context":{"description":"other"}}`
 	rOther := signedJSONRequest(t, http.MethodPost, "/approvals/request", otherBody, s.privKey, s.agentID)
 	wOther := httptest.NewRecorder()
 	s.router.ServeHTTP(wOther, rOther)
