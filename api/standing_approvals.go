@@ -283,7 +283,11 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			defer db.RollbackTx(r.Context(), tx)
 		}
 
-		sourceConfigIDPtr, ok := resolveSourceActionConfigForStandingApproval(w, r, tx, profile.ID, req)
+		sourceConfigIDPtr, ok := resolveSourceActionConfigForStandingApproval(w, r, tx, profile.ID, req, sourceActionConfigResolveOptions{
+			LogLabel:       "CreateStandingApproval",
+			AutoCreateName: autoApprovedFromRequestConfigName,
+			FailureMessage: "Failed to create standing approval",
+		})
 		if !ok {
 			return
 		}
@@ -326,6 +330,17 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 
 const autoApprovedFromRequestConfigName = "Auto-approved from request"
 
+const autoCreatedFromRuleProposalConfigName = "Auto-created from approved rule proposal"
+
+var autoCreatedFromRuleProposalConfigDescription = "Created automatically when approving a standing auto-approve rule proposal"
+
+type sourceActionConfigResolveOptions struct {
+	LogLabel              string
+	AutoCreateName        string
+	AutoCreateDescription *string
+	FailureMessage        string
+}
+
 // resolveSourceActionConfigForStandingApproval validates an explicit source config
 // or auto-creates/reactivates a backing action configuration when omitted.
 // Returns the config ID and true on success; false if an HTTP error was written.
@@ -335,6 +350,7 @@ func resolveSourceActionConfigForStandingApproval(
 	tx db.DBTX,
 	userID string,
 	req createStandingApprovalRequest,
+	opts sourceActionConfigResolveOptions,
 ) (*string, bool) {
 	if req.SourceActionConfigurationID != nil {
 		sourceConfigID := strings.TrimSpace(*req.SourceActionConfigurationID)
@@ -342,26 +358,30 @@ func resolveSourceActionConfigForStandingApproval(
 			// Empty string is treated as omitted — fall through to auto-create.
 		} else {
 			if len(sourceConfigID) > maxActionConfigIDLength {
+				log.Printf("[%s] %s: source_action_configuration_id too long", TraceID(r.Context()), opts.LogLabel)
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id must be between 1 and 128 characters"))
 				return nil, false
 			}
 
 			ac, err := db.GetActionConfigByID(r.Context(), tx, sourceConfigID, userID)
 			if err != nil {
-				log.Printf("[%s] CreateStandingApproval: load action config: %v", TraceID(r.Context()), err)
+				log.Printf("[%s] %s: load action config: %v", TraceID(r.Context()), opts.LogLabel, err)
 				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+				RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
 				return nil, false
 			}
 			if ac == nil {
+				log.Printf("[%s] %s: source_action_configuration_id not found: %s", TraceID(r.Context()), opts.LogLabel, sourceConfigID)
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id must reference an existing action configuration"))
 				return nil, false
 			}
 			if ac.AgentID != req.AgentID {
+				log.Printf("[%s] %s: action config %s belongs to agent %d, expected %d", TraceID(r.Context()), opts.LogLabel, sourceConfigID, ac.AgentID, req.AgentID)
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action configuration does not belong to the specified agent"))
 				return nil, false
 			}
 			if ac.ActionType != req.ActionType {
+				log.Printf("[%s] %s: action config %s action_type mismatch: %q vs %q", TraceID(r.Context()), opts.LogLabel, sourceConfigID, ac.ActionType, req.ActionType)
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action_type must match the referenced action configuration"))
 				return nil, false
 			}
@@ -371,9 +391,9 @@ func resolveSourceActionConfigForStandingApproval(
 
 	existing, err := db.FindLatestActionConfigForAgentActionType(r.Context(), tx, req.AgentID, userID, req.ActionType)
 	if err != nil {
-		log.Printf("[%s] CreateStandingApproval: find backing action config: %v", TraceID(r.Context()), err)
+		log.Printf("[%s] %s: find backing action config: %v", TraceID(r.Context()), opts.LogLabel, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+		RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
 		return nil, false
 	}
 	if existing != nil {
@@ -389,9 +409,9 @@ func resolveSourceActionConfigForStandingApproval(
 				Status: &active,
 			})
 			if err != nil {
-				log.Printf("[%s] CreateStandingApproval: reactivate action config: %v", TraceID(r.Context()), err)
+				log.Printf("[%s] %s: reactivate action config: %v", TraceID(r.Context()), opts.LogLabel, err)
 				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+				RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
 				return nil, false
 			}
 			id := updated.ID
@@ -401,6 +421,7 @@ func resolveSourceActionConfigForStandingApproval(
 
 	connectorIDPtr := connectorIDFromActionType(req.ActionType)
 	if connectorIDPtr == nil {
+		log.Printf("[%s] %s: action type %q has no connector prefix", TraceID(r.Context()), opts.LogLabel, req.ActionType)
 		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Cannot auto-create action configuration: action type has no connector prefix"))
 		return nil, false
 	}
@@ -408,21 +429,22 @@ func resolveSourceActionConfigForStandingApproval(
 
 	exists, err := db.ConnectorActionExists(r.Context(), tx, connectorID, req.ActionType)
 	if err != nil {
-		log.Printf("[%s] CreateStandingApproval: check connector action: %v", TraceID(r.Context()), err)
+		log.Printf("[%s] %s: check connector action: %v", TraceID(r.Context()), opts.LogLabel, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+		RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
 		return nil, false
 	}
 	if !exists {
+		log.Printf("[%s] %s: action type %q not registered for connector %q", TraceID(r.Context()), opts.LogLabel, req.ActionType, connectorID)
 		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Cannot auto-create action configuration: action type is not registered for connector"))
 		return nil, false
 	}
 
 	configID, err := generatePrefixedID("ac_", 16)
 	if err != nil {
-		log.Printf("[%s] CreateStandingApproval: generate action config ID: %v", TraceID(r.Context()), err)
+		log.Printf("[%s] %s: generate action config ID: %v", TraceID(r.Context()), opts.LogLabel, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+		RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
 		return nil, false
 	}
 
@@ -433,7 +455,8 @@ func resolveSourceActionConfigForStandingApproval(
 		ConnectorID: connectorID,
 		ActionType:  req.ActionType,
 		Parameters:  []byte("{}"),
-		Name:        autoApprovedFromRequestConfigName,
+		Name:        opts.AutoCreateName,
+		Description: opts.AutoCreateDescription,
 	})
 	if err != nil {
 		var acErr *db.ActionConfigError
@@ -443,13 +466,14 @@ func resolveSourceActionConfigForStandingApproval(
 				RespondError(w, r, http.StatusNotFound, NotFound(ErrAgentNotFound, "Agent not found"))
 				return nil, false
 			case db.ActionConfigErrInvalidRef:
+				log.Printf("[%s] %s: invalid connector or action type reference for %q", TraceID(r.Context()), opts.LogLabel, req.ActionType)
 				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Cannot auto-create action configuration: invalid connector or action type reference"))
 				return nil, false
 			}
 		}
-		log.Printf("[%s] CreateStandingApproval: create backing action config: %v", TraceID(r.Context()), err)
+		log.Printf("[%s] %s: create backing action config: %v", TraceID(r.Context()), opts.LogLabel, err)
 		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+		RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
 		return nil, false
 	}
 

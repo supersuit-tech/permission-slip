@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+	"time"
 
+	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
@@ -166,5 +169,142 @@ func TestApproveStandingApprovalRequest_Idempotent(t *testing.T) {
 	router.ServeHTTP(w2, r2)
 	if w2.Code != http.StatusOK {
 		t.Fatalf("second approve (idempotent): %d %s", w2.Code, w2.Body.String())
+	}
+}
+
+func TestApproveStandingApprovalRequest_AutoCreatesActionConfig(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	standingApprovalTestConnectorOnly(t, tx, "email.send")
+
+	requestID := testhelper.GenerateID(t, "sar_")
+	constraints := []byte(`{"to":"*@example.com"}`)
+	_, err := tx.Exec(t.Context(),
+		`INSERT INTO standing_approval_requests
+		   (request_id, agent_id, user_id, action_type, action_version, constraints, status)
+		 VALUES ($1, $2, $3, 'email.send', '1', $4, 'pending')`,
+		requestID, agentID, uid, constraints,
+	)
+	if err != nil {
+		t.Fatalf("insert request: %v", err)
+	}
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/standing-approval-requests/"+requestID+"/approve", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp approveStandingApprovalRequestResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.StandingApproval == nil || resp.StandingApproval.SourceActionConfigurationID == nil {
+		t.Fatal("expected standing approval with source_action_configuration_id")
+	}
+
+	configs, err := db.ListActionConfigsByAgent(t.Context(), tx, agentID, uid)
+	if err != nil {
+		t.Fatalf("ListActionConfigsByAgent: %v", err)
+	}
+	if len(configs) != 1 {
+		t.Fatalf("expected 1 auto-created action config, got %d", len(configs))
+	}
+	if configs[0].Name != autoCreatedFromRuleProposalConfigName {
+		t.Errorf("expected config name %q, got %q", autoCreatedFromRuleProposalConfigName, configs[0].Name)
+	}
+	if configs[0].ID != *resp.StandingApproval.SourceActionConfigurationID {
+		t.Errorf("expected linked config %q, got %q", configs[0].ID, *resp.StandingApproval.SourceActionConfigurationID)
+	}
+}
+
+func TestApproveStandingApprovalRequest_MultipleMatchingConfigsUsesNewest(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	standingApprovalTestConnectorOnly(t, tx, "email.send")
+	connectorID := "email"
+
+	olderID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfig(t, tx, olderID, agentID, uid, connectorID, "email.send")
+	time.Sleep(10 * time.Millisecond)
+	newerID := testhelper.GenerateID(t, "ac_")
+	testhelper.InsertActionConfig(t, tx, newerID, agentID, uid, connectorID, "email.send")
+
+	requestID := testhelper.GenerateID(t, "sar_")
+	constraints := []byte(`{"to":"*@example.com"}`)
+	_, err := tx.Exec(t.Context(),
+		`INSERT INTO standing_approval_requests
+		   (request_id, agent_id, user_id, action_type, action_version, constraints, status)
+		 VALUES ($1, $2, $3, 'email.send', '1', $4, 'pending')`,
+		requestID, agentID, uid, constraints,
+	)
+	if err != nil {
+		t.Fatalf("insert request: %v", err)
+	}
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/standing-approval-requests/"+requestID+"/approve", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp approveStandingApprovalRequestResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.StandingApproval == nil || resp.StandingApproval.SourceActionConfigurationID == nil {
+		t.Fatal("expected standing approval with source_action_configuration_id")
+	}
+	got := *resp.StandingApproval.SourceActionConfigurationID
+	if got != newerID {
+		t.Errorf("expected newest config %q, got %q (older was %q)", newerID, got, olderID)
+	}
+}
+
+func TestApproveStandingApprovalRequest_UnknownActionType(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+
+	requestID := testhelper.GenerateID(t, "sar_")
+	constraints := []byte(`{"anything":"goes"}`)
+	_, err := tx.Exec(t.Context(),
+		`INSERT INTO standing_approval_requests
+		   (request_id, agent_id, user_id, action_type, action_version, constraints, status)
+		 VALUES ($1, $2, $3, 'unknown.action', '1', $4, 'pending')`,
+		requestID, agentID, uid, constraints,
+	)
+	if err != nil {
+		t.Fatalf("insert request: %v", err)
+	}
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/standing-approval-requests/"+requestID+"/approve", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	body := w.Body.String()
+	if !strings.Contains(body, "not registered for connector") {
+		t.Errorf("expected clear error about unregistered action type, got: %s", body)
 	}
 }

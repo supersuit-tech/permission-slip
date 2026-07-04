@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
+import { getApiErrorMessage } from "@/api/errors";
 
 export function useApproveStandingApprovalRequest() {
   const { session } = useAuth();
@@ -16,7 +17,11 @@ export function useApproveStandingApprovalRequest() {
           params: { path: { request_id: requestId } },
         },
       );
-      if (error) throw new Error("Failed to approve rule proposal");
+      if (error) {
+        throw new Error(
+          getApiErrorMessage(error, "Failed to approve rule proposal"),
+        );
+      }
       return data;
     },
     onSuccess: () => {
