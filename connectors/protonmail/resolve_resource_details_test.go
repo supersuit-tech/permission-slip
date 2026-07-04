@@ -240,10 +240,10 @@ func TestEnvelopeToMetadata_OnlyAllowedFields(t *testing.T) {
 		t.Fatalf("empty envelope should yield zero metadata: %+v", meta)
 	}
 	m := meta.asMap()
-	if len(m) != 4 {
-		t.Fatalf("expected exactly 4 keys, got %d: %v", len(m), m)
+	if len(m) != 6 {
+		t.Fatalf("expected exactly 6 keys, got %d: %v", len(m), m)
 	}
-	for _, key := range []string{"subject", "from", "to", "date"} {
+	for _, key := range []string{"subject", "from", "to", "cc", "bcc", "date"} {
 		if _, ok := m[key]; !ok {
 			t.Errorf("missing key %q", key)
 		}
