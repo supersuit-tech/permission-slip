@@ -11426,6 +11426,9 @@ components:
           type: boolean
         webhook_url:
           type: string
+        warning:
+          type: string
+          description: Advisory when another agent for the same approver shares this webhook URL
         test:
           $ref: '#/components/schemas/AgentWebhookTestResult'
     SetAgentWebhookRequest:

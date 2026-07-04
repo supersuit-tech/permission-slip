@@ -143,3 +143,115 @@ func TestValidatePrivateNetworkURL_LocalhostAllowed(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestAgentWebhook_SharedURLWarning(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	pubKey1, _, _ := GenerateEd25519OpenSSHKey()
+	pubKey2, privKey2, _ := GenerateEd25519OpenSSHKey()
+	agent1 := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKey1)
+	agent2 := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKey2)
+
+	hookSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer hookSrv.Close()
+
+	oldClient := agentWakeHTTPClient
+	agentWakeHTTPClient = hookSrv.Client()
+	t.Cleanup(func() { agentWakeHTTPClient = oldClient })
+
+	mockVault := vault.NewMockVaultStore()
+	vaultID, err := mockVault.CreateSecret(context.Background(), tx, "agent1", []byte("tok1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	sharedURL := hookSrv.URL + "/hooks"
+	if err := db.SetAgentWebhook(context.Background(), tx, agent1, sharedURL, vaultID); err != nil {
+		t.Fatal(err)
+	}
+
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	putBody := `{"url":"` + sharedURL + `/","token":"hook-secret-2"}`
+	putReq := signedJSONRequest(t, http.MethodPut, "/agent/webhook", putBody, privKey2, agent2)
+	putW := httptest.NewRecorder()
+	router.ServeHTTP(putW, putReq)
+
+	if putW.Code != http.StatusOK {
+		t.Fatalf("PUT expected 200, got %d: %s", putW.Code, putW.Body.String())
+	}
+	var putResp agentWebhookStatusResponse
+	if err := json.Unmarshal(putW.Body.Bytes(), &putResp); err != nil {
+		t.Fatal(err)
+	}
+	if putResp.Warning != agentWebhookSharedURLWarning {
+		t.Fatalf("PUT warning = %q, want %q", putResp.Warning, agentWebhookSharedURLWarning)
+	}
+
+	getReq := signedJSONRequest(t, http.MethodGet, "/agent/webhook", "", privKey2, agent2)
+	getW := httptest.NewRecorder()
+	router.ServeHTTP(getW, getReq)
+
+	if getW.Code != http.StatusOK {
+		t.Fatalf("GET expected 200, got %d: %s", getW.Code, getW.Body.String())
+	}
+	var getResp agentWebhookStatusResponse
+	if err := json.Unmarshal(getW.Body.Bytes(), &getResp); err != nil {
+		t.Fatal(err)
+	}
+	if getResp.Warning != agentWebhookSharedURLWarning {
+		t.Fatalf("GET warning = %q, want %q", getResp.Warning, agentWebhookSharedURLWarning)
+	}
+}
+
+func TestAgentWebhook_UniqueURLNoWarning(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	pubKey1, _, _ := GenerateEd25519OpenSSHKey()
+	pubKey2, privKey2, _ := GenerateEd25519OpenSSHKey()
+	agent1 := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKey1)
+	agent2 := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKey2)
+
+	hookSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer hookSrv.Close()
+
+	oldClient := agentWakeHTTPClient
+	agentWakeHTTPClient = hookSrv.Client()
+	t.Cleanup(func() { agentWakeHTTPClient = oldClient })
+
+	mockVault := vault.NewMockVaultStore()
+	vaultID, err := mockVault.CreateSecret(context.Background(), tx, "agent1", []byte("tok1"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetAgentWebhook(context.Background(), tx, agent1, hookSrv.URL+"/hooks-a", vaultID); err != nil {
+		t.Fatal(err)
+	}
+
+	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	putBody := `{"url":"` + hookSrv.URL + `/hooks-b","token":"hook-secret-2"}`
+	putReq := signedJSONRequest(t, http.MethodPut, "/agent/webhook", putBody, privKey2, agent2)
+	putW := httptest.NewRecorder()
+	router.ServeHTTP(putW, putReq)
+
+	if putW.Code != http.StatusOK {
+		t.Fatalf("PUT expected 200, got %d: %s", putW.Code, putW.Body.String())
+	}
+	var putResp agentWebhookStatusResponse
+	if err := json.Unmarshal(putW.Body.Bytes(), &putResp); err != nil {
+		t.Fatal(err)
+	}
+	if putResp.Warning != "" {
+		t.Fatalf("PUT warning = %q, want empty", putResp.Warning)
+	}
+}
