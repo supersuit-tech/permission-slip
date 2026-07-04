@@ -67,7 +67,7 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		constraintsBytes, err := validateStandingApprovalConstraints(req.Constraints)
+		constraintsBytes, err := validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, req.ActionType, req.Constraints)
 		if err != nil {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidConstraints, err.Error()))
 			return

@@ -16,6 +16,7 @@ import { useDenyStandingApprovalRequest } from "../../hooks/useDenyStandingAppro
 import { useConnectorDisplayName } from "../../hooks/useConnectorDisplayName";
 import { colors } from "../../theme/colors";
 import { humanizeActionType } from "./approvalUtils";
+import { formatStandingApprovalConstraintsText } from "./formatStandingApprovalConstraints";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -36,7 +37,12 @@ export default function StandingApprovalRequestDetailScreen({
   const agentName = agent ? getAgentDisplayName(agent) : `Agent ${request.agent_id}`;
   const { connectorDisplayName } = useConnectorDisplayName(request.action_type);
 
-  const constraintsText = JSON.stringify(request.constraints, null, 2);
+  const constraintsText =
+    request.constraints && typeof request.constraints === "object"
+      ? formatStandingApprovalConstraintsText(
+          request.constraints as Record<string, unknown>,
+        )
+      : "No constraints";
 
   const handleApprove = useCallback(async () => {
     setBusy(true);
@@ -74,6 +80,10 @@ export default function StandingApprovalRequestDetailScreen({
 
       <Text style={styles.sectionLabel}>Constraints</Text>
       <Text style={styles.mono}>{constraintsText}</Text>
+      <Text style={styles.metaNote}>
+        Verified fields ($meta) match server-fetched envelope data, not
+        agent-supplied parameters.
+      </Text>
 
       {request.expires_in_seconds != null && (
         <Text style={styles.meta}>
@@ -137,6 +147,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     color: colors.gray900,
   },
+  metaNote: { marginTop: 8, fontSize: 12, color: colors.gray500, lineHeight: 18 },
   meta: { marginTop: 12, fontSize: 14, color: colors.gray500 },
   actions: { flexDirection: "row", gap: 12, marginTop: 24 },
   button: {

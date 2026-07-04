@@ -18,6 +18,28 @@ Use this skill when you need human approval for a Permission Slip action and mus
 
 If `request` returns `executed: true` or `status: approved`, the action already ran — skip watching.
 
+## Verified metadata constraints (`$meta`)
+
+For connectors that resolve envelope metadata (Proton Mail message-targeted actions), prefer **`$meta` constraints** over plain parameter pins on `from` / `to` — agents can spoof param values, but `$meta` is checked against server-fetched headers.
+
+**Proton Mail examples:**
+
+```bash
+# Auto-approve read_email only for Amazon auto-confirm messages
+permission-slip request --action protonmail.read_email \
+  --standing-constraints '{"message_id":"*","folder":"*","$meta":{"from":{"$pattern":"auto-confirm@amazon.com"}}}' \
+  --params '{"message_id":42,"folder":"INBOX"}'
+
+# Recipient rule: at least one To address must match (per message)
+# {"message_id":"*","$meta":{"to":{"$pattern":"*@mycorp.com"}}}
+```
+
+- Use `$meta.from` (or legacy `sender`) for sender rules — not a top-level `from` param on `read_email`.
+- `$meta.bcc` rarely matches received mail (IMAP omits Bcc on inbox messages); do not rely on it for inbox automation.
+- For `protonmail.send_email`, constrain outbound `to` / `cc` / `bcc` as normal params; array patterns require **every** recipient to match.
+
+See [Proton Mail connector docs](../../docs/connectors/protonmail.md#standing-approval-constraints-meta) for the full action table.
+
 ## Commands
 
 ```bash

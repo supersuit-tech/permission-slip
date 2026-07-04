@@ -15,6 +15,7 @@ import { useDenyStandingApprovalRequest } from "@/hooks/useDenyStandingApprovalR
 import { useActionSchema } from "@/hooks/useActionSchema";
 import type { StandingApprovalRequestSummary } from "@/hooks/useStandingApprovalRequests";
 import { formatConnectorDisplayName } from "./approvalConnectorLabel";
+import { ConstraintsSummary } from "./ConstraintsSummary";
 
 interface ReviewStandingApprovalRequestDialogProps {
   request: StandingApprovalRequestSummary;
@@ -38,7 +39,10 @@ export function ReviewStandingApprovalRequestDialog({
     connectorName,
     actionType: request.action_type,
   });
-  const constraintsJson = JSON.stringify(request.constraints, null, 2);
+  const constraints =
+    request.constraints && typeof request.constraints === "object"
+      ? (request.constraints as Record<string, unknown>)
+      : null;
   const busy = isApproving || isDenying;
 
   async function handleApprove() {
@@ -93,9 +97,11 @@ export function ReviewStandingApprovalRequestDialog({
             <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
               Constraints
             </p>
-            <pre className="bg-muted max-h-48 overflow-auto rounded-md p-3 text-xs">
-              {constraintsJson}
-            </pre>
+            <ConstraintsSummary constraints={constraints} />
+            <p className="text-muted-foreground mt-2 text-xs">
+              Verified fields (<span className="font-mono">$meta</span>) match
+              server-fetched envelope data, not agent-supplied parameters.
+            </p>
           </div>
 
           {request.max_executions != null && (

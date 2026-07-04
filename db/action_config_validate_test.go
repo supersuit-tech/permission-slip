@@ -668,3 +668,101 @@ func TestValidateConfigParameters_AllowsMetaNamespace(t *testing.T) {
 		t.Fatalf("expected valid $meta config, got: %v", err)
 	}
 }
+
+func TestValidateParametersAgainstConfig_MetaPerMessageFromMatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","$meta":{"from":{"$pattern":"auto-confirm@amazon.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42,"folder":"INBOX"}`)
+	meta := json.RawMessage(`{"messages":[{"from":"auto-confirm@amazon.com","to":["me@example.com"],"cc":[],"bcc":[]}],"senders":["auto-confirm@amazon.com"],"sender":"auto-confirm@amazon.com"}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, meta); err != nil {
+		t.Fatalf("expected match, got: %v", err)
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaPerMessageFromMismatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","$meta":{"from":{"$pattern":"auto-confirm@amazon.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42}`)
+	meta := json.RawMessage(`{"messages":[{"from":"other@example.com","to":[],"cc":[],"bcc":[]}],"senders":["other@example.com"]}`)
+
+	err := ValidateParametersAgainstConfig(config, exec, meta)
+	if err == nil {
+		t.Fatal("expected mismatch")
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaToAnyOfMatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","$meta":{"to":{"$pattern":"*@mycorp.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42}`)
+	meta := json.RawMessage(`{"messages":[{"from":"a@x.com","to":["me@y.com","bob@mycorp.com"],"cc":[],"bcc":[]}],"senders":["a@x.com"]}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, meta); err != nil {
+		t.Fatalf("expected any-of to match, got: %v", err)
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaToAnyOfMismatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","$meta":{"to":{"$pattern":"*@mycorp.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42}`)
+	meta := json.RawMessage(`{"messages":[{"from":"a@x.com","to":["me@y.com"],"cc":[],"bcc":[]}],"senders":["a@x.com"]}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, meta); err == nil {
+		t.Fatal("expected mismatch when no recipient matches")
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaBccMissingFailsClosed(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","$meta":{"bcc":"secret@example.com"}}`)
+	exec := json.RawMessage(`{"message_id":42}`)
+	meta := json.RawMessage(`{"messages":[{"from":"a@x.com","to":["me@y.com"],"cc":[],"bcc":[]}],"senders":["a@x.com"]}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, meta); err == nil {
+		t.Fatal("expected fail-closed on missing bcc")
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaAllMessagesMustMatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_ids":"*","$meta":{"from":{"$pattern":"*@alice.com"}}}`)
+	exec := json.RawMessage(`{"message_ids":[1,2]}`)
+	meta := json.RawMessage(`{"messages":[{"from":"a@alice.com","to":[],"cc":[],"bcc":[]},{"from":"b@other.com","to":[],"cc":[],"bcc":[]}],"senders":["a@alice.com","b@other.com"]}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, meta); err == nil {
+		t.Fatal("expected one mismatched message to fail")
+	}
+}
+
+func TestValidateParametersAgainstConfig_ExecPatternArrayAllMustMatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"to":{"$pattern":"*@example.com"},"subject":"*"}`)
+	exec := json.RawMessage(`{"to":["alice@example.com","bob@example.com"],"subject":"Hi"}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err != nil {
+		t.Fatalf("expected all recipients to match pattern, got: %v", err)
+	}
+}
+
+func TestValidateParametersAgainstConfig_ExecPatternArrayOneMismatch(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"to":{"$pattern":"*@example.com"},"subject":"*"}`)
+	exec := json.RawMessage(`{"to":["alice@example.com","bob@other.com"],"subject":"Hi"}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, nil); err == nil {
+		t.Fatal("expected mismatch when one recipient fails pattern")
+	}
+}
+
+func TestValidateParametersAgainstConfig_MetaSenderLegacyFlatFallback(t *testing.T) {
+	t.Parallel()
+	config := json.RawMessage(`{"message_id":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
+	exec := json.RawMessage(`{"message_id":42}`)
+	meta := json.RawMessage(`{"sender":"alice@example.com"}`)
+
+	if err := ValidateParametersAgainstConfig(config, exec, meta); err != nil {
+		t.Fatalf("expected flat fallback match, got: %v", err)
+	}
+}
