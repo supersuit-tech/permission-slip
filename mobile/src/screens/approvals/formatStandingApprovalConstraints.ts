@@ -33,6 +33,23 @@ function metaConstraintLabel(key: string): string {
   }
 }
 
+function formatDataWindowConstraint(raw: unknown): string | null {
+  if (!raw || typeof raw !== "object") return null;
+  const dw = raw as Record<string, unknown>;
+  if (typeof dw.last_days === "number" && dw.last_days >= 1) {
+    const n = dw.last_days;
+    return `last ${n} day${n === 1 ? "" : "s"}`;
+  }
+  const parts: string[] = [];
+  if (typeof dw.starts_at === "string" && dw.starts_at) {
+    parts.push(`from ${dw.starts_at}`);
+  }
+  if (typeof dw.ends_at === "string" && dw.ends_at) {
+    parts.push(`until ${dw.ends_at}`);
+  }
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
 function parseValue(
   label: string,
   raw: unknown,
@@ -60,6 +77,18 @@ export function formatStandingApprovalConstraints(
         raw as Record<string, unknown>,
       )) {
         lines.push(parseValue(metaConstraintLabel(metaKey), metaVal, true));
+      }
+      continue;
+    }
+    if (key === "$data_window") {
+      const text = formatDataWindowConstraint(raw);
+      if (text) {
+        lines.push({
+          label: "Data window",
+          mode: "fixed",
+          value: text,
+          verified: false,
+        });
       }
       continue;
     }

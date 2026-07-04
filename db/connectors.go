@@ -1,8 +1,8 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -42,6 +42,7 @@ type ConnectorAction struct {
 	RequiresPaymentMethod bool
 	DisplayTemplate       *string
 	Preview               []byte // raw JSONB — structured preview layout config
+	DataWindow            []byte // raw JSONB — {"start_param","end_param"} or nil
 }
 
 // CredentialFieldSpec is one field in a static (api_key/custom) credential schema.
@@ -120,7 +121,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	// Fetch actions.
 	actionRows, err := db.Query(ctx,
-		`SELECT action_type, operation_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template, preview
+		`SELECT action_type, operation_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template, preview, data_window
 		 FROM connector_actions
 		 WHERE connector_id = $1
 		 ORDER BY action_type`,
@@ -133,7 +134,7 @@ func GetConnectorByID(ctx context.Context, db DBTX, connectorID string) (*Connec
 
 	for actionRows.Next() {
 		var a ConnectorAction
-		if err := actionRows.Scan(&a.ActionType, &a.OperationType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema, &a.RequiresPaymentMethod, &a.DisplayTemplate, &a.Preview); err != nil {
+		if err := actionRows.Scan(&a.ActionType, &a.OperationType, &a.Name, &a.Description, &a.RiskLevel, &a.ParametersSchema, &a.RequiresPaymentMethod, &a.DisplayTemplate, &a.Preview, &a.DataWindow); err != nil {
 			return nil, err
 		}
 		cd.Actions = append(cd.Actions, a)
@@ -340,6 +341,7 @@ type ExternalConnectorAction struct {
 	RequiresPaymentMethod bool
 	DisplayTemplate       string
 	Preview               []byte // raw JSON — structured preview layout config
+	DataWindow            []byte // raw JSON — {"start_param","end_param"} or nil
 }
 
 // ExternalConnectorCredential describes a required credential from an external connector manifest.
@@ -402,8 +404,8 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 			opType = "write"
 		}
 		_, err := tx.Exec(ctx, `
-			INSERT INTO connector_actions (connector_id, action_type, operation_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template, preview)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+			INSERT INTO connector_actions (connector_id, action_type, operation_type, name, description, risk_level, parameters_schema, requires_payment_method, display_template, preview, data_window)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
 			ON CONFLICT (connector_id, action_type) DO UPDATE SET
 				operation_type = EXCLUDED.operation_type,
 				name = EXCLUDED.name,
@@ -412,8 +414,9 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 				parameters_schema = EXCLUDED.parameters_schema,
 				requires_payment_method = EXCLUDED.requires_payment_method,
 				display_template = EXCLUDED.display_template,
-				preview = EXCLUDED.preview`,
-			m.ID, a.ActionType, opType, a.Name, nilIfEmpty(a.Description), nilIfEmpty(a.RiskLevel), nilIfEmptyBytes(a.ParametersSchema), a.RequiresPaymentMethod, nilIfEmpty(a.DisplayTemplate), nilIfEmptyBytes(a.Preview))
+				preview = EXCLUDED.preview,
+				data_window = EXCLUDED.data_window`,
+			m.ID, a.ActionType, opType, a.Name, nilIfEmpty(a.Description), nilIfEmpty(a.RiskLevel), nilIfEmptyBytes(a.ParametersSchema), a.RequiresPaymentMethod, nilIfEmpty(a.DisplayTemplate), nilIfEmptyBytes(a.Preview), nilIfEmptyBytes(a.DataWindow))
 		if err != nil {
 			return err
 		}

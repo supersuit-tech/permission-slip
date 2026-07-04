@@ -8,6 +8,8 @@ import { getAgentDisplayName } from "@/lib/agents";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 import { ActionConfigParameterFields } from "@/pages/agents/connectors/ActionConfigParameterFields";
 import type { ParamMode } from "@/pages/agents/connectors/ActionConfigFormFields";
+import { DataWindowPicker } from "@/components/DataWindowPicker";
+import type { DataWindowFormState } from "@/lib/dataWindow";
 
 const selectClassName =
   "border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
@@ -115,6 +117,9 @@ export function StepConstraints({
   onParamModeChange,
   manualConstraintsJson,
   onManualConstraintsJsonChange,
+  dataWindowSupported,
+  dataWindowForm,
+  onDataWindowFormChange,
   isPending,
 }: {
   configSchema: ParametersSchema | null;
@@ -125,6 +130,9 @@ export function StepConstraints({
   onParamModeChange: (key: string, mode: ParamMode) => void;
   manualConstraintsJson: string;
   onManualConstraintsJsonChange: (value: string) => void;
+  dataWindowSupported?: boolean;
+  dataWindowForm: DataWindowFormState;
+  onDataWindowFormChange: (value: DataWindowFormState) => void;
   isPending: boolean;
 }) {
   if (schemaLoading) {
@@ -185,6 +193,14 @@ export function StepConstraints({
           </div>
         </div>
       )}
+
+      {dataWindowSupported ? (
+        <DataWindowPicker
+          value={dataWindowForm}
+          onChange={onDataWindowFormChange}
+          disabled={isPending}
+        />
+      ) : null}
     </div>
   );
 }

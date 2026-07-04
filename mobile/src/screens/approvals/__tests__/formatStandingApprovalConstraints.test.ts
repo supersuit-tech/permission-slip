@@ -31,4 +31,17 @@ describe("formatStandingApprovalConstraints", () => {
     });
     expect(text).toBe("Verified To: team@mycorp.com");
   });
+
+  it("formats $data_window last_days", () => {
+    const lines = formatStandingApprovalConstraints({
+      chat_id: "42",
+      $data_window: { last_days: 30 },
+    });
+    expect(lines).toContainEqual({
+      label: "Data window",
+      mode: "fixed",
+      value: "last 30 days",
+      verified: false,
+    });
+  });
 });

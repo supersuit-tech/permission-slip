@@ -147,6 +147,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Description:     "List upcoming events from Google Calendar",
 				RiskLevel:       "low",
 				DisplayTemplate: "List calendar events from {{calendar_name}}",
+				DataWindow:      &connectors.DataWindowParams{StartParam: "time_min", EndParam: "time_max"},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {

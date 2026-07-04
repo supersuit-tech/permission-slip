@@ -35,6 +35,7 @@ type connectorActionResponse struct {
 	RequiresPaymentMethod bool    `json:"requires_payment_method"`
 	DisplayTemplate       *string `json:"display_template,omitempty"`
 	Preview               any     `json:"preview,omitempty"`
+	DataWindow            any     `json:"data_window,omitempty"`
 }
 
 type credentialFieldResponse struct {
@@ -158,6 +159,14 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 				log.Printf("[%s] warning: failed to unmarshal connector %s action %s preview: %v", TraceID(ctx), c.ID, a.ActionType, err)
 			} else {
 				resp.Preview = preview
+			}
+		}
+		if len(a.DataWindow) > 0 {
+			var dw any
+			if err := json.Unmarshal(a.DataWindow, &dw); err != nil {
+				log.Printf("[%s] warning: failed to unmarshal connector %s action %s data_window: %v", TraceID(ctx), c.ID, a.ActionType, err)
+			} else {
+				resp.DataWindow = dw
 			}
 		}
 		actions[i] = resp

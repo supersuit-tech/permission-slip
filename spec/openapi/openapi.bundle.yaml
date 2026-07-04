@@ -8489,6 +8489,21 @@ components:
           required:
             - layout
             - fields
+        data_window:
+          type: object
+          description: |
+            When present, the action supports `$data_window` standing-approval constraints.
+            Names the connector parameter pair used for time-scoped read enforcement.
+          properties:
+            start_param:
+              type: string
+              description: Parameter name for the inclusive lower bound (RFC3339).
+            end_param:
+              type: string
+              description: Parameter name for the exclusive upper bound (RFC3339).
+          required:
+            - start_param
+            - end_param
           example:
             layout: event
             fields:

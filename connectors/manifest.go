@@ -31,15 +31,16 @@ type ConnectorManifest struct {
 
 // ManifestAction describes a single action exposed by an external connector.
 type ManifestAction struct {
-	ActionType            string          `json:"action_type"`
-	OperationType         string          `json:"operation_type,omitempty"` // read, write, edit, or delete; inferred from action_type when empty
-	Name                  string          `json:"name"`
-	Description           string          `json:"description"`
-	RiskLevel             string          `json:"risk_level"`
-	ParametersSchema      json.RawMessage `json:"parameters_schema,omitempty"`
-	RequiresPaymentMethod bool            `json:"requires_payment_method,omitempty"`
-	DisplayTemplate       string          `json:"display_template,omitempty"`
-	Preview               *ActionPreview  `json:"preview,omitempty"`
+	ActionType            string            `json:"action_type"`
+	OperationType         string            `json:"operation_type,omitempty"` // read, write, edit, or delete; inferred from action_type when empty
+	Name                  string            `json:"name"`
+	Description           string            `json:"description"`
+	RiskLevel             string            `json:"risk_level"`
+	ParametersSchema      json.RawMessage   `json:"parameters_schema,omitempty"`
+	RequiresPaymentMethod bool              `json:"requires_payment_method,omitempty"`
+	DisplayTemplate       string            `json:"display_template,omitempty"`
+	Preview               *ActionPreview    `json:"preview,omitempty"`
+	DataWindow            *DataWindowParams `json:"data_window,omitempty"`
 }
 
 // ActionPreview defines a structured layout for rich rendering of an action's
@@ -710,6 +711,7 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 			RequiresPaymentMethod: a.RequiresPaymentMethod,
 			DisplayTemplate:       a.DisplayTemplate,
 			Preview:               previewJSON,
+			DataWindow:            marshalDataWindowParams(a.DataWindow),
 		})
 	}
 	for _, c := range m.RequiredCredentials {
@@ -774,4 +776,16 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 		})
 	}
 	return out
+}
+
+func marshalDataWindowParams(dw *DataWindowParams) []byte {
+	if dw == nil || dw.StartParam == "" || dw.EndParam == "" {
+		return nil
+	}
+	b, err := json.Marshal(dw)
+	if err != nil {
+		log.Printf("warning: failed to marshal data_window: %v", err)
+		return nil
+	}
+	return b
 }

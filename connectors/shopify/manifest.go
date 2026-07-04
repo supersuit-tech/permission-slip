@@ -25,6 +25,7 @@ func (c *ShopifyConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Get Orders",
 				Description: "List or filter orders from the Shopify store",
 				RiskLevel:   "low",
+				DataWindow:  &connectors.DataWindowParams{StartParam: "created_at_min", EndParam: "created_at_max"},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {

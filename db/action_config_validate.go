@@ -144,6 +144,12 @@ func ValidateConfigParameters(params json.RawMessage) error {
 			}
 			continue
 		}
+		if key == DataWindowNamespaceKey {
+			if err := ValidateDataWindowConstraintShape(raw); err != nil {
+				return err
+			}
+			continue
+		}
 		if pattern, ok := extractPattern(raw); ok {
 			if !strings.Contains(pattern, "*") {
 				return &ConfigValidationError{
@@ -229,6 +235,9 @@ func ValidateParametersAgainstConfig(configParams, execParams, resolvedMeta json
 	metaConstraints, hasMeta := config[MetaNamespaceKey]
 	if hasMeta {
 		delete(config, MetaNamespaceKey)
+	}
+	if _, hasDW := config[DataWindowNamespaceKey]; hasDW {
+		delete(config, DataWindowNamespaceKey)
 	}
 
 	var exec map[string]json.RawMessage

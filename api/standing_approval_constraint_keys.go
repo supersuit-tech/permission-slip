@@ -71,8 +71,22 @@ func validateStandingApprovalConstraintKeys(
 		}
 	}
 
+	dataWindowRaw, hasDataWindow := obj[db.DataWindowNamespaceKey]
+	if hasDataWindow {
+		if err := db.ValidateDataWindowConstraintShape(dataWindowRaw); err != nil {
+			return err
+		}
+		pair, err := db.GetActionDataWindowParams(ctx, d, actionType)
+		if err != nil {
+			return fmt.Errorf("lookup action data window: %w", err)
+		}
+		if pair == nil {
+			return fmt.Errorf("$data_window constraints are not supported for action %q", actionType)
+		}
+	}
+
 	for key := range obj {
-		if key == db.MetaNamespaceKey {
+		if key == db.MetaNamespaceKey || key == db.DataWindowNamespaceKey {
 			continue
 		}
 		if schemaKeys != nil {
