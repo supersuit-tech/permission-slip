@@ -257,10 +257,10 @@ func TestEnvelopeToMetadata_OnlyAllowedFields(t *testing.T) {
 
 func assertEnvelopeMetadataOnly(t *testing.T, details map[string]any) {
 	t.Helper()
-	if len(details) != 4 {
-		t.Fatalf("expected exactly 4 metadata fields, got %d: %v", len(details), details)
+	if len(details) != 6 {
+		t.Fatalf("expected exactly 6 metadata fields, got %d: %v", len(details), details)
 	}
-	for _, key := range []string{"subject", "from", "to", "date"} {
+	for _, key := range []string{"subject", "from", "to", "cc", "bcc", "date"} {
 		if _, ok := details[key]; !ok {
 			t.Errorf("missing key %q", key)
 		}
