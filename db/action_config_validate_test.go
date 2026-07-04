@@ -407,7 +407,7 @@ func TestValidateParametersAgainstConfig_PatternRequiresString(t *testing.T) {
 	}{
 		{"number", json.RawMessage(`{"tag":42}`)},
 		{"boolean", json.RawMessage(`{"tag":true}`)},
-		{"array", json.RawMessage(`{"tag":["v1"]}`)},
+		{"array of numbers", json.RawMessage(`{"tag":[42]}`)},
 		{"object", json.RawMessage(`{"tag":{"v":"1"}}`)},
 		{"null", json.RawMessage(`{"tag":null}`)},
 	}
@@ -671,7 +671,7 @@ func TestValidateConfigParameters_AllowsMetaNamespace(t *testing.T) {
 
 func TestValidateParametersAgainstConfig_MetaPerMessageFromMatch(t *testing.T) {
 	t.Parallel()
-	config := json.RawMessage(`{"message_id":"*","$meta":{"from":{"$pattern":"auto-confirm@amazon.com"}}}`)
+	config := json.RawMessage(`{"message_id":"*","folder":"*","$meta":{"from":{"$pattern":"auto-confirm@amazon.com"}}}`)
 	exec := json.RawMessage(`{"message_id":42,"folder":"INBOX"}`)
 	meta := json.RawMessage(`{"messages":[{"from":"auto-confirm@amazon.com","to":["me@example.com"],"cc":[],"bcc":[]}],"senders":["auto-confirm@amazon.com"],"sender":"auto-confirm@amazon.com"}`)
 
