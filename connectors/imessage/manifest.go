@@ -65,7 +65,7 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Get Chat",
 				Description:     "Get a single conversation with its participant list",
 				RiskLevel:       "low",
-				DisplayTemplate: "Get chat {{chat_id}}",
+				DisplayTemplate: "Get chat {{chat_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["chat_id"],
@@ -84,7 +84,7 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Read Message History",
 				Description:     "Read messages in a chat, with optional incremental cursor for polling",
 				RiskLevel:       "low",
-				DisplayTemplate: "Read history for chat {{chat_id}}",
+				DisplayTemplate: "Read history for chat {{chat_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["chat_id"],

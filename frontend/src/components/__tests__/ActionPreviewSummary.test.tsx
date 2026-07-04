@@ -740,6 +740,48 @@ describe("buildSummary", () => {
         "Do Nothing",
       );
     });
+
+    describe("imessage chat name resolution", () => {
+      it("uses chat_name from resourceDetails for imessage.read_history", () => {
+        const result = buildSummary(
+          "imessage.read_history",
+          { chat_id: 30 },
+          null,
+          "Read Message History",
+          "Read history for chat {{chat_name}}",
+          { chat_name: "with Jane Appleseed" },
+        );
+        expect(result).toContain("Read history for chat");
+        expect(result).toContain("Jane Appleseed");
+        expect(result).not.toContain("30");
+      });
+
+      it("uses chat_name from resourceDetails for imessage.get_chat", () => {
+        const result = buildSummary(
+          "imessage.get_chat",
+          { chat_id: 30 },
+          null,
+          "Get Chat",
+          "Get chat {{chat_name}}",
+          { chat_name: "Family 🏠" },
+        );
+        expect(result).toContain("Get chat");
+        expect(result).toContain("Family 🏠");
+        expect(result).not.toContain("30");
+      });
+
+      it("falls back when chat_name is missing", () => {
+        const result = buildSummary(
+          "imessage.read_history",
+          { chat_id: 30 },
+          null,
+          "Read Message History",
+          "Read history for chat {{chat_name}}",
+        );
+        expect(result).toContain("Read Message History");
+        expect(result).toContain("30");
+      });
+    });
   });
 });
 

@@ -71,6 +71,11 @@ var resourceDetailFields = map[string]bool{
 	"date":        true,
 	"messages":    true,
 	"in_reply_to": true,
+	// iMessage (see connectors/imessage/resolve_resource_details.go)
+	"chat_name":             true,
+	"delivery_disclosure":   true,
+	"delivery_service":      true,
+	"chat_service":          true,
 }
 
 // TestDisplayTemplateParamsExist validates that every {{param}} reference in a

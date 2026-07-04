@@ -258,6 +258,42 @@ describe("buildActionSummary", () => {
     expect(buildActionSummary("email.send", {})).toBe("Send");
   });
 
+  describe("imessage chat name resolution", () => {
+    it("uses chat_name from resourceDetails for imessage.read_history", () => {
+      const result = buildActionSummary(
+        "imessage.read_history",
+        { chat_id: 30 },
+        "Read history for chat {{chat_name}}",
+        { chat_name: "with Jane Appleseed" },
+      );
+      expect(result).toContain("Read history for chat");
+      expect(result).toContain("Jane Appleseed");
+      expect(result).not.toContain("30");
+    });
+
+    it("uses chat_name from resourceDetails for imessage.get_chat", () => {
+      const result = buildActionSummary(
+        "imessage.get_chat",
+        { chat_id: 30 },
+        "Get chat {{chat_name}}",
+        { chat_name: "Family 🏠" },
+      );
+      expect(result).toContain("Get chat");
+      expect(result).toContain("Family 🏠");
+      expect(result).not.toContain("30");
+    });
+
+    it("falls back when chat_name is missing", () => {
+      const result = buildActionSummary(
+        "imessage.read_history",
+        { chat_id: 30 },
+        "Read history for chat {{chat_name}}",
+      );
+      expect(result).toContain("Read history");
+      expect(result).toContain("30");
+    });
+  });
+
   describe("google.create_calendar_event", () => {
     const calendarParams = {
       calendar_id: "primary",

@@ -39,6 +39,27 @@ func resolveChatForSend(ctx context.Context, client *imsgClient, creds connector
 	return &chats[0], nil
 }
 
+const chatListLookupLimit = 200
+
+// lookupChatByID finds a chat via chats.list (rich metadata including contact names).
+func lookupChatByID(ctx context.Context, client *imsgClient, creds connectors.Credentials, chatID int) (*chat, error) {
+	if chatID <= 0 {
+		return nil, fmt.Errorf("invalid chat_id")
+	}
+
+	var result chatsListResult
+	if err := client.rpcCall(ctx, creds, "chats.list", map[string]any{"limit": chatListLookupLimit}, &result); err != nil {
+		return nil, err
+	}
+	for _, ch := range result.Chats {
+		if ch.ID == chatID {
+			copy := ch
+			return &copy, nil
+		}
+	}
+	return nil, fmt.Errorf("chat %d not found", chatID)
+}
+
 func listChatsByRef(ctx context.Context, client *imsgClient, creds connectors.Credentials, guid, identifier string) ([]chat, error) {
 	var result chatsListResult
 	if err := client.rpcCall(ctx, creds, "chats.list", map[string]any{"limit": 200}, &result); err != nil {

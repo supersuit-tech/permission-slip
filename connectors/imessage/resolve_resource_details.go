@@ -8,12 +8,48 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
-// ResolveResourceDetails enriches send approvals with predicted delivery service.
+// ResolveResourceDetails enriches iMessage approvals with human-readable chat names.
 func (c *IMessageConnector) ResolveResourceDetails(ctx context.Context, actionType string, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
-	if actionType != "imessage.send_message" {
+	actionCtx, cancel := c.actionTimeout(ctx)
+	defer cancel()
+
+	switch actionType {
+	case "imessage.send_message":
+		return c.resolveSendMessageDetails(actionCtx, params, creds)
+	case "imessage.read_history", "imessage.get_chat":
+		return c.resolveChatIDDetails(actionCtx, params, creds)
+	default:
+		return nil, nil
+	}
+}
+
+func (c *IMessageConnector) resolveChatIDDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
+	var p struct {
+		ChatID int `json:"chat_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		log.Printf("imessage: resolve chat details: parse params: %v", err)
+		return nil, nil
+	}
+	if p.ChatID <= 0 {
+		log.Printf("imessage: resolve chat details: missing chat_id")
 		return nil, nil
 	}
 
+	chatObj, err := lookupChatByID(ctx, c.client, creds, p.ChatID)
+	if err != nil {
+		log.Printf("imessage: resolve chat details: chat lookup: %v", err)
+		return nil, nil
+	}
+
+	label := chatDisplayLabel(ctx, c.client, creds, chatObj)
+	if label == "" {
+		return nil, nil
+	}
+	return map[string]any{"chat_name": label}, nil
+}
+
+func (c *IMessageConnector) resolveSendMessageDetails(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
 	var sendParams sendMessageParams
 	if err := json.Unmarshal(params, &sendParams); err != nil {
 		log.Printf("imessage: resolve send_message details: parse params: %v", err)
@@ -24,10 +60,7 @@ func (c *IMessageConnector) ResolveResourceDetails(ctx context.Context, actionTy
 		return nil, nil
 	}
 
-	actionCtx, cancel := c.actionTimeout(ctx)
-	defer cancel()
-
-	chatObj, err := resolveChatForSend(actionCtx, c.client, creds, sendParams)
+	chatObj, err := resolveChatForSend(ctx, c.client, creds, sendParams)
 	if err != nil {
 		log.Printf("imessage: resolve send_message details: chat lookup: %v", err)
 	}
@@ -41,12 +74,22 @@ func (c *IMessageConnector) ResolveResourceDetails(ctx context.Context, actionTy
 	if chatObj != nil && chatObj.Service != "" {
 		details["chat_service"] = chatObj.Service
 	}
-	if chatObj != nil && chatObj.DisplayName != "" {
-		details["chat_name"] = chatObj.DisplayName
-	} else if chatObj != nil && chatObj.Name != "" {
-		details["chat_name"] = chatObj.Name
+
+	displayChat := chatForDisplayLabel(ctx, c.client, creds, sendParams, chatObj)
+	if label := chatDisplayLabel(ctx, c.client, creds, displayChat); label != "" {
+		details["chat_name"] = label
 	}
 	return details, nil
+}
+
+// chatForDisplayLabel prefers chats.list metadata (contact names) over group CLI output.
+func chatForDisplayLabel(ctx context.Context, client *imsgClient, creds connectors.Credentials, p sendMessageParams, chatObj *chat) *chat {
+	if p.ChatID > 0 {
+		if enriched, err := lookupChatByID(ctx, client, creds, p.ChatID); err == nil {
+			return enriched
+		}
+	}
+	return chatObj
 }
 
 var _ connectors.ResourceDetailResolver = (*IMessageConnector)(nil)
