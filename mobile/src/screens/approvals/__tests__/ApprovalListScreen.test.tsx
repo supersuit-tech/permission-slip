@@ -61,8 +61,8 @@ const mockUseStandingApprovalInstanceAmbiguityWarning = jest.fn(() => ({
 }));
 
 jest.mock("../../../hooks/useStandingApprovalInstanceAmbiguityWarning", () => ({
-  useStandingApprovalInstanceAmbiguityWarning: (...args: unknown[]) =>
-    mockUseStandingApprovalInstanceAmbiguityWarning(...args),
+  useStandingApprovalInstanceAmbiguityWarning: () =>
+    mockUseStandingApprovalInstanceAmbiguityWarning(),
 }));
 
 jest.mock("../../../hooks/useStandingApprovalConnectorLabel", () => ({
