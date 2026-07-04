@@ -295,7 +295,11 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 	}
 
 	// Persist execution result on the approval row (best-effort).
-	if err := db.UpdateApprovalExecution(ctx, deps.DB, appr.ApprovalID, execStatus, resultJSON); err != nil {
+	// Use a fresh context detached from the execution deadline so a timed-out
+	// connector call can still record execution_status/execution_result.
+	persistCtx, persistCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer persistCancel()
+	if err := db.UpdateApprovalExecution(persistCtx, deps.DB, appr.ApprovalID, execStatus, resultJSON); err != nil {
 		log.Printf("[%s] executeApprovalAction: failed to store execution result for approval %s: %v", TraceID(ctx), appr.ApprovalID, err)
 		CaptureError(ctx, err)
 	}
