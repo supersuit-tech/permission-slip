@@ -40,8 +40,10 @@ export function ReviewStandingApprovalRequestDialog({
       setDone("approved");
       toast.success("Auto-approve rule activated");
       setTimeout(() => onOpenChange(false), 1500);
-    } catch {
-      toast.error("Failed to approve rule");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to approve rule";
+      toast.error(message);
     }
   }
 
@@ -51,8 +53,10 @@ export function ReviewStandingApprovalRequestDialog({
       setDone("denied");
       toast.success("Rule proposal denied");
       setTimeout(() => onOpenChange(false), 1500);
-    } catch {
-      toast.error("Failed to deny rule");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Failed to deny rule";
+      toast.error(message);
     }
   }
 

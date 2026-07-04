@@ -206,14 +206,6 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		sourceConfigID, err := db.FindActionConfigIDForStandingApprovalRequest(
-			r.Context(), deps.DB, sar.AgentID, profile.ID, sar.ActionType, sar.SourceActionConfigurationID,
-		)
-		if err != nil {
-			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error()))
-			return
-		}
-
 		startsAt := time.Now().UTC()
 		var expiresAt *time.Time
 		if sar.ExpiresInSeconds != nil {
@@ -244,6 +236,21 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 		if owned {
 			defer db.RollbackTx(r.Context(), tx)
 		}
+
+		sourceConfigIDPtr, ok := resolveSourceActionConfigForStandingApproval(w, r, tx, profile.ID, createStandingApprovalRequest{
+			AgentID:                     sar.AgentID,
+			ActionType:                  sar.ActionType,
+			SourceActionConfigurationID: sar.SourceActionConfigurationID,
+		}, sourceActionConfigResolveOptions{
+			LogLabel:              "ApproveStandingApprovalRequest",
+			AutoCreateName:        autoCreatedFromRuleProposalConfigName,
+			AutoCreateDescription: &autoCreatedFromRuleProposalConfigDescription,
+			FailureMessage:        "Failed to approve standing approval request",
+		})
+		if !ok {
+			return
+		}
+		sourceConfigID := *sourceConfigIDPtr
 
 		sa, err := db.CreateStandingApproval(r.Context(), tx, db.CreateStandingApprovalParams{
 			StandingApprovalID:          saID,
