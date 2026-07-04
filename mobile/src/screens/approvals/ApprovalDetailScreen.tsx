@@ -4,7 +4,7 @@
  * approve/deny buttons. Uses subtle shadows and visual hierarchy
  * for a polished, first-class feel.
  */
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -69,6 +69,9 @@ import {
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
+/** Time to show the approve/deny confirmation before returning to the list. */
+export const AUTO_DISMISS_DELAY_MS = 2000;
+
 export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const { approval } = route.params;
   const { agents } = useAgents();
@@ -79,6 +82,25 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const [resolvedAt, setResolvedAt] = useState<string | null>(null);
   const [autoApproveFuture, setAutoApproveFuture] = useState(false);
   const [standingApprovalCreated, setStandingApprovalCreated] = useState(false);
+
+  const autoDismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const clearAutoDismissTimer = useCallback(() => {
+    if (autoDismissTimerRef.current !== null) {
+      clearTimeout(autoDismissTimerRef.current);
+      autoDismissTimerRef.current = null;
+    }
+  }, []);
+
+  const scheduleAutoDismiss = useCallback(() => {
+    clearAutoDismissTimer();
+    autoDismissTimerRef.current = setTimeout(() => {
+      autoDismissTimerRef.current = null;
+      navigation.goBack();
+    }, AUTO_DISMISS_DELAY_MS);
+  }, [clearAutoDismissTimer, navigation]);
+
+  useEffect(() => () => clearAutoDismissTimer(), [clearAutoDismissTimer]);
 
   const {
     approveApproval,
@@ -248,6 +270,8 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           Alert.alert("Auto-approval failed", message);
         }
       }
+
+      scheduleAutoDismiss();
     } catch (err) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const message =
@@ -260,6 +284,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     autoApproveFuture,
     matchingActionConfig,
     createStandingApproval,
+    scheduleAutoDismiss,
   ]);
 
   const handleDeny = useCallback(() => {
@@ -277,6 +302,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
               setResolvedAt(new Date().toISOString());
               setIsDenied(true);
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              scheduleAutoDismiss();
             } catch (err) {
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               const message =
@@ -287,7 +313,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
         },
       ],
     );
-  }, [denyApproval, approval.approval_id]);
+  }, [denyApproval, approval.approval_id, scheduleAutoDismiss]);
 
   const handleDone = useCallback(() => {
     navigation.goBack();
