@@ -215,7 +215,7 @@ func TestAgentCreateStandingApprovalRequest_ConflictsWithPinnedConfig(t *testing
 
 	pinnedConfigID := testhelper.GenerateID(t, "ac_")
 	params, _ := json.Marshal(map[string]string{
-		"connector_instance": s.instDefault.ConnectorInstanceID,
+		"connector_instance": "Default",
 	})
 	testhelper.InsertActionConfigFull(t, s.tx, pinnedConfigID, s.agentID, s.uid, s.connID, s.actionType, testhelper.ActionConfigOpts{
 		Parameters: params,
