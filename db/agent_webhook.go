@@ -69,6 +69,25 @@ func ClearAgentWebhook(ctx context.Context, db DBTX, agentID int64) (*string, er
 	return prevVaultID, nil
 }
 
+// WebhookURLSharedByOtherAgent reports whether another agent belonging to the
+// same approver has the same webhook URL (trailing slashes normalized).
+func WebhookURLSharedByOtherAgent(ctx context.Context, db DBTX, agentID int64, webhookURL string) (bool, error) {
+	var exists bool
+	err := db.QueryRow(ctx,
+		`SELECT EXISTS(
+			SELECT 1 FROM agents other
+			INNER JOIN agents self ON self.approver_id = other.approver_id
+			WHERE self.agent_id = $1
+			  AND other.agent_id != $1
+			  AND other.webhook_url IS NOT NULL
+			  AND other.webhook_url != ''
+			  AND rtrim(other.webhook_url, '/') = rtrim($2, '/')
+		)`,
+		agentID, webhookURL,
+	).Scan(&exists)
+	return exists, err
+}
+
 // AgentHasWebhook reports whether the agent has a webhook URL configured.
 func AgentHasWebhook(ctx context.Context, db DBTX, agentID int64) (bool, error) {
 	var exists bool

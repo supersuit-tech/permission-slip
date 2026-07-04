@@ -70,6 +70,8 @@ permission-slip webhook clear           # remove config
 
 The hooks URL must resolve to a **private** address (RFC1918, Tailscale `100.64.0.0/10`, or loopback). Public URLs are rejected at registration.
 
+If another of your agents is already registered with the same hooks URL, `webhook set` and `webhook status` include an advisory `warning` field. Sharing one gateway across agents is allowed, but wakes without `session_key` in approval context are delivered to the gateway's main session and may reach the wrong agent — pass `session_key` in approval context for shared-gateway setups, or give each agent its own gateway.
+
 ### Heartbeat sweep
 
 ```bash

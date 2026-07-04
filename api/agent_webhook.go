@@ -17,9 +17,12 @@ type setAgentWebhookRequest struct {
 	Token string `json:"token" validate:"required"`
 }
 
+const agentWebhookSharedURLWarning = "Another of your agents is registered with this same webhook URL. Wakes without a session_key are delivered to the gateway's main session and may reach the wrong agent. Include session_key in approval context, or give each agent its own gateway."
+
 type agentWebhookStatusResponse struct {
 	Configured bool                    `json:"configured"`
 	WebhookURL string                  `json:"webhook_url,omitempty"`
+	Warning    string                  `json:"warning,omitempty"`
 	Test       *agentWebhookTestResult `json:"test,omitempty"`
 }
 
@@ -112,11 +115,13 @@ func handlePutAgentWebhook(deps *Deps) http.HandlerFunc {
 			log.Printf("[%s] PutAgentWebhook: test delivery: %v", TraceID(r.Context()), err)
 		}
 
-		RespondJSON(w, http.StatusOK, agentWebhookStatusResponse{
+		resp := agentWebhookStatusResponse{
 			Configured: true,
 			WebhookURL: req.URL,
 			Test:       testResult,
-		})
+		}
+		populateWebhookSharedURLWarning(r.Context(), deps, &resp, agent.AgentID, req.URL)
+		RespondJSON(w, http.StatusOK, resp)
 	}
 }
 
@@ -134,6 +139,7 @@ func handleGetAgentWebhook(deps *Deps) http.HandlerFunc {
 		if cfg != nil && cfg.WebhookURL != nil && *cfg.WebhookURL != "" {
 			resp.Configured = true
 			resp.WebhookURL = *cfg.WebhookURL
+			populateWebhookSharedURLWarning(r.Context(), deps, &resp, agent.AgentID, *cfg.WebhookURL)
 		}
 
 		if r.URL.Query().Get("test") == "true" {
@@ -169,5 +175,16 @@ func handleDeleteAgentWebhook(deps *Deps) http.HandlerFunc {
 			}
 		}
 		RespondJSON(w, http.StatusOK, map[string]bool{"cleared": true})
+	}
+}
+
+func populateWebhookSharedURLWarning(ctx context.Context, deps *Deps, resp *agentWebhookStatusResponse, agentID int64, webhookURL string) {
+	shared, err := db.WebhookURLSharedByOtherAgent(ctx, deps.DB, agentID, webhookURL)
+	if err != nil {
+		log.Printf("[%s] webhook shared URL check: %v", TraceID(ctx), err)
+		return
+	}
+	if shared {
+		resp.Warning = agentWebhookSharedURLWarning
 	}
 }

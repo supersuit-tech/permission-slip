@@ -388,6 +388,7 @@ export class ApiClient {
     return this.request<{
       configured: boolean;
       webhook_url?: string;
+      warning?: string;
       test?: {
         configured: boolean;
         success: boolean;
@@ -406,6 +407,7 @@ export class ApiClient {
     return this.request<{
       configured: boolean;
       webhook_url?: string;
+      warning?: string;
       test?: {
         configured: boolean;
         success: boolean;

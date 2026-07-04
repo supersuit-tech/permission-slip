@@ -5,6 +5,9 @@ AgentWebhookConfig:
       type: boolean
     webhook_url:
       type: string
+    warning:
+      type: string
+      description: Advisory when another agent for the same approver shares this webhook URL
     test:
       $ref: '#/AgentWebhookTestResult'
 
