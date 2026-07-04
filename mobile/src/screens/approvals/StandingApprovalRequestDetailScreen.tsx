@@ -14,9 +14,11 @@ import { useAgents, getAgentDisplayName, type AgentSummary } from "../../hooks/u
 import { useApproveStandingApprovalRequest } from "../../hooks/useApproveStandingApprovalRequest";
 import { useDenyStandingApprovalRequest } from "../../hooks/useDenyStandingApprovalRequest";
 import { useStandingApprovalConnectorLabel } from "../../hooks/useStandingApprovalConnectorLabel";
+import { useStandingApprovalInstanceAmbiguityWarning } from "../../hooks/useStandingApprovalInstanceAmbiguityWarning";
 import { colors } from "../../theme/colors";
 import { humanizeActionType } from "./approvalUtils";
 import { formatStandingApprovalConstraintsText } from "./formatStandingApprovalConstraints";
+import { StandingApprovalInstanceAmbiguityWarning } from "./StandingApprovalInstanceAmbiguityWarning";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -36,6 +38,8 @@ export default function StandingApprovalRequestDetailScreen({
   const agent = agents.find((a: AgentSummary) => a.agent_id === request.agent_id);
   const agentName = agent ? getAgentDisplayName(agent) : `Agent ${request.agent_id}`;
   const { connectorLabel } = useStandingApprovalConnectorLabel(request);
+  const { showWarning: showInstanceAmbiguityWarning } =
+    useStandingApprovalInstanceAmbiguityWarning(request);
 
   const constraintsText =
     request.constraints && typeof request.constraints === "object"
@@ -77,6 +81,8 @@ export default function StandingApprovalRequestDetailScreen({
       <Text style={styles.subtitle}>
         {connectorLabel} · From {agentName}
       </Text>
+
+      {showInstanceAmbiguityWarning && <StandingApprovalInstanceAmbiguityWarning />}
 
       <Text style={styles.sectionLabel}>Constraints</Text>
       <Text style={styles.mono}>{constraintsText}</Text>
