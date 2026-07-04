@@ -285,7 +285,7 @@ When `bin/server` is signed with a stable identity, TCC stores the **designated 
 ### Caveats
 
 - **Back up the certificate.** Export it from Keychain Access (`.p12`). A new cert means one more FDA re-grant.
-- **Keychain must be unlocked** for `codesign`. Auto-login handles this for most Mac Minis. When you run `make redeploy` over SSH with `PS_CODESIGN_IDENTITY` set, the script detects the SSH session and prompts for your macOS login password to unlock the keychain automatically. For non-interactive runs (no TTY), unlock it yourself first: `security unlock-keychain ~/Library/Keychains/login.keychain-db`.
+- **Keychain must be unlocked** for `codesign`. Auto-login handles this for most Mac Minis. When you run `make redeploy` with `PS_CODESIGN_IDENTITY` set, the script checks whether the login keychain is actually locked (it can be, over SSH, in detached tmux/screen sessions, or after a keychain auto-lock timeout) and prompts for your macOS login password to unlock it automatically. For non-interactive runs (no TTY), unlock it yourself first: `security unlock-keychain ~/Library/Keychains/login.keychain-db`.
 - **Linux / CI builds are unchanged.** Signing is a no-op unless the host is Darwin and `PS_CODESIGN_IDENTITY` is set.
 
 ---

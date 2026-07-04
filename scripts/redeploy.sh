@@ -25,10 +25,12 @@
 #
 #   PS_CODESIGN_IDENTITY="Permission Slip Signing" make redeploy
 #
-# When redeploying over SSH with PS_CODESIGN_IDENTITY set, the script prompts
-# for your macOS login password to unlock the login keychain before building —
+# When redeploying with PS_CODESIGN_IDENTITY set and the login keychain is
+# locked (common over SSH or in detached tmux/screen sessions), the script
+# prompts for your macOS login password to unlock it before building —
 # codesign can't use the signing key from a locked keychain and fails with
-# 'errSecInternalComponent' otherwise. GUI sessions skip the prompt.
+# 'errSecInternalComponent' otherwise. Already-unlocked keychains skip the
+# prompt, so GUI sessions are typically unaffected.
 #
 # Safety: the running server is only ever replaced by a SUCCESSFUL build. A
 # failed `git pull` (e.g. a transient network blip) or a failed dependency
@@ -72,19 +74,23 @@ if ! make install; then
 fi
 
 # codesign needs the login keychain unlocked to use PS_CODESIGN_IDENTITY's
-# private key. GUI logins unlock it automatically, but SSH sessions don't —
-# codesign then fails with the cryptic 'errSecInternalComponent'. Prompt for
-# the login password up front so `make redeploy` over SSH just works.
+# private key; a locked keychain fails with the cryptic
+# 'errSecInternalComponent'. Don't guess the lock state from SSH env vars —
+# they're missing in reattached tmux/screen sessions, and GUI keychains can
+# lock on a timer. Probe the actual state: `security show-keychain-info`
+# succeeds when the keychain is unlocked and fails with
+# errSecInteractionNotAllowed when it's locked and can't prompt.
 LOGIN_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
-if [ "$(uname -s)" = "Darwin" ] && [ -n "${PS_CODESIGN_IDENTITY:-}" ] \
-  && [ -n "${SSH_CONNECTION:-}${SSH_TTY:-}" ] && [ -f "$LOGIN_KEYCHAIN" ]; then
-  if [ -t 0 ]; then
-    echo "==> Unlocking login keychain for codesign (SSH session detected)"
+if [ "$(uname -s)" = "Darwin" ] && [ -n "${PS_CODESIGN_IDENTITY:-}" ] && [ -f "$LOGIN_KEYCHAIN" ]; then
+  if security show-keychain-info "$LOGIN_KEYCHAIN" >/dev/null 2>&1; then
+    : # keychain already unlocked — no prompt needed
+  elif [ -t 0 ]; then
+    echo "==> Login keychain is locked — unlocking for codesign"
     if ! security unlock-keychain "$LOGIN_KEYCHAIN"; then
       echo "    WARNING: keychain unlock failed — codesign may fail with errSecInternalComponent." >&2
     fi
   else
-    echo "    WARNING: SSH session without a TTY — can't prompt to unlock the login keychain; codesign may fail unless it's already unlocked." >&2
+    echo "    WARNING: login keychain is locked and there's no TTY to prompt — codesign may fail with errSecInternalComponent. Unlock it first: security unlock-keychain ~/Library/Keychains/login.keychain-db" >&2
   fi
 fi
 
