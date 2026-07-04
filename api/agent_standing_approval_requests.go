@@ -17,6 +17,7 @@ type agentStandingApprovalRequestBody struct {
 	MaxExecutions               *int            `json:"max_executions,omitempty" validate:"omitempty,gt=0"`
 	ExpiresInSeconds            *int            `json:"expires_in_seconds,omitempty" validate:"omitempty,gt=0"`
 	SourceActionConfigurationID *string         `json:"source_action_configuration_id"`
+	ConnectorInstance           *string         `json:"connector_instance"`
 }
 
 type agentStandingApprovalRequestResponse struct {
@@ -86,6 +87,14 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			}
 		}
 
+		var connectorInstanceSelector string
+		if req.ConnectorInstance != nil {
+			connectorInstanceSelector = strings.TrimSpace(*req.ConnectorInstance)
+			if connectorInstanceSelector == "" {
+				req.ConnectorInstance = nil
+			}
+		}
+
 		requestID, err := generatePrefixedID("sar_", 16)
 		if err != nil {
 			log.Printf("[%s] CreateStandingApprovalRequest: generate ID: %v", TraceID(r.Context()), err)
@@ -98,12 +107,61 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			r.Context(), deps.DB, agent.AgentID, agent.ApproverID,
 			req.ActionType, req.SourceActionConfigurationID,
 		)
-		var connectorName, connectorInstanceDisplay *string
+		var connectorName, connectorInstanceID, connectorInstanceDisplay *string
 		if display.ConnectorName != "" {
 			connectorName = &display.ConnectorName
 		}
 		if display.ConnectorInstanceDisplay != "" {
 			connectorInstanceDisplay = &display.ConnectorInstanceDisplay
+		}
+
+		if connectorInstanceSelector != "" {
+			resolved, err := resolveConnectorInstanceForStandingApprovalRequest(
+				r.Context(), deps.DB, agent.AgentID, agent.ApproverID,
+				req.ActionType, connectorInstanceSelector,
+			)
+			if err != nil {
+				if respondConnectorInstanceResolutionError(w, r, err) {
+					return
+				}
+				log.Printf("[%s] resolveConnectorInstanceForStandingApprovalRequest: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval request"))
+				return
+			}
+			if resolved != nil {
+				connectorInstanceID = resolved.ConnectorInstanceID
+				if resolved.ConnectorInstanceDisplay != nil {
+					connectorInstanceDisplay = resolved.ConnectorInstanceDisplay
+				}
+			}
+
+			if req.SourceActionConfigurationID != nil {
+				ac, err := db.GetActionConfigByID(r.Context(), deps.DB, *req.SourceActionConfigurationID, agent.ApproverID)
+				if err != nil {
+					log.Printf("[%s] GetActionConfigByID for instance conflict check: %v", TraceID(r.Context()), err)
+					CaptureError(r.Context(), err)
+					RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval request"))
+					return
+				}
+				if ac == nil || ac.AgentID != agent.AgentID {
+					RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id not found"))
+					return
+				}
+				if connectorInstanceID != nil {
+					if err := validateStandingApprovalRequestInstanceAgainstPinnedConfig(
+						r.Context(), deps.DB, agent.AgentID, agent.ApproverID, ac, *connectorInstanceID,
+					); err != nil {
+						if respondConnectorInstanceResolutionError(w, r, err) {
+							return
+						}
+						log.Printf("[%s] validateStandingApprovalRequestInstanceAgainstPinnedConfig: %v", TraceID(r.Context()), err)
+						CaptureError(r.Context(), err)
+						RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval request"))
+						return
+					}
+				}
+			}
 		}
 
 		sar, err := db.InsertStandingApprovalRequest(r.Context(), deps.DB, db.InsertStandingApprovalRequestParams{
@@ -117,6 +175,7 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			ExpiresInSeconds:            req.ExpiresInSeconds,
 			SourceActionConfigurationID: req.SourceActionConfigurationID,
 			ConnectorName:               connectorName,
+			ConnectorInstanceID:         connectorInstanceID,
 			ConnectorInstanceDisplay:    connectorInstanceDisplay,
 		})
 		if err != nil {

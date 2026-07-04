@@ -43,13 +43,21 @@ StandingApprovalRequest:
       nullable: true
       description: |
         Human-readable connector name frozen at proposal time (e.g. "Proton Mail").
+    connector_instance_id:
+      type: string
+      nullable: true
+      description: |
+        Connector instance UUID frozen at proposal time when the agent declared
+        connector_instance on the request, or when the backing action configuration
+        pins a fixed instance.
     connector_instance_display:
       type: string
       nullable: true
       description: |
-        Human-readable connector instance label when the backing action configuration
-        resolves to a specific account (e.g. "Personal"). Mirrors
-        `_connector_instance_display` on regular approvals.
+        Human-readable connector instance label when the agent declared
+        connector_instance or the backing action configuration resolves to a
+        specific account (e.g. "Personal"). Mirrors `_connector_instance_display`
+        on regular approvals.
     status:
       type: string
       enum: [pending, approved, denied, expired, cancelled]
@@ -104,6 +112,13 @@ AgentCreateStandingApprovalRequestBody:
       minimum: 1
     source_action_configuration_id:
       type: string
+    connector_instance:
+      type: string
+      description: |
+        Optional connector instance selector (UUID or display name) declaring which
+        account this rule proposal applies to. When omitted, instance display is
+        resolved only from a pinned connector_instance on the backing action
+        configuration.
 
 AgentCreateStandingApprovalRequestResponse:
   type: object

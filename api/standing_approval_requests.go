@@ -22,6 +22,7 @@ type standingApprovalRequestResponse struct {
 	ExpiresInSeconds            *int       `json:"expires_in_seconds,omitempty"`
 	SourceActionConfigurationID *string    `json:"source_action_configuration_id,omitempty"`
 	ConnectorName               *string    `json:"connector_name,omitempty"`
+	ConnectorInstanceID         *string    `json:"connector_instance_id,omitempty"`
 	ConnectorInstanceDisplay    *string    `json:"connector_instance_display,omitempty"`
 	Status                      string     `json:"status"`
 	DecidedAt                   *time.Time `json:"decided_at,omitempty"`
@@ -84,6 +85,7 @@ func toStandingApprovalRequestResponse(sar db.StandingApprovalRequest) standingA
 		ExpiresInSeconds:            sar.ExpiresInSeconds,
 		SourceActionConfigurationID: sar.SourceActionConfigurationID,
 		ConnectorName:               sar.ConnectorName,
+		ConnectorInstanceID:         sar.ConnectorInstanceID,
 		ConnectorInstanceDisplay:    sar.ConnectorInstanceDisplay,
 		Status:                      sar.Status,
 		DecidedAt:                   sar.DecidedAt,
@@ -264,6 +266,7 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			ActionVersion:               sar.ActionVersion,
 			Constraints:                 sar.Constraints,
 			SourceActionConfigurationID: &sourceConfigID,
+			ConnectorInstanceID:         sar.ConnectorInstanceID,
 			StartsAt:                    startsAt,
 			ExpiresAt:                   expiresAt,
 		})
