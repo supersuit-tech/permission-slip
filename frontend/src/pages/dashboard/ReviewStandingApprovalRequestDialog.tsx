@@ -16,6 +16,8 @@ import { useActionSchema } from "@/hooks/useActionSchema";
 import type { StandingApprovalRequestSummary } from "@/hooks/useStandingApprovalRequests";
 import { formatConnectorDisplayName } from "./approvalConnectorLabel";
 import { ConstraintsSummary } from "./ConstraintsSummary";
+import { useStandingApprovalInstanceAmbiguityWarning } from "@/hooks/useStandingApprovalInstanceAmbiguityWarning";
+import { StandingApprovalInstanceAmbiguityWarning } from "./StandingApprovalInstanceAmbiguityWarning";
 
 interface ReviewStandingApprovalRequestDialogProps {
   request: StandingApprovalRequestSummary;
@@ -33,6 +35,8 @@ export function ReviewStandingApprovalRequestDialog({
   const { approveRequest, isPending: isApproving } = useApproveStandingApprovalRequest();
   const { denyRequest, isPending: isDenying } = useDenyStandingApprovalRequest();
   const { connectorName } = useActionSchema(request.action_type);
+  const { showWarning: showInstanceAmbiguityWarning } =
+    useStandingApprovalInstanceAmbiguityWarning(request);
   const [done, setDone] = useState<"approved" | "denied" | null>(null);
 
   const connectorDisplayName = formatConnectorDisplayName({
@@ -93,6 +97,10 @@ export function ReviewStandingApprovalRequestDialog({
             <span className="font-medium">{connectorDisplayName}</span> (
             <span className="font-mono">{request.action_type}</span>).
           </p>
+
+          {showInstanceAmbiguityWarning && (
+            <StandingApprovalInstanceAmbiguityWarning />
+          )}
 
           <div>
             <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">

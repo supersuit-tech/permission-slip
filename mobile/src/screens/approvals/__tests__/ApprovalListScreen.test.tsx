@@ -42,14 +42,32 @@ jest.mock("../../../hooks/useApprovals", () => ({
   useApprovals: () => mockUseApprovalsReturn,
 }));
 
+let mockUseStandingApprovalRequestsReturn = {
+  requests: [] as Array<Record<string, unknown>>,
+  isLoading: false,
+  isRefetching: false,
+  error: null as string | null,
+  refetch: jest.fn(),
+  dataUpdatedAt: Date.now(),
+};
+
 jest.mock("../../../hooks/useStandingApprovalRequests", () => ({
-  useStandingApprovalRequests: () => ({
-    requests: [],
-    isLoading: false,
-    isRefetching: false,
-    error: null,
-    refetch: jest.fn(),
-    dataUpdatedAt: Date.now(),
+  useStandingApprovalRequests: () => mockUseStandingApprovalRequestsReturn,
+}));
+
+const mockUseStandingApprovalInstanceAmbiguityWarning = jest.fn(() => ({
+  showWarning: false,
+  warningMessage: "Applies to an unspecified account",
+}));
+
+jest.mock("../../../hooks/useStandingApprovalInstanceAmbiguityWarning", () => ({
+  useStandingApprovalInstanceAmbiguityWarning: (...args: unknown[]) =>
+    mockUseStandingApprovalInstanceAmbiguityWarning(...args),
+}));
+
+jest.mock("../../../hooks/useStandingApprovalConnectorLabel", () => ({
+  useStandingApprovalConnectorLabel: () => ({
+    connectorLabel: "Proton Mail",
   }),
 }));
 
@@ -118,6 +136,18 @@ describe("ApprovalListScreen", () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    mockUseStandingApprovalInstanceAmbiguityWarning.mockReturnValue({
+      showWarning: false,
+      warningMessage: "Applies to an unspecified account",
+    });
+    mockUseStandingApprovalRequestsReturn = {
+      requests: [],
+      isLoading: false,
+      isRefetching: false,
+      error: null,
+      refetch: jest.fn(),
+      dataUpdatedAt: Date.now(),
+    };
     mockUseApprovalsReturn = {
       approvals: mockApprovals,
       hasMore: false,
@@ -241,5 +271,72 @@ describe("ApprovalListScreen", () => {
       (node) => node.props.testID === "last-updated",
     );
     expect(lastUpdated).toHaveLength(0);
+  });
+
+  it("shows instance ambiguity warning on rule proposal rows when hook reports it", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      approvals: [],
+    };
+    mockUseStandingApprovalRequestsReturn = {
+      ...mockUseStandingApprovalRequestsReturn,
+      requests: [
+        {
+          request_id: "sar_ambiguous",
+          agent_id: 42,
+          user_id: "user-1",
+          action_type: "protonmail.read_email",
+          action_version: "1",
+          constraints: { from: "auto-confirm@amazon.com" },
+          connector_name: "Proton Mail",
+          status: "pending",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    };
+    mockUseStandingApprovalInstanceAmbiguityWarning.mockReturnValue({
+      showWarning: true,
+      warningMessage: "Applies to an unspecified account",
+    });
+
+    await act(async () => {
+      renderer = renderList();
+    });
+
+    const allText = getAllText(renderer);
+    expect(allText).toContain("Applies to an unspecified account");
+  });
+
+  it("hides instance ambiguity warning when hook reports no ambiguity", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      approvals: [],
+    };
+    mockUseStandingApprovalRequestsReturn = {
+      ...mockUseStandingApprovalRequestsReturn,
+      requests: [
+        {
+          request_id: "sar_clear",
+          agent_id: 42,
+          user_id: "user-1",
+          action_type: "protonmail.read_email",
+          action_version: "1",
+          constraints: { from: "auto-confirm@amazon.com" },
+          connector_name: "Proton Mail",
+          connector_instance_display: "Personal",
+          status: "pending",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    };
+
+    await act(async () => {
+      renderer = renderList();
+    });
+
+    const allText = getAllText(renderer);
+    expect(allText).not.toContain("Applies to an unspecified account");
   });
 });
