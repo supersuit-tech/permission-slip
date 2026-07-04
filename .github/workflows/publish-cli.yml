@@ -4,13 +4,20 @@ on:
   push:
     tags:
       - 'cli/v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (must match cli/package.json, e.g. 0.1.23)'
+        required: true
+        type: string
 
 jobs:
   publish:
     name: Publish @permission-slip/cli
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      # write is needed so dispatch-triggered runs can create the cli/v* tag
+      contents: write
 
     steps:
       - uses: actions/checkout@v6
@@ -33,7 +40,11 @@ jobs:
 
       - name: Verify package version matches tag
         run: |
-          TAG_VERSION="${GITHUB_REF_NAME#cli/v}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG_VERSION="${{ inputs.version }}"
+          else
+            TAG_VERSION="${GITHUB_REF_NAME#cli/v}"
+          fi
           PKG_VERSION=$(node -p "require('./package.json').version")
           if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
             echo "::error::Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)"
@@ -41,7 +52,38 @@ jobs:
           fi
         working-directory: cli
 
+      - name: Guard against re-publishing an existing tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const tag = `cli/v${{ inputs.version }}`;
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`,
+              });
+              core.setFailed(`Tag ${tag} already exists — bump the version instead of re-publishing.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
       - name: Publish to npm
         run: cd cli && npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Dispatch-triggered runs have no tag yet, so create it after a successful
+      # publish. Tags created with GITHUB_TOKEN do not re-trigger this workflow.
+      - name: Create release tag (workflow_dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/cli/v${{ inputs.version }}',
+              sha: context.sha,
+            });

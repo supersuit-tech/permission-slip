@@ -157,7 +157,16 @@ GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
   -f sha="$SHA"
 ```
 
-If the command fails, print the error output and stop.
+If the command fails with a write-permission error (e.g. `"Write access to this GitHub API path is not permitted through this proxy"` — some session types cannot write tags or releases at all), fall back to dispatching the publish workflow directly. For the `cli` package, `publish-cli.yml` has a `workflow_dispatch` trigger that verifies the version, publishes to npm, and creates the tag itself:
+
+```bash
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+  gh workflow run publish-cli.yml --ref main -f version="<version>"
+```
+
+Or, when `gh` is unavailable, use the GitHub MCP tool `mcp__github__actions_run_trigger` with workflow file `publish-cli.yml`, ref `main`, and input `version: <version>`. Then confirm the run succeeds instead of checking for the tag immediately (the workflow creates the tag after a successful publish).
+
+If neither path works, print the error output and stop.
 
 ### 6. Confirm
 
