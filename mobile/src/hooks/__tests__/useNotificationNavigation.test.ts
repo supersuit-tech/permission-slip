@@ -9,6 +9,7 @@ let mockAuthStatus = "authenticated";
 let mockSession: { access_token: string } | null = null;
 
 const mockNavigate = jest.fn();
+const mockDispatch = jest.fn();
 const mockIsReady = jest.fn(() => true);
 const mockSetBadgeCount = jest.fn().mockResolvedValue(true);
 
@@ -32,10 +33,12 @@ jest.mock("../../navigation/navigationRef", () => ({
   navigationRef: {
     isReady: () => mockIsReady(),
     navigate: (...args: unknown[]) => mockNavigate(...args),
+    dispatch: (...args: unknown[]) => mockDispatch(...args),
   },
 }));
 
 import { useNotificationNavigation } from "../useNotificationNavigation";
+import { StackActions } from "@react-navigation/routers";
 
 // --- Helpers ---
 
@@ -118,10 +121,42 @@ describe("useNotificationNavigation", () => {
       headers: { Authorization: "Bearer test-token" },
       params: { query: { status: "all" } },
     });
+    expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
     expect(mockNavigate).toHaveBeenCalledWith("ApprovalDetail", {
       approvalId: "appr_abc123",
       approval: fakeApproval,
     });
+  });
+
+  it("pops to the approval list before navigating to a new approval", async () => {
+    const newApproval = {
+      ...fakeApproval,
+      approval_id: "appr_new456",
+      status: "pending",
+    };
+    mockClientGet.mockResolvedValue({
+      data: { data: [newApproval], has_more: false },
+      error: undefined,
+    });
+
+    const { capture, Consumer } = createHookCapture();
+    await act(async () => {
+      renderer = create(createElement(Consumer));
+    });
+
+    const response = makeNotificationResponse("appr_new456");
+    await act(async () => {
+      await capture.handleNotificationTap(response);
+    });
+
+    expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
+    expect(mockNavigate).toHaveBeenCalledWith("ApprovalDetail", {
+      approvalId: "appr_new456",
+      approval: newApproval,
+    });
+    expect(mockDispatch.mock.invocationCallOrder[0]).toBeLessThan(
+      mockNavigate.mock.invocationCallOrder[0],
+    );
   });
 
   it("clears the app badge count after navigating", async () => {
@@ -312,6 +347,7 @@ describe("useNotificationNavigation", () => {
       headers: { Authorization: "Bearer test-token" },
       params: { query: { status: "all" } },
     });
+    expect(mockDispatch).toHaveBeenCalledWith(StackActions.popToTop());
     expect(mockNavigate).toHaveBeenCalledWith("ApprovalDetail", {
       approvalId: "appr_abc123",
       approval: fakeApproval,

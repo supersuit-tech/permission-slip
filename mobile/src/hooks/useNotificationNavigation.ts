@@ -12,6 +12,7 @@
  * is queued and processed once the user is authenticated.
  */
 import { useCallback, useEffect, useRef } from "react";
+import { StackActions } from "@react-navigation/routers";
 import type { NotificationResponse } from "expo-notifications";
 import * as Notifications from "expo-notifications";
 import { useAuth } from "../auth/AuthContext";
@@ -103,6 +104,9 @@ export function useNotificationNavigation() {
           // Best-effort — badge clearing is non-critical
         });
 
+        // Pop to the approval list first so we never reuse a stale detail
+        // screen instance (e.g. one still showing "Request Approved").
+        navigationRef.dispatch(StackActions.popToTop());
         navigationRef.navigate("ApprovalDetail", {
           approvalId: approval.approval_id,
           approval,

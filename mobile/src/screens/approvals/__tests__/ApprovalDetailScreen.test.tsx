@@ -86,7 +86,9 @@ jest.mock("expo-clipboard", () => ({
   setStringAsync: jest.fn(),
 }));
 
-import ApprovalDetailScreen from "../ApprovalDetailScreen";
+import ApprovalDetailScreen, {
+  AUTO_DISMISS_DELAY_MS,
+} from "../ApprovalDetailScreen";
 
 // --- Helpers ---
 
@@ -538,6 +540,154 @@ describe("ApprovalDetailScreen", () => {
     });
 
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  it("auto-dismisses to the list after successful approval", async () => {
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+    });
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    expect(mockGoBack).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(AUTO_DISMISS_DELAY_MS);
+    });
+
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("auto-dismisses to the list after successful denial", async () => {
+    mockDenyApproval.mockResolvedValueOnce(undefined);
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const denyButton = findFirstByTestId(renderer, "deny-button");
+    await act(async () => {
+      denyButton?.props.onPress();
+    });
+
+    const denyAction = alertSpy.mock.calls[0]?.[2]?.find(
+      (btn) => btn.text === "Deny",
+    );
+    await act(async () => {
+      await denyAction?.onPress?.();
+    });
+
+    expect(mockGoBack).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(AUTO_DISMISS_DELAY_MS);
+    });
+
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not auto-dismiss after approve failure", async () => {
+    mockApproveApproval.mockRejectedValueOnce(new Error("Approval has expired"));
+    jest.spyOn(Alert, "alert");
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(AUTO_DISMISS_DELAY_MS);
+    });
+
+    expect(mockGoBack).not.toHaveBeenCalled();
+  });
+
+  it("cleans up the auto-dismiss timer on unmount", async () => {
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+    });
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    await act(async () => {
+      renderer.unmount();
+    });
+
+    await act(async () => {
+      jest.advanceTimersByTime(AUTO_DISMISS_DELAY_MS);
+    });
+
+    expect(mockGoBack).not.toHaveBeenCalled();
+  });
+
+  it("starts auto-dismiss after standing approval flow settles on failure", async () => {
+    mockApproveApproval.mockResolvedValueOnce({
+      approval_id: "appr_test123",
+      status: "approved",
+      approved_at: new Date().toISOString(),
+    });
+    mockCreateStandingApproval.mockRejectedValueOnce(
+      new Error("Rule already exists"),
+    );
+    const alertSpy = jest.spyOn(Alert, "alert");
+
+    const approval = makeApproval();
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+
+    const checkbox = findFirstByTestId(renderer, "auto-approve-checkbox");
+    await act(async () => {
+      checkbox?.props.onPress();
+    });
+
+    const approveButton = findFirstByTestId(renderer, "approve-button");
+    await act(async () => {
+      approveButton?.props.onPress();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(alertSpy).toHaveBeenCalledWith(
+      "Auto-approval failed",
+      "Rule already exists",
+    );
+    expect(mockGoBack).not.toHaveBeenCalled();
+
+    await act(async () => {
+      jest.advanceTimersByTime(AUTO_DISMISS_DELAY_MS);
+    });
+
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 
   it("shows auto-approve checkbox for pending approvals", async () => {

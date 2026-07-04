@@ -66,6 +66,7 @@ export default function RootNavigator() {
             <Stack.Screen
               name="ApprovalDetail"
               component={ApprovalDetailScreen}
+              getId={({ params }) => params.approvalId}
               options={{
                 headerShown: true,
                 headerTitle: "Approval Details",
