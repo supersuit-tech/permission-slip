@@ -11989,6 +11989,18 @@ components:
         source_action_configuration_id:
           type: string
           nullable: true
+        connector_name:
+          type: string
+          nullable: true
+          description: |
+            Human-readable connector name frozen at proposal time (e.g. "Proton Mail").
+        connector_instance_display:
+          type: string
+          nullable: true
+          description: |
+            Human-readable connector instance label when the backing action configuration
+            resolves to a specific account (e.g. "Personal"). Mirrors
+            `_connector_instance_display` on regular approvals.
         status:
           type: string
           enum:

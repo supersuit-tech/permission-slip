@@ -48,6 +48,8 @@ describe("ReviewStandingApprovalRequestDialog", () => {
           action_type: "protonmail.read_email",
           action_version: "1",
           constraints: { from: "auto-confirm@amazon.com" },
+          connector_name: "Proton Mail",
+          connector_instance_display: "Personal",
           status: "pending",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -56,7 +58,7 @@ describe("ReviewStandingApprovalRequestDialog", () => {
     );
 
     expect(screen.getAllByText("Rule proposal").length).toBeGreaterThan(0);
-    expect(screen.getByText(/Proton Mail/)).toBeInTheDocument();
+    expect(screen.getByText(/Proton Mail \(Personal\)/)).toBeInTheDocument();
     expect(screen.getByText(/protonmail.read_email/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Approve rule/i })).toBeInTheDocument();
   });

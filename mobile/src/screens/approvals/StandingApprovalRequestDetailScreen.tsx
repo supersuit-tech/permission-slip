@@ -13,7 +13,7 @@ import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useAgents, getAgentDisplayName, type AgentSummary } from "../../hooks/useAgents";
 import { useApproveStandingApprovalRequest } from "../../hooks/useApproveStandingApprovalRequest";
 import { useDenyStandingApprovalRequest } from "../../hooks/useDenyStandingApprovalRequest";
-import { useConnectorDisplayName } from "../../hooks/useConnectorDisplayName";
+import { useStandingApprovalConnectorLabel } from "../../hooks/useStandingApprovalConnectorLabel";
 import { colors } from "../../theme/colors";
 import { humanizeActionType } from "./approvalUtils";
 
@@ -34,7 +34,7 @@ export default function StandingApprovalRequestDetailScreen({
 
   const agent = agents.find((a: AgentSummary) => a.agent_id === request.agent_id);
   const agentName = agent ? getAgentDisplayName(agent) : `Agent ${request.agent_id}`;
-  const { connectorDisplayName } = useConnectorDisplayName(request.action_type);
+  const { connectorLabel } = useStandingApprovalConnectorLabel(request);
 
   const constraintsText = JSON.stringify(request.constraints, null, 2);
 
@@ -69,7 +69,7 @@ export default function StandingApprovalRequestDetailScreen({
       </View>
       <Text style={styles.title}>{humanizeActionType(request.action_type)}</Text>
       <Text style={styles.subtitle}>
-        {connectorDisplayName} · From {agentName}
+        {connectorLabel} · From {agentName}
       </Text>
 
       <Text style={styles.sectionLabel}>Constraints</Text>

@@ -25,8 +25,10 @@ func NotifyStandingApprovalRequest(ctx context.Context, deps *Deps, sar *db.Stan
 	approvalURL := fmt.Sprintf("%s/approve-rule/%s", deps.BaseURL, sar.RequestID)
 
 	actionPayload, err := json.Marshal(map[string]any{
-		"type":        sar.ActionType,
-		"constraints": json.RawMessage(sar.Constraints),
+		"type":                       sar.ActionType,
+		"constraints":                json.RawMessage(sar.Constraints),
+		"connector_name":             sar.ConnectorName,
+		"connector_instance_display": sar.ConnectorInstanceDisplay,
 	})
 	if err != nil {
 		log.Printf("notify: marshal standing approval request action: %v", err)
@@ -34,7 +36,7 @@ func NotifyStandingApprovalRequest(ctx context.Context, deps *Deps, sar *db.Stan
 	}
 
 	ctxPayload, err := json.Marshal(map[string]any{
-		"description": fmt.Sprintf("Proposed auto-approve rule for %s", sar.ActionType),
+		"description": standingApprovalRequestDescription(sar),
 		"kind":        "standing_approval_request",
 	})
 	if err != nil {
@@ -68,4 +70,15 @@ func NotifyStandingApprovalRequest(ctx context.Context, deps *Deps, sar *db.Stan
 
 	deps.Notifier.Dispatch(ctx, notifApproval, recipient)
 	log.Printf("notify: dispatched standing approval request notification for %s to user %s", sar.RequestID, approver.ID)
+}
+
+func standingApprovalRequestDescription(sar *db.StandingApprovalRequest) string {
+	label := sar.ActionType
+	if sar.ConnectorName != nil && *sar.ConnectorName != "" {
+		label = *sar.ConnectorName
+		if sar.ConnectorInstanceDisplay != nil && *sar.ConnectorInstanceDisplay != "" {
+			label = fmt.Sprintf("%s (%s)", *sar.ConnectorName, *sar.ConnectorInstanceDisplay)
+		}
+	}
+	return fmt.Sprintf("Proposed auto-approve rule for %s", label)
 }

@@ -21,6 +21,8 @@ type standingApprovalRequestResponse struct {
 	MaxExecutions               *int       `json:"max_executions,omitempty"`
 	ExpiresInSeconds            *int       `json:"expires_in_seconds,omitempty"`
 	SourceActionConfigurationID *string    `json:"source_action_configuration_id,omitempty"`
+	ConnectorName               *string    `json:"connector_name,omitempty"`
+	ConnectorInstanceDisplay    *string    `json:"connector_instance_display,omitempty"`
 	Status                      string     `json:"status"`
 	DecidedAt                   *time.Time `json:"decided_at,omitempty"`
 	ResultingStandingApprovalID *string    `json:"resulting_standing_approval_id,omitempty"`
@@ -81,6 +83,8 @@ func toStandingApprovalRequestResponse(sar db.StandingApprovalRequest) standingA
 		MaxExecutions:               sar.MaxExecutions,
 		ExpiresInSeconds:            sar.ExpiresInSeconds,
 		SourceActionConfigurationID: sar.SourceActionConfigurationID,
+		ConnectorName:               sar.ConnectorName,
+		ConnectorInstanceDisplay:    sar.ConnectorInstanceDisplay,
 		Status:                      sar.Status,
 		DecidedAt:                   sar.DecidedAt,
 		ResultingStandingApprovalID: sar.ResultingStandingApprovalID,
