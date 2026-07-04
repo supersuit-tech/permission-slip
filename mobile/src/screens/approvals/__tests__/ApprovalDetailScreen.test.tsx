@@ -233,6 +233,44 @@ describe("ApprovalDetailScreen", () => {
     expect(json).toContain("support@example.com");
   });
 
+  it("shows iMessage participants when resource_details includes handles", async () => {
+    const approval = makeApproval({
+      action: {
+        type: "imessage.send_message",
+        version: "1",
+        parameters: { chat_id: 1, text: "Hello" },
+      },
+      resource_details: {
+        chat_name: "with Ben Kilmer",
+        participants: ["+15551234567"],
+      },
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    const json = JSON.stringify(renderer.toJSON());
+    expect(json).toContain("Participants");
+    expect(json).toContain("+15551234567");
+    expect(hasTestId(renderer, "imessage-participants-section")).toBe(true);
+  });
+
+  it("omits iMessage participants section when handles are absent", async () => {
+    const approval = makeApproval({
+      action: {
+        type: "imessage.send_message",
+        version: "1",
+        parameters: { chat_id: 1, text: "Hello" },
+      },
+      resource_details: {
+        chat_name: "with Ben Kilmer",
+      },
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    expect(hasTestId(renderer, "imessage-participants-section")).toBe(false);
+  });
+
   it("shows email thread card for google.send_email_reply with thread in context", async () => {
     const approval = makeApproval({
       action: {

@@ -66,6 +66,10 @@ import {
   isProtonReplyAction,
   parseProtonInReplyTo,
 } from "./protonInReplyToUtils";
+import {
+  formatImessageParticipants,
+  parseImessageParticipants,
+} from "./imessageParticipantsUtils";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -152,6 +156,14 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const protonBatchEmails = useMemo(
     () =>
       parseProtonBatchEmails(
+        approval.resource_details as Record<string, unknown> | undefined,
+      ),
+    [approval.resource_details],
+  );
+
+  const imessageParticipants = useMemo(
+    () =>
+      parseImessageParticipants(
         approval.resource_details as Record<string, unknown> | undefined,
       ),
     [approval.resource_details],
@@ -453,6 +465,17 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           </View>
         )}
 
+        {imessageParticipants && (
+          <View style={styles.sectionMajor} testID="imessage-participants-section">
+            <Text style={styles.sectionLabel}>Participants</Text>
+            <View style={styles.cardElevated}>
+              <Text style={styles.participantsText}>
+                {formatImessageParticipants(imessageParticipants)}
+              </Text>
+            </View>
+          </View>
+        )}
+
         {/* Parameters */}
         {paramEntries.length > 0 && (
           <View style={styles.sectionMajor}>
@@ -607,6 +630,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.06,
     shadowRadius: 8,
     elevation: 2,
+  },
+  participantsText: {
+    fontSize: 14,
+    color: colors.gray900,
+    lineHeight: 20,
   },
   // --- Expiry ---
   expiryRow: {

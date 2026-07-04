@@ -28,6 +28,7 @@ import {
   ProtonBatchEmailsPreview,
   parseProtonBatchEmails,
 } from "@/components/previews/ProtonBatchEmailsPreview";
+import { ImessageParticipantsRow } from "@/components/previews/ImessageParticipantsRow";
 import { RiskBadge } from "@/pages/dashboard/approval-components";
 import { MetadataLabel } from "@/components/MetadataLabel";
 
@@ -257,6 +258,8 @@ function ApprovalSupplementalContent({
         </div>
       )}
 
+      <ImessageParticipantsRow resourceDetails={resourceDetails} />
+
       {/* Parameters */}
       {hasParameters && (
         <div className="space-y-2">
@@ -364,6 +367,8 @@ function ApprovalContent({
           </div>
         </div>
       )}
+
+      <ImessageParticipantsRow resourceDetails={resourceDetails} />
 
       {/* Parameters */}
       {Object.keys(parameters).length > 0 && (
