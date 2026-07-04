@@ -386,9 +386,25 @@ remote is a proxy that only authorizes pushing the session's assigned feature br
 any tag push (e.g. `cli/v*`, which triggers `publish-cli.yml`) is rejected with
 `HTTP 403`. Do not waste retries on it.
 
-**Create the tag through the GitHub REST API instead** — it goes straight to authenticated
-GitHub and bypasses the proxy. This is exactly what the `version-tag` skill does. A
-`GH_TOKEN` is available in the environment:
+**Preferred: dispatch `publish-cli.yml` directly.** The workflow has a
+`workflow_dispatch` trigger with a required `version` input. A dispatched run on `main`
+tests, builds, verifies `cli/package.json` matches the input version, publishes to npm,
+and then creates the `cli/v<version>` tag itself. Trigger it with the GitHub MCP tool
+`mcp__github__actions_run_trigger` (workflow file `publish-cli.yml`, ref `main`, input
+`version: <version>`), or with the REST API when it's available:
+
+```bash
+curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/json" \
+  https://api.github.com/repos/supersuit-tech/permission-slip/actions/workflows/publish-cli.yml/dispatches \
+  -d '{"ref":"main","inputs":{"version":"<version>"}}'
+```
+
+**Fallback: create the tag through the GitHub REST API** (fires the tag-push trigger).
+Note this does NOT work in every session type — some sessions get
+`"Write access to this GitHub API path is not permitted through this proxy"` on
+`git/refs` (and on releases). In that case use the workflow dispatch above instead.
+Requests must set `Content-Type: application/json` or the proxy rejects them:
 
 ```bash
 # Resolve the target commit (latest main, after any version-bump PR has merged)
@@ -398,15 +414,14 @@ SHA=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
 
 # Create the tag ref (fires the publish workflow)
 curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/json" \
   https://api.github.com/repos/supersuit-tech/permission-slip/git/refs \
   -d "{\"ref\":\"refs/tags/cli/v<version>\",\"sha\":\"$SHA\"}"
 ```
 
-Before tagging, confirm the package.json version at that SHA matches the tag (the publish
-workflow's "Verify package version matches tag" step will fail otherwise).
-
-**`publish-cli.yml` publishes only on a `cli/v*` tag push** — there is no
-`workflow_dispatch` trigger, so a branch push or manual dispatch will not publish.
+Before publishing either way, confirm the package.json version on `main` matches the
+target version (the publish workflow's "Verify package version matches tag" step will
+fail otherwise).
 
 ### When a publish run fails at `npm publish`
 
