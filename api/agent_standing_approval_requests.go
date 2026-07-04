@@ -94,6 +94,18 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		display := resolveStandingApprovalRequestDisplay(
+			r.Context(), deps.DB, agent.AgentID, agent.ApproverID,
+			req.ActionType, req.SourceActionConfigurationID,
+		)
+		var connectorName, connectorInstanceDisplay *string
+		if display.ConnectorName != "" {
+			connectorName = &display.ConnectorName
+		}
+		if display.ConnectorInstanceDisplay != "" {
+			connectorInstanceDisplay = &display.ConnectorInstanceDisplay
+		}
+
 		sar, err := db.InsertStandingApprovalRequest(r.Context(), deps.DB, db.InsertStandingApprovalRequestParams{
 			RequestID:                   requestID,
 			AgentID:                     agent.AgentID,
@@ -104,6 +116,8 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			MaxExecutions:               req.MaxExecutions,
 			ExpiresInSeconds:            req.ExpiresInSeconds,
 			SourceActionConfigurationID: req.SourceActionConfigurationID,
+			ConnectorName:               connectorName,
+			ConnectorInstanceDisplay:    connectorInstanceDisplay,
 		})
 		if err != nil {
 			log.Printf("[%s] InsertStandingApprovalRequest: %v", TraceID(r.Context()), err)

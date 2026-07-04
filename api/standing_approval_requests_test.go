@@ -45,6 +45,23 @@ func TestAgentCreateStandingApprovalRequest_Success(t *testing.T) {
 	if resp.Status != "pending" {
 		t.Errorf("expected pending, got %q", resp.Status)
 	}
+
+	listR := authenticatedRequest(t, http.MethodGet, "/standing-approval-requests", uid)
+	listW := httptest.NewRecorder()
+	router.ServeHTTP(listW, listR)
+	if listW.Code != http.StatusOK {
+		t.Fatalf("list: %d %s", listW.Code, listW.Body.String())
+	}
+	var listResp standingApprovalRequestListResponse
+	if err := json.Unmarshal(listW.Body.Bytes(), &listResp); err != nil {
+		t.Fatalf("unmarshal list: %v", err)
+	}
+	if len(listResp.Data) != 1 {
+		t.Fatalf("expected 1 request, got %d", len(listResp.Data))
+	}
+	if listResp.Data[0].ConnectorName == nil || *listResp.Data[0].ConnectorName == "" {
+		t.Error("expected connector_name on list response")
+	}
 }
 
 func TestApproveStandingApprovalRequest_HappyPath(t *testing.T) {

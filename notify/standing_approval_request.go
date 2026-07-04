@@ -9,11 +9,29 @@ import (
 )
 
 func buildStandingApprovalRequestSubject(approval Approval) string {
-	actionType := extractActionType(approval.Action)
-	if actionType != "" {
-		return fmt.Sprintf("Rule proposal: auto-approve %s", actionType)
+	label := standingApprovalRequestActionLabel(approval.Action)
+	if label != "" {
+		return fmt.Sprintf("Rule proposal: auto-approve %s", label)
 	}
 	return "Rule proposal: new auto-approve rule"
+}
+
+func standingApprovalRequestActionLabel(action json.RawMessage) string {
+	var obj struct {
+		Type                     string  `json:"type"`
+		ConnectorName            *string `json:"connector_name"`
+		ConnectorInstanceDisplay *string `json:"connector_instance_display"`
+	}
+	if json.Unmarshal(action, &obj) != nil {
+		return extractActionType(action)
+	}
+	if obj.ConnectorName != nil && *obj.ConnectorName != "" {
+		if obj.ConnectorInstanceDisplay != nil && *obj.ConnectorInstanceDisplay != "" {
+			return fmt.Sprintf("%s (%s)", *obj.ConnectorName, *obj.ConnectorInstanceDisplay)
+		}
+		return *obj.ConnectorName
+	}
+	return obj.Type
 }
 
 func buildStandingApprovalRequestPlainBody(approval Approval) string {
@@ -23,6 +41,10 @@ func buildStandingApprovalRequestPlainBody(approval Approval) string {
 		agentName = fmt.Sprintf("Agent %d", approval.AgentID)
 	}
 	b.WriteString(fmt.Sprintf("%s proposed a new auto-approve rule.\n\n", agentName))
+	actionLabel := standingApprovalRequestActionLabel(approval.Action)
+	if actionLabel != "" {
+		b.WriteString(fmt.Sprintf("Connector: %s\n", actionLabel))
+	}
 	actionType := extractActionType(approval.Action)
 	if actionType != "" {
 		b.WriteString(fmt.Sprintf("Action type: %s\n", actionType))
@@ -44,6 +66,7 @@ func buildStandingApprovalRequestHTMLBody(approval Approval) string {
 		agentName = fmt.Sprintf("Agent %d", approval.AgentID)
 	}
 	actionType := extractActionType(approval.Action)
+	actionLabel := standingApprovalRequestActionLabel(approval.Action)
 	description := extractDescription(approval.Context)
 
 	var b bytes.Buffer
@@ -53,8 +76,11 @@ func buildStandingApprovalRequestHTMLBody(approval Approval) string {
 	b.WriteString(`<h2 style="margin:0 0 4px 0;font-size:20px;">Auto-Approve Rule Proposal</h2>`)
 	b.WriteString(fmt.Sprintf(`<p style="margin:0;color:#6b7280;font-size:14px;">from %s</p>`, html.EscapeString(agentName)))
 	b.WriteString(`</div>`)
+	if actionLabel != "" {
+		b.WriteString(fmt.Sprintf(`<p style="margin:0 0 8px 0;"><strong>Connector:</strong> %s</p>`, html.EscapeString(actionLabel)))
+	}
 	if actionType != "" {
-		b.WriteString(fmt.Sprintf(`<p style="margin:0 0 8px 0;"><strong>Action:</strong> %s</p>`, html.EscapeString(actionType)))
+		b.WriteString(fmt.Sprintf(`<p style="margin:0 0 8px 0;"><strong>Action:</strong> <span style="font-family:monospace;">%s</span></p>`, html.EscapeString(actionType)))
 	}
 	if description != "" {
 		b.WriteString(fmt.Sprintf(`<p style="margin:0 0 16px 0;color:#374151;">%s</p>`, html.EscapeString(description)))
@@ -87,10 +113,9 @@ func formatConstraintsForEmail(action json.RawMessage) string {
 
 func buildStandingApprovalRequestPushContent(approval Approval) PushContent {
 	agentName := AgentDisplayName(approval.AgentName, approval.AgentID)
-	actionType := extractActionType(approval.Action)
 	body := "New auto-approve rule"
-	if actionType != "" {
-		body = actionType
+	if label := standingApprovalRequestActionLabel(approval.Action); label != "" {
+		body = label
 	}
 	return PushContent{
 		Title:      fmt.Sprintf("%s proposed a rule", agentName),

@@ -35,8 +35,9 @@ export function ReviewStandingApprovalRequestDialog({
   const [done, setDone] = useState<"approved" | "denied" | null>(null);
 
   const connectorDisplayName = formatConnectorDisplayName({
-    connectorName,
+    connectorName: request.connector_name ?? connectorName,
     actionType: request.action_type,
+    instanceDisplay: request.connector_instance_display,
   });
   const constraintsJson = JSON.stringify(request.constraints, null, 2);
   const busy = isApproving || isDenying;

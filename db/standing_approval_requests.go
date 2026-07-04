@@ -20,6 +20,8 @@ type StandingApprovalRequest struct {
 	MaxExecutions               *int
 	ExpiresInSeconds            *int
 	SourceActionConfigurationID *string
+	ConnectorName               *string
+	ConnectorInstanceDisplay    *string
 	Status                      string
 	DecidedAt                   *time.Time
 	ResultingStandingApprovalID *string
@@ -29,6 +31,7 @@ type StandingApprovalRequest struct {
 
 const standingApprovalRequestColumns = `request_id, agent_id, user_id, action_type, action_version,
 	constraints, max_executions, expires_in_seconds, source_action_configuration_id,
+	connector_name, connector_instance_display,
 	status, decided_at, resulting_standing_approval_id, created_at, updated_at`
 
 // StandingApprovalRequestCursor identifies pagination position.
@@ -68,11 +71,12 @@ const (
 func scanStandingApprovalRequest(row rowScanner) (*StandingApprovalRequest, error) {
 	var sar StandingApprovalRequest
 	var maxExec, expiresIn sql.NullInt64
-	var sourceConfigID, resultingSAID sql.NullString
+	var sourceConfigID, connectorName, connectorInstanceDisplay, resultingSAID sql.NullString
 	var decidedAt, createdAt, updatedAt sql.NullString
 	err := row.Scan(
 		&sar.RequestID, &sar.AgentID, &sar.UserID, &sar.ActionType, &sar.ActionVersion,
 		&sar.Constraints, &maxExec, &expiresIn, &sourceConfigID,
+		&connectorName, &connectorInstanceDisplay,
 		&sar.Status, &decidedAt, &resultingSAID, &createdAt, &updatedAt,
 	)
 	if err != nil {
@@ -89,6 +93,14 @@ func scanStandingApprovalRequest(row rowScanner) (*StandingApprovalRequest, erro
 	if sourceConfigID.Valid {
 		s := sourceConfigID.String
 		sar.SourceActionConfigurationID = &s
+	}
+	if connectorName.Valid {
+		s := connectorName.String
+		sar.ConnectorName = &s
+	}
+	if connectorInstanceDisplay.Valid {
+		s := connectorInstanceDisplay.String
+		sar.ConnectorInstanceDisplay = &s
 	}
 	if resultingSAID.Valid {
 		s := resultingSAID.String
@@ -121,6 +133,8 @@ type InsertStandingApprovalRequestParams struct {
 	MaxExecutions               *int
 	ExpiresInSeconds            *int
 	SourceActionConfigurationID *string
+	ConnectorName               *string
+	ConnectorInstanceDisplay    *string
 }
 
 // InsertStandingApprovalRequest inserts a pending standing approval request.
@@ -128,12 +142,13 @@ func InsertStandingApprovalRequest(ctx context.Context, db DBTX, p InsertStandin
 	row := db.QueryRow(ctx,
 		`INSERT INTO standing_approval_requests
 		   (request_id, agent_id, user_id, action_type, action_version, constraints,
-		    max_executions, expires_in_seconds, source_action_configuration_id, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+		    max_executions, expires_in_seconds, source_action_configuration_id,
+		    connector_name, connector_instance_display, status)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, 'pending')
 		 RETURNING `+standingApprovalRequestColumns,
 		p.RequestID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion, p.Constraints,
 		nullableIntArg(p.MaxExecutions), nullableIntArg(p.ExpiresInSeconds),
-		p.SourceActionConfigurationID,
+		p.SourceActionConfigurationID, p.ConnectorName, p.ConnectorInstanceDisplay,
 	)
 	return scanStandingApprovalRequest(row)
 }
