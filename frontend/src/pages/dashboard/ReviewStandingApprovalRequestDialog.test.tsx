@@ -27,8 +27,15 @@ vi.mock("@/hooks/useDenyStandingApprovalRequest", () => ({
   }),
 }));
 
+vi.mock("@/hooks/useActionSchema", () => ({
+  useActionSchema: () => ({
+    connectorName: "Proton Mail",
+    isLoading: false,
+  }),
+}));
+
 describe("ReviewStandingApprovalRequestDialog", () => {
-  it("shows rule proposal badge and action type", () => {
+  it("shows rule proposal badge, connector name, and action type", () => {
     render(
       <ReviewStandingApprovalRequestDialog
         open
@@ -38,9 +45,9 @@ describe("ReviewStandingApprovalRequestDialog", () => {
           request_id: "sar_test",
           agent_id: 1,
           user_id: "user-1",
-          action_type: "email.send",
+          action_type: "protonmail.read_email",
           action_version: "1",
-          constraints: { to: "*@example.com" },
+          constraints: { from: "auto-confirm@amazon.com" },
           status: "pending",
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -49,7 +56,8 @@ describe("ReviewStandingApprovalRequestDialog", () => {
     );
 
     expect(screen.getAllByText("Rule proposal").length).toBeGreaterThan(0);
-    expect(screen.getByText(/email.send/)).toBeInTheDocument();
+    expect(screen.getByText(/Proton Mail/)).toBeInTheDocument();
+    expect(screen.getByText(/protonmail.read_email/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Approve rule/i })).toBeInTheDocument();
   });
 

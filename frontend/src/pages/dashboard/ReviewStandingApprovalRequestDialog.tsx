@@ -12,7 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import { useApproveStandingApprovalRequest } from "@/hooks/useApproveStandingApprovalRequest";
 import { useDenyStandingApprovalRequest } from "@/hooks/useDenyStandingApprovalRequest";
+import { useActionSchema } from "@/hooks/useActionSchema";
 import type { StandingApprovalRequestSummary } from "@/hooks/useStandingApprovalRequests";
+import { formatConnectorDisplayName } from "./approvalConnectorLabel";
 
 interface ReviewStandingApprovalRequestDialogProps {
   request: StandingApprovalRequestSummary;
@@ -29,8 +31,13 @@ export function ReviewStandingApprovalRequestDialog({
 }: ReviewStandingApprovalRequestDialogProps) {
   const { approveRequest, isPending: isApproving } = useApproveStandingApprovalRequest();
   const { denyRequest, isPending: isDenying } = useDenyStandingApprovalRequest();
+  const { connectorName } = useActionSchema(request.action_type);
   const [done, setDone] = useState<"approved" | "denied" | null>(null);
 
+  const connectorDisplayName = formatConnectorDisplayName({
+    connectorName,
+    actionType: request.action_type,
+  });
   const constraintsJson = JSON.stringify(request.constraints, null, 2);
   const busy = isApproving || isDenying;
 
@@ -77,7 +84,9 @@ export function ReviewStandingApprovalRequestDialog({
         <div className="space-y-4 text-sm">
           <p>
             <span className="font-medium">{agentDisplayName}</span> wants a standing
-            auto-approve rule for <span className="font-mono">{request.action_type}</span>.
+            auto-approve rule for{" "}
+            <span className="font-medium">{connectorDisplayName}</span> (
+            <span className="font-mono">{request.action_type}</span>).
           </p>
 
           <div>
