@@ -104,4 +104,17 @@ describe("ConstraintsSummary", () => {
     expect(screen.getByText("auto-confirm@amazon.com")).toBeInTheDocument();
     expect(screen.getByText("message_id")).toBeInTheDocument();
   });
+
+  it("renders $data_window as a human-readable data window", () => {
+    render(
+      <ConstraintsSummary
+        constraints={{
+          chat_id: "42",
+          $data_window: { last_days: 30 },
+        }}
+      />,
+    );
+    expect(screen.getByText("Data window")).toBeInTheDocument();
+    expect(screen.getByText("last 30 days")).toBeInTheDocument();
+  });
 });

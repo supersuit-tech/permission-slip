@@ -1,3 +1,5 @@
+import { formatDataWindowConstraint } from "@/lib/dataWindow";
+
 /** Check if a stored parameter value is a $pattern wrapper object. */
 export function isPatternWrapper(value: unknown): value is { $pattern: string } {
   return (
@@ -9,6 +11,7 @@ export function isPatternWrapper(value: unknown): value is { $pattern: string } 
 }
 
 export const META_NAMESPACE_KEY = "$meta";
+export const DATA_WINDOW_NAMESPACE_KEY = "$data_window";
 
 /** Human-readable labels for verified $meta constraint fields. */
 export function metaConstraintLabel(key: string): string {
@@ -49,7 +52,7 @@ function parseConstraintValue(
   return { name, mode: "fixed", value: String(raw) };
 }
 
-/** Flatten standing-approval constraints into display rows (params + $meta). */
+/** Flatten standing-approval constraints into display rows (params + $meta + $data_window). */
 export function parseStandingApprovalConstraints(
   constraints: Record<string, unknown> | null | undefined,
 ): ParsedConstraint[] {
@@ -64,6 +67,17 @@ export function parseStandingApprovalConstraints(
       )) {
         const label = metaConstraintLabel(metaKey);
         parsed.push(parseConstraintValue(label, metaVal));
+      }
+      continue;
+    }
+    if (key === DATA_WINDOW_NAMESPACE_KEY) {
+      const text = formatDataWindowConstraint(raw);
+      if (text) {
+        parsed.push({
+          name: "Data window",
+          mode: "fixed",
+          value: text,
+        });
       }
       continue;
     }

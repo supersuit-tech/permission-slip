@@ -388,6 +388,7 @@ func (c *SendGridConnector) Manifest() *connectors.ConnectorManifest {
 				Name:        "Get Bounce List",
 				Description: "Retrieve the list of email addresses that have bounced, with bounce reason and status. Useful for deliverability management.",
 				RiskLevel:   "low",
+				DataWindow:  &connectors.DataWindowParams{StartParam: "start_time", EndParam: "end_time"},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {

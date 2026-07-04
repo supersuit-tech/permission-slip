@@ -842,6 +842,13 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 			}
 			continue
 		}
+		if key == db.DataWindowNamespaceKey {
+			if err := db.ValidateDataWindowConstraintShape(v); err != nil {
+				return nil, err
+			}
+			allWildcard = false
+			continue
+		}
 		if string(v) == "null" {
 			return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
 		}

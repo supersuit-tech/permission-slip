@@ -24,6 +24,14 @@ import {
   type ParamMode,
 } from "@/pages/agents/connectors/ActionConfigFormFields";
 import {
+  buildDataWindowConstraint,
+  dataWindowCountsAsConstraint,
+  DEFAULT_DATA_WINDOW_FORM,
+  parseDataWindowFormState,
+  type DataWindowFormState,
+} from "@/lib/dataWindow";
+import { DATA_WINDOW_NAMESPACE_KEY } from "@/lib/constraints";
+import {
   StepPickAgent,
   StepPickAction,
   StepConstraints,
@@ -68,7 +76,11 @@ function defaultExpiresAt(): string {
 function hasNonWildcardConstraint(
   paramValues: Record<string, string>,
   paramModes: Record<string, ParamMode>,
+  dataWindowForm: DataWindowFormState,
 ): boolean {
+  if (dataWindowCountsAsConstraint(dataWindowForm)) {
+    return true;
+  }
   for (const key of Object.keys(paramValues)) {
     const mode = paramModes[key] ?? "fixed";
     if (mode !== "wildcard") {
@@ -138,6 +150,9 @@ export function CreateStandingApprovalDialog({
     hasInitialContext && ctxConstraints
       ? JSON.stringify(ctxConstraints, null, 2)
       : "",
+  );
+  const [dataWindowForm, setDataWindowForm] = useState<DataWindowFormState>(() =>
+    parseDataWindowFormState(ctxConstraints),
   );
   const [noExpiry, setNoExpiry] = useState(isEditMode ? !editTarget.expires_at : true);
   const [expiresAt, setExpiresAt] = useState(() => {
@@ -223,6 +238,7 @@ export function CreateStandingApprovalDialog({
     connectorName,
     actionName,
     connectorLogoSvg,
+    dataWindow,
   } = useActionSchema(effectiveActionType);
 
   const configSchema = fetchedSchema;
@@ -269,6 +285,7 @@ export function CreateStandingApprovalDialog({
         ? JSON.stringify(ctxConstraints, null, 2)
         : "",
     );
+    setDataWindowForm(parseDataWindowFormState(ctxConstraints));
     setNoExpiry(isEditMode ? !editTarget.expires_at : true);
     if (isEditMode && editTarget.expires_at) {
       const d = new Date(editTarget.expires_at);
@@ -299,6 +316,7 @@ export function CreateStandingApprovalDialog({
     }
     setParamValues(values);
     setParamModes(modes);
+    setDataWindowForm({ ...DEFAULT_DATA_WINDOW_FORM });
   }
 
   function handleNext() {
@@ -360,7 +378,7 @@ export function CreateStandingApprovalDialog({
           return;
         }
       } else {
-        if (!hasNonWildcardConstraint(paramValues, paramModes)) {
+        if (!hasNonWildcardConstraint(paramValues, paramModes, dataWindowForm)) {
           toast.error(
             "At least one parameter constraint must be non-wildcard",
           );
@@ -433,6 +451,13 @@ export function CreateStandingApprovalDialog({
         configSchema?.properties,
         paramModes,
       );
+    }
+
+    const dw = buildDataWindowConstraint(dataWindowForm);
+    if (dw) {
+      constraints[DATA_WINDOW_NAMESPACE_KEY] = dw;
+    } else {
+      delete constraints[DATA_WINDOW_NAMESPACE_KEY];
     }
 
     try {
@@ -577,6 +602,9 @@ export function CreateStandingApprovalDialog({
               }
               manualConstraintsJson={manualConstraintsJson}
               onManualConstraintsJsonChange={setManualConstraintsJson}
+              dataWindowSupported={!!dataWindow}
+              dataWindowForm={dataWindowForm}
+              onDataWindowFormChange={setDataWindowForm}
               isPending={isPending}
             />
           )}

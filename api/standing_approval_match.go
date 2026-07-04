@@ -5,6 +5,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/supersuit-tech/permission-slip/db"
 )
@@ -52,6 +53,21 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 			CaptureError(r.Context(), err)
 			continue
 		}
+
+		effectiveParams, dwErr := applyStandingApprovalDataWindow(
+			r.Context(), deps.DB, actionType, candidate.Constraints, params, time.Now(),
+		)
+		if dwErr != nil {
+			if isDataWindowUnsupported(dwErr) {
+				continue
+			}
+			log.Printf("[%s] AutoApprove: data window for %s: %v",
+				TraceID(r.Context()), candidate.StandingApprovalID, dwErr)
+			CaptureError(r.Context(), dwErr)
+			continue
+		}
+		params = effectiveParams
+
 		sa = candidate
 		break
 	}

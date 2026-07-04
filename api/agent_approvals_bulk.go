@@ -530,6 +530,21 @@ func attemptStandingApprovalForBulk(ctx context.Context, deps *Deps, agent *db.A
 			CaptureError(ctx, err)
 			continue
 		}
+
+		effectiveParams, dwErr := applyStandingApprovalDataWindow(
+			ctx, deps.DB, item.actionType, candidate.Constraints, item.actionParams, time.Now(),
+		)
+		if dwErr != nil {
+			if isDataWindowUnsupported(dwErr) {
+				continue
+			}
+			log.Printf("[%s] BulkRequest data window for %s: %v",
+				TraceID(ctx), candidate.StandingApprovalID, dwErr)
+			CaptureError(ctx, dwErr)
+			continue
+		}
+		item.actionParams = effectiveParams
+
 		sa = candidate
 		break
 	}

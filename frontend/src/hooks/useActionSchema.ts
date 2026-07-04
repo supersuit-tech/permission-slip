@@ -4,6 +4,10 @@ import {
   parseParametersSchema,
   type ParametersSchema,
 } from "@/lib/parameterSchema";
+import {
+  type DataWindowParams,
+  supportsDataWindow,
+} from "@/lib/dataWindow";
 
 /** Structured preview layout config from the connector manifest. */
 export interface ActionPreviewConfig {
@@ -29,6 +33,7 @@ export function useActionSchema(actionType: string): {
   actionName: string | null;
   displayTemplate: string | null;
   preview: ActionPreviewConfig | null;
+  dataWindow: DataWindowParams | null;
   connectorName: string | null;
   connectorLogoSvg: string | null;
   isLoading: boolean;
@@ -43,6 +48,7 @@ export function useActionSchema(actionType: string): {
         actionName: null,
         displayTemplate: null,
         preview: null,
+        dataWindow: null,
         connectorName: null,
         connectorLogoSvg: null,
       };
@@ -57,6 +63,7 @@ export function useActionSchema(actionType: string): {
         actionName: null,
         displayTemplate: null,
         preview: null,
+        dataWindow: null,
         connectorName: connector.name ?? null,
         connectorLogoSvg: connector.logo_svg ?? null,
       };
@@ -86,11 +93,15 @@ export function useActionSchema(actionType: string): {
       };
     }
 
+    const rawDataWindow = action.data_window as DataWindowParams | undefined;
+    const dataWindow = supportsDataWindow(rawDataWindow) ? rawDataWindow : null;
+
     return {
       schema,
       actionName: action.name ?? null,
       displayTemplate: action.display_template ?? null,
       preview,
+      dataWindow,
       connectorName: connector.name ?? null,
       connectorLogoSvg: connector.logo_svg ?? null,
     };

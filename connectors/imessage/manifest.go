@@ -85,6 +85,7 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 				Description:     "Read messages in a chat, with optional incremental cursor for polling",
 				RiskLevel:       "low",
 				DisplayTemplate: "Read history for chat {{chat_name}}",
+				DataWindow:      &connectors.DataWindowParams{StartParam: "start", EndParam: "end"},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["chat_id"],
