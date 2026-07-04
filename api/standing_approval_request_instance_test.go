@@ -202,7 +202,7 @@ func TestAgentCreateStandingApprovalRequest_AmbiguousDisplayName(t *testing.T) {
 	if w.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
-	if !strings.Contains(w.Body.String(), ErrConnectorInstanceAmbiguous) {
+	if !strings.Contains(w.Body.String(), string(ErrConnectorInstanceAmbiguous)) {
 		t.Errorf("expected ambiguous error, got: %s", w.Body.String())
 	}
 }
