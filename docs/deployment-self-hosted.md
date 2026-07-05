@@ -217,15 +217,32 @@ make redeploy
 ```
 
 This pulls `origin/main`, reinstalls dependencies, rebuilds the frontend and
-server, restarts the `launchd` service set up in Step 4, publishes an
-over-the-air mobile update via EAS when configured, and prints the build it's
+server, restarts the `launchd` service set up in Step 4, and may publish an
+over-the-air mobile update via EAS when configured. It prints the build it's
 now running (the same short SHA shown in the app footer, so you can confirm
 the update took effect). New connector fields, manifest changes, and
 migrations are picked up on the restart — there's nothing else to remember.
 
+**EAS OTA gating.** After a successful server restart, `make redeploy` publishes
+an EAS update only when a new `mobile/v*` release tag is reachable from the
+deployed checkout. The last successfully published tag is recorded in
+`.mobile-ota-deployed-tag` at the repo root (gitignored). If that tag was already
+published, the EAS step is skipped with a note — so backend-only or
+frontend-only deploys don't push a no-op OTA update to devices. When no
+`mobile/v*` tag is reachable from HEAD yet, the script keeps the legacy
+always-publish behavior.
+
+Force a publish regardless of tag state:
+
+```bash
+PS_FORCE_EAS_UPDATE=1 make redeploy
+```
+
 If EAS isn't set up on the host (no `EXPO_TOKEN` or `eas login`, etc.),
 `make redeploy` prints a note and skips the mobile step — the server redeploy
-still completes normally.
+still completes normally. A skipped or failed EAS publish does not update
+`.mobile-ota-deployed-tag`, so re-running `make redeploy` after logging in
+retries the publish.
 
 > **Named the LaunchAgent something other than `com.permissionslip.server`?** Pass it through:
 > ```bash

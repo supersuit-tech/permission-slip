@@ -379,7 +379,7 @@ When using gh, the local git remote uses a proxy, so always set the repo explici
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh <command>
 ```
 
-## Publishing the CLI / Release Tags
+## Publishing the CLI / Mobile / Release Tags
 
 **CLI releases are fully automated — do not publish manually after a normal merge.**
 Every push to `main` that touches `cli/**` triggers `publish-cli.yml`, which
@@ -390,7 +390,16 @@ for bigger bumps, `[skip publish]` to skip publishing. The committed
 `cli/package.json` version is NOT the source of truth — the latest `cli/v*` tag is.
 Never open version-bump PRs for the CLI.
 
-**Manual publish (rarely needed): dispatch `publish-cli.yml`.** The
+**Mobile release tags are fully automated — do not tag manually after a normal merge.**
+Every push to `main` that touches `mobile/**` triggers `tag-mobile.yml`, which
+auto-increments the patch version from the latest `mobile/v*` tag and creates the
+`mobile/v*` tag. Control it via the merge commit message: `[publish minor]` /
+`[publish major]` for bigger bumps, `[skip publish]` to skip tagging. The workflow
+is tag-only — it does NOT publish an EAS OTA update. Self-hosted installs publish
+OTA updates from `make redeploy` on their own machines (gated on new `mobile/v*`
+tags — see `docs/deployment-self-hosted.md`).
+
+**Manual CLI publish (rarely needed): dispatch `publish-cli.yml`.** The
 `workflow_dispatch` trigger takes an optional `version` input — leave it empty to
 auto-increment the patch version. A dispatched run on `main` tests, builds, stamps
 the version, publishes to npm, and creates the `cli/v<version>` tag itself. Trigger
@@ -402,6 +411,21 @@ REST API when it's available:
 curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
   -H "Content-Type: application/json" \
   https://api.github.com/repos/supersuit-tech/permission-slip/actions/workflows/publish-cli.yml/dispatches \
+  -d '{"ref":"main","inputs":{"version":"<version>"}}'
+```
+
+**Manual mobile tag (rarely needed): dispatch `tag-mobile.yml`.** The
+`workflow_dispatch` trigger takes an optional `version` input — leave it empty to
+auto-increment the patch version. A dispatched run on `main` creates the
+`mobile/v<version>` tag only (no npm publish, no EAS publish). Trigger it with
+the GitHub MCP tool `mcp__github__actions_run_trigger` (workflow file
+`tag-mobile.yml`, ref `main`, optional input `version: <version>`), or with the
+REST API when it's available:
+
+```bash
+curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/json" \
+  https://api.github.com/repos/supersuit-tech/permission-slip/actions/workflows/tag-mobile.yml/dispatches \
   -d '{"ref":"main","inputs":{"version":"<version>"}}'
 ```
 
