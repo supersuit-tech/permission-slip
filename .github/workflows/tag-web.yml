@@ -1,0 +1,110 @@
+name: Tag web release
+
+# Creates web/v* tags on three triggers:
+#   1. Push to main touching frontend/** — auto-increments the patch version from
+#      the latest web/v* tag. Add "[publish minor]" or "[publish major]" to
+#      the merge commit message for a bigger bump, or "[skip publish]" to skip
+#      tagging entirely.
+#   2. workflow_dispatch — creates a tag for an explicit version, or
+#      auto-increments the patch version when the input is left empty.
+#
+# Tag-only — unlike publish-cli.yml, this workflow does NOT publish anything.
+# Self-hosted installs redeploy web on every `make redeploy` (no tag-gated skip).
+#
+# Tags created with GITHUB_TOKEN do not re-trigger workflows.
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'frontend/**'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to tag (e.g. 1.0.0). Leave empty to auto-increment the patch version from the latest web/v* tag.'
+        required: false
+        type: string
+
+# Queue runs so two quick merges don't race to compute the same next version.
+concurrency:
+  group: tag-web
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag web release
+    runs-on: ubuntu-latest
+    # Merge commits can opt out of auto-tagging with [skip publish].
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      !contains(github.event.head_commit.message, '[skip publish]')
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve target version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+          if [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
+          else
+            LATEST=$(gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/web/v" \
+              --jq '.[].ref | ltrimstr("refs/tags/web/v") | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' \
+              | sort -V | tail -n1)
+            if [ -z "$LATEST" ]; then
+              VERSION="1.0.0"
+            else
+              MAJOR=$(echo "$LATEST" | cut -d. -f1)
+              MINOR=$(echo "$LATEST" | cut -d. -f2)
+              PATCH=$(echo "$LATEST" | cut -d. -f3)
+              case "$HEAD_COMMIT_MESSAGE" in
+                *"[publish major]"*) VERSION="$((MAJOR + 1)).0.0" ;;
+                *"[publish minor]"*) VERSION="$MAJOR.$((MINOR + 1)).0" ;;
+                *) VERSION="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+              esac
+            fi
+          fi
+          # Validate whichever source the version came from (dispatch input or
+          # computed). The strict charset also makes the output safe to
+          # interpolate into later steps.
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Resolved version '$VERSION' is not valid semver"
+            exit 1
+          fi
+          echo "Tagging version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Guard against re-creating an existing tag
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const tag = `web/v${{ steps.version.outputs.version }}`;
+            try {
+              await github.rest.git.getRef({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                ref: `tags/${tag}`,
+              });
+              core.setFailed(`Tag ${tag} already exists — bump the version instead of re-tagging.`);
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+
+      - name: Create release tag
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.git.createRef({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              ref: 'refs/tags/web/v${{ steps.version.outputs.version }}',
+              sha: context.sha,
+            });

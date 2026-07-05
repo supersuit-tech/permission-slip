@@ -63,6 +63,21 @@ LAUNCHD_LABEL="${PS_LAUNCHD_LABEL:-com.permissionslip.server}"
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Return the semver from the latest reachable <prefix>/v* tag, or empty when
+# none exists.
+release_version() {
+  local prefix="$1"
+  local tag
+  tag="$(git tag --list "${prefix}/v*" --merged HEAD 2>/dev/null | sort -V | tail -n1 || true)"
+  if [ -n "$tag" ]; then
+    echo "${tag#${prefix}/v}"
+  fi
+}
+
+# Capture release versions before pulling so we can report upgrades afterward.
+OLD_WEB_VERSION="$(release_version web)"
+OLD_MOBILE_VERSION="$(release_version mobile)"
+
 # Loud macOS reminder: iMessage reads need Full Disk Access on the server and imsg.
 "$REPO_ROOT/scripts/print-macos-full-disk-access-notice.sh"
 
@@ -78,9 +93,10 @@ if ! git pull --ff-only; then
   echo "    WARNING: git pull failed — rebuilding the current checkout instead." >&2
 fi
 
-# Tag auto-following can miss mobile/v* tags whose commits are already local
+# Tag auto-following can miss release tags whose commits are already local
 # (e.g. when a previous redeploy pulled main before the tag workflow finished).
 git fetch origin 'refs/tags/mobile/v*:refs/tags/mobile/v*' 2>/dev/null || true
+git fetch origin 'refs/tags/web/v*:refs/tags/web/v*' 2>/dev/null || true
 
 echo "==> Refreshing dependencies"
 if ! make install; then
@@ -109,6 +125,8 @@ if [ "$(uname -s)" = "Darwin" ] && [ -n "${PS_CODESIGN_IDENTITY:-}" ] && [ -f "$
 fi
 
 echo "==> Building frontend + server"
+# Web is always rebuilt and redeployed on every redeploy — there is no tag-gated
+# skip for web. Do NOT mirror the mobile OTA tag-gating logic below onto web.
 # If this fails, 'set -e' aborts here, BEFORE the restart below, leaving the
 # currently-running service untouched.
 make build
@@ -139,7 +157,8 @@ else
 fi
 
 # Publish an OTA mobile update when EAS is configured. Additive only — never
-# affects the server redeploy above or the script's exit code.
+# affects the server redeploy above or the script's exit code. Web redeploy is
+# never gated on release tags; only mobile OTA publishing uses that pattern.
 EAS_AUTH_CHECK_TIMEOUT="${PS_EAS_AUTH_CHECK_TIMEOUT:-30}"
 
 # Return 0 when EAS credentials are available (EXPO_TOKEN or eas-cli login).
@@ -196,5 +215,31 @@ else
   fi
 fi
 
-SHA="$(git rev-parse --short HEAD)"
-echo "==> Done. Now running build $SHA — the app footer should show 'Build $SHA'."
+NEW_WEB_VERSION="$(release_version web)"
+NEW_MOBILE_VERSION="$(release_version mobile)"
+CLI_VERSION="$(release_version cli)"
+
+format_upgrade_line() {
+  local name="$1"
+  local old="$2"
+  local new="$3"
+  if [ -z "$new" ]; then
+    echo "  $name: version unknown"
+  elif [ -z "$old" ]; then
+    echo "  $name is now at $new"
+  elif [ "$old" = "$new" ]; then
+    echo "  $name is at $new (unchanged)"
+  else
+    echo "  Upgraded $name from $old to $new"
+  fi
+}
+
+echo "==> Done."
+echo "  Deploy summary:"
+format_upgrade_line "Web" "$OLD_WEB_VERSION" "$NEW_WEB_VERSION"
+format_upgrade_line "Mobile" "$OLD_MOBILE_VERSION" "$NEW_MOBILE_VERSION"
+if [ -n "$CLI_VERSION" ]; then
+  echo "  CLI version: $CLI_VERSION"
+else
+  echo "  CLI version: unknown"
+fi

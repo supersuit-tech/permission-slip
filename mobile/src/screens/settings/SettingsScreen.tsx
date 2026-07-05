@@ -37,22 +37,8 @@ import { colors } from "../../theme/colors";
 import CustomServerSettings from "./CustomServerSettings";
 import DeveloperSettings from "./DeveloperSettings";
 
-const GIT_COMMIT_HASH: string =
-  (Constants.expoConfig?.extra?.gitCommitHash as string) ?? "unknown";
-
-const GIT_COMMIT_TIMESTAMP: string =
-  (Constants.expoConfig?.extra?.gitCommitTimestamp as string) ?? "unknown";
-
-function formatCommitTimestamp(iso: string): string {
-  if (iso === "unknown") return "";
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
+const APP_VERSION: string =
+  (Constants.expoConfig?.version as string) ?? "unknown";
 
 type Props = NativeStackScreenProps<RootStackParamList, "Settings">;
 
@@ -303,11 +289,8 @@ export default function SettingsScreen(_props: Props) {
       <DeveloperSettings />
 
       <View style={styles.buildInfo}>
-        <Text style={styles.buildInfoText} testID="git-commit-hash">
-          Build {GIT_COMMIT_HASH.slice(0, 7)}
-          {formatCommitTimestamp(GIT_COMMIT_TIMESTAMP)
-            ? ` · ${formatCommitTimestamp(GIT_COMMIT_TIMESTAMP)}`
-            : ""}
+        <Text style={styles.buildInfoText} testID="app-version">
+          v{APP_VERSION}
         </Text>
       </View>
     </ScrollView>

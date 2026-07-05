@@ -16,6 +16,8 @@ interface ImportMetaEnv {
   readonly VITE_GIT_COMMIT_HASH?: string;
   /** Git commit timestamp stamped at build time (ISO-8601). */
   readonly VITE_GIT_COMMIT_TIMESTAMP?: string;
+  /** Web release version from the latest web/v* tag (stamped at build time). */
+  readonly VITE_WEB_VERSION?: string;
 }
 
 interface ImportMeta {
