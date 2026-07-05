@@ -212,4 +212,5 @@ Every execution under a standing approval also writes to `AUDIT_LOG` with `event
 | Constraints | Same per-action constraints from ADR-001, enforced every execution |
 | Coexistence | Falls through to one-off approval if no standing approval matches |
 | Revocation | Instant, from web UI |
+| Account scope | Editable in place on action configs and standing approvals; linked rules auto-follow config scope changes |
 | Audit | Every execution logged, even under standing approvals |

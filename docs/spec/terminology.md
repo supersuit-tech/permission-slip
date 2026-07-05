@@ -152,6 +152,8 @@ A constraint-scoped pre-authorization that lets an agent execute a specific acti
 - Executions are unlimited within the rule window
 - Constraints are enforced on every execution (same rules as one-off approvals)
 - Revocable instantly from the web UI at any time
+- Account scope (`connector_instance` on action configs; `connector_instance_id` on standing approvals) is editable in place from the connector config page — no revoke-and-recreate required
+- When an action config's account scope changes, any linked active standing approvals automatically follow the same scope in the same transaction
 - Every execution is audited, even without per-request approval
 - Falls through to one-off approval if the agent's request doesn't match the standing approval's constraints
 

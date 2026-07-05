@@ -54,7 +54,7 @@ export function EditActionConfigDialog({
 }: EditActionConfigDialogProps) {
   const { updateActionConfig, isPending } = useUpdateActionConfig();
   const { instances } = useAgentConnectorInstances(agentId, connectorId);
-  const showAccountSelect = instances.length > 1;
+  const showAccountSelect = instances.length >= 1;
 
   // No useEffect needed to sync state: the parent conditionally renders this
   // component (`{editTarget && <EditActionConfigDialog>}`), so it always

@@ -107,6 +107,7 @@ type StandingApprovalOpts struct {
 	Status                      string
 	Constraints                 []byte
 	SourceActionConfigurationID *string
+	ConnectorInstanceID         *string
 	StartsAt                    time.Time
 	ExpiresAt                   time.Time
 }
@@ -134,9 +135,9 @@ func InsertStandingApprovalFull(t *testing.T, d db.DBTX, saID string, agentID in
 	startsStr := opts.StartsAt.UTC().Format("2006-01-02T15:04:05.000000Z")
 	expiresStr := opts.ExpiresAt.UTC().Format("2006-01-02T15:04:05.000000Z")
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
-		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, sourceID, startsStr, expiresStr)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, connector_instance_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, sourceID, opts.ConnectorInstanceID, startsStr, expiresStr)
 }
 
 // RequireStandingApprovalExecutionCount asserts the number of rows in

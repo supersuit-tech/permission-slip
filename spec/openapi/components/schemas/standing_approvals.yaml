@@ -176,6 +176,16 @@ StandingApproval:
         backend does not enforce the pattern.
       example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
+    connector_instance_id:
+      type: string
+      format: uuid
+      nullable: true
+      description: |
+        Connector account scope for this standing approval. `null` means the rule
+        applies to all connected accounts for the connector; a UUID limits the
+        rule to that specific account.
+      example: null
+
   example:
     standing_approval_id: "sa_abc123"
     agent_id: 42
@@ -338,6 +348,15 @@ UpdateStandingApprovalRequest:
         Omitting the field preserves the current expiration
         (the approval remains active until revoked).
       example: "2026-04-14T00:00:00Z"
+
+    connector_instance_id:
+      type: string
+      format: uuid
+      nullable: true
+      description: |
+        Updated account scope. Null means all connected accounts for the connector.
+        Omitting the field preserves the current scope.
+      example: null
 
   example:
     constraints:

@@ -13,6 +13,7 @@ import {
 import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
 import { useUpdateStandingApproval } from "@/hooks/useUpdateStandingApproval";
 import { useRevokeStandingApproval } from "@/hooks/useRevokeStandingApproval";
+import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import { StepLimits } from "@/pages/dashboard/StandingApprovalSteps";
@@ -20,6 +21,13 @@ import {
   pickPrimaryStandingApproval,
   standingApprovalRowStatus,
 } from "@/lib/standingApprovalStatus";
+import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
+import {
+  connectorInstanceFromParameters,
+  connectorInstanceFromStandingApprovalId,
+  resolveConnectorInstanceAccountLabel,
+  standingApprovalConnectorInstanceIdForUpdate,
+} from "./connectorInstanceAccount";
 
 function standingApprovalConstraintsForCreate(
   params: Record<string, unknown>,
@@ -46,6 +54,7 @@ interface ActionConfigStandingApprovalSheetProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agentId: number;
+  connectorId: string;
   config: ActionConfiguration;
   standingRows: StandingApproval[];
   onSuccess: () => void;
@@ -55,6 +64,7 @@ export function ActionConfigStandingApprovalSheet({
   open,
   onOpenChange,
   agentId,
+  connectorId,
   config,
   standingRows,
   onSuccess,
@@ -67,17 +77,24 @@ export function ActionConfigStandingApprovalSheet({
     useRevokeStandingApproval();
   const isPending = isCreatePending || isUpdatePending || isRevokePending;
 
+  const { instances } = useAgentConnectorInstances(agentId, connectorId);
+  const showAccountSelect = instances.length >= 1;
+
   const primary = pickPrimaryStandingApproval(standingRows);
   const rowStatus = standingApprovalRowStatus(standingRows);
   const isEditActive = primary?.status === "active";
 
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAtLocal);
+  const [connectorInstance, setConnectorInstance] = useState("*");
 
   useEffect(() => {
     if (!open) return;
     if (isEditActive && primary) {
       setNoExpiry(!primary.expires_at);
+      setConnectorInstance(
+        connectorInstanceFromStandingApprovalId(primary.connector_instance_id),
+      );
       if (primary.expires_at) {
         const d = new Date(primary.expires_at);
         const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -88,8 +105,11 @@ export function ActionConfigStandingApprovalSheet({
     } else {
       setNoExpiry(true);
       setExpiresAt(defaultExpiresAtLocal());
+      setConnectorInstance(
+        connectorInstanceFromParameters(config.parameters as Record<string, unknown>),
+      );
     }
-  }, [open, isEditActive, primary]);
+  }, [open, isEditActive, primary, config.parameters]);
 
   async function handleRevoke() {
     if (!primary) return;
@@ -124,6 +144,8 @@ export function ActionConfigStandingApprovalSheet({
         await updateStandingApproval(primary.standing_approval_id, {
           constraints: primary.constraints as Record<string, unknown>,
           expires_at: noExpiry ? null : new Date(expiresAt).toISOString(),
+          connector_instance_id:
+            standingApprovalConnectorInstanceIdForUpdate(connectorInstance),
         });
         toast.success("Standing approval updated");
         onSuccess();
@@ -175,7 +197,7 @@ export function ActionConfigStandingApprovalSheet({
           <SheetTitle>Standing approval</SheetTitle>
           <SheetDescription>
             {isEditActive
-              ? "Adjust expiration for this configuration."
+              ? "Adjust account scope and expiration for this standing approval."
               : "Auto-approve requests that match this configuration, with optional expiry."}
           </SheetDescription>
         </SheetHeader>
@@ -192,6 +214,25 @@ export function ActionConfigStandingApprovalSheet({
           {config.status !== "active" && (
             <p className="text-muted-foreground text-sm">
               This configuration is disabled. Enable it before creating a standing approval.
+            </p>
+          )}
+          {isEditActive && showAccountSelect && (
+            <ConnectorInstanceAccountSelect
+              id="standing-approval-account"
+              value={connectorInstance}
+              onChange={setConnectorInstance}
+              instances={instances}
+              disabled={isPending}
+            />
+          )}
+          {isEditActive && !showAccountSelect && instances.length === 1 && (
+            <p className="text-muted-foreground text-sm">
+              Applies to{" "}
+              {resolveConnectorInstanceAccountLabel(
+                config.parameters.connector_instance,
+                instances,
+              )}
+              .
             </p>
           )}
           <StepLimits

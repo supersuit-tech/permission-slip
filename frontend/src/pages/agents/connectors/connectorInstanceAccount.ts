@@ -77,3 +77,18 @@ export function parametersWithoutConnectorInstance(
 export function instanceSelectLabel(instance: AgentConnectorInstance): string {
   return instance.display?.trim() || "Unnamed account";
 }
+
+export function connectorInstanceFromStandingApprovalId(
+  connectorInstanceId: string | null | undefined,
+): string {
+  if (!connectorInstanceId?.trim()) {
+    return "*";
+  }
+  return connectorInstanceId.trim();
+}
+
+export function standingApprovalConnectorInstanceIdForUpdate(
+  connectorInstance: string,
+): string | null {
+  return connectorInstance === "*" ? null : connectorInstance;
+}

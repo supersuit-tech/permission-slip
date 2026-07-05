@@ -10,8 +10,8 @@ import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import { isPatternWrapper } from "@/lib/constraints";
 import {
   parametersWithoutConnectorInstance,
-  resolveConnectorInstanceAccountLabel,
 } from "./connectorInstanceAccount";
+import { ActionConfigAccountRescopeCell } from "./ActionConfigAccountRescopeCell";
 import {
   standingApprovalRowStatus,
   standingApprovalStatusLabel,
@@ -28,6 +28,7 @@ interface ActionConfigRowProps {
   onStandingSuccess: () => void;
   onEdit: (config: ActionConfiguration) => void;
   onDelete: (config: ActionConfiguration) => void;
+  onConfigChanged?: () => void;
 }
 
 export function ActionConfigRow({
@@ -40,15 +41,12 @@ export function ActionConfigRow({
   onStandingSuccess,
   onEdit,
   onDelete,
+  onConfigChanged,
 }: ActionConfigRowProps) {
   const action = actions.find((a) => a.action_type === config.action_type);
 
   const paramEntries = Object.entries(
     parametersWithoutConnectorInstance(config.parameters),
-  );
-  const accountLabel = resolveConnectorInstanceAccountLabel(
-    config.parameters.connector_instance,
-    instances,
   );
   const isDisabled = config.status === "disabled";
   const [standingSheetOpen, setStandingSheetOpen] = useState(false);
@@ -100,7 +98,12 @@ export function ActionConfigRow({
       </TableCell>
       {showAccountColumn && (
         <TableCell>
-          <span className="text-sm">{accountLabel}</span>
+          <ActionConfigAccountRescopeCell
+            agentId={agentId}
+            config={config}
+            instances={instances}
+            onSuccess={onConfigChanged}
+          />
         </TableCell>
       )}
       <TableCell>
@@ -124,6 +127,7 @@ export function ActionConfigRow({
           open={standingSheetOpen}
           onOpenChange={setStandingSheetOpen}
           agentId={agentId}
+          connectorId={config.connector_id}
           config={config}
           standingRows={standingRows}
           onSuccess={onStandingSuccess}

@@ -552,23 +552,30 @@ func diagnoseStandingApprovalFailure(ctx context.Context, db DBTX, saID, userID 
 
 // UpdateStandingApprovalParams holds the fields that can be updated on an active standing approval.
 type UpdateStandingApprovalParams struct {
-	StandingApprovalID string
-	UserID             string
-	Constraints        []byte     // raw JSONB
-	ExpiresAt          *time.Time // nil means no expiry (until revoked)
+	StandingApprovalID     string
+	UserID                 string
+	Constraints            []byte     // raw JSONB
+	ExpiresAt              *time.Time // nil means no expiry (until revoked)
+	ConnectorInstanceID    *string    // nil = all accounts when ConnectorInstanceIDSet is true
+	ConnectorInstanceIDSet bool       // when false, connector_instance_id is left unchanged
 }
 
 // UpdateStandingApproval updates the constraints and expires_at of an active
 // standing approval belonging to the given user. Returns the updated approval, or a domain error.
 func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprovalParams) (*StandingApproval, error) {
-	row := db.QueryRow(ctx,
-		`UPDATE standing_approvals
-		 SET constraints = $3, expires_at = $4
+	query := `UPDATE standing_approvals
+		 SET constraints = $3, expires_at = $4`
+	args := []any{p.StandingApprovalID, p.UserID, p.Constraints, NullableTimestampForSQLite(p.ExpiresAt)}
+	if p.ConnectorInstanceIDSet {
+		query += `, connector_instance_id = $5`
+		args = append(args, p.ConnectorInstanceID)
+	}
+	query += `
 		 WHERE standing_approval_id = $1 AND user_id = $2
 		   AND status = 'active'
-		 RETURNING `+standingApprovalColumns,
-		p.StandingApprovalID, p.UserID, p.Constraints, NullableTimestampForSQLite(p.ExpiresAt),
-	)
+		 RETURNING ` + standingApprovalColumns
+
+	row := db.QueryRow(ctx, query, args...)
 	updated, err := scanStandingApproval(row)
 	if err == nil {
 		return updated, nil
@@ -588,6 +595,37 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 		return nil, &StandingApprovalError{Code: StandingApprovalErrAlreadyRevoked, Status: sa.Status}
 	}
 	return nil, &StandingApprovalError{Code: StandingApprovalErrNotActive, Status: sa.Status}
+}
+
+// UpdateStandingApprovalsConnectorInstanceBySourceConfig sets connector_instance_id
+// on every active standing approval linked to the given source action configuration.
+func UpdateStandingApprovalsConnectorInstanceBySourceConfig(
+	ctx context.Context,
+	db DBTX,
+	userID, sourceConfigID string,
+	connectorInstanceID *string,
+) ([]StandingApproval, error) {
+	rows, err := db.Query(ctx,
+		`UPDATE standing_approvals
+		 SET connector_instance_id = $3
+		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'
+		 RETURNING `+standingApprovalColumns,
+		userID, sourceConfigID, connectorInstanceID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var out []StandingApproval
+	for rows.Next() {
+		sa, err := scanStandingApproval(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, *sa)
+	}
+	return out, rows.Err()
 }
 
 // FindActiveStandingApprovalsForAgent returns all active standing approvals for
