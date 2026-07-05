@@ -1,63 +1,101 @@
 name: Publish CLI to npm
 
+# Publishes @permission-slip/cli on three triggers:
+#   1. Push to main touching cli/** — auto-increments the patch version from the
+#      latest cli/v* tag and publishes. Add "[publish minor]" or
+#      "[publish major]" to the merge commit message for a bigger bump, or
+#      "[skip publish]" to skip publishing entirely.
+#   2. workflow_dispatch — publishes an explicit version, or auto-increments
+#      the patch version when the input is left empty.
+#   3. Push of a cli/v* tag — publishes that exact version.
+#
+# The version is stamped into cli/package.json in the workspace at build time
+# (never committed back), so the committed package.json version is NOT the
+# source of truth — the latest cli/v* tag is.
+
 on:
   push:
+    branches:
+      - main
     tags:
       - 'cli/v*'
+    paths:
+      # Path filters are not evaluated for tag pushes, so this only gates the
+      # main-branch trigger.
+      - 'cli/**'
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to publish (must match cli/package.json, e.g. 0.1.23)'
-        required: true
+        description: 'Version to publish (e.g. 0.1.26). Leave empty to auto-increment the patch version from the latest cli/v* tag.'
+        required: false
         type: string
+
+# Queue runs so two quick merges don't race to compute the same next version.
+concurrency:
+  group: publish-cli
+  cancel-in-progress: false
 
 jobs:
   publish:
     name: Publish @permission-slip/cli
     runs-on: ubuntu-latest
+    # Merge commits can opt out of auto-publishing with [skip publish].
+    if: >-
+      github.ref_type == 'tag' ||
+      github.event_name == 'workflow_dispatch' ||
+      !contains(github.event.head_commit.message, '[skip publish]')
     permissions:
-      # write is needed so dispatch-triggered runs can create the cli/v* tag
+      # write is needed so non-tag-triggered runs can create the cli/v* tag
       contents: write
 
     steps:
       - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          registry-url: 'https://registry.npmjs.org'
-          cache: npm
-          cache-dependency-path: cli/package-lock.json
-
-      - name: Install dependencies
-        run: cd cli && npm ci
-
-      - name: Run tests
-        run: cd cli && npm test
-
-      - name: Build
-        run: cd cli && npm run build
-
-      - name: Verify package version matches tag
+      - name: Resolve target version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+          INPUT_VERSION: ${{ inputs.version }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG_VERSION="${{ inputs.version }}"
+          set -euo pipefail
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            VERSION="${GITHUB_REF_NAME#cli/v}"
+          elif [ -n "$INPUT_VERSION" ]; then
+            VERSION="$INPUT_VERSION"
           else
-            TAG_VERSION="${GITHUB_REF_NAME#cli/v}"
+            LATEST=$(gh api --paginate "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/cli/v" \
+              --jq '.[].ref | ltrimstr("refs/tags/cli/v") | select(test("^[0-9]+\\.[0-9]+\\.[0-9]+$"))' \
+              | sort -V | tail -n1)
+            if [ -z "$LATEST" ]; then
+              VERSION="0.0.1"
+            else
+              MAJOR=$(echo "$LATEST" | cut -d. -f1)
+              MINOR=$(echo "$LATEST" | cut -d. -f2)
+              PATCH=$(echo "$LATEST" | cut -d. -f3)
+              case "$HEAD_COMMIT_MESSAGE" in
+                *"[publish major]"*) VERSION="$((MAJOR + 1)).0.0" ;;
+                *"[publish minor]"*) VERSION="$MAJOR.$((MINOR + 1)).0" ;;
+                *) VERSION="$MAJOR.$MINOR.$((PATCH + 1))" ;;
+              esac
+            fi
           fi
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          if [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
-            echo "::error::Tag version ($TAG_VERSION) does not match package.json version ($PKG_VERSION)"
+          # Validate whichever source the version came from (tag name, dispatch
+          # input, or computed). The strict charset also makes the output safe
+          # to interpolate into later steps.
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "::error::Resolved version '$VERSION' is not valid semver"
             exit 1
           fi
-        working-directory: cli
+          echo "Publishing version: $VERSION"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
-      - name: Guard against re-publishing an existing tag (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Guard against re-publishing an existing version
+        if: github.ref_type != 'tag'
         uses: actions/github-script@v8
         with:
           script: |
-            const tag = `cli/v${{ inputs.version }}`;
+            const tag = `cli/v${{ steps.version.outputs.version }}`;
             try {
               await github.rest.git.getRef({
                 owner: context.repo.owner,
@@ -69,21 +107,43 @@ jobs:
               if (error.status !== 404) throw error;
             }
 
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          registry-url: 'https://registry.npmjs.org'
+          cache: npm
+          cache-dependency-path: cli/package-lock.json
+
+      - name: Install dependencies
+        run: cd cli && npm ci
+
+      # Stamp the resolved version into the workspace package.json before
+      # build/publish. This is never committed back to the repo.
+      - name: Stamp package version
+        run: npm version "${{ steps.version.outputs.version }}" --no-git-tag-version --allow-same-version
+        working-directory: cli
+
+      - name: Run tests
+        run: cd cli && npm test
+
+      - name: Build
+        run: cd cli && npm run build
+
       - name: Publish to npm
         run: cd cli && npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      # Dispatch-triggered runs have no tag yet, so create it after a successful
+      # Non-tag-triggered runs have no tag yet, so create it after a successful
       # publish. Tags created with GITHUB_TOKEN do not re-trigger this workflow.
-      - name: Create release tag (workflow_dispatch only)
-        if: github.event_name == 'workflow_dispatch'
+      - name: Create release tag
+        if: github.ref_type != 'tag'
         uses: actions/github-script@v8
         with:
           script: |
             await github.rest.git.createRef({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              ref: 'refs/tags/cli/v${{ inputs.version }}',
+              ref: 'refs/tags/cli/v${{ steps.version.outputs.version }}',
               sha: context.sha,
             });
