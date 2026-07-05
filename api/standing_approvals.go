@@ -25,6 +25,7 @@ type standingApprovalResponse struct {
 	ActionVersion               string     `json:"action_version"`
 	Constraints                 any        `json:"constraints"`
 	SourceActionConfigurationID *string    `json:"source_action_configuration_id"`
+	ConnectorInstanceID         *string    `json:"connector_instance_id,omitempty"`
 	Status                      string     `json:"status"`
 	StartsAt                    time.Time  `json:"starts_at"`
 	ExpiresAt                   *time.Time `json:"expires_at"`
@@ -61,15 +62,23 @@ type updateStandingApprovalRequest struct {
 	// (even if the value was null). This distinguishes "field omitted" (preserve existing)
 	// from "field set to null" (clear expiry → until revoked).
 	ExpiresAtSet bool `json:"-"`
+	// ConnectorInstanceID is the account scope. Null means all accounts when
+	// ConnectorInstanceIDSet is true. When ConnectorInstanceIDSet is false, the
+	// existing scope is preserved.
+	ConnectorInstanceID *string `json:"connector_instance_id"`
+	// ConnectorInstanceIDSet is true when the JSON payload explicitly included
+	// the "connector_instance_id" key (even if the value was null).
+	ConnectorInstanceIDSet bool `json:"-"`
 }
 
 func (r *updateStandingApprovalRequest) UnmarshalJSON(data []byte) error {
-	// Check whether "expires_at" key is present in the raw JSON.
+	// Check whether optional keys are present in the raw JSON.
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
 		return err
 	}
 	_, r.ExpiresAtSet = raw["expires_at"]
+	_, r.ConnectorInstanceIDSet = raw["connector_instance_id"]
 
 	// Unmarshal into an alias to avoid infinite recursion.
 	type alias updateStandingApprovalRequest
@@ -679,11 +688,29 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		connectorInstanceID := existing.ConnectorInstanceID
+		if req.ConnectorInstanceIDSet {
+			if err := validateStandingApprovalConnectorInstanceID(
+				r.Context(), deps.DB, existing, profile.ID, req.ConnectorInstanceID,
+			); err != nil {
+				if respondConnectorInstanceResolutionError(w, r, err) {
+					return
+				}
+				log.Printf("[%s] UpdateStandingApproval: validate connector instance: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update standing approval"))
+				return
+			}
+			connectorInstanceID = req.ConnectorInstanceID
+		}
+
 		sa, err := db.UpdateStandingApproval(r.Context(), deps.DB, db.UpdateStandingApprovalParams{
-			StandingApprovalID: saID,
-			UserID:             profile.ID,
-			Constraints:        constraintsBytes,
-			ExpiresAt:          req.ExpiresAt,
+			StandingApprovalID:     saID,
+			UserID:                 profile.ID,
+			Constraints:            constraintsBytes,
+			ExpiresAt:              req.ExpiresAt,
+			ConnectorInstanceID:    connectorInstanceID,
+			ConnectorInstanceIDSet: req.ConnectorInstanceIDSet,
 		})
 		if err != nil {
 			if handleStandingApprovalError(w, r, err) {
@@ -747,6 +774,7 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 		ActionType:                  sa.ActionType,
 		ActionVersion:               sa.ActionVersion,
 		SourceActionConfigurationID: sa.SourceActionConfigurationID,
+		ConnectorInstanceID:         sa.ConnectorInstanceID,
 		Status:                      sa.Status,
 		StartsAt:                    sa.StartsAt,
 		ExpiresAt:                   sa.ExpiresAt,

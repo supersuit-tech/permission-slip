@@ -79,7 +79,7 @@ export function ActionConfigurationsSection({
 
   const configIds = useMemo(() => configs.map((c) => c.id), [configs]);
   const { instances } = useAgentConnectorInstances(agentId, connectorId);
-  const showAccountColumn = instances.length > 1;
+  const showAccountColumn = instances.length >= 1;
   const {
     byConfigId: standingByConfig,
     error: standingError,
@@ -207,6 +207,10 @@ export function ActionConfigurationsSection({
                     }}
                     onEdit={setEditTarget}
                     onDelete={setDeleteTarget}
+                    onConfigChanged={() => {
+                      onConfigsChanged?.();
+                      void refetchStanding();
+                    }}
                   />
                 ))}
               </TableBody>

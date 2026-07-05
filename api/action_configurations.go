@@ -312,8 +312,10 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 		// Wildcard configs (action_type = "*") do not allow parameter changes —
 		// their parameters must remain {}. Look up the existing config to check.
 		var params []byte
+		var existing *db.ActionConfiguration
 		if req.Parameters != nil {
-			existing, err := db.GetActionConfigByID(r.Context(), deps.DB, configID, profile.ID)
+			var err error
+			existing, err = db.GetActionConfigByID(r.Context(), deps.DB, configID, profile.ID)
 			if err != nil {
 				log.Printf("[%s] UpdateActionConfig: lookup for wildcard check: %v", TraceID(r.Context()), err)
 				CaptureError(r.Context(), err)
@@ -341,7 +343,50 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 			params = req.Parameters
 		}
 
-		ac, err := db.UpdateActionConfig(r.Context(), deps.DB, db.UpdateActionConfigParams{
+		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
+		if err != nil {
+			log.Printf("[%s] UpdateActionConfig: begin tx: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
+			return
+		}
+		if owned {
+			defer db.RollbackTx(r.Context(), tx)
+		}
+
+		var scopeChanged bool
+		var newConnectorInstanceID *string
+		if req.Parameters != nil && existing != nil {
+			scopeChanged, err = connectorInstanceScopeChanged(
+				r.Context(), tx, existing.AgentID, profile.ID, existing.ConnectorID,
+				existing.Parameters, params,
+			)
+			if err != nil {
+				if respondConnectorInstanceResolutionError(w, r, err) {
+					return
+				}
+				log.Printf("[%s] UpdateActionConfig: compare connector scope: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
+				return
+			}
+			if scopeChanged {
+				newConnectorInstanceID, err = resolveConnectorInstanceIDFromConfigParameters(
+					r.Context(), tx, existing.AgentID, profile.ID, existing.ConnectorID, params,
+				)
+				if err != nil {
+					if respondConnectorInstanceResolutionError(w, r, err) {
+						return
+					}
+					log.Printf("[%s] UpdateActionConfig: resolve connector scope: %v", TraceID(r.Context()), err)
+					CaptureError(r.Context(), err)
+					RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
+					return
+				}
+			}
+		}
+
+		ac, err := db.UpdateActionConfig(r.Context(), tx, db.UpdateActionConfigParams{
 			ID:          configID,
 			UserID:      profile.ID,
 			Parameters:  params,
@@ -365,6 +410,30 @@ func handleUpdateActionConfig(deps *Deps) http.HandlerFunc {
 			CaptureError(r.Context(), err)
 			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
 			return
+		}
+
+		if scopeChanged {
+			updatedSAs, err := db.UpdateStandingApprovalsConnectorInstanceBySourceConfig(
+				r.Context(), tx, profile.ID, configID, newConnectorInstanceID,
+			)
+			if err != nil {
+				log.Printf("[%s] UpdateActionConfig: propagate standing approval scope: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
+				return
+			}
+			for _, sa := range updatedSAs {
+				emitStandingApprovalUpdateAuditEvent(r.Context(), tx, profile.ID, sa.AgentID, sa.StandingApprovalID, sa.ActionType)
+			}
+		}
+
+		if owned {
+			if err := db.CommitTx(r.Context(), tx); err != nil {
+				log.Printf("[%s] UpdateActionConfig: commit: %v", TraceID(r.Context()), err)
+				CaptureError(r.Context(), err)
+				RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to update action configuration"))
+				return
+			}
 		}
 
 		sas, err := db.ListActiveStandingApprovalsBySourceActionConfigID(r.Context(), deps.DB, profile.ID, configID)

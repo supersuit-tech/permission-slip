@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   connectorInstanceFromParameters,
+  connectorInstanceFromStandingApprovalId,
   isAllAccountsConnectorInstance,
   mergeConnectorInstanceIntoParameters,
   parametersWithoutConnectorInstance,
   resolveConnectorInstanceAccountLabel,
+  standingApprovalConnectorInstanceIdForUpdate,
 } from "../connectorInstanceAccount";
 
 const instances = [
@@ -68,5 +70,23 @@ describe("connectorInstanceAccount", () => {
       repo: "x",
       connector_instance: "22222222-2222-2222-2222-222222222222",
     });
+  });
+
+  it("maps standing approval connector_instance_id to selector values", () => {
+    expect(connectorInstanceFromStandingApprovalId(null)).toBe("*");
+    expect(connectorInstanceFromStandingApprovalId(undefined)).toBe("*");
+    expect(
+      connectorInstanceFromStandingApprovalId(
+        "22222222-2222-2222-2222-222222222222",
+      ),
+    ).toBe("22222222-2222-2222-2222-222222222222");
+    expect(
+      standingApprovalConnectorInstanceIdForUpdate("*"),
+    ).toBeNull();
+    expect(
+      standingApprovalConnectorInstanceIdForUpdate(
+        "22222222-2222-2222-2222-222222222222",
+      ),
+    ).toBe("22222222-2222-2222-2222-222222222222");
   });
 });
