@@ -218,10 +218,10 @@ make redeploy
 
 This pulls `origin/main`, reinstalls dependencies, rebuilds the frontend and
 server, restarts the `launchd` service set up in Step 4, and may publish an
-over-the-air mobile update via EAS when configured. It prints the build it's
-now running (the same short SHA shown in the app footer, so you can confirm
-the update took effect). New connector fields, manifest changes, and
-migrations are picked up on the restart — there's nothing else to remember.
+over-the-air mobile update via EAS when configured. It prints a deploy summary
+with web, mobile, and CLI release versions so you can confirm the update took
+effect. New connector fields, manifest changes, and migrations are picked up on
+the restart — there's nothing else to remember.
 
 **EAS OTA gating.** After a successful server restart, `make redeploy` publishes
 an EAS update only when a new `mobile/v*` release tag is reachable from the

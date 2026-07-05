@@ -5,9 +5,8 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { sentryVitePlugin } from "@sentry/vite-plugin";
 
-// Build stamp: prefer env vars (Docker build args pass these in), fall back
-// to local git. Mirrors mobile/app.config.ts so web and mobile use the same
-// Build "<sha>" identifier.
+// Build stamp: prefer env vars (Docker build args / Makefile pass these in),
+// fall back to local git. Release version comes from the latest web/v* tag.
 function readGit(cmd: string): string {
   try {
     return execSync(cmd, { encoding: "utf-8" }).trim();
@@ -17,6 +16,11 @@ function readGit(cmd: string): string {
 }
 process.env.VITE_GIT_COMMIT_HASH ||= readGit("git rev-parse HEAD");
 process.env.VITE_GIT_COMMIT_TIMESTAMP ||= readGit("git log -1 --format=%cI HEAD");
+process.env.VITE_WEB_VERSION ||= (() => {
+  const tag = readGit("git describe --tags --match 'web/v*' --abbrev=0");
+  if (tag === "unknown") return "dev";
+  return tag.replace(/^web\/v/, "");
+})();
 
 // Source maps are only generated when all Sentry upload vars are present.
 // This prevents .map files from being left in dist/ and accidentally served

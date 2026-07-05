@@ -25,6 +25,7 @@ jest.mock("expo-constants", () => ({
   __esModule: true,
   default: {
     expoConfig: {
+      version: "1.2.3",
       extra: {
         gitCommitHash: "abc1234def5678",
         gitCommitTimestamp: "2026-04-16T10:30:00+00:00",
@@ -330,15 +331,14 @@ describe("SettingsScreen", () => {
     alertSpy.mockRestore();
   });
 
-  it("renders the git commit hash at the bottom", async () => {
+  it("renders the app version at the bottom", async () => {
     await act(async () => {
       renderer = renderScreen();
     });
-    const hashNodes = findByTestId(renderer, "git-commit-hash");
-    expect(hashNodes.length).toBeGreaterThanOrEqual(1);
-    const textContent = hashNodes[0]?.children?.join("") ?? "";
-    expect(textContent).toContain("abc1234");
-    expect(textContent).toContain("Apr 16, 2026");
+    const versionNodes = findByTestId(renderer, "app-version");
+    expect(versionNodes.length).toBeGreaterThanOrEqual(1);
+    const textContent = versionNodes[0]?.children?.join("") ?? "";
+    expect(textContent).toBe("v1.2.3");
   });
 
 });

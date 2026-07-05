@@ -207,10 +207,10 @@ make redeploy
 
 This pulls `origin/main`, reinstalls dependencies, rebuilds the frontend and
 server, restarts the systemd service, publishes an over-the-air mobile update
-via EAS when configured, and prints the build it's now running (the same short
-SHA shown in the app footer, so you can confirm the update took effect). New
-connector fields, manifest changes, and migrations are picked up on the restart
-— there's nothing else to remember.
+via EAS when configured, and prints a deploy summary with web, mobile, and CLI
+release versions so you can confirm the update took effect. New connector
+fields, manifest changes, and migrations are picked up on the restart — there's
+nothing else to remember.
 
 If EAS isn't set up on the host (no `EXPO_TOKEN` or `eas login`, etc.),
 `make redeploy` prints a note and skips the mobile step — the server redeploy

@@ -399,6 +399,15 @@ is tag-only — it does NOT publish an EAS OTA update. Self-hosted installs publ
 OTA updates from `make redeploy` on their own machines (gated on new `mobile/v*`
 tags — see `docs/deployment-self-hosted.md`).
 
+**Web release tags are fully automated — do not tag manually after a normal merge.**
+Every push to `main` that touches `frontend/**` triggers `tag-web.yml`, which
+auto-increments the patch version from the latest `web/v*` tag and creates the
+`web/v*` tag. Control it via the merge commit message: `[publish minor]` /
+`[publish major]` for bigger bumps, `[skip publish]` to skip tagging. The workflow
+is tag-only — it does NOT deploy anything. Self-hosted installs always redeploy
+web on every `make redeploy` (no tag-gated skip). The stamped `VITE_WEB_VERSION`
+comes from the latest reachable `web/v*` tag at build time.
+
 **Manual CLI publish (rarely needed): dispatch `publish-cli.yml`.** The
 `workflow_dispatch` trigger takes an optional `version` input — leave it empty to
 auto-increment the patch version. A dispatched run on `main` tests, builds, stamps
@@ -426,6 +435,20 @@ REST API when it's available:
 curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
   -H "Content-Type: application/json" \
   https://api.github.com/repos/supersuit-tech/permission-slip/actions/workflows/tag-mobile.yml/dispatches \
+  -d '{"ref":"main","inputs":{"version":"<version>"}}'
+```
+
+**Manual web tag (rarely needed): dispatch `tag-web.yml`.** The
+`workflow_dispatch` trigger takes an optional `version` input — leave it empty to
+auto-increment the patch version. A dispatched run on `main` creates the
+`web/v<version>` tag only (no deploy step). Trigger it with the GitHub MCP tool
+`mcp__github__actions_run_trigger` (workflow file `tag-web.yml`, ref `main`,
+optional input `version: <version>`), or with the REST API when it's available:
+
+```bash
+curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
+  -H "Content-Type: application/json" \
+  https://api.github.com/repos/supersuit-tech/permission-slip/actions/workflows/tag-web.yml/dispatches \
   -d '{"ref":"main","inputs":{"version":"<version>"}}'
 ```
 

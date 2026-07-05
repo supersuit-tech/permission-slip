@@ -72,8 +72,9 @@ typecheck: generate-frontend
 GIT_SHA := $(shell git rev-parse --short HEAD 2>/dev/null || echo "unknown")
 GIT_COMMIT_HASH := $(shell git rev-parse HEAD 2>/dev/null || echo "unknown")
 GIT_COMMIT_TIMESTAMP := $(shell git log -1 --format=%cI HEAD 2>/dev/null || echo "unknown")
+WEB_VERSION := $(shell git describe --tags --match 'web/v*' --abbrev=0 2>/dev/null | sed 's/^web\/v//' || echo "dev")
 build: generate
-	cd frontend && VITE_GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) VITE_GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) npm run build
+	cd frontend && VITE_GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) VITE_GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) VITE_WEB_VERSION=$(WEB_VERSION) npm run build
 	touch frontend/dist/.gitkeep
 	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
 	@$(MAKE) codesign-server
@@ -81,7 +82,7 @@ build: generate
 # CI / slim server build: expects bundle + generate-frontend-from-bundle already
 # (see install-build-deps). Does not install mobile or CLI npm dependencies.
 build-ci:
-	cd frontend && VITE_GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) VITE_GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) npm run build
+	cd frontend && VITE_GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) VITE_GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) VITE_WEB_VERSION=$(WEB_VERSION) npm run build
 	touch frontend/dist/.gitkeep
 	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
 	@$(MAKE) codesign-server
@@ -107,6 +108,7 @@ docker-build:
 		--build-arg VITE_SUPABASE_PUBLISHABLE_KEY=$${VITE_SUPABASE_PUBLISHABLE_KEY} \
 		--build-arg GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) \
 		--build-arg GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) \
+		--build-arg VITE_WEB_VERSION=$(WEB_VERSION) \
 		-t permission-slip .
 
 # Update a self-hosted install in one step: pull latest, reinstall deps,

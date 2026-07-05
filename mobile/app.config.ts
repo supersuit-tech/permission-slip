@@ -20,11 +20,24 @@ try {
   // Git not available at build time — leave as "unknown"
 }
 
+function readMobileVersion(): string {
+  try {
+    const tag = execSync("git describe --tags --match 'mobile/v*' --abbrev=0", {
+      encoding: "utf-8",
+    }).trim();
+    return tag.replace(/^mobile\/v/, "");
+  } catch {
+    return "1.0.0";
+  }
+}
+
+const appVersion = readMobileVersion();
+
 const config: ExpoConfig = {
   name: "Permission Slip",
   slug: "permission-slip",
   owner: process.env.EXPO_OWNER || "supersuit-tech",
-  version: "1.0.1",
+  version: appVersion,
   runtimeVersion: { policy: "appVersion" as const },
   scheme: "permissionslip",
   orientation: "portrait",

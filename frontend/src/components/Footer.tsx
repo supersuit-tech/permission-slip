@@ -7,25 +7,8 @@ interface FooterProps {
 
 const linkClass = "hover:text-foreground transition-colors";
 
-const GIT_COMMIT_HASH = import.meta.env.VITE_GIT_COMMIT_HASH ?? "unknown";
-const GIT_COMMIT_TIMESTAMP =
-  import.meta.env.VITE_GIT_COMMIT_TIMESTAMP ?? "unknown";
-
-function formatCommitTimestamp(iso: string): string {
-  if (iso === "unknown") return "";
-  const date = new Date(iso);
-  if (isNaN(date.getTime())) return "";
-  return date.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  });
-}
-
-function buildLabel(): string {
-  const sha = GIT_COMMIT_HASH.slice(0, 7);
-  const ts = formatCommitTimestamp(GIT_COMMIT_TIMESTAMP);
-  return ts ? `Build ${sha} · ${ts}` : `Build ${sha}`;
+function getWebVersion(): string {
+  return import.meta.env.VITE_WEB_VERSION ?? "unknown";
 }
 
 /** Shared site footer for auth and marketing-style layouts. */
@@ -36,7 +19,7 @@ export function Footer({ className }: FooterProps) {
         <Link to="/support" className={linkClass}>
           Support
         </Link>
-        <span data-testid="git-commit-hash">{buildLabel()}</span>
+        <span data-testid="app-version">v{getWebVersion()}</span>
       </div>
     </footer>
   );
