@@ -32,7 +32,31 @@ Or, when `gh` is unavailable, use the GitHub MCP tool
 `main`, and (optionally) input `version: <version>`. Report the dispatched run
 to the user and finish — no need to watch the publish run to completion.
 
-The steps below apply to the **mobile** and **web** packages.
+## Mobile releases are automated — you usually don't need this skill
+
+Every merge to `main` that touches `mobile/**` automatically creates the next
+`mobile/v*` tag via `tag-mobile.yml`. Merge commit messages can contain
+`[publish minor]` or `[publish major]` for bigger bumps, or `[skip publish]` to
+skip tagging. The workflow is tag-only — it does NOT publish an EAS OTA update;
+self-hosted installs publish OTA updates from `make redeploy` on their own
+machines with their own EAS credentials.
+
+**For `/version-tag mobile`, skip steps 2–5 entirely.** Just dispatch the tag
+workflow — it auto-increments when no version is given, guards against existing
+tags itself, and creates the tag on `main`:
+
+```bash
+# Explicit version (omit -f version=... to auto-increment the patch version)
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+  gh workflow run tag-mobile.yml --ref main -f version="<version>"
+```
+
+Or, when `gh` is unavailable, use the GitHub MCP tool
+`mcp__github__actions_run_trigger` with workflow file `tag-mobile.yml`, ref
+`main`, and (optionally) input `version: <version>`. Report the dispatched run
+to the user and finish — no need to watch the workflow run to completion.
+
+The steps below apply to the **web** package only.
 
 ## Arguments
 
@@ -206,7 +230,7 @@ GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
   -f sha="$SHA"
 ```
 
-If the command fails with a write-permission error (e.g. `"Write access to this GitHub API path is not permitted through this proxy"` — some session types cannot write tags or releases at all), print the error output and stop. (For `cli`, this never applies — use the workflow dispatch described at the top instead of creating tags directly.)
+If the command fails with a write-permission error (e.g. `"Write access to this GitHub API path is not permitted through this proxy"` — some session types cannot write tags or releases at all), print the error output and stop. (For `cli` and `mobile`, this never applies — use the workflow dispatch described at the top instead of creating tags directly.)
 
 ### 6. Confirm
 
