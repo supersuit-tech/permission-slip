@@ -26,15 +26,6 @@ StandingApprovalRequest:
     constraints:
       type: object
       additionalProperties: true
-    max_executions:
-      type: integer
-      nullable: true
-    expires_in_seconds:
-      type: integer
-      nullable: true
-      description: |
-        Relative expiry window in seconds. When the user approves, expires_at on
-        the resulting standing approval is computed from approval time (not request time).
     source_action_configuration_id:
       type: string
       nullable: true
@@ -104,12 +95,6 @@ AgentCreateStandingApprovalRequestBody:
     constraints:
       type: object
       additionalProperties: true
-    max_executions:
-      type: integer
-      minimum: 1
-    expires_in_seconds:
-      type: integer
-      minimum: 1
     source_action_configuration_id:
       type: string
     connector_instance:

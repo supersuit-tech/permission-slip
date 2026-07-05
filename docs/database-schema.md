@@ -241,7 +241,7 @@ User-created configurations that define exactly how an agent is allowed to use a
 
 ### `standing_approvals`
 
-Pre-authorized rules that let agents act without per-request approval, within constraints. Enforces a 90-day maximum lifetime — no permanent delegation. Tracks state transitions with dedicated timestamps.
+Pre-authorized rules that let agents act without per-request approval, within constraints. Default lifetime is until revoked; users may optionally set `expires_at` from the web UI. Tracks state transitions with dedicated timestamps.
 
 | Column | Type | Constraints |
 |---|---|---|
@@ -253,7 +253,7 @@ Pre-authorized rules that let agents act without per-request approval, within co
 | `constraints` | jsonb | max 64 KB |
 | `status` | text | NOT NULL, CHECK IN ('active', 'expired', 'revoked') |
 | `starts_at` | timestamptz | NOT NULL |
-| `expires_at` | timestamptz | NOT NULL, CHECK >= starts_at, CHECK duration <= 90 days |
+| `expires_at` | timestamptz | NULLABLE, CHECK >= starts_at when set |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
 | `revoked_at` | timestamptz | |
 | `expired_at` | timestamptz | |
@@ -510,7 +510,7 @@ Tests are split by domain. Each domain file owns its own schema assertions, CASC
 - `approvals_test.go` — schema, cascades, CHECK constraints, indexes, consumed tokens, pg_cron jobs
 - `credentials_test.go` — schema, cascades, unique constraints (including NULL label), indexes
 - `agent_connectors_test.go` — schema, cascades, indexes
-- `standing_approvals_test.go` — schema, cascades, CHECK constraints (status, 90-day max), indexes, standing_approval_executions table
+- `standing_approvals_test.go` — schema, cascades, CHECK constraints (status, nullable expires_at), indexes, standing_approval_executions table
 - `action_configurations_test.go` — schema, cascades, CHECK constraints (status, parameters size), credential SET NULL behavior, CRUD function tests (create, get, list, update, delete), user scoping
 - `audit_events_test.go` — ListAuditEvents query: all event types, filters (agent_id, event_type, outcome), pagination, user isolation, ordering
 - `usage_periods_test.go` — schema, atomic increments, JSONB breakdown, cascade delete

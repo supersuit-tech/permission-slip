@@ -623,7 +623,7 @@ func TestCreateStandingApproval_OtherUsersAgent(t *testing.T) {
 	}
 }
 
-func TestCreateStandingApproval_DurationExceeds90Days(t *testing.T) {
+func TestCreateStandingApproval_LongDurationAllowed(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
@@ -633,15 +633,15 @@ func TestCreateStandingApproval_DurationExceeds90Days(t *testing.T) {
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	expiresAt := time.Now().Add(91 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	expiresAt := time.Now().Add(365 * 24 * time.Hour).UTC().Format(time.RFC3339)
 	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"to": "a@b.com"}, "source_action_configuration_id": %q, "expires_at": "%s"}`, agentID, acID, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
 
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", w.Code, w.Body.String())
 	}
 }
 

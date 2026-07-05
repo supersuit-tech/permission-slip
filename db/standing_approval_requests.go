@@ -17,8 +17,6 @@ type StandingApprovalRequest struct {
 	ActionType                  string
 	ActionVersion               string
 	Constraints                 []byte
-	MaxExecutions               *int
-	ExpiresInSeconds            *int
 	SourceActionConfigurationID *string
 	ConnectorName               *string
 	ConnectorInstanceID         *string
@@ -31,7 +29,7 @@ type StandingApprovalRequest struct {
 }
 
 const standingApprovalRequestColumns = `request_id, agent_id, user_id, action_type, action_version,
-	constraints, max_executions, expires_in_seconds, source_action_configuration_id,
+	constraints, source_action_configuration_id,
 	connector_name, connector_instance_id, connector_instance_display,
 	status, decided_at, resulting_standing_approval_id, created_at, updated_at`
 
@@ -71,25 +69,16 @@ const (
 
 func scanStandingApprovalRequest(row rowScanner) (*StandingApprovalRequest, error) {
 	var sar StandingApprovalRequest
-	var maxExec, expiresIn sql.NullInt64
 	var sourceConfigID, connectorName, connectorInstanceID, connectorInstanceDisplay, resultingSAID sql.NullString
 	var decidedAt, createdAt, updatedAt sql.NullString
 	err := row.Scan(
 		&sar.RequestID, &sar.AgentID, &sar.UserID, &sar.ActionType, &sar.ActionVersion,
-		&sar.Constraints, &maxExec, &expiresIn, &sourceConfigID,
+		&sar.Constraints, &sourceConfigID,
 		&connectorName, &connectorInstanceID, &connectorInstanceDisplay,
 		&sar.Status, &decidedAt, &resultingSAID, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
-	}
-	if maxExec.Valid {
-		v := int(maxExec.Int64)
-		sar.MaxExecutions = &v
-	}
-	if expiresIn.Valid {
-		v := int(expiresIn.Int64)
-		sar.ExpiresInSeconds = &v
 	}
 	if sourceConfigID.Valid {
 		s := sourceConfigID.String
@@ -135,8 +124,6 @@ type InsertStandingApprovalRequestParams struct {
 	ActionType                  string
 	ActionVersion               string
 	Constraints                 []byte
-	MaxExecutions               *int
-	ExpiresInSeconds            *int
 	SourceActionConfigurationID *string
 	ConnectorName               *string
 	ConnectorInstanceID         *string
@@ -148,12 +135,11 @@ func InsertStandingApprovalRequest(ctx context.Context, db DBTX, p InsertStandin
 	row := db.QueryRow(ctx,
 		`INSERT INTO standing_approval_requests
 		   (request_id, agent_id, user_id, action_type, action_version, constraints,
-		    max_executions, expires_in_seconds, source_action_configuration_id,
+		    source_action_configuration_id,
 		    connector_name, connector_instance_id, connector_instance_display, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, 'pending')
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
 		 RETURNING `+standingApprovalRequestColumns,
 		p.RequestID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion, p.Constraints,
-		nullableIntArg(p.MaxExecutions), nullableIntArg(p.ExpiresInSeconds),
 		p.SourceActionConfigurationID, p.ConnectorName, p.ConnectorInstanceID, p.ConnectorInstanceDisplay,
 	)
 	return scanStandingApprovalRequest(row)
@@ -349,11 +335,4 @@ func FindActionConfigIDForStandingApprovalRequest(ctx context.Context, db DBTX, 
 	default:
 		return "", fmt.Errorf("multiple action configurations match action_type; pass source_action_configuration_id")
 	}
-}
-
-func nullableIntArg(p *int) any {
-	if p == nil {
-		return nil
-	}
-	return *p
 }

@@ -18,8 +18,6 @@ type standingApprovalRequestResponse struct {
 	ActionType                  string     `json:"action_type"`
 	ActionVersion               string     `json:"action_version"`
 	Constraints                 any        `json:"constraints"`
-	MaxExecutions               *int       `json:"max_executions,omitempty"`
-	ExpiresInSeconds            *int       `json:"expires_in_seconds,omitempty"`
 	SourceActionConfigurationID *string    `json:"source_action_configuration_id,omitempty"`
 	ConnectorName               *string    `json:"connector_name,omitempty"`
 	ConnectorInstanceID         *string    `json:"connector_instance_id,omitempty"`
@@ -81,8 +79,6 @@ func toStandingApprovalRequestResponse(sar db.StandingApprovalRequest) standingA
 		ActionType:                  sar.ActionType,
 		ActionVersion:               sar.ActionVersion,
 		Constraints:                 constraints,
-		MaxExecutions:               sar.MaxExecutions,
-		ExpiresInSeconds:            sar.ExpiresInSeconds,
 		SourceActionConfigurationID: sar.SourceActionConfigurationID,
 		ConnectorName:               sar.ConnectorName,
 		ConnectorInstanceID:         sar.ConnectorInstanceID,
@@ -213,16 +209,6 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 		}
 
 		startsAt := time.Now().UTC()
-		var expiresAt *time.Time
-		if sar.ExpiresInSeconds != nil {
-			t := startsAt.Add(time.Duration(*sar.ExpiresInSeconds) * time.Second)
-			expiresAt = &t
-			const maxStandingApprovalDuration = 90 * 24 * time.Hour
-			if expiresAt.Sub(startsAt) > maxStandingApprovalDuration {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Duration exceeds maximum of 90 days"))
-				return
-			}
-		}
 
 		saID, err := generatePrefixedID("sa_", 16)
 		if err != nil {
@@ -268,7 +254,7 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			SourceActionConfigurationID: &sourceConfigID,
 			ConnectorInstanceID:         sar.ConnectorInstanceID,
 			StartsAt:                    startsAt,
-			ExpiresAt:                   expiresAt,
+			ExpiresAt:                   nil,
 		})
 		if err != nil {
 			if handleStandingApprovalError(w, r, err) {

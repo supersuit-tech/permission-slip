@@ -1521,7 +1521,7 @@ X-Permission-Slip-Signature: agent_id="agent_x7K9mP4n...", algorithm="Ed25519", 
   - `constraints` (object or null): Parameter bounds enforced at execution time
   - `status` (string): Always `active` (only active standing approvals are returned)
   - `starts_at` (string): ISO 8601 timestamp when the approval became active
-  - `expires_at` (string): ISO 8601 timestamp when the approval expires (max 90 days from `starts_at`)
+  - `expires_at` (string or null): ISO 8601 timestamp when the approval expires, or null for until-revoked
 
 **Error Responses:**
 

@@ -291,8 +291,6 @@ export class ApiClient {
     action_type: string;
     action_version?: string;
     constraints: unknown;
-    max_executions?: number;
-    expires_in_seconds?: number;
     source_action_configuration_id?: string;
     connector_instance?: string;
   }) {

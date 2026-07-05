@@ -105,6 +105,92 @@ func TestApproveStandingApprovalRequest_HappyPath(t *testing.T) {
 	}
 }
 
+func TestApproveStandingApprovalRequest_UntilRevoked(t *testing.T) {
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	configID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
+
+	requestID := testhelper.GenerateID(t, "sar_")
+	constraints := []byte(`{"to":"*@example.com"}`)
+	_, err := tx.Exec(t.Context(),
+		`INSERT INTO standing_approval_requests
+		   (request_id, agent_id, user_id, action_type, action_version, constraints, source_action_configuration_id, status)
+		 VALUES ($1, $2, $3, 'email.send', '1', $4, $5, 'pending')`,
+		requestID, agentID, uid, constraints, configID,
+	)
+	if err != nil {
+		t.Fatalf("insert request: %v", err)
+	}
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/standing-approval-requests/"+requestID+"/approve", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp approveStandingApprovalRequestResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.StandingApproval == nil {
+		t.Fatal("expected standing approval in response")
+	}
+	if resp.StandingApproval.ExpiresAt != nil {
+		t.Fatalf("expected until-revoked (null expires_at), got %v", resp.StandingApproval.ExpiresAt)
+	}
+}
+
+func TestAgentCreateStandingApprovalRequest_IgnoresLegacyLimitFields(t *testing.T) {
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+	configID := standingApprovalTestConfigID(t, tx, agentID, uid, "email.send")
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret, BaseURL: "https://app.example.com"}
+	router := NewRouter(deps)
+
+	reqBody := `{"action_type":"email.send","constraints":{"to":"*@example.com"},"source_action_configuration_id":"` + configID + `","max_executions":100,"expires_in_seconds":31536000}`
+	r := signedJSONRequest(t, http.MethodPost, "/standing-approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var createResp agentStandingApprovalRequestResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &createResp); err != nil {
+		t.Fatalf("unmarshal create: %v", err)
+	}
+
+	approveR := authenticatedRequest(t, http.MethodPost, "/standing-approval-requests/"+createResp.RequestID+"/approve", uid)
+	approveW := httptest.NewRecorder()
+	router.ServeHTTP(approveW, approveR)
+	if approveW.Code != http.StatusOK {
+		t.Fatalf("approve: %d %s", approveW.Code, approveW.Body.String())
+	}
+
+	var approveResp approveStandingApprovalRequestResponse
+	if err := json.Unmarshal(approveW.Body.Bytes(), &approveResp); err != nil {
+		t.Fatalf("unmarshal approve: %v", err)
+	}
+	if approveResp.StandingApproval == nil || approveResp.StandingApproval.ExpiresAt != nil {
+		t.Fatalf("expected until-revoked standing approval, got %+v", approveResp.StandingApproval)
+	}
+}
+
 func TestDenyStandingApprovalRequest(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)

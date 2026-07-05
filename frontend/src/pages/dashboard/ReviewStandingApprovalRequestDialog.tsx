@@ -113,20 +113,6 @@ export function ReviewStandingApprovalRequestDialog({
             </p>
           </div>
 
-          {request.max_executions != null && (
-            <p>
-              <span className="text-muted-foreground">Max executions:</span>{" "}
-              {request.max_executions}
-            </p>
-          )}
-          {request.expires_in_seconds != null && (
-            <p>
-              <span className="text-muted-foreground">Expires after approval:</span>{" "}
-              {Math.round(request.expires_in_seconds / 86400)} day(s) (
-              {request.expires_in_seconds}s)
-            </p>
-          )}
-
           {done === "approved" && (
             <p className="text-green-600 dark:text-green-400">Rule approved and active.</p>
           )}
