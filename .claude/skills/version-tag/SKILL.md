@@ -8,6 +8,32 @@ argument-hint: <package> [version] (e.g., "cli 0.1.0" or just "cli")
 
 Create and push a git tag for a specific package from the latest `main` branch.
 
+## CLI releases are automated — you usually don't need this skill
+
+Every merge to `main` that touches `cli/**` automatically publishes a new patch
+version to npm and creates the `cli/v*` tag via `publish-cli.yml`. Merge commit
+messages can contain `[publish minor]` or `[publish major]` for bigger bumps, or
+`[skip publish]` to skip publishing. The committed `cli/package.json` version is
+NOT the source of truth — the workflow stamps the resolved version at build time;
+the latest `cli/v*` tag is authoritative.
+
+**For `/version-tag cli`, skip steps 2–5 entirely.** Just dispatch the publish
+workflow — it auto-increments when no version is given, guards against existing
+tags itself, and creates the tag after a successful publish:
+
+```bash
+# Explicit version (omit -f version=... to auto-increment the patch version)
+GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
+  gh workflow run publish-cli.yml --ref main -f version="<version>"
+```
+
+Or, when `gh` is unavailable, use the GitHub MCP tool
+`mcp__github__actions_run_trigger` with workflow file `publish-cli.yml`, ref
+`main`, and (optionally) input `version: <version>`. Report the dispatched run
+to the user and finish — no need to watch the publish run to completion.
+
+The steps below apply to the **mobile** and **web** packages.
+
 ## Arguments
 
 This skill takes one required and one optional argument:
@@ -180,16 +206,7 @@ GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
   -f sha="$SHA"
 ```
 
-If the command fails with a write-permission error (e.g. `"Write access to this GitHub API path is not permitted through this proxy"` — some session types cannot write tags or releases at all), fall back to dispatching the publish workflow directly. For the `cli` package, `publish-cli.yml` has a `workflow_dispatch` trigger that verifies the version, publishes to npm, and creates the tag itself:
-
-```bash
-GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip \
-  gh workflow run publish-cli.yml --ref main -f version="<version>"
-```
-
-Or, when `gh` is unavailable, use the GitHub MCP tool `mcp__github__actions_run_trigger` with workflow file `publish-cli.yml`, ref `main`, and input `version: <version>`. Then confirm the run succeeds instead of checking for the tag immediately (the workflow creates the tag after a successful publish).
-
-If neither path works, print the error output and stop.
+If the command fails with a write-permission error (e.g. `"Write access to this GitHub API path is not permitted through this proxy"` — some session types cannot write tags or releases at all), print the error output and stop. (For `cli`, this never applies — use the workflow dispatch described at the top instead of creating tags directly.)
 
 ### 6. Confirm
 

@@ -379,19 +379,24 @@ When using gh, the local git remote uses a proxy, so always set the repo explici
 GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh <command>
 ```
 
-## Pushing Release Tags (web sessions)
+## Publishing the CLI / Release Tags
 
-**In the cloud/web sandbox, `git push origin <tag>` does NOT work for tags.** The git
-remote is a proxy that only authorizes pushing the session's assigned feature branch —
-any tag push (e.g. `cli/v*`, which triggers `publish-cli.yml`) is rejected with
-`HTTP 403`. Do not waste retries on it.
+**CLI releases are fully automated — do not publish manually after a normal merge.**
+Every push to `main` that touches `cli/**` triggers `publish-cli.yml`, which
+auto-increments the patch version from the latest `cli/v*` tag, stamps it into the
+workspace `package.json` (never committed back), publishes to npm, and creates the
+tag. Control it via the merge commit message: `[publish minor]` / `[publish major]`
+for bigger bumps, `[skip publish]` to skip publishing. The committed
+`cli/package.json` version is NOT the source of truth — the latest `cli/v*` tag is.
+Never open version-bump PRs for the CLI.
 
-**Preferred: dispatch `publish-cli.yml` directly.** The workflow has a
-`workflow_dispatch` trigger with a required `version` input. A dispatched run on `main`
-tests, builds, verifies `cli/package.json` matches the input version, publishes to npm,
-and then creates the `cli/v<version>` tag itself. Trigger it with the GitHub MCP tool
-`mcp__github__actions_run_trigger` (workflow file `publish-cli.yml`, ref `main`, input
-`version: <version>`), or with the REST API when it's available:
+**Manual publish (rarely needed): dispatch `publish-cli.yml`.** The
+`workflow_dispatch` trigger takes an optional `version` input — leave it empty to
+auto-increment the patch version. A dispatched run on `main` tests, builds, stamps
+the version, publishes to npm, and creates the `cli/v<version>` tag itself. Trigger
+it with the GitHub MCP tool `mcp__github__actions_run_trigger` (workflow file
+`publish-cli.yml`, ref `main`, optional input `version: <version>`), or with the
+REST API when it's available:
 
 ```bash
 curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
@@ -400,28 +405,12 @@ curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vn
   -d '{"ref":"main","inputs":{"version":"<version>"}}'
 ```
 
-**Fallback: create the tag through the GitHub REST API** (fires the tag-push trigger).
-Note this does NOT work in every session type — some sessions get
-`"Write access to this GitHub API path is not permitted through this proxy"` on
-`git/refs` (and on releases). In that case use the workflow dispatch above instead.
-Requests must set `Content-Type: application/json` or the proxy rejects them:
-
-```bash
-# Resolve the target commit (latest main, after any version-bump PR has merged)
-SHA=$(curl -sS -H "Authorization: Bearer $GH_TOKEN" \
-  https://api.github.com/repos/supersuit-tech/permission-slip/git/ref/heads/main \
-  | jq -r '.object.sha')
-
-# Create the tag ref (fires the publish workflow)
-curl -sS -X POST -H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" \
-  -H "Content-Type: application/json" \
-  https://api.github.com/repos/supersuit-tech/permission-slip/git/refs \
-  -d "{\"ref\":\"refs/tags/cli/v<version>\",\"sha\":\"$SHA\"}"
-```
-
-Before publishing either way, confirm the package.json version on `main` matches the
-target version (the publish workflow's "Verify package version matches tag" step will
-fail otherwise).
+**In the cloud/web sandbox, `git push origin <tag>` does NOT work for tags.** The git
+remote is a proxy that only authorizes pushing the session's assigned feature branch —
+any tag push is rejected with `HTTP 403`. Do not waste retries on it; use the workflow
+dispatch above. Creating tag refs through the GitHub REST API also fails in some
+session types (`"Write access to this GitHub API path is not permitted through this
+proxy"`).
 
 ### When a publish run fails at `npm publish`
 
