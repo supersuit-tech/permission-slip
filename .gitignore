@@ -30,6 +30,9 @@ mobile/src/api/schema.d.ts
 # Storybook build output
 storybook-static/
 
+# Self-hosted redeploy: last successfully published mobile/v* tag (scripts/redeploy.sh)
+.mobile-ota-deployed-tag
+
 # Custom connectors config (user-specific, not checked in)
 custom-connectors.json
 *.db

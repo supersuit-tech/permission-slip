@@ -38,12 +38,22 @@
 # checkout. If the build itself fails, the script aborts BEFORE restarting, so
 # the service keeps serving the last known-good binary.
 #
-# After a successful server restart, the script also publishes an over-the-air
+# After a successful server restart, the script may publish an over-the-air
 # mobile update via EAS (`npx eas-cli@latest update --channel production` from
-# mobile/). If EAS isn't configured (no mobile/ dir, no node/npx, no eas.json,
-# or no EXPO_TOKEN / eas login), it prints a note and skips — never failing or
-# rolling back the server redeploy. An unexpected EAS failure is likewise
-# non-fatal: a warning is printed and the script still exits 0.
+# mobile/). Publishing is gated on new mobile/v* release tags: if the latest tag
+# reachable from HEAD matches the last successfully published tag (recorded in
+# .mobile-ota-deployed-tag), the EAS step is skipped. When no mobile/v* tag is
+# reachable from HEAD yet, the script keeps the legacy always-publish behavior.
+# Force a publish regardless of tag state:
+#
+#   PS_FORCE_EAS_UPDATE=1 make redeploy
+#
+# If EAS isn't configured (no mobile/ dir, no node/npx, no eas.json, or no
+# EXPO_TOKEN / eas login), it prints a note and skips — never failing or rolling
+# back the server redeploy. An unexpected EAS failure is likewise non-fatal: a
+# warning is printed and the script still exits 0. The state file is only
+# updated after a successful publish, so a skipped or failed EAS step retries
+# on the next redeploy.
 set -euo pipefail
 
 SERVICE="${PS_SERVICE:-permission-slip}"
@@ -67,6 +77,10 @@ echo "==> Pulling latest from origin/main"
 if ! git pull --ff-only; then
   echo "    WARNING: git pull failed — rebuilding the current checkout instead." >&2
 fi
+
+# Tag auto-following can miss mobile/v* tags whose commits are already local
+# (e.g. when a previous redeploy pulled main before the tag workflow finished).
+git fetch origin 'refs/tags/mobile/v*:refs/tags/mobile/v*' 2>/dev/null || true
 
 echo "==> Refreshing dependencies"
 if ! make install; then
@@ -151,15 +165,33 @@ eas_is_authenticated() {
   ) </dev/null >/dev/null 2>&1
 }
 
+MOBILE_OTA_DEPLOYED_TAG_FILE="$REPO_ROOT/.mobile-ota-deployed-tag"
+LATEST_MOBILE_TAG="$(git tag --list 'mobile/v*' --merged HEAD | sort -V | tail -n1 || true)"
+DEPLOYED_MOBILE_TAG=""
+if [ -f "$MOBILE_OTA_DEPLOYED_TAG_FILE" ]; then
+  DEPLOYED_MOBILE_TAG="$(tr -d '[:space:]' < "$MOBILE_OTA_DEPLOYED_TAG_FILE")"
+fi
+
+SKIP_EAS_UPDATE=0
+if [ -n "$LATEST_MOBILE_TAG" ] && [ "$LATEST_MOBILE_TAG" = "$DEPLOYED_MOBILE_TAG" ] && [ "${PS_FORCE_EAS_UPDATE:-}" != "1" ]; then
+  SKIP_EAS_UPDATE=1
+fi
+
 if [ ! -d "$REPO_ROOT/mobile" ] || [ ! -f "$REPO_ROOT/mobile/eas.json" ]; then
   echo "NOTE: mobile is not configured in this environment — skipping EAS update."
 elif ! command -v node >/dev/null 2>&1 || ! command -v npx >/dev/null 2>&1; then
   echo "NOTE: mobile is not configured in this environment — skipping EAS update."
+elif [ "$SKIP_EAS_UPDATE" -eq 1 ]; then
+  echo "NOTE: EAS update skipped — mobile release tag '$LATEST_MOBILE_TAG' was already published. Set PS_FORCE_EAS_UPDATE=1 to force a publish."
 elif ! eas_is_authenticated; then
   echo "NOTE: EAS update skipped — not logged in. Run 'npx eas-cli login' or set EXPO_TOKEN, then re-run 'make redeploy' to publish the OTA update."
 else
   echo "==> Publishing EAS update (production channel)"
-  if ! (cd "$REPO_ROOT/mobile" && npx --yes eas-cli@latest update --channel production); then
+  if (cd "$REPO_ROOT/mobile" && npx --yes eas-cli@latest update --channel production); then
+    if [ -n "$LATEST_MOBILE_TAG" ]; then
+      printf '%s\n' "$LATEST_MOBILE_TAG" > "$MOBILE_OTA_DEPLOYED_TAG_FILE"
+    fi
+  else
     echo "    WARNING: EAS update failed — server redeploy completed successfully." >&2
   fi
 fi
