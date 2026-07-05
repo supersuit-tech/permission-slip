@@ -44,10 +44,8 @@ func NotifyStandingApprovalRequest(ctx context.Context, deps *Deps, sar *db.Stan
 		return
 	}
 
-	expiresAt := sar.CreatedAt.Add(30 * 24 * time.Hour) // display-only default for template
-	if sar.ExpiresInSeconds != nil {
-		expiresAt = sar.CreatedAt.Add(time.Duration(*sar.ExpiresInSeconds) * time.Second)
-	}
+	// Display-only expiry for notification templates (proposal review window, not rule lifetime).
+	expiresAt := sar.CreatedAt.Add(30 * 24 * time.Hour)
 
 	notifApproval := notify.Approval{
 		ApprovalID:  sar.RequestID,

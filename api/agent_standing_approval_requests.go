@@ -14,8 +14,6 @@ type agentStandingApprovalRequestBody struct {
 	ActionType                  string          `json:"action_type" validate:"required"`
 	ActionVersion               string          `json:"action_version"`
 	Constraints                 json.RawMessage `json:"constraints" validate:"required"`
-	MaxExecutions               *int            `json:"max_executions,omitempty" validate:"omitempty,gt=0"`
-	ExpiresInSeconds            *int            `json:"expires_in_seconds,omitempty" validate:"omitempty,gt=0"`
 	SourceActionConfigurationID *string         `json:"source_action_configuration_id"`
 	ConnectorInstance           *string         `json:"connector_instance"`
 }
@@ -171,8 +169,6 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			ActionType:                  req.ActionType,
 			ActionVersion:               req.ActionVersion,
 			Constraints:                 constraintsBytes,
-			MaxExecutions:               req.MaxExecutions,
-			ExpiresInSeconds:            req.ExpiresInSeconds,
 			SourceActionConfigurationID: req.SourceActionConfigurationID,
 			ConnectorName:               connectorName,
 			ConnectorInstanceID:         connectorInstanceID,

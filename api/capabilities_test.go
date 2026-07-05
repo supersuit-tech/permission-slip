@@ -11,6 +11,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors/protonmail"
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
@@ -783,5 +785,49 @@ func TestGetCapabilities_SingleInstance_OmitsConnectorInstanceInjection(t *testi
 	}
 	if _, ok := props["connector_instance"]; ok {
 		t.Error("single-instance connector should not inject connector_instance")
+	}
+}
+
+func TestGetCapabilities_ProtonMailMetaConstraintFields(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	schema := json.RawMessage(`{"type":"object","properties":{"message_id":{"type":"integer"},"folder":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, connID, "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	registry := connectors.NewRegistry()
+	registry.Register(protonmail.New())
+
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret, Connectors: registry})
+	r := capabilitiesRequest(t, agentID, privKey)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp capabilitiesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Connectors) != 1 || len(resp.Connectors[0].Actions) != 1 {
+		t.Fatalf("expected 1 connector with 1 action, got %+v", resp.Connectors)
+	}
+	fields := resp.Connectors[0].Actions[0].MetaConstraintFields
+	if len(fields) == 0 {
+		t.Fatal("expected meta_constraint_fields for protonmail.read_email")
+	}
+	if fields[0] != "bcc" || fields[len(fields)-1] != "to" {
+		t.Fatalf("expected sorted meta fields, got %v", fields)
 	}
 }

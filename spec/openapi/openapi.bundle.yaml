@@ -1189,10 +1189,11 @@ paths:
         3. **Which need user setup** → `credentials_ready: false` + `credentials_setup_url`
         4. **What actions exist** → `connectors[].actions[]`
         5. **What parameters each action expects** → `parameters_schema`
-        6. **What configurations are available** → `action_configurations[]` with `configuration_id`
-        7. **Which actions can execute immediately** → `standing_approvals` is non-empty
-        8. **Which need one-off approval** → `standing_approvals` is empty
-        9. **What constraints apply** → `standing_approvals[].constraints`
+        6. **Which verified metadata fields support standing approval `$meta` constraints** → `meta_constraint_fields` (when present)
+        7. **What configurations are available** → `action_configurations[]` with `configuration_id`
+        8. **Which actions can execute immediately** → `standing_approvals` is non-empty
+        9. **Which need one-off approval** → `standing_approvals` is empty
+        10. **What constraints apply** → `standing_approvals[].constraints`
 
         ## Authorization Flow Decision
 
@@ -5229,7 +5230,6 @@ paths:
             Invalid request. Common causes:
             - Missing or empty `constraints` (`invalid_constraints`)
             - All constraint values are wildcards (`invalid_constraints`)
-            - Duration exceeds 90 days (`invalid_request`)
             - Invalid field values (`invalid_request`)
           content:
             application/json:
@@ -5245,14 +5245,6 @@ paths:
                       retryable: false
                       details:
                         hint: 'Provide a JSON object with at least one non-wildcard constraint, e.g. {"repo": "my-org/my-repo", "title": "*"}'
-                      trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
-                duration_exceeded:
-                  summary: Duration exceeds maximum
-                  value:
-                    error:
-                      code: invalid_request
-                      message: Duration exceeds maximum of 90 days
-                      retryable: false
                       trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -5355,10 +5347,7 @@ paths:
         Update the constraints and expires_at of an active standing approval.
         The standing approval must belong to the authenticated user and be in `active` status.
         Agent and action type cannot be changed — only constraints and expiry.
-
-        **Duration policy**: The total lifespan from the approval's original `starts_at` may not exceed
-        the maximum allowed window (90 days). Expiry headroom shrinks as the approval ages — this is
-        not a rolling window from the time of the update call.
+        Omit `expires_at` to preserve the current value; send `null` for until-revoked.
 
         Emits a `standing_approval.updated` audit event on success.
       tags:
@@ -5525,7 +5514,8 @@ paths:
       description: |
         Agent proposes a new auto-approve (standing approval) rule. The proposal stays
         pending until the agent's owning user approves or denies it from web or mobile.
-        expires_at on the resulting rule is computed at approval time from expires_in_seconds.
+        Approved rules last until revoked unless the user sets an optional expiry when
+        creating a rule directly from the web UI.
       tags:
         - Standing Approval Requests
       security:
@@ -9745,6 +9735,22 @@ components:
                 maxLength: 998
               body:
                 type: string
+        meta_constraint_fields:
+          type: array
+          items:
+            type: string
+          description: |
+            Verified metadata fields supported in standing approval `$meta` constraints
+            for this action (e.g. `from`, `to`, `cc`, `bcc`). Values are checked against
+            server-fetched envelope data, not agent-supplied parameters. Omitted when the
+            action does not support `$meta` constraints.
+          example:
+            - from
+            - sender
+            - senders
+            - to
+            - cc
+            - bcc
         standing_approvals:
           type: array
           items:
@@ -11947,12 +11953,6 @@ components:
         constraints:
           type: object
           additionalProperties: true
-        max_executions:
-          type: integer
-          minimum: 1
-        expires_in_seconds:
-          type: integer
-          minimum: 1
         source_action_configuration_id:
           type: string
         connector_instance:
@@ -12002,15 +12002,6 @@ components:
         constraints:
           type: object
           additionalProperties: true
-        max_executions:
-          type: integer
-          nullable: true
-        expires_in_seconds:
-          type: integer
-          nullable: true
-          description: |
-            Relative expiry window in seconds. When the user approves, expires_at on
-            the resulting standing approval is computed from approval time (not request time).
         source_action_configuration_id:
           type: string
           nullable: true

@@ -5,7 +5,8 @@ agentCreateStandingApprovalRequest:
     description: |
       Agent proposes a new auto-approve (standing approval) rule. The proposal stays
       pending until the agent's owning user approves or denies it from web or mobile.
-      expires_at on the resulting rule is computed at approval time from expires_in_seconds.
+      Approved rules last until revoked unless the user sets an optional expiry when
+      creating a rule directly from the web UI.
     tags:
       - Standing Approval Requests
     security:

@@ -64,6 +64,8 @@ Calendar, Drive, Contacts, VPN, and Pass are **not** available through Bridge (n
 
 For actions that target specific messages by IMAP UID, standing approvals can pin constraints to **verified envelope metadata** under a reserved `$meta` namespace. Matching uses server-fetched From/To/Cc/Bcc headers — never agent-supplied parameter values.
 
+Agents discover supported fields per action via `GET /agents/{agent_id}/capabilities` → `connectors[].actions[].meta_constraint_fields` (e.g. `from`, `to`, `cc`, `bcc` on `protonmail.read_email`). A top-level `from` constraint is rejected — use `{"$meta":{"from":...}}` instead.
+
 | Action | `$meta` fields | Notes |
 |--------|----------------|-------|
 | `protonmail.read_email` | `from`, `to`, `cc`, `bcc` | `sender` / `senders` are aliases for `from` |

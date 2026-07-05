@@ -143,19 +143,19 @@ An asynchronous request for permission to perform a specific one-off action. The
 **Example:** *"Send email to bob@example.com with subject 'Meeting tomorrow' and body 'Let's meet at 3pm.'"*
 
 ### Standing Approval
-A time-bound (or indefinite), constraint-scoped pre-authorization that lets an agent execute a specific action type **without per-request human approval**. The agent can execute the action as many times as it wants (or up to a configured cap) within the approval window.
+A constraint-scoped pre-authorization that lets an agent execute a specific action type **without per-request human approval**. Rules last until revoked unless the user sets an optional expiry when creating the rule from the web UI.
 
 **Key characteristics:**
-- Created proactively by the user from the web interface
+- Created proactively by the user from the web interface, or proposed by an agent for user review
 - Scoped to a specific agent, action type, and set of constraints
-- Duration is user-defined: from 1 hour to a maximum of 90 days
-- Executions can be unlimited (default) or capped at a user-defined number
+- Default duration is until revoked; users may optionally set an expiry date in the web UI
+- Executions are unlimited within the rule window
 - Constraints are enforced on every execution (same rules as one-off approvals)
 - Revocable instantly from the web UI at any time
 - Every execution is audited, even without per-request approval
 - Falls through to one-off approval if the agent's request doesn't match the standing approval's constraints
 
-**Example:** *"Agent 'My Assistant' can read emails from @github.com for the next 7 days, unlimited times."*
+**Example:** *"Agent 'My Assistant' can read emails from @github.com until I revoke the rule."*
 
 See [ADR-002](../adr/002-standing-approvals.md) for full design details.
 

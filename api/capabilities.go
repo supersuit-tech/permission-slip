@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip/connectors"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
@@ -40,6 +41,7 @@ type actionCapability struct {
 	Description          *string                      `json:"description,omitempty"`
 	RiskLevel            *string                      `json:"risk_level,omitempty"`
 	ParametersSchema     json.RawMessage              `json:"parameters_schema,omitempty"`
+	MetaConstraintFields []string                     `json:"meta_constraint_fields,omitempty"`
 	StandingApprovals    []standingApprovalCapability `json:"standing_approvals"`
 	ActionConfigurations []actionConfigCapability     `json:"action_configurations"`
 }
@@ -107,7 +109,7 @@ func handleGetCapabilities(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		resp := buildCapabilitiesResponse(agentID, caps, deps.BaseURL)
+		resp := buildCapabilitiesResponse(agentID, caps, deps.BaseURL, deps.Connectors)
 
 		// Look up the approver's profile to include their username.
 		profile, err := db.GetProfileByUserID(r.Context(), deps.DB, agent.ApproverID)
@@ -125,7 +127,7 @@ func handleGetCapabilities(deps *Deps) http.HandlerFunc {
 // buildCapabilitiesResponse transforms the DB result into the API response,
 // nesting actions under their connectors, standing approvals under their actions,
 // and action configurations under their actions.
-func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseURL string) capabilitiesResponse {
+func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseURL string, registry *connectors.Registry) capabilitiesResponse {
 	// Index actions by connector ID.
 	actionsByConnector := make(map[string][]db.CapabilityAction)
 	for _, a := range caps.Actions {
@@ -186,6 +188,9 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 				Description:      a.Description,
 				RiskLevel:        a.RiskLevel,
 				ParametersSchema: injectConnectorInstanceIntoParametersSchema(a.ParametersSchema, cc.Instances),
+			}
+			if fields, ok := actionMetaConstraintFieldList(registry, a.ActionType); ok {
+				acap.MetaConstraintFields = fields
 			}
 
 			// Attach standing approvals for this action type.

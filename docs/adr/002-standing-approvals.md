@@ -41,8 +41,7 @@ From the web interface, the user configures:
 | **Agent** | Which agent this applies to | "My AI Assistant" |
 | **Action type** | Which action is pre-approved | `email.read` |
 | **Constraints** | Boundaries the agent must stay within | sender: `*@github.com`, max results: 10 |
-| **Duration** | How long the standing approval is valid | 24 hours, 7 days, 30 days, 90 days (max) |
-| **Max executions** | Optional cap on total uses | unlimited, or e.g. 100 |
+| **Duration** | How long the standing approval is valid | Until revoked (default), or optional user-set expiry |
 
 #### Agent discovers its standing approvals
 
@@ -61,7 +60,7 @@ Agent                          Permission Slip                    Gmail
   │                                  │ 1. Verify agent signature    │
   │                                  │ 2. Match standing approval   │
   │                                  │ 3. Validate constraints      │
-  │                                  │ 4. Check TTL + exec count    │
+  │                                  │ 4. Check TTL (when set)    │
   │                                  │ 5. Execute with credentials  │
   │                                  │─────────────────────────────>│
   │                                  │<─────────────────────────────│
@@ -78,7 +77,7 @@ No push notification. No confirmation code. No single-use token. The standing ap
 | Approval | Per-request, push notification + confirmation code | Pre-approved for a duration |
 | Authorization | `Authorization: Bearer <jwt>` header | Agent signature only (no `Authorization` header) |
 | Request body | Same structure (`request_id` + `action`) | Same structure (`request_id` + `action`) |
-| Executions | Exactly once per approval | Unlimited (or capped) within the window |
+| Executions | Exactly once per approval | Unlimited within the rule window |
 | Constraints enforced | At request validation time | At execution time (every call) |
 | Audit trail | One entry per approval + execution | One entry per execution (many per standing approval) |
 | User involvement | Every time | Once at creation, then only to review/revoke |
@@ -90,8 +89,7 @@ No push notification. No confirmation code. No single-use token. The standing ap
 ```
 Created ──> Active ──> Expired
               │
-              ├──> Revoked (user manually revokes)
-              └──> Exhausted (max executions reached)
+              └──> Revoked (user manually revokes)
 ```
 
 1. **Created:** User configures the standing approval from the web UI.
@@ -108,7 +106,7 @@ Standing approvals **do not relax constraints** — they relax the approval prom
 1. **Agent signature verified** (Ed25519, same as always)
 2. **Standing approval matched** (agent + action type + active status)
 3. **Parameters validated against constraints** (same rules as ADR-001 Decision 4)
-4. **TTL checked** (standing approval not expired)
+4. **TTL checked** (standing approval not expired, when `expires_at` is set)
 5. **Action executed** via connector with stored credentials
 6. **Audit log entry created** (every execution, not just the standing approval creation)
 
@@ -130,17 +128,9 @@ Standing approvals and one-off approvals coexist:
 
 ### Duration
 
-Users set the duration to any value up to a **90-day maximum**. This cap prevents permanent delegation of authority and ensures users periodically re-evaluate their standing approvals.
+Standing approvals default to **until revoked** (`expires_at` is null). Users creating rules from the web UI may optionally set an expiry date; there is no maximum duration when a date is set.
 
-| Duration | Use case |
-|---|---|
-| 1 hour | Short debugging session, one-time batch job |
-| 24 hours | Daily workflow automation |
-| 7 days | Weekly reporting, recurring tasks |
-| 30 days | Monthly reporting, ongoing automation |
-| 90 days | Quarterly workflows, maximum allowed |
-
-**90-day cap.** Standing approvals enforce a maximum lifetime of 90 days. Users who need longer-running automation can recreate a standing approval when the previous one expires. This deliberate friction ensures periodic review of delegated authority — even trusted agents should have their access re-evaluated regularly.
+Agent-proposed rules do not include expiry or usage limits — approved proposals always become until-revoked rules. The human reviewer controls risk via approval and instant revocation.
 
 **Revocation is always instant.** Regardless of duration, the user can revoke any standing approval at any time from the web UI.
 
@@ -152,15 +142,13 @@ Users set the duration to any value up to a **90-day maximum**. This cap prevent
 
 1. **Constraints are tight.** A standing approval for `email.send` to `*@mycompany.com` with a 50-recipient cap is bounded. One for `email.send` to `*` with no cap is dangerous — the UI should warn about wide-open constraints.
 2. **Revocation is instant.** User can kill a standing approval at any time from the web interface.
-3. **90-day maximum lifetime.** No permanent delegation — users must periodically re-evaluate standing approvals. This prevents "set and forget" security drift.
-4. **Every execution is audited.** The user can review what the agent actually did during the standing approval window.
-5. **Constraints are enforced every time.** A standing approval is not a blank check — it's a scoped delegation with enforcement on every call.
+3. **Every execution is audited.** The user can review what the agent actually did during the standing approval window.
+4. **Constraints are enforced every time.** A standing approval is not a blank check — it's a scoped delegation with enforcement on every call.
 
 **UI warnings for broad standing approvals:**
 
 The web interface SHOULD warn users when creating standing approvals with:
 - No recipient constraints on `email.send`
-- Maximum duration (90 days) on write actions
 - Multiple broad standing approvals for the same agent
 
 ---
@@ -177,7 +165,7 @@ STANDING_APPROVAL {
     json    constraints           "same schema as ACTION_CONFIG"
     string  status                "active | expired | revoked"
     timestamp starts_at
-    timestamp expires_at          "NOT NULL, max 90 days from starts_at"
+    timestamp expires_at          "nullable; null = until revoked"
     timestamp created_at
     timestamp revoked_at          "null if not revoked"
 }
@@ -192,15 +180,15 @@ Every execution under a standing approval also writes to `AUDIT_LOG` with `event
 - **Prevents credential bypass.** If we don't offer pre-approval, users who want automation will give agents direct credentials — defeating Permission Slip entirely.
 - **Reduces approval fatigue.** Repetitive, predictable actions shouldn't require a prompt every time.
 - **Constraints are still enforced.** This relaxes the *approval prompt*, not the *security boundary*.
-- **90-day cap prevents permanent delegation.** Users must periodically re-evaluate standing approvals, preventing security drift from "set and forget" grants.
-- **User controls the risk window.** Duration (up to 90 days) and instant revocation are user-defined.
+- **Instant revocation limits open-ended delegation.** Users approve rules until revoked and can cancel at any time from the web UI.
+- **User controls the risk window.** Optional expiry from the web UI and instant revocation are user-defined.
 - **Progressive trust.** Users start with one-off approvals, then graduate to standing approvals for actions they trust — the system grows with the user's confidence.
 
 ## Alternatives considered
 
 - **Longer TTL on single-use tokens.** Doesn't solve the problem — you'd need 288 tokens per day for a 5-minute check. And single-use means one execution per token.
 - **Batch approvals (approve N actions at once).** Awkward UX — user has to approve a specific count upfront. Standing approvals handle recurring automation via duration and constraints instead.
-- **Auto-approve rules as a separate concept.** Standing approvals already cover this — a standing approval with 90-day duration is functionally an auto-approve rule, but managed through the same UI with periodic renewal.
+- **Auto-approve rules as a separate concept.** Standing approvals already cover this — an until-revoked standing approval is functionally an auto-approve rule, managed through the same UI with revocation as the off switch.
 - **Refresh tokens.** Adds complexity (refresh flow, token rotation) for something that standing approvals handle more cleanly at the authorization layer rather than the token layer.
 
 ## Consequences
@@ -209,7 +197,7 @@ Every execution under a standing approval also writes to `AUDIT_LOG` with `event
 - The web interface needs a standing approval management UI (create, list, revoke).
 - A new authenticated endpoint is needed for agents to discover their active standing approvals (separate from the unauthenticated `GET /v1/connectors` discovery endpoint).
 - Audit queries need to distinguish one-off executions from standing executions.
-- Standing approvals enforce a 90-day maximum lifetime via database CHECK constraint (`expires_at - starts_at <= INTERVAL '90 days'`). `expires_at` is NOT NULL.
+- `expires_at` is nullable; null means until revoked. The former 90-day database CHECK constraint was removed in migration `20260317124702`.
 
 ---
 
@@ -219,8 +207,8 @@ Every execution under a standing approval also writes to `AUDIT_LOG` with `event
 |---|---|
 | What | Standing approvals: time-bound, constraint-scoped pre-authorization |
 | When | User creates proactively from web UI |
-| Duration | User-defined (1 hour to 90 days max) |
-| Executions | Unlimited (default) or capped |
+| Duration | Until revoked (default); optional user-set expiry from web UI |
+| Executions | Unlimited within the rule window |
 | Constraints | Same per-action constraints from ADR-001, enforced every execution |
 | Coexistence | Falls through to one-off approval if no standing approval matches |
 | Revocation | Instant, from web UI |

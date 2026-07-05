@@ -53,10 +53,11 @@ agentCapabilities:
       3. **Which need user setup** → `credentials_ready: false` + `credentials_setup_url`
       4. **What actions exist** → `connectors[].actions[]`
       5. **What parameters each action expects** → `parameters_schema`
-      6. **What configurations are available** → `action_configurations[]` with `configuration_id`
-      7. **Which actions can execute immediately** → `standing_approvals` is non-empty
-      8. **Which need one-off approval** → `standing_approvals` is empty
-      9. **What constraints apply** → `standing_approvals[].constraints`
+      6. **Which verified metadata fields support standing approval `$meta` constraints** → `meta_constraint_fields` (when present)
+      7. **What configurations are available** → `action_configurations[]` with `configuration_id`
+      8. **Which actions can execute immediately** → `standing_approvals` is non-empty
+      9. **Which need one-off approval** → `standing_approvals` is empty
+      10. **What constraints apply** → `standing_approvals[].constraints`
 
       ## Authorization Flow Decision
 

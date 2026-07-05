@@ -91,12 +91,6 @@ export default function StandingApprovalRequestDetailScreen({
         agent-supplied parameters.
       </Text>
 
-      {request.expires_in_seconds != null && (
-        <Text style={styles.meta}>
-          Expires {Math.round(request.expires_in_seconds / 86400)} day(s) after you approve
-        </Text>
-      )}
-
       <View style={styles.actions}>
         <TouchableOpacity
           style={[styles.button, styles.denyButton]}
@@ -154,7 +148,6 @@ const styles = StyleSheet.create({
     color: colors.gray900,
   },
   metaNote: { marginTop: 8, fontSize: 12, color: colors.gray500, lineHeight: 18 },
-  meta: { marginTop: 12, fontSize: 14, color: colors.gray500 },
   actions: { flexDirection: "row", gap: 12, marginTop: 24 },
   button: {
     flex: 1,
