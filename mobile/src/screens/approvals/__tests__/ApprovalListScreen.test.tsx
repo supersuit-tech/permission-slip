@@ -55,14 +55,12 @@ jest.mock("../../../hooks/useStandingApprovalRequests", () => ({
   useStandingApprovalRequests: () => mockUseStandingApprovalRequestsReturn,
 }));
 
-const mockUseStandingApprovalInstanceAmbiguityWarning = jest.fn(() => ({
-  showWarning: false,
-  warningMessage: "Applies to an unspecified account",
+const mockUseStandingApprovalInstanceScope = jest.fn(() => ({
+  scopeLabel: "Applies to all accounts",
 }));
 
-jest.mock("../../../hooks/useStandingApprovalInstanceAmbiguityWarning", () => ({
-  useStandingApprovalInstanceAmbiguityWarning: () =>
-    mockUseStandingApprovalInstanceAmbiguityWarning(),
+jest.mock("../../../hooks/useStandingApprovalInstanceScope", () => ({
+  useStandingApprovalInstanceScope: () => mockUseStandingApprovalInstanceScope(),
 }));
 
 jest.mock("../../../hooks/useStandingApprovalConnectorLabel", () => ({
@@ -136,9 +134,8 @@ describe("ApprovalListScreen", () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
-    mockUseStandingApprovalInstanceAmbiguityWarning.mockReturnValue({
-      showWarning: false,
-      warningMessage: "Applies to an unspecified account",
+    mockUseStandingApprovalInstanceScope.mockReturnValue({
+      scopeLabel: "Applies to all accounts",
     });
     mockUseStandingApprovalRequestsReturn = {
       requests: [],
@@ -273,7 +270,7 @@ describe("ApprovalListScreen", () => {
     expect(lastUpdated).toHaveLength(0);
   });
 
-  it("shows instance ambiguity warning on rule proposal rows when hook reports it", async () => {
+  it("shows account scope line on rule proposal rows", async () => {
     mockUseApprovalsReturn = {
       ...mockUseApprovalsReturn,
       approvals: [],
@@ -295,9 +292,8 @@ describe("ApprovalListScreen", () => {
         },
       ],
     };
-    mockUseStandingApprovalInstanceAmbiguityWarning.mockReturnValue({
-      showWarning: true,
-      warningMessage: "Applies to an unspecified account",
+    mockUseStandingApprovalInstanceScope.mockReturnValue({
+      scopeLabel: "Applies to all accounts",
     });
 
     await act(async () => {
@@ -305,10 +301,10 @@ describe("ApprovalListScreen", () => {
     });
 
     const allText = getAllText(renderer);
-    expect(allText).toContain("Applies to an unspecified account");
+    expect(allText).toContain("Applies to all accounts");
   });
 
-  it("hides instance ambiguity warning when hook reports no ambiguity", async () => {
+  it("shows pinned account scope line when hook returns a specific account", async () => {
     mockUseApprovalsReturn = {
       ...mockUseApprovalsReturn,
       approvals: [],
@@ -332,11 +328,15 @@ describe("ApprovalListScreen", () => {
       ],
     };
 
+    mockUseStandingApprovalInstanceScope.mockReturnValue({
+      scopeLabel: "Applies to Personal",
+    });
+
     await act(async () => {
       renderer = renderList();
     });
 
     const allText = getAllText(renderer);
-    expect(allText).not.toContain("Applies to an unspecified account");
+    expect(allText).toContain("Applies to Personal");
   });
 });

@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
 import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
+import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
 import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
 import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
@@ -38,6 +39,12 @@ import {
   riskDialogAccentClass,
 } from "./RiskBadge";
 import type { ApprovalMode } from "./RecommendedTemplatesDialog";
+import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
+import {
+  connectorInstanceFromParameters,
+  mergeConnectorInstanceIntoParameters,
+  parametersWithoutConnectorInstance,
+} from "./connectorInstanceAccount";
 
 const approvalModeOptions: { label: string; value: ApprovalMode }[] = [
   { label: "Auto-approve", value: "auto_approve" },
@@ -72,12 +79,15 @@ export function AddActionConfigDialog({
   const isPending = isCreatingConfig || isCreatingStanding;
   const { templates, isLoading: templatesLoading } =
     useActionConfigTemplates(connectorId);
+  const { instances } = useAgentConnectorInstances(agentId, connectorId);
+  const showAccountSelect = instances.length > 1;
 
   const [selectedActionType, setSelectedActionType] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
+  const [connectorInstance, setConnectorInstance] = useState("*");
   const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
   const [approvalMode, setApprovalMode] = useState<ApprovalMode>("requires_approval");
 
@@ -109,6 +119,7 @@ export function AddActionConfigDialog({
     setDescription("");
     setParamValues({});
     setParamModes({});
+    setConnectorInstance("*");
     setAppliedTemplateId(null);
     setApprovalMode("requires_approval");
   }
@@ -122,6 +133,7 @@ export function AddActionConfigDialog({
     setSelectedActionType(actionType);
     setParamValues({});
     setParamModes({});
+    setConnectorInstance("*");
     setAppliedTemplateId(null);
   }
 
@@ -136,7 +148,9 @@ export function AddActionConfigDialog({
 
       const values: Record<string, string> = {};
       const modes: Record<string, ParamMode> = {};
-      for (const [key, value] of Object.entries(template.parameters)) {
+      for (const [key, value] of Object.entries(
+        parametersWithoutConnectorInstance(template.parameters),
+      )) {
         if (value === "*") {
           values[key] = "*";
           modes[key] = "wildcard";
@@ -153,6 +167,9 @@ export function AddActionConfigDialog({
       }
       setParamValues(values);
       setParamModes(modes);
+      setConnectorInstance(
+        connectorInstanceFromParameters(template.parameters),
+      );
       setAppliedTemplateId(template.id);
 
       // When selecting a new template via the picker (not from initial),
@@ -202,11 +219,17 @@ export function AddActionConfigDialog({
     }
 
     try {
-      const builtParams = buildParametersFromForm(
+      let builtParams = buildParametersFromForm(
         paramValues,
         schema?.properties,
         paramModes,
       );
+      if (showAccountSelect) {
+        builtParams = mergeConnectorInstanceIntoParameters(
+          builtParams,
+          connectorInstance,
+        );
+      }
       const ac = await createActionConfig({
         agent_id: agentId,
         connector_id: connectorId,
@@ -349,6 +372,16 @@ export function AddActionConfigDialog({
               onChange={setDescription}
               disabled={isPending}
             />
+
+            {showAccountSelect && (
+              <ConnectorInstanceAccountSelect
+                id="config-account"
+                value={connectorInstance}
+                onChange={setConnectorInstance}
+                instances={instances}
+                disabled={isPending}
+              />
+            )}
 
             {selectedAction && (
               <div className="space-y-2">

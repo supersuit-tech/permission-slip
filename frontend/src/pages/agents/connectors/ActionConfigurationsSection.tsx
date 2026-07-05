@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { useStandingApprovalsForConfigs } from "@/hooks/useStandingApprovalsForConfigs";
+import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
 import { Loader2, Plus, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -77,6 +78,8 @@ export function ActionConfigurationsSection({
     );
 
   const configIds = useMemo(() => configs.map((c) => c.id), [configs]);
+  const { instances } = useAgentConnectorInstances(agentId, connectorId);
+  const showAccountColumn = instances.length > 1;
   const {
     byConfigId: standingByConfig,
     error: standingError,
@@ -164,6 +167,11 @@ export function ActionConfigurationsSection({
                   <TableHead className="font-semibold text-primary-foreground">
                     Parameters
                   </TableHead>
+                  {showAccountColumn && (
+                    <TableHead className="font-semibold text-primary-foreground">
+                      Account
+                    </TableHead>
+                  )}
                   <TableHead className="font-semibold text-primary-foreground">
                     Status
                   </TableHead>
@@ -177,7 +185,7 @@ export function ActionConfigurationsSection({
                 {standingError && (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={showAccountColumn ? 7 : 6}
                       className="text-destructive bg-destructive/5 py-2 text-sm"
                     >
                       {standingError}
@@ -190,6 +198,8 @@ export function ActionConfigurationsSection({
                     agentId={agentId}
                     config={config}
                     actions={actions}
+                    instances={instances}
+                    showAccountColumn={showAccountColumn}
                     standingRows={standingByConfig.get(config.id) ?? []}
                     onStandingSuccess={() => {
                       void refetchStanding();

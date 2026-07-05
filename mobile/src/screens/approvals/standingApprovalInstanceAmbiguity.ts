@@ -1,6 +1,3 @@
-export const STANDING_APPROVAL_INSTANCE_AMBIGUITY_WARNING =
-  "Applies to an unspecified account";
-
 export function hasFrozenStandingApprovalInstanceDisplay(
   connectorInstanceDisplay: string | null | undefined,
 ): boolean {
@@ -10,12 +7,36 @@ export function hasFrozenStandingApprovalInstanceDisplay(
   );
 }
 
-export function shouldShowStandingApprovalInstanceAmbiguityWarning(
+export type ConnectorInstanceForScope = {
+  display?: string | null;
+};
+
+/**
+ * Returns a neutral scope label for rule-proposal approval screens.
+ * Resolution order:
+ * 1. frozen connector_instance_display → "Applies to <name>"
+ * 2. exactly one instance → "Applies to <that account's display name>"
+ * 3. otherwise → "Applies to all accounts"
+ *
+ * Returns null while instance count is still loading to avoid a flash.
+ */
+export function getStandingApprovalInstanceScopeLabel(
   connectorInstanceDisplay: string | null | undefined,
-  instanceCount: number | undefined,
-): boolean {
-  if (hasFrozenStandingApprovalInstanceDisplay(connectorInstanceDisplay)) {
-    return false;
+  instances: ConnectorInstanceForScope[],
+  instanceCountLoaded: boolean,
+): string | null {
+  if (!instanceCountLoaded) {
+    return null;
   }
-  return instanceCount !== undefined && instanceCount > 1;
+
+  if (hasFrozenStandingApprovalInstanceDisplay(connectorInstanceDisplay)) {
+    return `Applies to ${connectorInstanceDisplay!.trim()}`;
+  }
+
+  if (instances.length === 1) {
+    const display = instances[0]?.display?.trim();
+    return display ? `Applies to ${display}` : "Applies to this account";
+  }
+
+  return "Applies to all accounts";
 }

@@ -5,8 +5,13 @@ import { Button } from "@/components/ui/button";
 import { TableRow, TableCell } from "@/components/ui/table";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
+import type { AgentConnectorInstance } from "@/hooks/useAgentConnectorInstances";
 import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import { isPatternWrapper } from "@/lib/constraints";
+import {
+  parametersWithoutConnectorInstance,
+  resolveConnectorInstanceAccountLabel,
+} from "./connectorInstanceAccount";
 import {
   standingApprovalRowStatus,
   standingApprovalStatusLabel,
@@ -17,6 +22,8 @@ interface ActionConfigRowProps {
   agentId: number;
   config: ActionConfiguration;
   actions: ConnectorAction[];
+  instances: AgentConnectorInstance[];
+  showAccountColumn: boolean;
   standingRows: StandingApproval[];
   onStandingSuccess: () => void;
   onEdit: (config: ActionConfiguration) => void;
@@ -27,6 +34,8 @@ export function ActionConfigRow({
   agentId,
   config,
   actions,
+  instances,
+  showAccountColumn,
   standingRows,
   onStandingSuccess,
   onEdit,
@@ -34,7 +43,13 @@ export function ActionConfigRow({
 }: ActionConfigRowProps) {
   const action = actions.find((a) => a.action_type === config.action_type);
 
-  const paramEntries = Object.entries(config.parameters);
+  const paramEntries = Object.entries(
+    parametersWithoutConnectorInstance(config.parameters),
+  );
+  const accountLabel = resolveConnectorInstanceAccountLabel(
+    config.parameters.connector_instance,
+    instances,
+  );
   const isDisabled = config.status === "disabled";
   const [standingSheetOpen, setStandingSheetOpen] = useState(false);
   const saStatus = standingApprovalRowStatus(standingRows);
@@ -83,6 +98,11 @@ export function ActionConfigRow({
           <span className="text-muted-foreground text-xs">No parameters</span>
         )}
       </TableCell>
+      {showAccountColumn && (
+        <TableCell>
+          <span className="text-sm">{accountLabel}</span>
+        </TableCell>
+      )}
       <TableCell>
         <StatusBadge status={config.status} />
       </TableCell>

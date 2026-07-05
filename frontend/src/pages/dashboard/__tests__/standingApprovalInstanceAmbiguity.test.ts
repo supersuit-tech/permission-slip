@@ -1,17 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  getStandingApprovalInstanceScopeLabel,
   hasFrozenStandingApprovalInstanceDisplay,
-  shouldShowStandingApprovalInstanceAmbiguityWarning,
-  STANDING_APPROVAL_INSTANCE_AMBIGUITY_WARNING,
 } from "../standingApprovalInstanceAmbiguity";
 
 describe("standingApprovalInstanceAmbiguity", () => {
-  it("exports the reviewer-facing warning copy", () => {
-    expect(STANDING_APPROVAL_INSTANCE_AMBIGUITY_WARNING).toBe(
-      "Applies to an unspecified account",
-    );
-  });
-
   describe("hasFrozenStandingApprovalInstanceDisplay", () => {
     it("returns true for non-empty display strings", () => {
       expect(hasFrozenStandingApprovalInstanceDisplay("Personal")).toBe(true);
@@ -24,29 +17,39 @@ describe("standingApprovalInstanceAmbiguity", () => {
     });
   });
 
-  describe("shouldShowStandingApprovalInstanceAmbiguityWarning", () => {
-    it("hides when instance display is frozen", () => {
+  describe("getStandingApprovalInstanceScopeLabel", () => {
+    it("returns null while instance count is still loading", () => {
       expect(
-        shouldShowStandingApprovalInstanceAmbiguityWarning("Personal", 3),
-      ).toBe(false);
+        getStandingApprovalInstanceScopeLabel(null, [], false),
+      ).toBeNull();
     });
 
-    it("shows when display is absent and multiple instances exist", () => {
-      expect(shouldShowStandingApprovalInstanceAmbiguityWarning(null, 2)).toBe(
-        true,
-      );
-    });
-
-    it("hides for a single instance", () => {
-      expect(shouldShowStandingApprovalInstanceAmbiguityWarning(null, 1)).toBe(
-        false,
-      );
-    });
-
-    it("hides while instance count is still loading", () => {
+    it("uses frozen connector_instance_display when present", () => {
       expect(
-        shouldShowStandingApprovalInstanceAmbiguityWarning(null, undefined),
-      ).toBe(false);
+        getStandingApprovalInstanceScopeLabel("Personal", [{ display: "Work" }], true),
+      ).toBe("Applies to Personal");
+    });
+
+    it("uses the single instance display name when only one exists", () => {
+      expect(
+        getStandingApprovalInstanceScopeLabel(null, [{ display: "Personal" }], true),
+      ).toBe("Applies to Personal");
+    });
+
+    it("falls back for a single instance without display", () => {
+      expect(
+        getStandingApprovalInstanceScopeLabel(null, [{}], true),
+      ).toBe("Applies to this account");
+    });
+
+    it("shows all accounts when multiple instances exist and display is absent", () => {
+      expect(
+        getStandingApprovalInstanceScopeLabel(
+          null,
+          [{ display: "Personal" }, { display: "Work" }],
+          true,
+        ),
+      ).toBe("Applies to all accounts");
     });
   });
 });

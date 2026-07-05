@@ -1,22 +1,21 @@
 import { StyleSheet, Text, View } from "react-native";
 import { colors } from "../../theme/colors";
-import { STANDING_APPROVAL_INSTANCE_AMBIGUITY_WARNING } from "./standingApprovalInstanceAmbiguity";
 
-interface StandingApprovalInstanceAmbiguityWarningProps {
+interface StandingApprovalInstanceScopeLineProps {
+  label: string;
   compact?: boolean;
 }
 
-export function StandingApprovalInstanceAmbiguityWarning({
+export function StandingApprovalInstanceScopeLine({
+  label,
   compact = false,
-}: StandingApprovalInstanceAmbiguityWarningProps) {
+}: StandingApprovalInstanceScopeLineProps) {
   return (
     <View
       style={[styles.box, compact && styles.boxCompact]}
-      accessibilityRole="alert"
+      accessibilityRole="text"
     >
-      <Text style={[styles.text, compact && styles.textCompact]}>
-        {STANDING_APPROVAL_INSTANCE_AMBIGUITY_WARNING}
-      </Text>
+      <Text style={[styles.text, compact && styles.textCompact]}>{label}</Text>
     </View>
   );
 }
@@ -28,8 +27,8 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.pendingBg,
-    backgroundColor: colors.riskMediumBg,
+    borderColor: colors.gray200,
+    backgroundColor: colors.gray50,
   },
   boxCompact: {
     marginTop: 6,
@@ -38,7 +37,7 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 13,
     lineHeight: 18,
-    color: colors.pendingText,
+    color: colors.gray500,
   },
   textCompact: {
     fontSize: 12,

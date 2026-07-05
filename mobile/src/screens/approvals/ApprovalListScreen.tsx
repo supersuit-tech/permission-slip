@@ -23,7 +23,7 @@ import {
   useStandingApprovalRequests,
   type StandingApprovalRequestSummary,
 } from "../../hooks/useStandingApprovalRequests";
-import { useStandingApprovalInstanceAmbiguityWarning } from "../../hooks/useStandingApprovalInstanceAmbiguityWarning";
+import { useStandingApprovalInstanceScope } from "../../hooks/useStandingApprovalInstanceScope";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
 import { useActionSchema } from "../../hooks/useActionSchema";
 import { useStandingApprovalConnectorLabel } from "../../hooks/useStandingApprovalConnectorLabel";
@@ -32,7 +32,7 @@ import { buildActionSummary, humanizeActionType, safeParams, isExpired as checkE
 import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
 import { BrandBadge } from "../../components/BrandBadge";
-import { StandingApprovalInstanceAmbiguityWarning } from "./StandingApprovalInstanceAmbiguityWarning";
+import { StandingApprovalInstanceScopeLine } from "./StandingApprovalInstanceScopeLine";
 
 type StatusTab = "pending" | "approved" | "denied";
 
@@ -316,8 +316,7 @@ const RuleProposalRow = memo(function RuleProposalRow({
   onPress: () => void;
 }) {
   const { connectorLabel } = useStandingApprovalConnectorLabel(request);
-  const { showWarning: showInstanceAmbiguityWarning } =
-    useStandingApprovalInstanceAmbiguityWarning(request);
+  const { scopeLabel } = useStandingApprovalInstanceScope(request);
 
   return (
     <TouchableOpacity style={styles.ruleRow} onPress={onPress} accessibilityRole="button">
@@ -328,8 +327,8 @@ const RuleProposalRow = memo(function RuleProposalRow({
       <Text style={styles.rowSubtitle}>
         {connectorLabel} · {agentName}
       </Text>
-      {showInstanceAmbiguityWarning && (
-        <StandingApprovalInstanceAmbiguityWarning compact />
+      {scopeLabel && (
+        <StandingApprovalInstanceScopeLine label={scopeLabel} compact />
       )}
     </TouchableOpacity>
   );

@@ -1,6 +1,6 @@
 import {
+  getStandingApprovalInstanceScopeLabel,
   hasFrozenStandingApprovalInstanceDisplay,
-  shouldShowStandingApprovalInstanceAmbiguityWarning,
 } from "../standingApprovalInstanceAmbiguity";
 
 describe("standingApprovalInstanceAmbiguity", () => {
@@ -15,26 +15,31 @@ describe("standingApprovalInstanceAmbiguity", () => {
     });
   });
 
-  describe("shouldShowStandingApprovalInstanceAmbiguityWarning", () => {
-    it("shows when display is absent and multiple instances exist", () => {
-      expect(shouldShowStandingApprovalInstanceAmbiguityWarning(undefined, 2)).toBe(
-        true,
-      );
+  describe("getStandingApprovalInstanceScopeLabel", () => {
+    it("returns null while loading", () => {
+      expect(getStandingApprovalInstanceScopeLabel(undefined, [], false)).toBeNull();
     });
 
-    it("hides when display is present", () => {
+    it("uses frozen display when present", () => {
       expect(
-        shouldShowStandingApprovalInstanceAmbiguityWarning("Personal", 2),
-      ).toBe(false);
+        getStandingApprovalInstanceScopeLabel("Personal", [{ display: "Work" }], true),
+      ).toBe("Applies to Personal");
     });
 
-    it("hides for one or zero instances", () => {
-      expect(shouldShowStandingApprovalInstanceAmbiguityWarning(null, 1)).toBe(
-        false,
-      );
-      expect(shouldShowStandingApprovalInstanceAmbiguityWarning(null, 0)).toBe(
-        false,
-      );
+    it("uses single instance display when only one exists", () => {
+      expect(
+        getStandingApprovalInstanceScopeLabel(null, [{ display: "Personal" }], true),
+      ).toBe("Applies to Personal");
+    });
+
+    it("shows all accounts for multiple instances without frozen display", () => {
+      expect(
+        getStandingApprovalInstanceScopeLabel(
+          undefined,
+          [{ display: "Personal" }, { display: "Work" }],
+          true,
+        ),
+      ).toBe("Applies to all accounts");
     });
   });
 });
