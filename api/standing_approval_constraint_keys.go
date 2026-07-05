@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
@@ -91,7 +92,7 @@ func validateStandingApprovalConstraintKeys(
 		}
 		if schemaKeys != nil {
 			if _, ok := schemaKeys[key]; !ok {
-				return fmt.Errorf("constraint key %q is not a parameter on action %q", key, actionType)
+				return formatUnknownConstraintKeyError(key, actionType, metaFields)
 			}
 		}
 	}
@@ -154,6 +155,21 @@ func mergePropertyKeys(propsJSON json.RawMessage, keys map[string]struct{}) erro
 }
 
 func connectorMetaConstraintFields(registry *connectors.Registry, actionType string) (map[string]struct{}, bool) {
+	fields, ok := actionMetaConstraintFieldList(registry, actionType)
+	if !ok {
+		return nil, false
+	}
+	out := make(map[string]struct{}, len(fields))
+	for _, field := range fields {
+		out[field] = struct{}{}
+	}
+	return out, true
+}
+
+func actionMetaConstraintFieldList(registry *connectors.Registry, actionType string) ([]string, bool) {
+	if registry == nil {
+		return nil, false
+	}
 	parts := strings.SplitN(actionType, ".", 2)
 	if len(parts) != 2 {
 		return nil, false
@@ -167,12 +183,22 @@ func connectorMetaConstraintFields(registry *connectors.Registry, actionType str
 		return nil, false
 	}
 	fields, supported := capabilities.ConstraintMetadataActionSupport(actionType)
-	if !supported {
+	if !supported || len(fields) == 0 {
 		return nil, false
 	}
-	out := make(map[string]struct{}, len(fields))
-	for _, field := range fields {
-		out[field] = struct{}{}
-	}
+	out := append([]string(nil), fields...)
+	sort.Strings(out)
 	return out, true
+}
+
+func formatUnknownConstraintKeyError(key, actionType string, metaFields map[string]struct{}) error {
+	if metaFields != nil {
+		if _, ok := metaFields[key]; ok {
+			return fmt.Errorf(
+				`constraint key %q is not a parameter on action %q; did you mean a verified metadata constraint? Use {"$meta":{%q:...}}`,
+				key, actionType, key,
+			)
+		}
+	}
+	return fmt.Errorf("constraint key %q is not a parameter on action %q", key, actionType)
 }

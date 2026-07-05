@@ -1189,10 +1189,11 @@ paths:
         3. **Which need user setup** → `credentials_ready: false` + `credentials_setup_url`
         4. **What actions exist** → `connectors[].actions[]`
         5. **What parameters each action expects** → `parameters_schema`
-        6. **What configurations are available** → `action_configurations[]` with `configuration_id`
-        7. **Which actions can execute immediately** → `standing_approvals` is non-empty
-        8. **Which need one-off approval** → `standing_approvals` is empty
-        9. **What constraints apply** → `standing_approvals[].constraints`
+        6. **Which verified metadata fields support standing approval `$meta` constraints** → `meta_constraint_fields` (when present)
+        7. **What configurations are available** → `action_configurations[]` with `configuration_id`
+        8. **Which actions can execute immediately** → `standing_approvals` is non-empty
+        9. **Which need one-off approval** → `standing_approvals` is empty
+        10. **What constraints apply** → `standing_approvals[].constraints`
 
         ## Authorization Flow Decision
 
@@ -9734,6 +9735,22 @@ components:
                 maxLength: 998
               body:
                 type: string
+        meta_constraint_fields:
+          type: array
+          items:
+            type: string
+          description: |
+            Verified metadata fields supported in standing approval `$meta` constraints
+            for this action (e.g. `from`, `to`, `cc`, `bcc`). Values are checked against
+            server-fetched envelope data, not agent-supplied parameters. Omitted when the
+            action does not support `$meta` constraints.
+          example:
+            - from
+            - sender
+            - senders
+            - to
+            - cc
+            - bcc
         standing_approvals:
           type: array
           items:

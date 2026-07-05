@@ -688,7 +688,7 @@ After registration, agents need to know what they can do on behalf of their user
 
 ### GET /v1/agents/{agent_id}/capabilities
 
-Returns everything the agent needs to know: enabled connectors, available actions with full parameter schemas, active standing approvals, and credential readiness.
+Returns everything the agent needs to know: enabled connectors, available actions with full parameter schemas, supported `$meta` constraint fields (when applicable), active standing approvals, and credential readiness.
 
 This is the primary discovery endpoint for agents. Unlike `GET /v1/connectors` (which returns the global catalog), this endpoint returns only what's relevant to the authenticated agent — connectors the user has enabled, actions the agent can perform, and which actions can execute immediately via standing approval.
 

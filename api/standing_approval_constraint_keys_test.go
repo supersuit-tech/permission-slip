@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
@@ -23,6 +24,29 @@ func TestValidateStandingApprovalConstraintKeys_RejectsUnknownParam(t *testing.T
 	err := validateStandingApprovalConstraintKeys(context.Background(), tx, nil, "protonmail.read_email", constraints)
 	if err == nil {
 		t.Fatal("expected unknown param rejection")
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_SuggestsMetaForKnownField(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"folder":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(protonmail.New())
+
+	constraints := []byte(`{"from":"alice@example.com","message_id":"*"}`)
+	err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "protonmail.read_email", constraints)
+	if err == nil {
+		t.Fatal("expected top-level from rejection")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, `$meta`) || !strings.Contains(msg, "verified metadata constraint") {
+		t.Fatalf("expected $meta hint, got: %s", msg)
 	}
 }
 

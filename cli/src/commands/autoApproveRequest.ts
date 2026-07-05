@@ -17,7 +17,7 @@ export function autoApproveRequestCommand(program: Command): void {
     .command("request")
     .description("Request creation of a new auto-approve rule (requires approval in web or mobile)")
     .requiredOption("--action-type <type>", "Action type (e.g. email.send)")
-    .requiredOption("--constraints <json>", "Constraints JSON object")
+    .requiredOption("--constraints <json>", "Constraints JSON (use $meta for verified sender/recipient rules on supported actions)")
     .option("--action-version <version>", "Action version (digits only)", "1")
     .option("--source-action-configuration-id <id>", "Backing action configuration ID")
     .option("--server <url>", "Permission Slip server URL")
