@@ -11,6 +11,8 @@ import (
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
+const standingApprovalScopeTestConstraints = `{"scope":"test-scope","ping":"*"}`
+
 func setupActionConfigScopeTest(t *testing.T) (db.DBTX, *Deps, http.Handler, int64, string, string, string, *db.AgentConnectorInstance, *db.AgentConnectorInstance) {
 	t.Helper()
 	tx := testhelper.SetupTestDB(t)
@@ -56,7 +58,7 @@ func TestUpdateStandingApproval_ScopeOmittedPreserves(t *testing.T) {
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
 		ActionType:                  actionType,
 		SourceActionConfigurationID: &configID,
-		Constraints:                 []byte(`{"ping":"*"}`),
+		Constraints:                 []byte(standingApprovalScopeTestConstraints),
 	})
 
 	if _, err := tx.Exec(context.Background(),
@@ -66,7 +68,7 @@ func TestUpdateStandingApproval_ScopeOmittedPreserves(t *testing.T) {
 		t.Fatalf("seed connector_instance_id: %v", err)
 	}
 
-	body := `{"constraints":{"ping":"*"},"expires_at":null}`
+	body := `{"constraints":` + standingApprovalScopeTestConstraints + `,"expires_at":null}`
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/update", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -95,7 +97,7 @@ func TestUpdateStandingApproval_ScopeNullSetsAllAccounts(t *testing.T) {
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
 		ActionType:                  actionType,
 		SourceActionConfigurationID: &configID,
-		Constraints:                 []byte(`{"ping":"*"}`),
+		Constraints:                 []byte(standingApprovalScopeTestConstraints),
 	})
 	if _, err := tx.Exec(context.Background(),
 		`UPDATE standing_approvals SET connector_instance_id = $1 WHERE standing_approval_id = $2`,
@@ -104,7 +106,7 @@ func TestUpdateStandingApproval_ScopeNullSetsAllAccounts(t *testing.T) {
 		t.Fatalf("seed connector_instance_id: %v", err)
 	}
 
-	body := `{"constraints":{"ping":"*"},"connector_instance_id":null}`
+	body := `{"constraints":` + standingApprovalScopeTestConstraints + `,"connector_instance_id":null}`
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/update", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -132,10 +134,10 @@ func TestUpdateStandingApproval_ScopeToSpecificInstance(t *testing.T) {
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
 		ActionType:                  actionType,
 		SourceActionConfigurationID: &configID,
-		Constraints:                 []byte(`{"ping":"*"}`),
+		Constraints:                 []byte(standingApprovalScopeTestConstraints),
 	})
 
-	body := `{"constraints":{"ping":"*"},"connector_instance_id":"` + instOther.ConnectorInstanceID + `"}`
+	body := `{"constraints":` + standingApprovalScopeTestConstraints + `,"connector_instance_id":"` + instOther.ConnectorInstanceID + `"}`
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/"+saID+"/update", uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -167,7 +169,7 @@ func TestUpdateActionConfig_PropagatesScopeToLinkedStandingApproval(t *testing.T
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
 		ActionType:                  actionType,
 		SourceActionConfigurationID: &configID,
-		Constraints:                 []byte(`{"ping":"*"}`),
+		Constraints:                 []byte(standingApprovalScopeTestConstraints),
 	})
 
 	newParams, _ := json.Marshal(map[string]string{
