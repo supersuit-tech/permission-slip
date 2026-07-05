@@ -94,6 +94,9 @@ describe("ActionConfigurationsSection", () => {
       if (url === "/v1/action-config-templates") {
         return Promise.resolve({ data: { data: [] } });
       }
+      if (url === "/v1/agents/{agent_id}/connectors/{connector_id}/instances") {
+        return Promise.resolve({ data: { data: [] } });
+      }
       return Promise.resolve({ data: null });
     });
   });
@@ -144,6 +147,57 @@ describe("ActionConfigurationsSection", () => {
     // Wildcard params show *
     const wildcardBadges = screen.getAllByText("*");
     expect(wildcardBadges.length).toBe(2); // title and body
+  });
+
+  it("shows account column when multiple connector instances exist", async () => {
+    mockGet.mockImplementation((url: string) => {
+      if (url === "/v1/action-config-templates") {
+        return Promise.resolve({ data: { data: [] } });
+      }
+      if (url === "/v1/agents/{agent_id}/connectors/{connector_id}/instances") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                connector_instance_id: "11111111-1111-1111-1111-111111111111",
+                agent_id: 42,
+                connector_id: "github",
+                display: "Personal",
+                is_default: true,
+                enabled_at: "2026-01-01T00:00:00Z",
+              },
+              {
+                connector_instance_id: "22222222-2222-2222-2222-222222222222",
+                agent_id: 42,
+                connector_id: "github",
+                display: "Work",
+                is_default: false,
+                enabled_at: "2026-01-02T00:00:00Z",
+              },
+            ],
+          },
+        });
+      }
+      return Promise.resolve({ data: null });
+    });
+
+    const multiAccountConfig: ActionConfiguration[] = [
+      {
+        ...mockConfigs[0]!,
+        parameters: {
+          ...mockConfigs[0]!.parameters,
+          connector_instance: "11111111-1111-1111-1111-111111111111",
+        },
+      },
+    ];
+
+    renderSection({ configs: multiAccountConfig });
+
+    await waitFor(() => {
+      expect(screen.getByText("Account")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Personal")).toBeInTheDocument();
+    expect(screen.queryByText("connector_instance:")).not.toBeInTheDocument();
   });
 
   it("shows Add Configuration button when configs exist", () => {

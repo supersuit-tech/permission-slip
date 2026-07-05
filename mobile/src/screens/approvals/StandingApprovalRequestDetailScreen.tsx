@@ -14,11 +14,11 @@ import { useAgents, getAgentDisplayName, type AgentSummary } from "../../hooks/u
 import { useApproveStandingApprovalRequest } from "../../hooks/useApproveStandingApprovalRequest";
 import { useDenyStandingApprovalRequest } from "../../hooks/useDenyStandingApprovalRequest";
 import { useStandingApprovalConnectorLabel } from "../../hooks/useStandingApprovalConnectorLabel";
-import { useStandingApprovalInstanceAmbiguityWarning } from "../../hooks/useStandingApprovalInstanceAmbiguityWarning";
+import { useStandingApprovalInstanceScope } from "../../hooks/useStandingApprovalInstanceScope";
 import { colors } from "../../theme/colors";
 import { humanizeActionType } from "./approvalUtils";
 import { formatStandingApprovalConstraintsText } from "./formatStandingApprovalConstraints";
-import { StandingApprovalInstanceAmbiguityWarning } from "./StandingApprovalInstanceAmbiguityWarning";
+import { StandingApprovalInstanceScopeLine } from "./StandingApprovalInstanceScopeLine";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -38,8 +38,7 @@ export default function StandingApprovalRequestDetailScreen({
   const agent = agents.find((a: AgentSummary) => a.agent_id === request.agent_id);
   const agentName = agent ? getAgentDisplayName(agent) : `Agent ${request.agent_id}`;
   const { connectorLabel } = useStandingApprovalConnectorLabel(request);
-  const { showWarning: showInstanceAmbiguityWarning } =
-    useStandingApprovalInstanceAmbiguityWarning(request);
+  const { scopeLabel } = useStandingApprovalInstanceScope(request);
 
   const constraintsText =
     request.constraints && typeof request.constraints === "object"
@@ -82,7 +81,7 @@ export default function StandingApprovalRequestDetailScreen({
         {connectorLabel} · From {agentName}
       </Text>
 
-      {showInstanceAmbiguityWarning && <StandingApprovalInstanceAmbiguityWarning />}
+      {scopeLabel && <StandingApprovalInstanceScopeLine label={scopeLabel} />}
 
       <Text style={styles.sectionLabel}>Constraints</Text>
       <Text style={styles.mono}>{constraintsText}</Text>

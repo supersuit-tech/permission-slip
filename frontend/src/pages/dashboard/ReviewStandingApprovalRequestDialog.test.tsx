@@ -34,21 +34,18 @@ vi.mock("@/hooks/useActionSchema", () => ({
   }),
 }));
 
-const mockUseStandingApprovalInstanceAmbiguityWarning = vi.fn(() => ({
-  showWarning: false,
-  warningMessage: "Applies to an unspecified account",
+const mockUseStandingApprovalInstanceScope = vi.fn(() => ({
+  scopeLabel: "Applies to all accounts",
 }));
 
-vi.mock("@/hooks/useStandingApprovalInstanceAmbiguityWarning", () => ({
-  useStandingApprovalInstanceAmbiguityWarning: () =>
-    mockUseStandingApprovalInstanceAmbiguityWarning(),
+vi.mock("@/hooks/useStandingApprovalInstanceScope", () => ({
+  useStandingApprovalInstanceScope: () => mockUseStandingApprovalInstanceScope(),
 }));
 
 describe("ReviewStandingApprovalRequestDialog", () => {
   beforeEach(() => {
-    mockUseStandingApprovalInstanceAmbiguityWarning.mockReturnValue({
-      showWarning: false,
-      warningMessage: "Applies to an unspecified account",
+    mockUseStandingApprovalInstanceScope.mockReturnValue({
+      scopeLabel: "Applies to all accounts",
     });
   });
   it("shows rule proposal badge, connector name, and action type", () => {
@@ -79,10 +76,9 @@ describe("ReviewStandingApprovalRequestDialog", () => {
     expect(screen.getByRole("button", { name: /Approve rule/i })).toBeInTheDocument();
   });
 
-  it("shows ambiguity warning when instance is unspecified on a multi-instance connector", () => {
-    mockUseStandingApprovalInstanceAmbiguityWarning.mockReturnValue({
-      showWarning: true,
-      warningMessage: "Applies to an unspecified account",
+  it("shows scope line for multi-account connectors", () => {
+    mockUseStandingApprovalInstanceScope.mockReturnValue({
+      scopeLabel: "Applies to all accounts",
     });
 
     render(
@@ -105,15 +101,12 @@ describe("ReviewStandingApprovalRequestDialog", () => {
       />,
     );
 
-    expect(
-      screen.getByText("Applies to an unspecified account"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Applies to all accounts")).toBeInTheDocument();
   });
 
-  it("hides ambiguity warning when instance display is frozen", () => {
-    mockUseStandingApprovalInstanceAmbiguityWarning.mockReturnValue({
-      showWarning: false,
-      warningMessage: "Applies to an unspecified account",
+  it("shows pinned account scope line when instance display is frozen", () => {
+    mockUseStandingApprovalInstanceScope.mockReturnValue({
+      scopeLabel: "Applies to Personal",
     });
 
     render(
@@ -137,9 +130,7 @@ describe("ReviewStandingApprovalRequestDialog", () => {
       />,
     );
 
-    expect(
-      screen.queryByText("Applies to an unspecified account"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByText("Applies to Personal")).toBeInTheDocument();
   });
 
   it("shows API error message when approve fails", async () => {

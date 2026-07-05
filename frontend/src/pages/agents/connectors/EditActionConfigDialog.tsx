@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { useUpdateActionConfig } from "@/hooks/useUpdateActionConfig";
+import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
 import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import {
@@ -27,6 +28,12 @@ import {
   isPatternWrapper,
   type ParamMode,
 } from "./ActionConfigFormFields";
+import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
+import {
+  connectorInstanceFromParameters,
+  mergeConnectorInstanceIntoParameters,
+  parametersWithoutConnectorInstance,
+} from "./connectorInstanceAccount";
 
 interface EditActionConfigDialogProps {
   open: boolean;
@@ -46,6 +53,8 @@ export function EditActionConfigDialog({
   actions,
 }: EditActionConfigDialogProps) {
   const { updateActionConfig, isPending } = useUpdateActionConfig();
+  const { instances } = useAgentConnectorInstances(agentId, connectorId);
+  const showAccountSelect = instances.length > 1;
 
   // No useEffect needed to sync state: the parent conditionally renders this
   // component (`{editTarget && <EditActionConfigDialog>}`), so it always
@@ -54,10 +63,13 @@ export function EditActionConfigDialog({
   const [description, setDescription] = useState(config.description ?? "");
   const [status, setStatus] = useState<"active" | "disabled">(config.status);
   const [paramValues, setParamValues] = useState<Record<string, string>>(() =>
-    toStringRecord(config.parameters),
+    toStringRecord(parametersWithoutConnectorInstance(config.parameters)),
   );
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>(() =>
-    inferModesFromConfig(config.parameters),
+    inferModesFromConfig(parametersWithoutConnectorInstance(config.parameters)),
+  );
+  const [connectorInstance, setConnectorInstance] = useState(() =>
+    connectorInstanceFromParameters(config.parameters),
   );
 
   const action = useMemo(
@@ -94,6 +106,17 @@ export function EditActionConfigDialog({
     }
 
     try {
+      let parameters = buildParametersFromForm(
+        paramValues,
+        schema?.properties,
+        paramModes,
+      );
+      if (showAccountSelect) {
+        parameters = mergeConnectorInstanceIntoParameters(
+          parameters,
+          connectorInstance,
+        );
+      }
       await updateActionConfig({
         configId: config.id,
         agentId,
@@ -101,7 +124,7 @@ export function EditActionConfigDialog({
           name: name.trim(),
           description: description.trim() || null,
           status,
-          parameters: buildParametersFromForm(paramValues, schema?.properties, paramModes),
+          parameters,
         },
       });
       toast.success(`Configuration "${name.trim()}" updated`);
@@ -160,6 +183,16 @@ export function EditActionConfigDialog({
               onChange={setStatus}
               disabled={isPending}
             />
+
+            {showAccountSelect && (
+              <ConnectorInstanceAccountSelect
+                id="edit-config-account"
+                value={connectorInstance}
+                onChange={setConnectorInstance}
+                instances={instances}
+                disabled={isPending}
+              />
+            )}
 
             {action ? (
               <div className="space-y-2">
