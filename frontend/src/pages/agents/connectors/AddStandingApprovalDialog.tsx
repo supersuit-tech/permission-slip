@@ -18,7 +18,7 @@ import {
   ConstraintScenariosEditor,
   ensureScenarioFieldRows,
 } from "./ConstraintScenariosEditor";
-import { parseParametersSchema } from "./ConstraintParameterFields";
+import { parseParametersSchema } from "@/lib/parameterSchema";
 import {
   ActionSelect,
   NameField,
