@@ -18,11 +18,14 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
+    "postinstall": "npm run build --prefix ../shared/constraints",
+    "prebuild": "npm run build --prefix ../shared/constraints",
     "test": "node --experimental-vm-modules node_modules/.bin/jest --passWithNoTests",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
+    "@permission-slip/constraints-format": "file:../shared/constraints",
     "commander": "^14.0.3"
   },
   "devDependencies": {
@@ -38,7 +41,8 @@
     "globalSetup": "<rootDir>/tests/setup.ts",
     "globalTeardown": "<rootDir>/tests/teardown.ts",
     "moduleNameMapper": {
-      "^(\\.{1,2}/.*)\\.js$": "$1"
+      "^(\\.{1,2}/.*)\\.js$": "$1",
+      "^@permission-slip/constraints-format$": "<rootDir>/../shared/constraints/dist/index.js"
     },
     "transform": {
       "^.+\\.tsx?$": [

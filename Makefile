@@ -15,6 +15,7 @@
 
 # Install all dependencies (frontend + backend + mobile + cli)
 install:
+	cd shared/constraints && npm install
 	cd frontend && npm install
 	cd mobile && npm install
 	cd cli && npm install
@@ -121,7 +122,7 @@ redeploy:
 
 # ---------- Testing ----------
 
-test: test-backend test-frontend mobile-test cli-test
+test: test-backend test-frontend mobile-test shared-constraints-test cli-test
 
 test-backend:
 	go test ./...
@@ -239,6 +240,7 @@ install-connectors:
 
 # Install CLI dependencies
 cli-install:
+	cd shared/constraints && npm install
 	cd cli && npm install
 
 # Build the CLI (TypeScript → dist/)
@@ -246,8 +248,17 @@ cli-build: cli-install
 	cd cli && npm run build
 
 # Run CLI tests
-cli-test: cli-install
+cli-test: cli-install shared-constraints-build
 	cd cli && npm test
+
+shared-constraints-install:
+	cd shared/constraints && npm install
+
+shared-constraints-build: shared-constraints-install
+	cd shared/constraints && npm run build
+
+shared-constraints-test: shared-constraints-build
+	cd shared/constraints && npm test
 
 # Shorthand: install + build + test
 cli: cli-build cli-test

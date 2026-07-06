@@ -8,7 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "generate:api": "openapi-typescript ../spec/openapi/openapi.bundle.yaml -o src/api/schema.d.ts",
-    "postinstall": "npm run generate:api && cp ../shared/validation.json src/lib/validation.json",
+    "postinstall": "npm run build --prefix ../shared/constraints && npm run generate:api && cp ../shared/validation.json src/lib/validation.json",
     "test": "jest",
     "eas-build:dev": "npx eas-cli@latest build --profile development --platform all",
     "eas-build:preview": "npx eas-cli@latest build --profile preview --platform all",
@@ -18,11 +18,18 @@
   },
   "jest": {
     "preset": "jest-expo",
+    "moduleNameMapper": {
+      "^@permission-slip/constraints-format$": "<rootDir>/node_modules/@permission-slip/constraints-format/dist/index.js"
+    },
     "transformIgnorePatterns": [
+      "shared/constraints/dist",
+      "node_modules/@permission-slip/constraints-format",
       "node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|react-native-url-polyfill)"
     ]
   },
   "dependencies": {
+    "@babel/runtime": "^7.28.4",
+    "@permission-slip/constraints-format": "file:../shared/constraints",
     "@react-navigation/native": "^7.2.2",
     "@react-navigation/native-stack": "^7.14.2",
     "@tanstack/react-query": "^5.90.21",
@@ -33,9 +40,9 @@
     "expo-linking": "^55.0.7",
     "expo-local-authentication": "^55.0.13",
     "expo-notifications": "^55.0.10",
-    "expo-updates": "^55.0.21",
     "expo-secure-store": "^55.0.8",
     "expo-status-bar": "~55.0.4",
+    "expo-updates": "^55.0.21",
     "openapi-fetch": "^0.17.0",
     "react": "19.2.0",
     "react-native": "0.83.2",
@@ -47,10 +54,10 @@
     "@types/jest": "^30.0.0",
     "@types/react": "~19.2.2",
     "@types/react-test-renderer": "^19.1.0",
-"jest-expo": "^55.0.9",
+    "jest-expo": "^55.0.9",
     "openapi-typescript": "^7.13.0",
     "react-test-renderer": "^19.2.0",
     "typescript": "~5.9.2"
   },
-"private": true
+  "private": true
 }
