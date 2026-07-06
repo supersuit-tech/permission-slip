@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setupAuthMocks } from "../../../../auth/__tests__/fixtures";
 import { renderWithProviders } from "../../../../test-helpers";
@@ -16,6 +16,7 @@ const actions: ConnectorAction[] = [
     name: "Create Issue",
     description: "Create a new issue",
     risk_level: "low",
+    requires_payment_method: false,
     parameters_schema: {
       type: "object",
       required: ["repo"],

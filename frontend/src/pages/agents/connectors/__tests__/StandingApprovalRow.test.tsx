@@ -15,6 +15,7 @@ const actions: ConnectorAction[] = [
     name: "Create Issue",
     description: "Create a new issue",
     risk_level: "low",
+    requires_payment_method: false,
     parameters_schema: { type: "object", properties: {} },
   },
 ];
