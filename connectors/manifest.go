@@ -18,15 +18,16 @@ import (
 // required credentials, and optional configuration templates so the server can
 // register and seed DB rows automatically on startup.
 type ConnectorManifest struct {
-	ID                  string                  `json:"id"`
-	Name                string                  `json:"name"`
-	Description         string                  `json:"description"`
-	Status              string                  `json:"status,omitempty"`
-	LogoSVG             string                  `json:"logo_svg,omitempty"`
-	Actions             []ManifestAction        `json:"actions"`
-	RequiredCredentials []ManifestCredential    `json:"required_credentials"`
-	Templates           []ManifestTemplate      `json:"templates,omitempty"`
-	OAuthProviders      []ManifestOAuthProvider `json:"oauth_providers,omitempty"`
+	ID                  string               `json:"id"`
+	Name                string               `json:"name"`
+	Description         string               `json:"description"`
+	Status              string               `json:"status,omitempty"`
+	LogoSVG             string               `json:"logo_svg,omitempty"`
+	Actions             []ManifestAction     `json:"actions"`
+	RequiredCredentials []ManifestCredential `json:"required_credentials"`
+	// Templates are defined in manifests but not synced to the DB while the feature is disabled; see issue #1436.
+	Templates      []ManifestTemplate      `json:"templates,omitempty"`
+	OAuthProviders []ManifestOAuthProvider `json:"oauth_providers,omitempty"`
 }
 
 // ManifestAction describes a single action exposed by an external connector.
@@ -105,6 +106,8 @@ type ManifestStandingApproval struct {
 // a standing approval. Only templates with standing_approval (or duration_days) are
 // synced to the database — requires-approval-only legacy templates are ignored.
 // ID must be globally unique.
+//
+// Currently not synced to the database while the feature is disabled; see issue #1436.
 type ManifestTemplate struct {
 	ID               string                    `json:"id"`
 	ActionType       string                    `json:"action_type"`

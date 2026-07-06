@@ -18,16 +18,12 @@ import {
   useStandingApprovals,
   type StandingApproval,
 } from "@/hooks/useStandingApprovals";
-import { useStandingApprovalTemplates } from "@/hooks/useStandingApprovalTemplates";
-import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
 import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import { StandingApprovalRow } from "./StandingApprovalRow";
 import { AddStandingApprovalDialog } from "./AddStandingApprovalDialog";
 import { EditStandingApprovalDialog } from "./EditStandingApprovalDialog";
 import { RevokeStandingApprovalDialog } from "./RevokeStandingApprovalDialog";
-import { RecommendedTemplatesDialog } from "./RecommendedTemplatesDialog";
-import { templateIsApplied } from "./templateMatching";
 
 interface StandingApprovalsSectionProps {
   agentId: number;
@@ -42,9 +38,6 @@ export function StandingApprovalsSection({
   actions,
 }: StandingApprovalsSectionProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
-  const [initialTemplateForAdd, setInitialTemplateForAdd] =
-    useState<StandingApprovalTemplate | null>(null);
-  const [recommendedDialogOpen, setRecommendedDialogOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<StandingApproval | null>(null);
   const [revokeTarget, setRevokeTarget] = useState<StandingApproval | null>(
     null,
@@ -56,9 +49,6 @@ export function StandingApprovalsSection({
     error,
     refetch,
   } = useStandingApprovals({ status: "all" });
-
-  const { templates, isLoading: templatesLoading } =
-    useStandingApprovalTemplates(connectorId);
 
   const actionTypeSet = useMemo(
     () => new Set(actions.map((a) => a.action_type)),
@@ -76,33 +66,8 @@ export function StandingApprovalsSection({
     [standingApprovals, agentId, actionTypeSet],
   );
 
-  const activeRules = useMemo(
-    () => connectorRules.filter((sa) => sa.status === "active"),
-    [connectorRules],
-  );
-
-  const hasRecommendedTemplates =
-    !templatesLoading &&
-    templates.some(
-      (t) =>
-        actionTypeSet.has(t.action_type) &&
-        !templateIsApplied(t, activeRules),
-    );
-
   const { instances } = useAgentConnectorInstances(agentId, connectorId);
   const showAccountColumn = instances.length >= 1;
-
-  function openAddDialog(fromTemplate?: StandingApprovalTemplate | null) {
-    setInitialTemplateForAdd(fromTemplate ?? null);
-    setAddDialogOpen(true);
-  }
-
-  function handleAddDialogOpenChange(open: boolean) {
-    if (!open) {
-      setInitialTemplateForAdd(null);
-    }
-    setAddDialogOpen(open);
-  }
 
   return (
     <Card>
@@ -113,23 +78,11 @@ export function StandingApprovalsSection({
         </div>
         {connectorRules.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-            {hasRecommendedTemplates && (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="shrink-0"
-                onClick={() => setRecommendedDialogOpen(true)}
-                disabled={actions.length === 0}
-              >
-                Recommended Templates
-              </Button>
-            )}
             <Button
               type="button"
               size="sm"
               className="shrink-0"
-              onClick={() => openAddDialog()}
+              onClick={() => setAddDialogOpen(true)}
               disabled={actions.length === 0}
             >
               <Plus className="size-4" />
@@ -150,11 +103,7 @@ export function StandingApprovalsSection({
           <p className="text-destructive text-sm">{error}</p>
         ) : connectorRules.length === 0 ? (
           <EmptyState
-            onAddCustom={() => openAddDialog()}
-            onBrowseRecommendedTemplates={() =>
-              setRecommendedDialogOpen(true)
-            }
-            showRecommendedLink={hasRecommendedTemplates}
+            onAddCustom={() => setAddDialogOpen(true)}
             actionsDisabled={actions.length === 0}
           />
         ) : (
@@ -207,24 +156,11 @@ export function StandingApprovalsSection({
 
       <AddStandingApprovalDialog
         open={addDialogOpen}
-        onOpenChange={handleAddDialogOpenChange}
+        onOpenChange={setAddDialogOpen}
         agentId={agentId}
         connectorId={connectorId}
         actions={actions}
-        initialTemplate={initialTemplateForAdd}
         onCreated={() => void refetch()}
-      />
-
-      <RecommendedTemplatesDialog
-        open={recommendedDialogOpen}
-        onOpenChange={setRecommendedDialogOpen}
-        agentId={agentId}
-        connectorId={connectorId}
-        actions={actions}
-        existingRules={activeRules}
-        onCustomize={(template) => {
-          openAddDialog(template);
-        }}
       />
 
       {editTarget && (
@@ -257,13 +193,9 @@ export function StandingApprovalsSection({
 
 function EmptyState({
   onAddCustom,
-  onBrowseRecommendedTemplates,
-  showRecommendedLink,
   actionsDisabled,
 }: {
   onAddCustom: () => void;
-  onBrowseRecommendedTemplates: () => void;
-  showRecommendedLink: boolean;
   actionsDisabled: boolean;
 }) {
   return (
@@ -277,18 +209,6 @@ function EmptyState({
           Every request from this agent will ask for your approval. Add a
           standing approval to pre-authorize trusted, repetitive actions.
         </p>
-        {showRecommendedLink && (
-          <div>
-            <button
-              type="button"
-              onClick={onBrowseRecommendedTemplates}
-              disabled={actionsDisabled}
-              className="text-muted-foreground hover:text-foreground text-sm underline-offset-4 transition-colors hover:underline disabled:pointer-events-none disabled:opacity-50"
-            >
-              Or start from a recommended template →
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );

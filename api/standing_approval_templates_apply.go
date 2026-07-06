@@ -1,3 +1,5 @@
+// Standing-approval templates are disabled for now — endpoints and DB plumbing are
+// kept intentionally dormant; see issue #1436.
 package api
 
 import (

@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import { useState, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -13,8 +13,6 @@ import {
 import { Label } from "@/components/ui/label";
 import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
 import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
-import { useStandingApprovalTemplates } from "@/hooks/useStandingApprovalTemplates";
-import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import {
   ConstraintParameterFields,
@@ -26,10 +24,8 @@ import {
   DescriptionField,
   buildParametersFromForm,
   getEmptyRequiredParams,
-  isPatternWrapper,
   type ParamMode,
 } from "./StandingApprovalFormFields";
-import { TemplatePicker } from "./TemplatePicker";
 import {
   RiskBadge,
   riskBlurb,
@@ -48,7 +44,6 @@ interface AddStandingApprovalDialogProps {
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
-  initialTemplate?: StandingApprovalTemplate | null;
   onCreated?: () => void;
 }
 
@@ -58,12 +53,9 @@ export function AddStandingApprovalDialog({
   agentId,
   connectorId,
   actions,
-  initialTemplate = null,
   onCreated,
 }: AddStandingApprovalDialogProps) {
   const { createStandingApproval, isPending } = useCreateStandingApproval();
-  const { templates, isLoading: templatesLoading } =
-    useStandingApprovalTemplates(connectorId);
   const { instances } = useAgentConnectorInstances(agentId, connectorId);
   const showAccountSelect = instances.length > 1;
 
@@ -73,13 +65,8 @@ export function AddStandingApprovalDialog({
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
   const [connectorInstance, setConnectorInstance] = useState("*");
-  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(
-    null,
-  );
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(() => defaultExpiresAtLocal());
-
-  const prevOpenRef = useRef(false);
 
   const selectedAction = useMemo(
     () => actions.find((a) => a.action_type === selectedActionType) ?? null,
@@ -105,7 +92,6 @@ export function AddStandingApprovalDialog({
     setParamValues({});
     setParamModes({});
     setConnectorInstance("*");
-    setAppliedTemplateId(null);
     setNoExpiry(true);
     setExpiresAt(defaultExpiresAtLocal());
   }
@@ -120,62 +106,7 @@ export function AddStandingApprovalDialog({
     setParamValues({});
     setParamModes({});
     setConnectorInstance("*");
-    setAppliedTemplateId(null);
   }
-
-  const handleTemplateSelect = useCallback(
-    (
-      template: StandingApprovalTemplate,
-      options?: { fromInitial?: boolean },
-    ) => {
-      setSelectedActionType(template.action_type);
-      setName(template.name);
-      setDescription(template.description ?? "");
-
-      const values: Record<string, string> = {};
-      const modes: Record<string, ParamMode> = {};
-      for (const [key, value] of Object.entries(template.constraints)) {
-        if (value === "*") {
-          values[key] = "*";
-          modes[key] = "wildcard";
-        } else if (isPatternWrapper(value)) {
-          values[key] = value.$pattern;
-          modes[key] = "pattern";
-        } else if (value === null || value === undefined) {
-          values[key] = "";
-          modes[key] = "fixed";
-        } else {
-          values[key] = String(value);
-          modes[key] = "fixed";
-        }
-      }
-      setParamValues(values);
-      setParamModes(modes);
-      setConnectorInstance("*");
-      setAppliedTemplateId(template.id);
-
-      if (template.duration_days != null) {
-        setNoExpiry(false);
-        const d = new Date();
-        d.setUTCDate(d.getUTCDate() + template.duration_days);
-        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
-        setExpiresAt(local.toISOString().slice(0, 16));
-      }
-
-      if (!options?.fromInitial) {
-        toast.success(`Template "${template.name}" applied`);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    const wasOpen = prevOpenRef.current;
-    prevOpenRef.current = open;
-    if (open && !wasOpen && initialTemplate) {
-      handleTemplateSelect(initialTemplate, { fromInitial: true });
-    }
-  }, [open, initialTemplate, handleTemplateSelect]);
 
   function handleParamChange(key: string, value: string) {
     setParamValues((prev) => ({ ...prev, [key]: value }));
@@ -218,13 +149,8 @@ export function AddStandingApprovalDialog({
         );
       }
 
-      const activeTemplate =
-        appliedTemplateId != null
-          ? (templates.find((t) => t.id === appliedTemplateId) ?? null)
-          : null;
       const constraints = standingApprovalConstraintsForCreate(
         builtConstraints as Record<string, unknown>,
-        activeTemplate ?? initialTemplate,
       );
 
       await createStandingApproval({
@@ -282,17 +208,6 @@ export function AddStandingApprovalDialog({
                   {riskBlurb(riskLevel)}
                 </p>
               </div>
-            )}
-
-            {selectedActionType && (
-              <TemplatePicker
-                templates={templates}
-                isLoading={templatesLoading}
-                actionType={selectedActionType}
-                onSelect={handleTemplateSelect}
-                disabled={isPending}
-                selectedTemplateId={appliedTemplateId}
-              />
             )}
 
             <NameField
@@ -374,10 +289,9 @@ function defaultExpiresAtLocal(): string {
 
 function standingApprovalConstraintsForCreate(
   params: Record<string, unknown>,
-  template?: StandingApprovalTemplate | null,
 ): Record<string, unknown> {
   const entries = Object.entries(params);
-  if (entries.length === 0 || template) {
+  if (entries.length === 0) {
     return params;
   }
   const allBareWildcard = entries.every(([, v]) => v === "*");
