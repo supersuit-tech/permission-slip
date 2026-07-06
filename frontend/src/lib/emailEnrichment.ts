@@ -25,7 +25,7 @@ const EMAIL_DETAIL_ACTION_TYPES = new Set([
 ]);
 
 /** Keys enrichment writes: flat single-message fields, batch map, or reply ref. */
-const ENRICHMENT_KEYS = ["subject", "messages", "in_reply_to"];
+const ENRICHMENT_KEYS = ["subject", "from", "date", "messages", "in_reply_to"];
 
 /**
  * True when an action's approval prompt should show email metadata but the

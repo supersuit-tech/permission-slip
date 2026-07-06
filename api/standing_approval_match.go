@@ -12,23 +12,22 @@ import (
 
 // tryStandingApprovalAutoApprove checks if an active standing approval matches
 // the given agent, action type, and parameters. If a match is found, the action
-// is executed immediately and the result is written to w. Returns true if the
-// response was written (either success or error), false if no standing approval
-// matched and the caller should fall through to the pending approval flow.
-func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps *Deps, agent *db.Agent, actionType string, params json.RawMessage, requestID string, pp *paymentParams, connectorInstanceID string) bool {
+// is executed immediately and the result is written to w.
+func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps *Deps, agent *db.Agent, actionType string, params json.RawMessage, requestID string, pp *paymentParams, connectorInstanceID string) standingApprovalAutoApproveOutcome {
 	approvals, err := db.FindActiveStandingApprovalsForAgent(r.Context(), deps.DB, agent.AgentID, actionType, connectorInstanceID)
 	if err != nil {
 		log.Printf("[%s] AutoApprove: find standing approvals: %v", TraceID(r.Context()), err)
 		CaptureError(r.Context(), err)
 		// Don't fail the request — fall through to the pending approval flow.
-		return false
+		return standingApprovalAutoApproveOutcome{}
 	}
 	if len(approvals) == 0 {
-		return false
+		return standingApprovalAutoApproveOutcome{}
 	}
 
 	// Find first standing approval whose constraints match.
 	var sa *db.StandingApproval
+	metadataUnresolvedSkipped := 0
 	for _, candidate := range approvals {
 		if len(candidate.Constraints) == 0 {
 			sa = candidate
@@ -37,6 +36,9 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 		if err := validateActionConstraints(r.Context(), deps, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID, candidate.Constraints, params); err != nil {
 			configErr, unresolved := constraintMatchErr(err)
 			if unresolved {
+				metadataUnresolvedSkipped++
+				log.Printf("[%s] AutoApprove: skipped %s — constraint metadata unresolved for %s",
+					TraceID(r.Context()), candidate.StandingApprovalID, actionType)
 				continue
 			}
 			if configErr != nil {
@@ -73,8 +75,11 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 	}
 
 	if sa == nil {
-		// Standing approvals exist but none matched — fall through to pending.
-		return false
+		out := standingApprovalAutoApproveOutcome{}
+		if metadataUnresolvedSkipped > 0 && configHasMetaConstraintsForAny(approvals) {
+			out.FallthroughReason = standingApprovalFallthroughMetadataUnavailable
+		}
+		return out
 	}
 
 	// Record the execution against the standing approval.
@@ -92,16 +97,16 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 			case db.StandingApprovalErrNotActive:
 				// Race: approval became inactive between find and record.
 				// Fall through to the pending approval flow.
-				return false
+				return standingApprovalAutoApproveOutcome{}
 			case db.StandingApprovalErrDuplicateRequest:
 				RespondError(w, r, http.StatusConflict, Conflict(ErrDuplicateRequestID, "A request with this request_id has already been submitted"))
-				return true
+				return standingApprovalAutoApproveOutcome{Handled: true}
 			}
 		}
 		log.Printf("[%s] AutoApprove: record execution: %v", TraceID(r.Context()), err)
 		CaptureError(r.Context(), err)
 		// Fall through to the pending approval flow rather than failing.
-		return false
+		return standingApprovalAutoApproveOutcome{}
 	}
 
 	// Execute the action via connector.
@@ -119,7 +124,7 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 	if execErr != nil {
 		cc := ConnectorContext{ActionType: actionType, AgentID: agent.AgentID}
 		if handleConnectorError(w, r, execErr, cc) {
-			return true
+			return standingApprovalAutoApproveOutcome{Handled: true}
 		}
 		log.Printf("[%s] AutoApprove: connector execution: %v", TraceID(r.Context()), execErr)
 		CaptureConnectorError(r.Context(), execErr, cc)
@@ -128,7 +133,7 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 			"standing_approval_id": sa.StandingApprovalID,
 		}
 		RespondError(w, r, http.StatusInternalServerError, resp)
-		return true
+		return standingApprovalAutoApproveOutcome{Handled: true}
 	}
 
 	// Notify user of standing approval execution (fire-and-forget).
@@ -151,5 +156,14 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 		Result:             actionResultPtr,
 		StandingApprovalID: sa.StandingApprovalID,
 	})
-	return true
+	return standingApprovalAutoApproveOutcome{Handled: true}
+}
+
+func configHasMetaConstraintsForAny(approvals []*db.StandingApproval) bool {
+	for _, sa := range approvals {
+		if configHasMetaConstraints(sa.Constraints) {
+			return true
+		}
+	}
+	return false
 }

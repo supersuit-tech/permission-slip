@@ -46,7 +46,14 @@ import { formatAbsoluteTime } from "@/lib/utils";
 import { useCountdown, RiskBadge, CountdownBadge } from "./approval-components";
 import { ApprovalSection } from "./ApprovalSection";
 import { formatConnectorDisplayName } from "./approvalConnectorLabel";
-import { buildCreateStandingApprovalFromApproval } from "./standingApprovalFromApproval";
+import { EmailApprovalDetailsRow } from "@/components/previews/EmailApprovalDetailsRow";
+import { emailDetailsUnavailable } from "@/lib/emailEnrichment";
+import { shouldShowEmailApprovalSection } from "@/lib/emailApprovalDetails";
+import { parseStandingApprovalFallthrough } from "@/lib/standingApprovalFallthrough";
+import {
+  buildCreateStandingApprovalFromApproval,
+  findMatchingActionConfigForApproval,
+} from "./standingApprovalFromApproval";
 
 /** Auto-close delay (ms) after a successful approval. */
 const SUCCESS_AUTO_CLOSE_MS = 3_000;
@@ -196,11 +203,8 @@ export function ReviewApprovalDialog({
     [standingApprovals, approval.agent_id, approval.action.type],
   );
   const matchingActionConfig = useMemo(
-    () =>
-      configs.find(
-        (c) => c.status === "active" && c.action_type === approval.action.type,
-      ) ?? null,
-    [configs, approval.action.type],
+    () => findMatchingActionConfigForApproval(configs, approval),
+    [configs, approval],
   );
   const showAutoApproveCheckbox =
     !standingApprovalsLoading && !hasExistingStandingApproval;
@@ -227,6 +231,11 @@ export function ReviewApprovalDialog({
         approval.resource_details as Record<string, unknown> | undefined,
       ),
     [approval.resource_details],
+  );
+
+  const standingApprovalFallthrough = useMemo(
+    () => parseStandingApprovalFallthrough(approval.context.details),
+    [approval.context.details],
   );
 
   const slackContext = useMemo(
@@ -392,6 +401,17 @@ export function ReviewApprovalDialog({
               </Badge>
             </div>
 
+            {/* Standing approval could not be auto-evaluated */}
+            {standingApprovalFallthrough && (
+              <div
+                className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200"
+                data-testid="standing-approval-fallthrough"
+                role="status"
+              >
+                {standingApprovalFallthrough.message}
+              </div>
+            )}
+
             {/* Rich action preview card */}
             <div className="space-y-2">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -422,6 +442,28 @@ export function ReviewApprovalDialog({
                 </div>
               ) : (
                 <>
+                  {shouldShowEmailApprovalSection(
+                    approval.action.type,
+                    approval.resource_details as Record<string, unknown> | undefined,
+                  ) && (
+                    <EmailApprovalDetailsRow
+                      actionType={approval.action.type}
+                      resourceDetails={
+                        approval.resource_details as Record<string, unknown> | undefined
+                      }
+                    />
+                  )}
+                  {emailDetailsUnavailable(
+                    approval.action.type,
+                    approval.resource_details as Record<string, unknown> | undefined,
+                  ) && (
+                    <p
+                      className="text-muted-foreground text-sm italic"
+                      data-testid="email-details-unavailable"
+                    >
+                      Email details unavailable
+                    </p>
+                  )}
                   {showEmailThreadPreview && (
                     <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
                       <EmailThreadPreview thread={emailThread} />

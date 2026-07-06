@@ -13,7 +13,9 @@ import (
 
 // resolveMessageEnvelopes is the IMAP-backed implementation used by
 // ResolveResourceDetails. Tests may replace it to avoid a live proxy.
-var resolveMessageEnvelopes = resolveMessageEnvelopesIMAP
+var resolveMessageEnvelopes = resolveMessageEnvelopesWithRetry
+
+const envelopeFetchMaxAttempts = 3
 
 // ResolveResourceDetails fetches human-readable email metadata for approval
 // prompts. Only subject, from, to, and date are returned. Errors are non-fatal
@@ -266,6 +268,34 @@ func resolveMessageEnvelopesIMAP(ctx context.Context, conn *ProtonMailConnector,
 	}
 
 	return fetchEnvelopeMetadataByUID(session, uidSet)
+}
+
+func resolveMessageEnvelopesWithRetry(ctx context.Context, conn *ProtonMailConnector, creds connectors.Credentials, folder string, uids []uint32, store connectors.MailboxUIDValidityStore) (map[uint32]emailEnvelopeMetadata, error) {
+	var lastErr error
+	for attempt := 1; attempt <= envelopeFetchMaxAttempts; attempt++ {
+		meta, err := resolveMessageEnvelopesIMAP(ctx, conn, creds, folder, uids, store)
+		if err == nil {
+			if len(meta) > 0 || len(uids) == 0 {
+				return meta, nil
+			}
+			lastErr = fmt.Errorf("envelope fetch returned no metadata for %d uid(s) in folder %q", len(uids), folder)
+		} else {
+			lastErr = err
+		}
+		if attempt < envelopeFetchMaxAttempts {
+			log.Printf("protonmail: envelope fetch attempt %d/%d failed (folder %q, %d uid(s)): %v",
+				attempt, envelopeFetchMaxAttempts, folder, len(uids), lastErr)
+			backoff := time.Duration(attempt) * 200 * time.Millisecond
+			timer := time.NewTimer(backoff)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				return nil, ctx.Err()
+			case <-timer.C:
+			}
+		}
+	}
+	return nil, lastErr
 }
 
 var _ connectors.ResourceDetailResolver = (*ProtonMailConnector)(nil)

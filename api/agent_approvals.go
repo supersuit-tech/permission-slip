@@ -251,7 +251,8 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		// approval matches this agent + action type + parameters. If so,
 		// execute immediately and return the result — no human review needed.
 		pp := &paymentParams{PaymentMethodID: req.PaymentMethodID, AmountCents: req.AmountCents}
-		if handled := tryStandingApprovalAutoApprove(w, r, deps, agent, actionType, actionParams, req.RequestID, pp, connectorInstanceID); handled {
+		autoApproveOutcome := tryStandingApprovalAutoApprove(w, r, deps, agent, actionType, actionParams, req.RequestID, pp, connectorInstanceID)
+		if autoApproveOutcome.Handled {
 			return
 		}
 
@@ -322,6 +323,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			mergeEmailThreadFromResourceDetailsIntoContext(req.Context, resourceDetails),
 			resourceDetails,
 		)
+		contextForStore = mergeStandingApprovalFallthroughIntoContext(contextForStore, autoApproveOutcome.FallthroughReason)
 
 		approval, err := db.InsertApproval(r.Context(), deps.DB, db.InsertApprovalParams{
 			ApprovalID:        approvalID,
@@ -417,16 +419,16 @@ func handleAgentCancelApproval(deps *Deps) http.HandlerFunc {
 // ── GET /approvals/{approval_id}/status ─────────────────────────────────────
 
 type agentApprovalStatusResponse struct {
-	ApprovalID      string           `json:"approval_id"`
-	Status          string           `json:"status"`
-	Terminal        bool             `json:"terminal"`
-	Retryable       bool             `json:"retryable"`
-	PushWakeConfigured bool          `json:"push_wake_configured,omitempty"`
-	Reason          *string          `json:"reason,omitempty"`
-	ExecutionStatus *string          `json:"execution_status,omitempty"`
-	ExecutionResult *json.RawMessage `json:"execution_result,omitempty"`
-	ExpiresAt       time.Time        `json:"expires_at"`
-	CreatedAt       time.Time        `json:"created_at"`
+	ApprovalID         string           `json:"approval_id"`
+	Status             string           `json:"status"`
+	Terminal           bool             `json:"terminal"`
+	Retryable          bool             `json:"retryable"`
+	PushWakeConfigured bool             `json:"push_wake_configured,omitempty"`
+	Reason             *string          `json:"reason,omitempty"`
+	ExecutionStatus    *string          `json:"execution_status,omitempty"`
+	ExecutionResult    *json.RawMessage `json:"execution_result,omitempty"`
+	ExpiresAt          time.Time        `json:"expires_at"`
+	CreatedAt          time.Time        `json:"created_at"`
 }
 
 func handleAgentApprovalStatus(deps *Deps) http.HandlerFunc {
