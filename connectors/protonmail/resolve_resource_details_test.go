@@ -117,7 +117,7 @@ func TestResolveResourceDetails_ArchiveEmail_SingleUsesFlatFields(t *testing.T) 
 	}
 
 	conn := New()
-	params, _ := json.Marshal(map[string]any{"message_id": 42})
+	params, _ := json.Marshal(map[string]any{"message_id": 42, "include_thread": false})
 	details, err := conn.ResolveResourceDetails(context.Background(), "protonmail.archive_email", params, validCreds())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -190,7 +190,7 @@ func TestResolveResourceDetails_ArchiveEmail_BatchKeyedByHandle(t *testing.T) {
 	}
 
 	conn := New()
-	params, _ := json.Marshal(map[string]any{"message_ids": []int{10, 11}})
+	params, _ := json.Marshal(map[string]any{"message_ids": []int{10, 11}, "include_thread": false})
 	details, err := conn.ResolveResourceDetails(context.Background(), "protonmail.archive_email", params, validCreds())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

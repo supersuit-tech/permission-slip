@@ -20,39 +20,24 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	var cache slackctx.SessionCache
 	switch actionType {
 	case "slack.send_message":
-		sc, err := buildSendMessageContext(ctx, c, creds, params, &cache)
-		if err != nil {
-			return nil, err
-		}
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
+		sc, _ := buildSendMessageContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
 
 	case "slack.schedule_message":
-		sc, err := buildScheduleMessageContext(ctx, c, creds, params, &cache)
-		if err != nil {
-			return nil, err
-		}
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
+		sc, _ := buildScheduleMessageContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
 
 	case "slack.send_dm":
-		sc, err := buildSendDMContext(ctx, c, creds, params, &cache)
-		if err != nil {
-			return nil, err
-		}
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
+		sc, _ := buildSendDMContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
 
 	case "slack.update_message":
-		sc, err := buildUpdateMessageContext(ctx, c, creds, params, &cache)
-		if err != nil {
-			return nil, err
-		}
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
+		sc, _ := buildUpdateMessageContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
 
 	case "slack.delete_message":
-		sc, err := buildDeleteMessageContext(ctx, c, creds, params, &cache)
-		if err != nil {
-			return nil, err
-		}
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
+		sc, _ := buildDeleteMessageContext(ctx, c, creds, params, &cache)
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
 
 	case "slack.read_channel_messages", "slack.read_thread",
 		"slack.set_topic", "slack.invite_to_channel",
@@ -94,25 +79,17 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	}
 }
 
-func mergeLifecycleResourceDetails(ctx context.Context, c *SlackConnector, creds connectors.Credentials, actionType string, params json.RawMessage, sc *slackctx.SlackContext) (map[string]any, error) {
+func mergeLifecycleResourceDetails(ctx context.Context, c *SlackConnector, creds connectors.Credentials, actionType string, params json.RawMessage, sc *slackctx.SlackContext) map[string]any {
 	out := map[string]any{}
 	switch actionType {
 	case "slack.send_message", "slack.schedule_message", "slack.update_message", "slack.delete_message":
-		legacy, err := c.resolveChannel(ctx, creds, params)
-		if err != nil {
-			return nil, err
-		}
-		if legacy != nil {
+		if legacy, err := c.resolveChannel(ctx, creds, params); err == nil && legacy != nil {
 			for k, v := range legacy {
 				out[k] = v
 			}
 		}
 	case "slack.send_dm":
-		legacy, err := c.resolveUser(ctx, creds, params)
-		if err != nil {
-			return nil, err
-		}
-		if legacy != nil {
+		if legacy, err := c.resolveUser(ctx, creds, params); err == nil && legacy != nil {
 			for k, v := range legacy {
 				out[k] = v
 			}
@@ -134,10 +111,7 @@ func mergeLifecycleResourceDetails(ctx context.Context, c *SlackConnector, creds
 			}
 		}
 	}
-	if len(out) == 0 {
-		return nil, nil
-	}
-	return out, nil
+	return out
 }
 
 func mergeResourceDetailMaps(a, b map[string]any) map[string]any {
