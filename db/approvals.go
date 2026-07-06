@@ -224,6 +224,68 @@ func DenyApproval(ctx context.Context, db DBTX, approvalID, approverID, reason s
 	return resolveApproval(ctx, db, approvalID, approverID, "denied", "denied_at", reason)
 }
 
+// DenyAllPendingStandaloneApprovals atomically denies every pending, non-expired
+// standalone approval (bulk_group_id IS NULL) for the given approver. Already
+// resolved or expired rows are skipped rather than failing the batch. Returns
+// the updated approvals and agent metadata keyed by agent_id for side effects.
+func DenyAllPendingStandaloneApprovals(ctx context.Context, db DBTX, approverID string) ([]Approval, map[int64][]byte, error) {
+	tx, owned, err := BeginOrContinue(ctx, db)
+	if err != nil {
+		return nil, nil, fmt.Errorf("begin tx: %w", err)
+	}
+	if owned {
+		defer func() { _ = RollbackTx(ctx, tx) }()
+	}
+
+	query := fmt.Sprintf(
+		`UPDATE approvals
+		 SET status = 'denied', denied_at = strftime('%%Y-%%m-%%dT%%H:%%M:%%fZ', 'now')
+		 WHERE approver_id = $1
+		   AND bulk_group_id IS NULL
+		   AND status = 'pending' AND datetime(expires_at) > datetime('now')
+		 RETURNING %s`,
+		approvalColumns,
+	)
+	rows, err := tx.Query(ctx, query, approverID)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rows.Close()
+
+	var approvals []Approval
+	agentIDs := make(map[int64]struct{})
+	for rows.Next() {
+		a, err := scanApproval(rows)
+		if err != nil {
+			return nil, nil, err
+		}
+		approvals = append(approvals, *a)
+		agentIDs[a.AgentID] = struct{}{}
+	}
+	if err := rows.Err(); err != nil {
+		return nil, nil, err
+	}
+
+	agentMeta := make(map[int64][]byte, len(agentIDs))
+	for agentID := range agentIDs {
+		var meta []byte
+		if err := tx.QueryRow(ctx,
+			`SELECT metadata FROM agents WHERE agent_id = $1`,
+			agentID,
+		).Scan(&meta); err != nil {
+			return nil, nil, err
+		}
+		agentMeta[agentID] = meta
+	}
+
+	if owned {
+		if err := CommitTx(ctx, tx); err != nil {
+			return nil, nil, fmt.Errorf("commit: %w", err)
+		}
+	}
+	return approvals, agentMeta, nil
+}
+
 // resolveApproval is the shared implementation for ApproveApproval and
 // DenyApproval. It atomically updates the approval status while enforcing
 // status='pending' AND datetime(expires_at) > datetime('now') to eliminate TOCTOU races. On

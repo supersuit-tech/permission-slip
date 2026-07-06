@@ -1210,6 +1210,56 @@ denyApproval:
       '503':
         $ref: '../responses/errors.yaml#/ServiceUnavailable'
 
+denyAllApprovals:
+  post:
+    operationId: denyAllApprovals
+    summary: Deny All Pending Standalone Approvals
+    description: |
+      Deny every pending, non-expired standalone approval request for the
+      authenticated approver. Bulk-group items and rule proposals are not
+      affected. Already resolved or expired items are skipped. Idempotent:
+      repeat calls return `denied_count: 0` when nothing remains pending.
+
+      Emits the same per-approval side effects (agent notification and
+      `approval_resolved` SSE events) as the single-item deny endpoint.
+
+    tags:
+      - Approvals
+
+    security:
+      - SupabaseSession: []
+
+    responses:
+      '200':
+        description: Bulk deny completed
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/approvals.yaml#/DenyAllApprovalsResponse'
+            examples:
+              denied_some:
+                summary: Denied pending approvals
+                value:
+                  denied_count: 3
+                  skipped_count: 0
+              nothing_pending:
+                summary: No pending standalone approvals
+                value:
+                  denied_count: 0
+                  skipped_count: 0
+
+      '401':
+        $ref: '../responses/errors.yaml#/Unauthorized'
+
+      '429':
+        $ref: '../responses/errors.yaml#/TooManyRequests'
+
+      '500':
+        $ref: '../responses/errors.yaml#/InternalServerError'
+
+      '503':
+        $ref: '../responses/errors.yaml#/ServiceUnavailable'
+
 bulkRequest:
   post:
     operationId: bulkRequestApproval

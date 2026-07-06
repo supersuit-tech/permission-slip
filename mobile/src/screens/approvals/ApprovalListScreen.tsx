@@ -7,6 +7,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -19,10 +20,13 @@ import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 import { useIsFocused } from "@react-navigation/native";
 import type { RootStackParamList } from "../../navigation/RootNavigator";
 import { useApprovals, type ApprovalSummary } from "../../hooks/useApprovals";
+import { useDenyApproval } from "../../hooks/useDenyApproval";
+import { useDenyAllApprovals } from "../../hooks/useDenyAllApprovals";
 import {
   useStandingApprovalRequests,
   type StandingApprovalRequestSummary,
 } from "../../hooks/useStandingApprovalRequests";
+import { useDenyStandingApprovalRequest } from "../../hooks/useDenyStandingApprovalRequest";
 import { useStandingApprovalInstanceScope } from "../../hooks/useStandingApprovalInstanceScope";
 import { useAgents, getAgentDisplayName } from "../../hooks/useAgents";
 import { useActionSchema } from "../../hooks/useActionSchema";
@@ -33,6 +37,7 @@ import { RiskBadge } from "./RiskBadge";
 import { CountdownBadge } from "./CountdownBadge";
 import { BrandBadge } from "../../components/BrandBadge";
 import { StandingApprovalInstanceScopeLine } from "./StandingApprovalInstanceScopeLine";
+import { DeclineRequestButton } from "./DeclineRequestButton";
 
 type StatusTab = "pending" | "approved" | "denied";
 
@@ -46,13 +51,22 @@ type Props = NativeStackScreenProps<RootStackParamList, "ApprovalList">;
 
 export default function ApprovalListScreen({ navigation }: Props) {
   const [activeTab, setActiveTab] = useState<StatusTab>("pending");
+  const [dismissedApprovalIds, setDismissedApprovalIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [dismissedRuleIds, setDismissedRuleIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const { approvals, isLoading, isRefetching, error, refetch, dataUpdatedAt } =
     useApprovals(activeTab);
+  const { denyApproval } = useDenyApproval();
+  const { denyAllApprovals, isPending: isDenyingAll } = useDenyAllApprovals(activeTab);
   const {
     requests: ruleProposals,
     refetch: refetchRules,
     isRefetching: rulesRefetching,
   } = useStandingApprovalRequests();
+  const { mutateAsync: denyRuleRequest } = useDenyStandingApprovalRequest();
   const { agents } = useAgents();
   const insets = useSafeAreaInsets();
 
@@ -131,6 +145,23 @@ export default function ApprovalListScreen({ navigation }: Props) {
     };
   }, [approvals]);
 
+  const visibleStandaloneApprovals = useMemo(
+    () =>
+      standaloneApprovals.filter(
+        (approval) => !dismissedApprovalIds.has(approval.approval_id),
+      ),
+    [standaloneApprovals, dismissedApprovalIds],
+  );
+
+  const visibleRuleProposals = useMemo(
+    () =>
+      ruleProposals.filter(
+        (request: StandingApprovalRequestSummary) =>
+          !dismissedRuleIds.has(request.request_id),
+      ),
+    [ruleProposals, dismissedRuleIds],
+  );
+
   const handleRulePress = useCallback(
     (request: StandingApprovalRequestSummary) => {
       navigation.navigate("StandingApprovalRequestDetail", {
@@ -145,15 +176,70 @@ export default function ApprovalListScreen({ navigation }: Props) {
     navigation.navigate("Settings");
   }, [navigation]);
 
+  const handleDeclineApproval = useCallback(
+    async (approvalId: string) => {
+      setDismissedApprovalIds((prev) => new Set(prev).add(approvalId));
+      try {
+        await denyApproval(approvalId);
+      } catch (err) {
+        setDismissedApprovalIds((prev) => {
+          const next = new Set(prev);
+          next.delete(approvalId);
+          return next;
+        });
+        throw err;
+      }
+    },
+    [denyApproval],
+  );
+
+  const handleDeclineRule = useCallback(
+    async (requestId: string) => {
+      setDismissedRuleIds((prev) => new Set(prev).add(requestId));
+      try {
+        await denyRuleRequest(requestId);
+      } catch (err) {
+        setDismissedRuleIds((prev) => {
+          const next = new Set(prev);
+          next.delete(requestId);
+          return next;
+        });
+        throw err;
+      }
+    },
+    [denyRuleRequest],
+  );
+
+  const handleDeclineAllPress = useCallback(() => {
+    const count = visibleStandaloneApprovals.length;
+    Alert.alert(
+      "Decline all pending requests?",
+      `Decline all ${count} pending request${count !== 1 ? "s" : ""}? Agents will be notified that these requests were denied.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Decline all",
+          style: "destructive",
+          onPress: () => {
+            void denyAllApprovals().catch(() => {
+              Alert.alert("Error", "Failed to decline pending requests. Please try again.");
+            });
+          },
+        },
+      ],
+    );
+  }, [denyAllApprovals, visibleStandaloneApprovals.length]);
+
   const renderItem = useCallback(
     ({ item }: { item: ApprovalSummary }) => (
       <ApprovalRow
         approval={item}
         agentName={resolveAgentName(item.agent_id)}
         onPress={() => handlePress(item)}
+        onDecline={() => handleDeclineApproval(item.approval_id)}
       />
     ),
-    [resolveAgentName, handlePress],
+    [resolveAgentName, handlePress, handleDeclineApproval],
   );
 
   const keyExtractor = useCallback(
@@ -183,8 +269,8 @@ export default function ApprovalListScreen({ navigation }: Props) {
         {TABS.map((tab) => {
           const isActive = activeTab === tab.key;
           const count =
-            isActive && (standaloneApprovals.length + bulkGroups.length) > 0
-              ? standaloneApprovals.length + bulkGroups.length
+            isActive && (visibleStandaloneApprovals.length + bulkGroups.length) > 0
+              ? visibleStandaloneApprovals.length + bulkGroups.length
               : null;
           return (
             <TouchableOpacity
@@ -245,20 +331,39 @@ export default function ApprovalListScreen({ navigation }: Props) {
         </View>
       ) : (
         <FlatList
-          data={standaloneApprovals}
+          data={visibleStandaloneApprovals}
           renderItem={renderItem}
           keyExtractor={keyExtractor}
           contentContainerStyle={
-            standaloneApprovals.length === 0 &&
+            visibleStandaloneApprovals.length === 0 &&
             bulkGroups.length === 0 &&
-            (activeTab !== "pending" || ruleProposals.length === 0)
+            (activeTab !== "pending" || visibleRuleProposals.length === 0)
               ? styles.emptyContainer
               : styles.list
           }
           ListHeaderComponent={
             activeTab === "pending" &&
-            (ruleProposals.length > 0 || bulkGroups.length > 0) ? (
+            (visibleRuleProposals.length > 0 ||
+              bulkGroups.length > 0 ||
+              visibleStandaloneApprovals.length > 0) ? (
               <View style={styles.ruleSection}>
+                {visibleStandaloneApprovals.length > 0 && (
+                  <TouchableOpacity
+                    testID="decline-all-button"
+                    accessibilityRole="button"
+                    accessibilityLabel={`Decline all ${visibleStandaloneApprovals.length} pending requests`}
+                    style={[
+                      styles.declineAllButton,
+                      isDenyingAll && styles.declineAllButtonDisabled,
+                    ]}
+                    disabled={isDenyingAll}
+                    onPress={handleDeclineAllPress}
+                  >
+                    <Text style={styles.declineAllText}>
+                      Decline all ({visibleStandaloneApprovals.length})
+                    </Text>
+                  </TouchableOpacity>
+                )}
                 {bulkGroups.map((group) => (
                   <TouchableOpacity
                     key={group.id}
@@ -274,19 +379,20 @@ export default function ApprovalListScreen({ navigation }: Props) {
                     </Text>
                   </TouchableOpacity>
                 ))}
-                {ruleProposals.map((request: StandingApprovalRequestSummary) => (
+                {visibleRuleProposals.map((request: StandingApprovalRequestSummary) => (
                   <RuleProposalRow
                     key={request.request_id}
                     request={request}
                     agentName={resolveAgentName(request.agent_id)}
                     onPress={() => handleRulePress(request)}
+                    onDecline={() => handleDeclineRule(request.request_id)}
                   />
                 ))}
               </View>
             ) : null
           }
           ListEmptyComponent={
-            activeTab === "pending" && ruleProposals.length > 0 ? null : (
+            activeTab === "pending" && visibleRuleProposals.length > 0 ? null : (
               <EmptyState tab={activeTab} />
             )
           }
@@ -310,27 +416,35 @@ const RuleProposalRow = memo(function RuleProposalRow({
   request,
   agentName,
   onPress,
+  onDecline,
 }: {
   request: StandingApprovalRequestSummary;
   agentName: string;
   onPress: () => void;
+  onDecline: () => Promise<void>;
 }) {
   const { connectorLabel } = useStandingApprovalConnectorLabel(request);
   const { scopeLabel } = useStandingApprovalInstanceScope(request);
 
   return (
-    <TouchableOpacity style={styles.ruleRow} onPress={onPress} accessibilityRole="button">
-      <View style={styles.ruleBadge}>
-        <Text style={styles.ruleBadgeText}>Rule proposal</Text>
-      </View>
-      <Text style={styles.rowTitle}>{humanizeActionType(request.action_type)}</Text>
-      <Text style={styles.rowSubtitle}>
-        {connectorLabel} · {agentName}
-      </Text>
-      {scopeLabel && (
-        <StandingApprovalInstanceScopeLine label={scopeLabel} compact />
-      )}
-    </TouchableOpacity>
+    <View style={styles.ruleRowContainer}>
+      <TouchableOpacity style={styles.ruleRow} onPress={onPress} accessibilityRole="button">
+        <View style={styles.ruleBadge}>
+          <Text style={styles.ruleBadgeText}>Rule proposal</Text>
+        </View>
+        <Text style={styles.rowTitle}>{humanizeActionType(request.action_type)}</Text>
+        <Text style={styles.rowSubtitle}>
+          {connectorLabel} · {agentName}
+        </Text>
+        {scopeLabel && (
+          <StandingApprovalInstanceScopeLine label={scopeLabel} compact />
+        )}
+      </TouchableOpacity>
+      <DeclineRequestButton
+        testID={`decline-rule-${request.request_id}`}
+        onDecline={onDecline}
+      />
+    </View>
   );
 });
 
@@ -339,10 +453,12 @@ const ApprovalRow = memo(function ApprovalRow({
   approval,
   agentName,
   onPress,
+  onDecline,
 }: {
   approval: ApprovalSummary;
   agentName: string;
   onPress: () => void;
+  onDecline: () => Promise<void>;
 }) {
   const { displayTemplate } = useActionSchema(approval.action.type);
   const summary = buildActionSummary(
@@ -354,52 +470,60 @@ const ApprovalRow = memo(function ApprovalRow({
   const expired = checkExpired(approval.status, approval.expires_at);
 
   return (
-    <TouchableOpacity
-      testID={`approval-row-${approval.approval_id}`}
-      accessibilityLabel={`${humanizeActionType(approval.action.type)} from ${agentName}`}
-      style={[styles.row, expired && styles.rowExpired]}
-      onPress={onPress}
-    >
-      <View style={styles.rowContent}>
-        <View style={styles.rowTop}>
-          <Text style={styles.actionType} numberOfLines={1}>
-            {humanizeActionType(approval.action.type)}
+    <View style={styles.rowContainer}>
+      <TouchableOpacity
+        testID={`approval-row-${approval.approval_id}`}
+        accessibilityLabel={`${humanizeActionType(approval.action.type)} from ${agentName}`}
+        style={[styles.row, expired && styles.rowExpired]}
+        onPress={onPress}
+      >
+        <View style={styles.rowContent}>
+          <View style={styles.rowTop}>
+            <Text style={styles.actionType} numberOfLines={1}>
+              {humanizeActionType(approval.action.type)}
+            </Text>
+            <RiskBadge level={approval.context.risk_level} />
+          </View>
+          <Text style={styles.summary} numberOfLines={1}>
+            {summary}
           </Text>
-          <RiskBadge level={approval.context.risk_level} />
+          <View style={styles.rowBottom}>
+            <Text style={styles.agentName} numberOfLines={1}>
+              {agentName}
+            </Text>
+            {approval.status === "pending" && (
+              <>
+                <Text style={styles.dot}>{"\u00B7"}</Text>
+                <CountdownBadge expiresAt={approval.expires_at} />
+              </>
+            )}
+            {approval.status === "approved" && (
+              <>
+                <Text style={styles.dot}>{"\u00B7"}</Text>
+                <Text style={styles.statusApproved}>Approved</Text>
+              </>
+            )}
+            {approval.status === "denied" && (
+              <>
+                <Text style={styles.dot}>{"\u00B7"}</Text>
+                <Text style={styles.statusDenied}>Denied</Text>
+              </>
+            )}
+            <Text style={styles.dot}>{"\u00B7"}</Text>
+            <Text style={styles.relativeTime}>
+              {formatRelativeTime(approval.created_at)}
+            </Text>
+          </View>
         </View>
-        <Text style={styles.summary} numberOfLines={1}>
-          {summary}
-        </Text>
-        <View style={styles.rowBottom}>
-          <Text style={styles.agentName} numberOfLines={1}>
-            {agentName}
-          </Text>
-          {approval.status === "pending" && (
-            <>
-              <Text style={styles.dot}>{"\u00B7"}</Text>
-              <CountdownBadge expiresAt={approval.expires_at} />
-            </>
-          )}
-          {approval.status === "approved" && (
-            <>
-              <Text style={styles.dot}>{"\u00B7"}</Text>
-              <Text style={styles.statusApproved}>Approved</Text>
-            </>
-          )}
-          {approval.status === "denied" && (
-            <>
-              <Text style={styles.dot}>{"\u00B7"}</Text>
-              <Text style={styles.statusDenied}>Denied</Text>
-            </>
-          )}
-          <Text style={styles.dot}>{"\u00B7"}</Text>
-          <Text style={styles.relativeTime}>
-            {formatRelativeTime(approval.created_at)}
-          </Text>
-        </View>
-      </View>
-      <Text style={styles.chevron}>{"\u203A"}</Text>
-    </TouchableOpacity>
+        <Text style={styles.chevron}>{"\u203A"}</Text>
+      </TouchableOpacity>
+      {approval.status === "pending" && (
+        <DeclineRequestButton
+          testID={`decline-approval-${approval.approval_id}`}
+          onDecline={onDecline}
+        />
+      )}
+    </View>
   );
 });
 
@@ -546,13 +670,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: "center",
   },
+  rowContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderBottomColor: colors.gray100,
+  },
   row: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.gray100,
   },
   rowExpired: {
     opacity: 0.5,
@@ -633,6 +762,24 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: colors.gray200,
   },
+  declineAllButton: {
+    alignSelf: "flex-end",
+    marginHorizontal: 20,
+    marginVertical: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    borderColor: colors.gray300,
+    borderRadius: 8,
+  },
+  declineAllButtonDisabled: {
+    opacity: 0.5,
+  },
+  declineAllText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.error,
+  },
   bulkRow: {
     paddingHorizontal: 20,
     paddingVertical: 14,
@@ -650,12 +797,17 @@ const styles = StyleSheet.create({
     color: colors.gray500,
     marginTop: 4,
   },
-  ruleRow: {
-    paddingHorizontal: 20,
-    paddingVertical: 14,
+  ruleRowContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     borderBottomWidth: 1,
     borderBottomColor: colors.gray100,
     backgroundColor: "#f5f3ff",
+  },
+  ruleRow: {
+    flex: 1,
+    paddingHorizontal: 20,
+    paddingVertical: 14,
   },
   ruleBadge: {
     alignSelf: "flex-start",
