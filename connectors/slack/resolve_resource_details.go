@@ -20,24 +20,39 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	var cache slackctx.SessionCache
 	switch actionType {
 	case "slack.send_message":
-		sc, _ := buildSendMessageContext(ctx, c, creds, params, &cache)
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+		sc, err := buildSendMessageContext(ctx, c, creds, params, &cache)
+		if err != nil {
+			return nil, err
+		}
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
 
 	case "slack.schedule_message":
-		sc, _ := buildScheduleMessageContext(ctx, c, creds, params, &cache)
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+		sc, err := buildScheduleMessageContext(ctx, c, creds, params, &cache)
+		if err != nil {
+			return nil, err
+		}
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
 
 	case "slack.send_dm":
-		sc, _ := buildSendDMContext(ctx, c, creds, params, &cache)
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+		sc, err := buildSendDMContext(ctx, c, creds, params, &cache)
+		if err != nil {
+			return nil, err
+		}
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
 
 	case "slack.update_message":
-		sc, _ := buildUpdateMessageContext(ctx, c, creds, params, &cache)
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+		sc, err := buildUpdateMessageContext(ctx, c, creds, params, &cache)
+		if err != nil {
+			return nil, err
+		}
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
 
 	case "slack.delete_message":
-		sc, _ := buildDeleteMessageContext(ctx, c, creds, params, &cache)
-		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc), nil
+		sc, err := buildDeleteMessageContext(ctx, c, creds, params, &cache)
+		if err != nil {
+			return nil, err
+		}
+		return mergeLifecycleResourceDetails(ctx, c, creds, actionType, params, sc)
 
 	case "slack.read_channel_messages", "slack.read_thread",
 		"slack.set_topic", "slack.invite_to_channel",
@@ -53,7 +68,7 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 			"slack.archive_channel", "slack.invite_to_channel", "slack.remove_from_channel":
 			extra, xerr := c.resolveSlackApprovalContext(ctx, actionType, params, creds, &cache)
 			if xerr != nil {
-				return base, nil
+				return nil, xerr
 			}
 			return mergeResourceDetailMaps(base, extra), nil
 		default:
@@ -79,17 +94,25 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 	}
 }
 
-func mergeLifecycleResourceDetails(ctx context.Context, c *SlackConnector, creds connectors.Credentials, actionType string, params json.RawMessage, sc *slackctx.SlackContext) map[string]any {
+func mergeLifecycleResourceDetails(ctx context.Context, c *SlackConnector, creds connectors.Credentials, actionType string, params json.RawMessage, sc *slackctx.SlackContext) (map[string]any, error) {
 	out := map[string]any{}
 	switch actionType {
 	case "slack.send_message", "slack.schedule_message", "slack.update_message", "slack.delete_message":
-		if legacy, err := c.resolveChannel(ctx, creds, params); err == nil && legacy != nil {
+		legacy, err := c.resolveChannel(ctx, creds, params)
+		if err != nil {
+			return nil, err
+		}
+		if legacy != nil {
 			for k, v := range legacy {
 				out[k] = v
 			}
 		}
 	case "slack.send_dm":
-		if legacy, err := c.resolveUser(ctx, creds, params); err == nil && legacy != nil {
+		legacy, err := c.resolveUser(ctx, creds, params)
+		if err != nil {
+			return nil, err
+		}
+		if legacy != nil {
 			for k, v := range legacy {
 				out[k] = v
 			}
@@ -111,7 +134,10 @@ func mergeLifecycleResourceDetails(ctx context.Context, c *SlackConnector, creds
 			}
 		}
 	}
-	return out
+	if len(out) == 0 {
+		return nil, nil
+	}
+	return out, nil
 }
 
 func mergeResourceDetailMaps(a, b map[string]any) map[string]any {
@@ -254,7 +280,7 @@ func (c *SlackConnector) resolveChannel(ctx context.Context, creds connectors.Cr
 		return nil, err
 	}
 	if !resp.OK {
-		return nil, fmt.Errorf("conversations.info: %s", resp.Error)
+		return nil, mapSlackError(resp.Error)
 	}
 
 	name := resp.Channel.Name
@@ -303,7 +329,7 @@ func (c *SlackConnector) resolveUser(ctx context.Context, creds connectors.Crede
 		return nil, err
 	}
 	if !resp.OK {
-		return nil, fmt.Errorf("users.info: %s", resp.Error)
+		return nil, mapSlackError(resp.Error)
 	}
 
 	// Prefer display_name > real_name (profile) > real_name (top-level) > username.

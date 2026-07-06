@@ -303,7 +303,9 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 					if resolver, ok := conn.(connectors.ResourceDetailResolver); ok {
 						resolveCtx, resolveCancel := context.WithTimeout(r.Context(), resourceDetailsResolveTimeout)
 						resolveCtx, resolveCreds := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
-						details, resolveErr := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCreds)
+						details, resolveErr := retryResourceDetails(resolveCtx, func(callCtx context.Context) (map[string]any, error) {
+							return resolver.ResolveResourceDetails(callCtx, actionType, actionParams, resolveCreds)
+						})
 						resolveCancel()
 						if resolveErr != nil {
 							log.Printf("[%s] ResolveResourceDetails: %v", TraceID(r.Context()), resolveErr)
