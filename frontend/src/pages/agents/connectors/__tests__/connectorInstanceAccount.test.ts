@@ -6,6 +6,7 @@ import {
   mergeConnectorInstanceIntoParameters,
   parametersWithoutConnectorInstance,
   resolveConnectorInstanceAccountLabel,
+  selectableConnectorInstancesForAccount,
   standingApprovalConnectorInstanceIdForUpdate,
 } from "../connectorInstanceAccount";
 
@@ -25,6 +26,14 @@ const instances = [
     display: "Work",
     is_default: false,
     enabled_at: "2026-01-02T00:00:00Z",
+  },
+  {
+    connector_instance_id: "33333333-3333-3333-3333-333333333333",
+    agent_id: 1,
+    connector_id: "protonmail",
+    display: "",
+    is_default: true,
+    enabled_at: "2026-01-01T00:00:00Z",
   },
 ];
 
@@ -88,5 +97,29 @@ describe("connectorInstanceAccount", () => {
         "22222222-2222-2222-2222-222222222222",
       ),
     ).toBe("22222222-2222-2222-2222-222222222222");
+  });
+
+  it("excludes credential-less instances from account selectors", () => {
+    expect(
+      selectableConnectorInstancesForAccount(instances, "*").map(
+        (i) => i.connector_instance_id,
+      ),
+    ).toEqual([
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+    ]);
+  });
+
+  it("keeps a selected credential-less instance in account selectors", () => {
+    expect(
+      selectableConnectorInstancesForAccount(
+        instances,
+        "33333333-3333-3333-3333-333333333333",
+      ).map((i) => i.connector_instance_id),
+    ).toEqual([
+      "11111111-1111-1111-1111-111111111111",
+      "22222222-2222-2222-2222-222222222222",
+      "33333333-3333-3333-3333-333333333333",
+    ]);
   });
 });

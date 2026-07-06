@@ -1,6 +1,9 @@
 import { Label } from "@/components/ui/label";
 import type { AgentConnectorInstance } from "@/hooks/useAgentConnectorInstances";
-import { instanceSelectLabel } from "./connectorInstanceAccount";
+import {
+  instanceSelectLabel,
+  selectableConnectorInstancesForAccount,
+} from "./connectorInstanceAccount";
 
 const selectClassName =
   "border-input bg-background flex h-9 w-full rounded-md border px-3 py-1 text-sm";
@@ -20,6 +23,11 @@ export function ConnectorInstanceAccountSelect({
   instances,
   disabled,
 }: ConnectorInstanceAccountSelectProps) {
+  const selectableInstances = selectableConnectorInstancesForAccount(
+    instances,
+    value,
+  );
+
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>Account</Label>
@@ -31,7 +39,7 @@ export function ConnectorInstanceAccountSelect({
         disabled={disabled}
       >
         <option value="*">All accounts</option>
-        {instances.map((instance) => (
+        {selectableInstances.map((instance) => (
           <option
             key={instance.connector_instance_id}
             value={instance.connector_instance_id}
