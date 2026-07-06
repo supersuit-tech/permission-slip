@@ -253,3 +253,82 @@ func TestRequestApproval_AutoApprove_ReadEmailMetaFromMatch(t *testing.T) {
 		t.Errorf("expected standing approval %q, got %q", saID, resp.StandingApprovalID)
 	}
 }
+
+func TestRequestApproval_Fallthrough_SurfacesMetadataUnavailableInContext(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	testhelper.InsertConnector(t, tx, "protonmail")
+	testhelper.InsertConnectorAction(t, tx, "protonmail", "protonmail.read_email", "Read Email")
+
+	saID := testhelper.GenerateID(t, "sa_")
+	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:  "protonmail.read_email",
+		Constraints: []byte(`{"message_id":"*","folder":"*","$meta":{"from":{"$pattern":"auto-confirm@amazon.com"}}}`),
+	})
+
+	action := &mockAction{result: &connectors.ActionResult{Data: json.RawMessage(`{"uid":42}`)}}
+	metaConn := &mockMetadataConnector{
+		mockConnector: mockConnector{
+			id:      "protonmail",
+			actions: map[string]connectors.Action{"protonmail.read_email": action},
+		},
+		metaErr: connectors.ErrConstraintMetadataUnavailable,
+	}
+	registry := connectors.NewRegistry()
+	registry.Register(metaConn)
+
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"read-email-meta-unresolved-001","action":{"type":"protonmail.read_email","parameters":{"message_id":42,"folder":"INBOX"}},"context":{"description":"read"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 pending, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "pending" {
+		t.Fatalf("expected pending, got %q", resp.Status)
+	}
+	if resp.ApprovalID == "" {
+		t.Fatal("expected approval_id on pending response")
+	}
+
+	approval, err := db.GetApprovalByID(t.Context(), tx, resp.ApprovalID)
+	if err != nil {
+		t.Fatalf("GetApprovalByID: %v", err)
+	}
+	if approval == nil {
+		t.Fatal("approval not found")
+	}
+
+	var ctxObj map[string]json.RawMessage
+	if err := json.Unmarshal(approval.Context, &ctxObj); err != nil {
+		t.Fatalf("unmarshal context: %v", err)
+	}
+	var details map[string]any
+	if err := json.Unmarshal(ctxObj["details"], &details); err != nil {
+		t.Fatalf("unmarshal details: %v", err)
+	}
+	ft, ok := details["standing_approval_fallthrough"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected standing_approval_fallthrough in context, got %#v", details)
+	}
+	if ft["reason"] != standingApprovalFallthroughMetadataUnavailable {
+		t.Fatalf("reason = %#v", ft["reason"])
+	}
+}

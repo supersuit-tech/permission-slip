@@ -220,10 +220,7 @@ describe("ReviewApprovalDialog — auto-approve future requests", () => {
       agent_id: 1,
       action_type: "email.send",
       action_version: "1",
-      constraints: {
-        recipient: "user@example.com",
-        subject: "Hello",
-      },
+      constraints: {},
       source_action_configuration_id: "ac_config1",
       expires_at: null,
     });

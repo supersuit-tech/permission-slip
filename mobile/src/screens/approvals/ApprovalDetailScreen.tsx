@@ -32,9 +32,8 @@ import { useCreateStandingApproval } from "../../hooks/useCreateStandingApproval
 import { useActionSchema } from "../../hooks/useActionSchema";
 import {
   useActionConfigs,
-  type ActionConfiguration,
 } from "../../hooks/useActionConfigs";
-import { buildCreateStandingApprovalFromApproval } from "./standingApprovalFromApproval";
+import { buildCreateStandingApprovalFromApproval, findMatchingActionConfigForApproval } from "./standingApprovalFromApproval";
 import { colors } from "../../theme/colors";
 import {
   humanizeActionType,
@@ -60,6 +59,9 @@ import {
 } from "./emailThreadUtils";
 import { ProtonInReplyToCard } from "./ProtonInReplyToCard";
 import { emailDetailsUnavailable } from "./emailEnrichment";
+import { EmailApprovalDetailsCard } from "./EmailApprovalDetailsCard";
+import { shouldShowEmailApprovalSection } from "./emailApprovalDetails";
+import { parseStandingApprovalFallthrough } from "./standingApprovalFallthrough";
 import { ProtonBatchEmailsCard } from "./ProtonBatchEmailsCard";
 import { parseProtonBatchEmails } from "./protonBatchEmailsUtils";
 import {
@@ -129,6 +131,11 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     ? getAgentDisplayName(agent)
     : `Agent ${approval.agent_id}`;
 
+  const standingApprovalFallthrough = useMemo(
+    () => parseStandingApprovalFallthrough(approval.context.details),
+    [approval.context.details],
+  );
+
   const parameters = safeParams(approval.action.parameters);
   const paramEntries: KeyValueEntry[] = useMemo(
     () => Object.entries(parameters).map(([label, value]) => ({ label, value })),
@@ -192,12 +199,8 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     [standingApprovals, approval.agent_id, approval.action.type],
   );
   const matchingActionConfig = useMemo(
-    () =>
-      configs.find(
-        (c: ActionConfiguration) =>
-          c.status === "active" && c.action_type === approval.action.type,
-      ) ?? null,
-    [configs, approval.action.type],
+    () => findMatchingActionConfigForApproval(configs, approval),
+    [configs, approval],
   );
   const showAutoApproveCheckbox =
     !standingApprovalsLoading && !hasExistingStandingApproval;
@@ -410,18 +413,42 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           contextDescription={approval.context.description}
         />
 
-        {/* Email enrichment fallback — metadata lookup failed at creation */}
-        {emailDetailsUnavailable(
+        {/* Email metadata — dedicated From / Subject / Date when enrichment succeeded */}
+        {standingApprovalFallthrough && (
+          <View style={styles.sectionMinor}>
+            <View
+              style={styles.standingApprovalFallthroughBanner}
+              testID="standing-approval-fallthrough"
+              accessibilityRole="text"
+            >
+              <Text style={styles.standingApprovalFallthroughText}>
+                {standingApprovalFallthrough.message}
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {shouldShowEmailApprovalSection(
           approval.action.type,
           approval.resource_details as Record<string, unknown> | undefined,
         ) && (
-          <View style={styles.sectionMinor}>
-            <Text
-              style={styles.emailDetailsUnavailableText}
-              testID="email-details-unavailable"
-            >
-              Email details unavailable
-            </Text>
+          <View style={styles.sectionMajor}>
+            <Text style={styles.sectionLabel}>Email</Text>
+            <EmailApprovalDetailsCard
+              actionType={approval.action.type}
+              resourceDetails={approval.resource_details as Record<string, unknown> | undefined}
+            />
+            {emailDetailsUnavailable(
+              approval.action.type,
+              approval.resource_details as Record<string, unknown> | undefined,
+            ) && (
+              <Text
+                style={styles.emailDetailsUnavailableText}
+                testID="email-details-unavailable"
+              >
+                Email details unavailable
+              </Text>
+            )}
           </View>
         )}
 
@@ -664,6 +691,19 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: colors.gray400,
     fontStyle: "italic",
+    marginTop: 8,
+  },
+  standingApprovalFallthroughBanner: {
+    backgroundColor: "#FFFBEB",
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: "#FDE68A",
+  },
+  standingApprovalFallthroughText: {
+    fontSize: 13,
+    color: "#92400E",
+    lineHeight: 18,
   },
   // --- Footer ---
   footerLabel: {
