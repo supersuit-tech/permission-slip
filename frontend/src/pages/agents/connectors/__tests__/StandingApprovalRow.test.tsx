@@ -67,7 +67,7 @@ describe("StandingApprovalRow", () => {
     expect(screen.getByText("No constraints")).toBeInTheDocument();
   });
 
-  it("renders Match all when constraints is an empty object", () => {
+  it("renders No constraints when constraints is an empty object", () => {
     renderRow({ ...baseRule, constraints: {} });
 
     expect(screen.getByText("No constraints")).toBeInTheDocument();

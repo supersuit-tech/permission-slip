@@ -319,8 +319,6 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 
 const autoApprovedFromRequestName = "Auto-approved from request"
 
-const maxStandingApprovalNameLength = 255
-
 func handleRevokeStandingApproval(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())
