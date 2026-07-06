@@ -92,7 +92,7 @@ func TestValidateParametersAgainstStructuredConfig_Negation(t *testing.T) {
 		"groups": [{
 			"match": "all",
 			"conditions": [
-				{"field":"recipient","op":"any_of","values":["*@acme.com","boss@partner.com"]},
+				{"field":"recipient","op":"any_of","values":[{"$pattern":"*@acme.com"},"boss@partner.com"]},
 				{"field":"recipient","op":"none_of","values":["ceo@acme.com"]}
 			]
 		}]

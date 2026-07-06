@@ -108,10 +108,8 @@ describe("EditStandingApprovalDialog", () => {
     );
 
     await waitFor(() => {
-      expect(screen.getByText("Verified metadata")).toBeInTheDocument();
+      expect(screen.getByText("Verified sender")).toBeInTheDocument();
     });
-    expect(document.getElementById("meta-from")).toHaveValue(
-      "automated@airbnb.com",
-    );
+    expect(screen.getByDisplayValue("automated@airbnb.com")).toBeInTheDocument();
   });
 });
