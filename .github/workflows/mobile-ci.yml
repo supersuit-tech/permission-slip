@@ -20,6 +20,7 @@ jobs:
           filters: |
             mobile:
               - 'mobile/**'
+              - 'shared/constraints/**'
               - 'spec/openapi/**'
               - 'Makefile'
               - '.github/workflows/mobile-ci.yml'

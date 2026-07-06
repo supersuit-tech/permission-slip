@@ -4,6 +4,7 @@ import {
   META_NAMESPACE_KEY,
   formatStandingApprovalConstraints,
   type ConstraintMode,
+  type ParsedConstraintLine,
 } from "@permission-slip/constraints-format";
 import type { ParamMode } from "@/pages/agents/connectors/StandingApprovalFormFields";
 import type { DataWindowFormState } from "@/lib/dataWindow";
@@ -348,7 +349,7 @@ export function parseStructuredConstraintsForDisplay(
   if (!constraints || typeof constraints !== "object") return [];
   if (!isStructuredConstraints(constraints)) return [];
 
-  return formatStandingApprovalConstraints(constraints).map((line) => ({
+  return formatStandingApprovalConstraints(constraints).map((line: ParsedConstraintLine) => ({
     name: line.label,
     mode: line.mode,
     value: line.mode === "wildcard" ? "any" : line.value,

@@ -24,7 +24,7 @@ install:
 # Minimal install for server production build (CI): frontend + Go only.
 # Uses npm ci --ignore-scripts to skip postinstall (openapi-typescript); run
 # make bundle && make generate-frontend-from-bundle before frontend build.
-install-build-deps:
+install-build-deps: shared-constraints-build
 	cd frontend && npm ci --ignore-scripts
 	go mod download
 
@@ -82,7 +82,7 @@ build: generate
 
 # CI / slim server build: expects bundle + generate-frontend-from-bundle already
 # (see install-build-deps). Does not install mobile or CLI npm dependencies.
-build-ci:
+build-ci: shared-constraints-build
 	cd frontend && VITE_GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) VITE_GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) VITE_WEB_VERSION=$(WEB_VERSION) npm run build
 	touch frontend/dist/.gitkeep
 	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
@@ -134,7 +134,7 @@ test-backend:
 		echo "Supabase not detected — skipping integration-tagged tests (run 'supabase start' to include them)."; \
 	fi
 
-test-frontend:
+test-frontend: shared-constraints-build
 	cd frontend && npm test
 
 # Explicit integration test target — errors if Supabase is not running.
