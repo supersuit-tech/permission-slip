@@ -319,10 +319,6 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 
 const autoApprovedFromRequestName = "Auto-approved from request"
 
-const autoCreatedFromRuleProposalName = "Auto-created from approved rule proposal"
-
-var autoCreatedFromRuleProposalDescription = "Created automatically when approving a standing auto-approve rule proposal"
-
 func handleRevokeStandingApproval(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		profile := Profile(r.Context())

@@ -5,7 +5,8 @@ import { TableRow, TableCell } from "@/components/ui/table";
 import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import type { AgentConnectorInstance } from "@/hooks/useAgentConnectorInstances";
-import { isPatternWrapper } from "@/lib/constraints";
+import { ConstraintsSummary } from "@/pages/dashboard/ConstraintsSummary";
+import { isBoilerplateStandingApprovalDescription } from "@/lib/standingApprovalConstraints";
 import { StandingApprovalAccountRescopeCell } from "./StandingApprovalAccountRescopeCell";
 import {
   connectorInstanceFromStandingApprovalId,
@@ -60,10 +61,14 @@ export function StandingApprovalRow({
   onChanged,
 }: StandingApprovalRowProps) {
   const action = actions.find((a) => a.action_type === rule.action_type);
-  const constraintEntries = Object.entries(
-    (rule.constraints ?? {}) as Record<string, unknown>,
-  ).filter(([key]) => key !== "$meta" && key !== "$data_window");
+  const constraints =
+    rule.constraints && typeof rule.constraints === "object"
+      ? (rule.constraints as Record<string, unknown>)
+      : null;
   const isInactive = rule.status !== "active";
+  const showDescription =
+    rule.description &&
+    !isBoilerplateStandingApprovalDescription(rule.description);
 
   return (
     <TableRow
@@ -77,7 +82,7 @@ export function StandingApprovalRow({
       <TableCell>
         <div>
           <p className="font-medium">{rule.name ?? rule.action_type}</p>
-          {rule.description && (
+          {showDescription && (
             <p className="text-muted-foreground text-sm">{rule.description}</p>
           )}
         </div>
@@ -91,15 +96,7 @@ export function StandingApprovalRow({
         </div>
       </TableCell>
       <TableCell>
-        {constraintEntries.length > 0 ? (
-          <div className="space-y-0.5">
-            {constraintEntries.map(([key, value]) => (
-              <ParameterPill key={key} name={key} value={value} />
-            ))}
-          </div>
-        ) : (
-          <span className="text-muted-foreground text-xs">Match all</span>
-        )}
+        <ConstraintsSummary constraints={constraints} />
       </TableCell>
       {showAccountColumn && (
         <TableCell>
@@ -152,23 +149,5 @@ export function StandingApprovalRow({
         </div>
       </TableCell>
     </TableRow>
-  );
-}
-
-function ParameterPill({ name, value }: { name: string; value: unknown }) {
-  const isWildcard = value === "*";
-  const isPattern = isPatternWrapper(value);
-  const displayValue = isPattern ? value.$pattern : String(value);
-
-  return (
-    <span className="inline-flex items-center gap-1 text-xs">
-      <span className="text-muted-foreground font-mono">{name}:</span>
-      <Badge
-        variant={isWildcard || isPattern ? "outline" : "secondary"}
-        className={`font-mono text-xs ${isWildcard ? "border-dashed" : ""} ${isPattern ? "border-dashed italic" : ""}`}
-      >
-        {displayValue}
-      </Badge>
-    </span>
   );
 }

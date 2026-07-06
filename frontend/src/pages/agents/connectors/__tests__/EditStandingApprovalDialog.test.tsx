@@ -66,4 +66,52 @@ describe("EditStandingApprovalDialog", () => {
     });
     expect(screen.getByLabelText(/Name/i)).toHaveValue("Match all issues");
   });
+
+  it("shows verified metadata fields from $meta constraints", async () => {
+    const protonmailActions: ConnectorAction[] = [
+      {
+        action_type: "protonmail.read_email",
+        operation_type: "read",
+        name: "Read Email",
+        description: "Read an email",
+        risk_level: "low",
+        requires_payment_method: false,
+        parameters_schema: {
+          type: "object",
+          properties: {
+            message_id: { type: "integer" },
+            folder: { type: "string" },
+          },
+        },
+        meta_constraint_fields: ["from", "sender", "to"],
+      },
+    ];
+
+    renderWithProviders(
+      <EditStandingApprovalDialog
+        open
+        onOpenChange={vi.fn()}
+        rule={{
+          ...nullConstraintRule,
+          action_type: "protonmail.read_email",
+          name: "Read Email from automated@airbnb.com",
+          constraints: {
+            message_id: "*",
+            folder: "*",
+            $meta: { from: "automated@airbnb.com" },
+          },
+        }}
+        agentId={42}
+        connectorId="protonmail"
+        actions={protonmailActions}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Verified metadata")).toBeInTheDocument();
+    });
+    expect(document.getElementById("meta-from")).toHaveValue(
+      "automated@airbnb.com",
+    );
+  });
 });

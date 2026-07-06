@@ -294,7 +294,7 @@ describe("ConnectorConfigPage", () => {
     await waitFor(() => {
       expect(screen.getByText("Match all issues")).toBeInTheDocument();
     });
-    expect(screen.getByText("Match all")).toBeInTheDocument();
+    expect(screen.getByText("No constraints")).toBeInTheDocument();
     expect(
       screen.queryByText("Something went wrong"),
     ).not.toBeInTheDocument();

@@ -19,6 +19,7 @@ import {
   ConstraintParameterFields,
   parseParametersSchema,
 } from "./ConstraintParameterFields";
+import { MetaConstraintFields } from "./MetaConstraintFields";
 import {
   NameField,
   DescriptionField,
@@ -27,6 +28,13 @@ import {
   isPatternWrapper,
   type ParamMode,
 } from "./StandingApprovalFormFields";
+import {
+  buildMetaConstraintsFromForm,
+  mergeStandingApprovalConstraints,
+  metaModesFromConstraints,
+  metaValuesFromConstraints,
+  preservedNamespacesFromConstraints,
+} from "@/lib/standingApprovalConstraints";
 import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
 import {
   connectorInstanceFromStandingApprovalId,
@@ -65,6 +73,19 @@ export function EditStandingApprovalDialog({
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>(() =>
     inferModesFromConstraints((rule.constraints ?? {}) as Record<string, unknown>),
   );
+  const [metaValues, setMetaValues] = useState<Record<string, string>>(() =>
+    metaValuesFromConstraints((rule.constraints ?? {}) as Record<string, unknown>),
+  );
+  const [metaModes, setMetaModes] = useState<Record<string, ParamMode>>(() =>
+    metaModesFromConstraints((rule.constraints ?? {}) as Record<string, unknown>),
+  );
+  const preservedNamespaces = useMemo(
+    () =>
+      preservedNamespacesFromConstraints(
+        (rule.constraints ?? {}) as Record<string, unknown>,
+      ),
+    [rule.constraints],
+  );
   const [connectorInstance, setConnectorInstance] = useState(() =>
     connectorInstanceFromStandingApprovalId(rule.connector_instance_id),
   );
@@ -88,6 +109,8 @@ export function EditStandingApprovalDialog({
       ),
     [action],
   );
+
+  const metaFields = action?.meta_constraint_fields ?? [];
 
   function handleParamChange(key: string, value: string) {
     setParamValues((prev) => ({ ...prev, [key]: value }));
@@ -114,10 +137,10 @@ export function EditStandingApprovalDialog({
     }
 
     try {
-      const constraints = buildParametersFromForm(
-        paramValues,
-        schema?.properties,
-        paramModes,
+      const constraints = mergeStandingApprovalConstraints(
+        buildParametersFromForm(paramValues, schema?.properties, paramModes),
+        buildMetaConstraintsFromForm(metaValues, metaModes),
+        preservedNamespaces,
       );
 
       await updateStandingApproval(rule.standing_approval_id, {
@@ -189,20 +212,39 @@ export function EditStandingApprovalDialog({
             )}
 
             {action ? (
-              <div className="space-y-2">
-                <Label>Constraints</Label>
-                <ConstraintParameterFields
-                  parametersSchema={schema}
-                  values={paramValues}
-                  onValueChange={handleParamChange}
-                  modes={paramModes}
-                  onModeChange={(key, mode) =>
-                    setParamModes((prev) => ({ ...prev, [key]: mode }))
-                  }
-                  disabled={isPending}
-                  agentId={agentId}
-                  connectorId={connectorId}
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Parameter constraints</Label>
+                  <ConstraintParameterFields
+                    parametersSchema={schema}
+                    values={paramValues}
+                    onValueChange={handleParamChange}
+                    modes={paramModes}
+                    onModeChange={(key, mode) =>
+                      setParamModes((prev) => ({ ...prev, [key]: mode }))
+                    }
+                    disabled={isPending}
+                    agentId={agentId}
+                    connectorId={connectorId}
+                  />
+                </div>
+                {metaFields.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Verified metadata</Label>
+                    <MetaConstraintFields
+                      fields={metaFields}
+                      values={metaValues}
+                      onValueChange={(key, value) =>
+                        setMetaValues((prev) => ({ ...prev, [key]: value }))
+                      }
+                      modes={metaModes}
+                      onModeChange={(key, mode) =>
+                        setMetaModes((prev) => ({ ...prev, [key]: mode }))
+                      }
+                      disabled={isPending}
+                    />
+                  </div>
+                )}
               </div>
             ) : null}
 

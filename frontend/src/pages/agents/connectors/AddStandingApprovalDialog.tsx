@@ -18,6 +18,7 @@ import {
   ConstraintParameterFields,
   parseParametersSchema,
 } from "./ConstraintParameterFields";
+import { MetaConstraintFields } from "./MetaConstraintFields";
 import {
   ActionSelect,
   NameField,
@@ -36,6 +37,10 @@ import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect
 import {
   mergeConnectorInstanceIntoParameters,
 } from "./connectorInstanceAccount";
+import {
+  buildMetaConstraintsFromForm,
+  mergeStandingApprovalConstraints,
+} from "@/lib/standingApprovalConstraints";
 import { StepLimits } from "@/pages/dashboard/StandingApprovalSteps";
 
 interface AddStandingApprovalDialogProps {
@@ -64,6 +69,8 @@ export function AddStandingApprovalDialog({
   const [description, setDescription] = useState("");
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
+  const [metaValues, setMetaValues] = useState<Record<string, string>>({});
+  const [metaModes, setMetaModes] = useState<Record<string, ParamMode>>({});
   const [connectorInstance, setConnectorInstance] = useState("*");
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(() => defaultExpiresAtLocal());
@@ -85,12 +92,16 @@ export function AddStandingApprovalDialog({
     [selectedAction],
   );
 
+  const metaFields = selectedAction?.meta_constraint_fields ?? [];
+
   function resetForm() {
     setSelectedActionType("");
     setName("");
     setDescription("");
     setParamValues({});
     setParamModes({});
+    setMetaValues({});
+    setMetaModes({});
     setConnectorInstance("*");
     setNoExpiry(true);
     setExpiresAt(defaultExpiresAtLocal());
@@ -105,6 +116,8 @@ export function AddStandingApprovalDialog({
     setSelectedActionType(actionType);
     setParamValues({});
     setParamModes({});
+    setMetaValues({});
+    setMetaModes({});
     setConnectorInstance("*");
   }
 
@@ -137,10 +150,13 @@ export function AddStandingApprovalDialog({
     }
 
     try {
-      let builtConstraints = buildParametersFromForm(
-        paramValues,
-        schema?.properties,
-        paramModes,
+      let builtConstraints = mergeStandingApprovalConstraints(
+        buildParametersFromForm(
+          paramValues,
+          schema?.properties,
+          paramModes,
+        ),
+        buildMetaConstraintsFromForm(metaValues, metaModes),
       );
       if (showAccountSelect) {
         builtConstraints = mergeConnectorInstanceIntoParameters(
@@ -235,20 +251,39 @@ export function AddStandingApprovalDialog({
             )}
 
             {selectedAction && (
-              <div className="space-y-2">
-                <Label>Constraints</Label>
-                <ConstraintParameterFields
-                  parametersSchema={schema}
-                  values={paramValues}
-                  onValueChange={handleParamChange}
-                  modes={paramModes}
-                  onModeChange={(key, mode) =>
-                    setParamModes((prev) => ({ ...prev, [key]: mode }))
-                  }
-                  disabled={isPending}
-                  agentId={agentId}
-                  connectorId={connectorId}
-                />
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Parameter constraints</Label>
+                  <ConstraintParameterFields
+                    parametersSchema={schema}
+                    values={paramValues}
+                    onValueChange={handleParamChange}
+                    modes={paramModes}
+                    onModeChange={(key, mode) =>
+                      setParamModes((prev) => ({ ...prev, [key]: mode }))
+                    }
+                    disabled={isPending}
+                    agentId={agentId}
+                    connectorId={connectorId}
+                  />
+                </div>
+                {metaFields.length > 0 && (
+                  <div className="space-y-2">
+                    <Label>Verified metadata</Label>
+                    <MetaConstraintFields
+                      fields={metaFields}
+                      values={metaValues}
+                      onValueChange={(key, value) =>
+                        setMetaValues((prev) => ({ ...prev, [key]: value }))
+                      }
+                      modes={metaModes}
+                      onModeChange={(key, mode) =>
+                        setMetaModes((prev) => ({ ...prev, [key]: mode }))
+                      }
+                      disabled={isPending}
+                    />
+                  </div>
+                )}
               </div>
             )}
 

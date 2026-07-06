@@ -207,7 +207,17 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 		}
 
 		startsAt := time.Now().UTC()
-		ruleName := autoCreatedFromRuleProposalName
+		actionName := sar.ActionType
+		if displayName, err := db.GetActionDisplayName(r.Context(), deps.DB, sar.ActionType); err != nil {
+			log.Printf("[%s] ApproveStandingApprovalRequest action name: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to approve standing approval request"))
+			return
+		} else if displayName != "" {
+			actionName = displayName
+		}
+		ruleName := deriveStandingApprovalNameFromRequest(actionName, sar.Constraints)
+		ruleDescription := standingApprovalAutoRuleDescription
 
 		actionSchema, err := db.GetActionParametersSchema(r.Context(), deps.DB, sar.ActionType)
 		if err != nil {
@@ -248,7 +258,7 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			ActionVersion:       sar.ActionVersion,
 			Constraints:         sar.Constraints,
 			Name:                &ruleName,
-			Description:         &autoCreatedFromRuleProposalDescription,
+			Description:         &ruleDescription,
 			ConnectorInstanceID: sar.ConnectorInstanceID,
 			StartsAt:            startsAt,
 			ExpiresAt:           nil,

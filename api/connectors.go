@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/supersuit-tech/permission-slip/connectors"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
@@ -26,16 +27,17 @@ type connectorListResponse struct {
 }
 
 type connectorActionResponse struct {
-	ActionType            string  `json:"action_type"`
-	OperationType         string  `json:"operation_type"`
-	Name                  string  `json:"name"`
-	Description           *string `json:"description,omitempty"`
-	RiskLevel             *string `json:"risk_level,omitempty"`
-	ParametersSchema      any     `json:"parameters_schema,omitempty"`
-	RequiresPaymentMethod bool    `json:"requires_payment_method"`
-	DisplayTemplate       *string `json:"display_template,omitempty"`
-	Preview               any     `json:"preview,omitempty"`
-	DataWindow            any     `json:"data_window,omitempty"`
+	ActionType            string   `json:"action_type"`
+	OperationType         string   `json:"operation_type"`
+	Name                  string   `json:"name"`
+	Description           *string  `json:"description,omitempty"`
+	RiskLevel             *string  `json:"risk_level,omitempty"`
+	ParametersSchema      any      `json:"parameters_schema,omitempty"`
+	RequiresPaymentMethod bool     `json:"requires_payment_method"`
+	DisplayTemplate       *string  `json:"display_template,omitempty"`
+	Preview               any      `json:"preview,omitempty"`
+	DataWindow            any      `json:"data_window,omitempty"`
+	MetaConstraintFields  []string `json:"meta_constraint_fields,omitempty"`
 }
 
 type credentialFieldResponse struct {
@@ -117,7 +119,7 @@ func handleGetConnector(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		RespondJSON(w, http.StatusOK, toConnectorDetailResponse(r.Context(), *connector))
+		RespondJSON(w, http.StatusOK, toConnectorDetailResponse(r.Context(), *connector, deps.Connectors))
 	}
 }
 
@@ -133,7 +135,7 @@ func toConnectorSummaryResponse(c db.ConnectorSummary) connectorSummaryResponse 
 	}
 }
 
-func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connectorDetailResponse {
+func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail, registry *connectors.Registry) connectorDetailResponse {
 	actions := make([]connectorActionResponse, len(c.Actions))
 	for i, a := range c.Actions {
 		resp := connectorActionResponse{
@@ -144,6 +146,9 @@ func toConnectorDetailResponse(ctx context.Context, c db.ConnectorDetail) connec
 			RiskLevel:             a.RiskLevel,
 			RequiresPaymentMethod: a.RequiresPaymentMethod,
 			DisplayTemplate:       a.DisplayTemplate,
+		}
+		if fields, ok := actionMetaConstraintFieldList(registry, a.ActionType); ok {
+			resp.MetaConstraintFields = fields
 		}
 		if len(a.ParametersSchema) > 0 {
 			var schema any
