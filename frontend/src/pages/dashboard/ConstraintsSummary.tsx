@@ -29,7 +29,9 @@ function ConstraintBadge({ constraint }: { constraint: ParsedConstraint }) {
   const displayValue =
     constraint.mode === "wildcard"
       ? "any"
-      : truncate(constraint.value, VALUE_TRUNCATE_LENGTH);
+      : constraint.negated
+        ? `not ${truncate(constraint.value, VALUE_TRUNCATE_LENGTH)}`
+        : truncate(constraint.value, VALUE_TRUNCATE_LENGTH);
 
   return (
     <Badge

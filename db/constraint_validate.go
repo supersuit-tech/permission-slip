@@ -209,22 +209,19 @@ func (e *ConfigValidationError) Error() string {
 }
 
 // ValidateParametersAgainstConfig checks that the provided execution parameters
-// satisfy the action configuration's parameter constraints:
-//
-//   - Wildcard parameters (value == "*") accept any value and may be omitted.
-//   - Pattern parameters ({"$pattern": "<glob>"}) require a string value that
-//     matches the glob pattern. Pattern parameters are required.
-//   - Fixed parameters (anything else) must match exactly.
-//   - Extra parameters not in the configuration are rejected.
-//   - Missing parameters that are fixed or pattern in the configuration are rejected.
-//   - Missing wildcard parameters are allowed (the agent chose not to provide them).
-//
-// Both configParams and execParams are raw JSONB (JSON objects). When the
-// configuration includes a $meta namespace, resolvedMeta must contain the
-// server-resolved metadata object; otherwise ErrMetadataUnresolved is returned.
-// Returns nil if validation passes, or a *ConfigValidationError describing the
-// first violation.
+// satisfy the action configuration's parameter constraints.
 func ValidateParametersAgainstConfig(configParams, execParams, resolvedMeta json.RawMessage) error {
+	if IsStructuredConstraintsV2(configParams) {
+		sc, err := ParseStructuredConstraints(configParams)
+		if err != nil {
+			return err
+		}
+		return ValidateParametersAgainstStructuredConfig(sc, execParams, resolvedMeta)
+	}
+	return validateFlatParametersAgainstConfig(configParams, execParams, resolvedMeta)
+}
+
+func validateFlatParametersAgainstConfig(configParams, execParams, resolvedMeta json.RawMessage) error {
 	var config map[string]json.RawMessage
 	if len(configParams) == 0 || string(configParams) == "{}" {
 		config = map[string]json.RawMessage{}

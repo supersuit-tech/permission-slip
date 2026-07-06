@@ -49,6 +49,15 @@ func fillMissingSchemaParameterWildcards(
 		return constraints, nil
 	}
 
+	if db.IsStructuredConstraintsV2(constraints) {
+		sc, err := db.ParseStructuredConstraints(constraints)
+		if err != nil {
+			return nil, err
+		}
+		updated := db.AddMissingSchemaFieldsToStructured(sc, schemaKeys)
+		return db.MarshalStructuredConstraints(updated)
+	}
+
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(constraints, &obj); err != nil {
 		return nil, fmt.Errorf("constraints must be a JSON object")
@@ -76,6 +85,10 @@ func validateStandingApprovalConstraintKeys(
 	actionType string,
 	constraints []byte,
 ) error {
+	if db.IsStructuredConstraintsV2(constraints) {
+		return validateStructuredStandingApprovalConstraintKeys(ctx, d, registry, actionType, constraints)
+	}
+
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(constraints, &obj); err != nil {
 		return fmt.Errorf("constraints must be a JSON object")
@@ -148,6 +161,94 @@ func validateStandingApprovalConstraintKeys(
 		return formatUnknownConstraintKeyError(key, actionType, metaFields)
 	}
 
+	return nil
+}
+
+func validateStructuredStandingApprovalConstraintKeys(
+	ctx context.Context,
+	d db.DBTX,
+	registry *connectors.Registry,
+	actionType string,
+	constraints []byte,
+) error {
+	sc, err := db.ParseStructuredConstraints(constraints)
+	if err != nil {
+		return err
+	}
+
+	schemaKeys, err := actionSchemaPropertyKeys(ctx, d, actionType)
+	if err != nil {
+		return err
+	}
+
+	var metaFields map[string]struct{}
+	var metaSupported bool
+	if registry != nil {
+		metaFields, metaSupported = connectorMetaConstraintFields(registry, actionType)
+	}
+
+	for gi, group := range sc.Groups {
+		for ci, cond := range group.Conditions {
+			field := cond.Field
+			if field == db.DataWindowNamespaceKey {
+				if err := db.ValidateDataWindowConstraintShape(cond.Value); err != nil {
+					return err
+				}
+				pair, err := db.GetActionDataWindowParams(ctx, d, actionType)
+				if err != nil {
+					return fmt.Errorf("lookup action data window: %w", err)
+				}
+				if pair == nil {
+					return fmt.Errorf("$data_window constraints are not supported for action %q", actionType)
+				}
+				continue
+			}
+			if strings.HasPrefix(field, db.MetaNamespaceKey+".") {
+				if !metaSupported {
+					return fmt.Errorf("$meta constraints are not supported for action %q", actionType)
+				}
+				metaKey := strings.TrimPrefix(field, db.MetaNamespaceKey+".")
+				if metaKey == "" {
+					return fmt.Errorf("group %d condition %d: $meta field must not be empty", gi, ci)
+				}
+				if _, ok := metaFields[metaKey]; !ok {
+					return fmt.Errorf("unsupported $meta constraint key %q for action %q", metaKey, actionType)
+				}
+				continue
+			}
+			if field == "" {
+				return fmt.Errorf("group %d condition %d: field must not be empty", gi, ci)
+			}
+			if schemaKeys != nil {
+				if _, ok := schemaKeys[field]; !ok {
+					return formatUnknownConstraintKeyError(field, actionType, metaFields)
+				}
+				continue
+			}
+			if metaFields != nil {
+				if _, ok := metaFields[field]; ok {
+					return formatUnknownConstraintKeyError(field, actionType, metaFields)
+				}
+			}
+			for _, val := range conditionValuesForValidation(cond) {
+				if !isAllowedParameterConstraintValue(val) {
+					return formatUnknownConstraintKeyError(field, actionType, metaFields)
+				}
+			}
+		}
+	}
+	return nil
+}
+
+func conditionValuesForValidation(cond db.ConstraintCondition) []json.RawMessage {
+	switch cond.Op {
+	case db.OpAnyOf, db.OpNoneOf:
+		return cond.Values
+	case db.OpMatches, db.OpDoesNotMatch:
+		if len(cond.Value) > 0 {
+			return []json.RawMessage{cond.Value}
+		}
+	}
 	return nil
 }
 

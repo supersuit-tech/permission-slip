@@ -58,6 +58,9 @@ export function mergeConnectorInstanceIntoParameters(
   parameters: Record<string, unknown>,
   connectorInstance: string,
 ): Record<string, unknown> {
+  if (parameters.$version === CONSTRAINT_VERSION && Array.isArray(parameters.groups)) {
+    return mergeConnectorInstanceIntoStructured(parameters, connectorInstance);
+  }
   const result = { ...parameters };
   if (connectorInstance === "*") {
     result[CONNECTOR_INSTANCE_PARAM] = "*";
@@ -66,6 +69,29 @@ export function mergeConnectorInstanceIntoParameters(
   }
   return result;
 }
+
+function mergeConnectorInstanceIntoStructured(
+  constraints: Record<string, unknown>,
+  connectorInstance: string,
+): Record<string, unknown> {
+  const groups = (constraints.groups as Array<Record<string, unknown>>).map(
+    (group, index) => {
+      if (index !== 0) return group;
+      const conditions = [
+        ...((group.conditions as Array<Record<string, unknown>>) ?? []),
+        {
+          field: CONNECTOR_INSTANCE_PARAM,
+          op: "matches",
+          value: connectorInstance === "*" ? "*" : connectorInstance,
+        },
+      ];
+      return { ...group, conditions };
+    },
+  );
+  return { ...constraints, groups };
+}
+
+const CONSTRAINT_VERSION = 2;
 
 export function parametersWithoutConnectorInstance(
   parameters: Record<string, unknown>,

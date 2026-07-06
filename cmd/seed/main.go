@@ -1234,9 +1234,9 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8, $9)`,
 		"sa-everything-2", slack, userHasEverything,
 		"slack.send_message",
-		"Post to #releases",
-		"Agent can send any message to the #releases channel.",
-		`{"channel": "#engineering"}`,
+		"Post to engineering channels",
+		"Agent can post to #engineering or #releases, but not #executive-only.",
+		`{"$version":2,"match":"any","groups":[{"match":"all","conditions":[{"field":"channel","op":"any_of","values":["#engineering","#releases"]},{"field":"channel","op":"none_of","values":["#executive-only"]}]}]}`,
 		now.Add(-3*24*time.Hour),
 		now.Add(27*24*time.Hour))
 

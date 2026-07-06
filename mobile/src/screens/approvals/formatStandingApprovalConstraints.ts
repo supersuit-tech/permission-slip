@@ -5,7 +5,10 @@ export interface ParsedConstraintLine {
   mode: ConstraintMode;
   value: string;
   verified: boolean;
+  negated?: boolean;
 }
+
+const CONSTRAINT_VERSION = 2;
 
 function isPatternWrapper(value: unknown): value is { $pattern: string } {
   return (
@@ -50,24 +53,92 @@ function formatDataWindowConstraint(raw: unknown): string | null {
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+function decodeDisplayValue(raw: unknown): { mode: ConstraintMode; value: string } {
+  if (raw === "*") {
+    return { mode: "wildcard", value: "any" };
+  }
+  if (isPatternWrapper(raw)) {
+    return { mode: "pattern", value: raw.$pattern };
+  }
+  return { mode: "fixed", value: String(raw) };
+}
+
+function parseStructuredConstraints(
+  constraints: Record<string, unknown>,
+): ParsedConstraintLine[] {
+  const groups = constraints.groups;
+  if (!Array.isArray(groups)) return [];
+
+  const lines: ParsedConstraintLine[] = [];
+  groups.forEach((group, scenarioIndex) => {
+    const prefix = groups.length > 1 ? `Scenario ${scenarioIndex + 1}: ` : "";
+    const conditions = (group as { conditions?: unknown[] }).conditions;
+    if (!Array.isArray(conditions)) return;
+
+    for (const cond of conditions) {
+      if (!cond || typeof cond !== "object") continue;
+      const c = cond as Record<string, unknown>;
+      const field = String(c.field ?? "");
+      const op = String(c.op ?? "matches");
+      const negated = op === "none_of" || op === "does_not_match";
+
+      if (field === "$data_window") {
+        const text = formatDataWindowConstraint(c.value);
+        if (text) {
+          lines.push({
+            label: `${prefix}Data window`,
+            mode: "fixed",
+            value: text,
+            verified: false,
+          });
+        }
+        continue;
+      }
+
+      const isMeta = field.startsWith("$meta.");
+      const label = isMeta
+        ? metaConstraintLabel(field.slice("$meta.".length))
+        : field;
+
+      const values: unknown[] =
+        op === "any_of" || op === "none_of"
+          ? ((c.values as unknown[]) ?? [])
+          : c.value !== undefined
+            ? [c.value]
+            : [];
+
+      for (const raw of values) {
+        const decoded = decodeDisplayValue(raw);
+        lines.push({
+          label: `${prefix}${label}`,
+          mode: decoded.mode,
+          value: decoded.value,
+          verified: isMeta,
+          negated,
+        });
+      }
+    }
+  });
+  return lines;
+}
+
 function parseValue(
   label: string,
   raw: unknown,
   verified: boolean,
 ): ParsedConstraintLine {
-  if (raw === "*") {
-    return { label, mode: "wildcard", value: "any", verified };
-  }
-  if (isPatternWrapper(raw)) {
-    return { label, mode: "pattern", value: raw.$pattern, verified };
-  }
-  return { label, mode: "fixed", value: String(raw), verified };
+  const decoded = decodeDisplayValue(raw);
+  return { label, mode: decoded.mode, value: decoded.value, verified };
 }
 
 export function formatStandingApprovalConstraints(
   constraints: Record<string, unknown> | null | undefined,
 ): ParsedConstraintLine[] {
   if (!constraints || typeof constraints !== "object") return [];
+
+  if (constraints.$version === CONSTRAINT_VERSION) {
+    return parseStructuredConstraints(constraints);
+  }
 
   const lines: ParsedConstraintLine[] = [];
   for (const [key, raw] of Object.entries(constraints)) {
@@ -104,8 +175,9 @@ export function formatStandingApprovalConstraintsText(
   if (lines.length === 0) return "No constraints";
   return lines
     .map((line) => {
+      const prefix = line.negated ? "not " : "";
       const value =
-        line.mode === "wildcard" ? "any value" : line.value;
+        line.mode === "wildcard" ? "any value" : `${prefix}${line.value}`;
       return `${line.label}: ${value}`;
     })
     .join("\n");
