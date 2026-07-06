@@ -227,6 +227,79 @@ describe("ConnectorConfigPage", () => {
     expect(screen.getByText("Disable")).toBeInTheDocument();
   });
 
+  it("renders standing approvals with null constraints without crashing", async () => {
+    mockGet.mockImplementation((path: string) => {
+      if (path === "/v1/agents/{agent_id}") {
+        return Promise.resolve({ data: mockAgentResponse });
+      }
+      if (path === "/v1/connectors/{connector_id}") {
+        return Promise.resolve({ data: mockDetailResponse });
+      }
+      if (path === "/v1/agents/{agent_id}/connectors") {
+        return Promise.resolve({ data: mockAgentConnectorsResponse });
+      }
+      if (path === "/v1/credentials") {
+        return Promise.resolve({ data: mockCredentialsResponse });
+      }
+      if (path === "/v1/standing-approvals") {
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                standing_approval_id: "sa_null_constraints",
+                agent_id: 42,
+                user_id: "user-1",
+                action_type: "github.create_issue",
+                action_version: "1",
+                name: "Match all issues",
+                status: "active",
+                starts_at: "2026-01-01T00:00:00Z",
+                created_at: "2026-01-01T00:00:00Z",
+                expires_at: null,
+                constraints: null,
+              },
+            ],
+            has_more: false,
+          },
+        });
+      }
+      if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/instances") {
+        return Promise.resolve({ data: { data: [] } });
+      }
+      if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/credential") {
+        return Promise.resolve({
+          data: {
+            agent_id: 42,
+            connector_id: "github",
+            credential_id: "cred_123",
+            oauth_connection_id: null,
+          },
+        });
+      }
+      if (path === "/v1/standing-approval-templates") {
+        return Promise.resolve({ data: { data: [] } });
+      }
+      if (path === "/v1/oauth/connections") {
+        return Promise.resolve({ data: { connections: [] } });
+      }
+      if (path === "/v1/oauth/providers") {
+        return Promise.resolve({ data: { providers: [] } });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    renderPage();
+    await settleAuthHydration();
+
+    await waitFor(() => {
+      expect(screen.getByText("Match all issues")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Match all")).toBeInTheDocument();
+    expect(
+      screen.queryByText("Something went wrong"),
+    ).not.toBeInTheDocument();
+  });
+
   it("shows 'Agent not found' when user does not own the agent", async () => {
     mockGet.mockImplementation((path: string) => {
       if (path === "/v1/agents/{agent_id}") {

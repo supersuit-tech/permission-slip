@@ -15,7 +15,7 @@ export function ConnectorOverviewSection({
   connector,
   enabledAt,
 }: ConnectorOverviewSectionProps) {
-  const authTypes = connector.required_credentials.map((c) => c.auth_type);
+  const authTypes = (connector.required_credentials ?? []).map((c) => c.auth_type);
   const uniqueAuthTypes = [...new Set(authTypes)];
 
   return (

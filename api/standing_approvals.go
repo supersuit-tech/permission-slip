@@ -644,6 +644,9 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 			resp.Constraints = constraints
 		}
 	}
+	if resp.Constraints == nil {
+		resp.Constraints = map[string]any{}
+	}
 
 	return resp
 }

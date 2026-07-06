@@ -380,7 +380,7 @@ function RecommendedTemplateCard({
   disabled: boolean;
   usePending: boolean;
 }) {
-  const constraintEntries = Object.entries(template.constraints);
+  const constraintEntries = Object.entries(template.constraints ?? {});
 
   return (
     <div className="rounded-lg border border-input p-3">

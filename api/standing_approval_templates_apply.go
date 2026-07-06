@@ -199,7 +199,7 @@ func buildStandingApprovalConstraintsFromTemplate(templateConstraints []byte) ([
 		}
 	}
 	if allBareWildcard {
-		return nil, nil
+		return []byte("{}"), nil
 	}
 	return nil, fmt.Errorf("standing approval constraints could not be derived from template constraints: %w", err)
 }

@@ -61,7 +61,7 @@ export function StandingApprovalRow({
 }: StandingApprovalRowProps) {
   const action = actions.find((a) => a.action_type === rule.action_type);
   const constraintEntries = Object.entries(
-    rule.constraints as Record<string, unknown>,
+    (rule.constraints ?? {}) as Record<string, unknown>,
   ).filter(([key]) => key !== "$meta" && key !== "$data_window");
   const isInactive = rule.status !== "active";
 

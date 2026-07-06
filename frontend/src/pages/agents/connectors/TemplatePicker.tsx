@@ -69,7 +69,7 @@ function TemplateCard({
   disabled?: boolean;
   isApplied?: boolean;
 }) {
-  const constraintEntries = Object.entries(template.constraints);
+  const constraintEntries = Object.entries(template.constraints ?? {});
 
   return (
     <button
