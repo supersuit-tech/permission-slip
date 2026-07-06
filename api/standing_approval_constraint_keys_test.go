@@ -190,3 +190,62 @@ func TestValidateStandingApprovalConstraintsForAction_NormalizesPatterns(t *test
 		t.Fatalf("from pattern not normalized: %v", meta["from"])
 	}
 }
+
+func TestValidateStandingApprovalConstraintsForAction_FillsMissingSchemaWildcards(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"folder":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(protonmail.New())
+
+	raw := json.RawMessage(`{"$meta":{"from":"automated@example.com"}}`)
+	out, err := validateStandingApprovalConstraintsForAction(context.Background(), tx, registry, "protonmail.read_email", raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var obj map[string]any
+	if err := json.Unmarshal(out, &obj); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if obj["message_id"] != "*" || obj["folder"] != "*" {
+		t.Fatalf("expected missing schema params wildcarded, got %#v", obj)
+	}
+	meta, ok := obj["$meta"].(map[string]any)
+	if !ok || meta["from"] != "automated@example.com" {
+		t.Fatalf("$meta.from = %#v", obj["$meta"])
+	}
+}
+
+func TestValidateStandingApprovalConstraintsForAction_PartialSchemaWildcards(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"folder":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(protonmail.New())
+
+	raw := json.RawMessage(`{"folder":"INBOX"}`)
+	out, err := validateStandingApprovalConstraintsForAction(context.Background(), tx, registry, "protonmail.read_email", raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var obj map[string]any
+	if err := json.Unmarshal(out, &obj); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if obj["message_id"] != "*" {
+		t.Fatalf("expected message_id wildcard, got %#v", obj["message_id"])
+	}
+	if obj["folder"] != "INBOX" {
+		t.Fatalf("expected folder INBOX, got %#v", obj["folder"])
+	}
+}

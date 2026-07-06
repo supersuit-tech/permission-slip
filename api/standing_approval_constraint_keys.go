@@ -28,7 +28,45 @@ func validateStandingApprovalConstraintsForAction(
 	if err := validateStandingApprovalConstraintKeys(ctx, d, registry, actionType, normalized); err != nil {
 		return nil, err
 	}
-	return normalized, nil
+	return fillMissingSchemaParameterWildcards(ctx, d, actionType, normalized)
+}
+
+// fillMissingSchemaParameterWildcards adds "*" for every action-schema parameter
+// key absent from the constraints object. Unset fields mean "any value" for
+// standing approvals — without this, $meta-only rules reject execution params
+// as extra keys before metadata matching runs.
+func fillMissingSchemaParameterWildcards(
+	ctx context.Context,
+	d db.DBTX,
+	actionType string,
+	constraints []byte,
+) ([]byte, error) {
+	schemaKeys, err := actionSchemaPropertyKeys(ctx, d, actionType)
+	if err != nil {
+		return nil, err
+	}
+	if len(schemaKeys) == 0 {
+		return constraints, nil
+	}
+
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal(constraints, &obj); err != nil {
+		return nil, fmt.Errorf("constraints must be a JSON object")
+	}
+
+	mutated := false
+	for key := range schemaKeys {
+		if _, ok := obj[key]; !ok {
+			obj[key] = json.RawMessage(`"*"`)
+			mutated = true
+		}
+	}
+
+	if !mutated {
+		return constraints, nil
+	}
+
+	return json.Marshal(obj)
 }
 
 func validateStandingApprovalConstraintKeys(
