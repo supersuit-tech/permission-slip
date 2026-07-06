@@ -42,7 +42,6 @@ graph TB
         GW["API Gateway<br/><i>TLS, signature verification,<br/>rate limiting</i>"]
         AR["Agent Registry<br/><i>Public keys, metadata,<br/>agent-user links</i>"]
         AE["Action Engine<br/><i>Action types, schemas,<br/>parameter validation</i>"]
-        AC["Action Config Engine<br/><i>User-defined configurations,<br/>wildcard matching,<br/>credential binding</i>"]
         APR["Approval Engine<br/><i>Pending requests, TTL,<br/>confirmation codes</i>"]
         TE["Token Engine<br/><i>JWT issuance, single-use<br/>tracking (jti), params_hash</i>"]
         SA["Standing Approval Engine<br/><i>Pre-authorized grants,<br/>constraint matching,<br/>execution counting</i>"]
@@ -70,8 +69,7 @@ graph TB
     A1 & A2 --> GW
     GW --> AR
     GW --> AE
-    AE --> AC
-    AC --> APR
+    AE --> APR
     APR --> NS
     NS --> User
     User --> APR
@@ -96,7 +94,6 @@ graph TB
     style TE fill:#F9AB00,color:#000,stroke:#D98B00
     style AR fill:#7B68EE,color:#fff,stroke:#5B48CE
     style AE fill:#34A853,color:#fff,stroke:#1A8833
-    style AC fill:#1B8A5A,color:#fff,stroke:#0D6B3F
     style APR fill:#4285F4,color:#fff,stroke:#2265D4
     style NS fill:#FF6D01,color:#fff,stroke:#DF4D00
     style SA fill:#0F9D58,color:#fff,stroke:#0B7A43
@@ -173,8 +170,8 @@ sequenceDiagram
     participant User as User / Approver
     participant Ext as External Service<br/>(e.g. Gmail)
 
-    Agent->>+PS: POST /v1/approvals/request<br/>{configuration_id: "ac_...",<br/>parameters: {body: "..."}}
-    Note over PS: Validate configuration_id,<br/>verify agent signature,<br/>check agent is registered,<br/>match wildcard parameters
+    Agent->>+PS: POST /v1/approvals/request<br/>{action: {type, parameters}, context}
+    Note over PS: Validate action type + schema,<br/>verify agent signature,<br/>check connector enabled,<br/>match standing approval or create pending
     PS-->>-Agent: {approval_id, status: "pending",<br/>expires_at}
 
     PS->>User: Push notification:<br/>"Send email to bob@example.com?"
@@ -222,7 +219,6 @@ graph LR
         API["API Layer"]
         Reg["Agent Registry"]
         Act["Action Engine"]
-        ACfg["Action Config Engine<br/><i>User-defined configurations,<br/>wildcard matching</i>"]
 
         subgraph "Email Actions"
             ER["email.read<br/><i>subject filter, sender filter,<br/>max results, date range</i>"]
@@ -249,16 +245,14 @@ graph LR
     SDK --> API
     API --> Reg
     API --> Act
-    Act --> ACfg
-    ACfg --> ER & ES
+    Act --> ER & ES
     ER & ES --> Appr
     Appr --> Tok
     Appr --> Notif
     Notif --> Phone
-    Web --> Appr
     Web --> Reg
     Web --> Act
-    Web --> ACfg
+    Web --> Appr
     Web --> Vault
     Tok --> Gmail
     Gmail --> Vault
@@ -267,7 +261,6 @@ graph LR
 
     style Vault fill:#D93025,color:#fff
     style Appr fill:#4285F4,color:#fff
-    style ACfg fill:#1B8A5A,color:#fff
     style Tok fill:#F9AB00,color:#000
     style Gmail fill:#EA4335,color:#fff
 ```
@@ -279,7 +272,7 @@ graph TB
     Request["Incoming Agent Request"]
 
     Request --> L1
-    L1["1. Action Validation<br/><i>Pre-defined types only,<br/>schema-validated parameters,<br/>configuration_id required</i>"]
+    L1["1. Action Validation<br/><i>Pre-defined types only,<br/>schema-validated parameters,<br/>connector enabled for agent</i>"]
     L1 --> L2
     L2["2. TLS 1.2+<br/><i>Encrypted in transit</i>"]
     L2 --> L3
@@ -374,32 +367,32 @@ erDiagram
         timestamp expires_at
     }
 
-    ACTION_CONFIGURATION {
-        string id PK "ac_ prefix"
-        bigint agent_id FK
-        string user_id FK
-        string connector_id FK
-        string action_type FK "composite with connector_id"
-        json parameters "fixed values or wildcard *"
-        string status "active | disabled"
-        string name
-        string description "nullable"
-        timestamp created_at
-        timestamp updated_at
-    }
-
     STANDING_APPROVAL {
         string standing_approval_id PK
         bigint agent_id FK
         string user_id FK
         string action_type "email.read | email.send"
         string action_version "1"
-        json constraints "same schema as ACTION_CONFIG"
+        json constraints "fixed value, pattern, or wildcard per parameter"
+        string name "nullable"
+        string description "nullable"
+        string connector_instance_id "nullable account scope"
         string status "active | expired | revoked"
         timestamp starts_at
         timestamp expires_at "null = no expiration"
         timestamp created_at
         timestamp revoked_at "null if not revoked"
+    }
+
+    STANDING_APPROVAL_TEMPLATE {
+        string id PK
+        string connector_id FK
+        string action_type FK "composite with connector_id"
+        string name
+        string description "nullable"
+        json constraints
+        int duration_days "nullable"
+        timestamp created_at
     }
 
     STANDING_APPROVAL_EXECUTION {
@@ -428,15 +421,12 @@ erDiagram
     USER ||--o{ CREDENTIAL : "stores (user-scoped)"
     AGENT ||--o{ AGENT_CONNECTOR : "enabled for"
     AGENT_CONNECTOR }o--|| CONNECTOR : "references"
-    AGENT ||--o{ ACTION_CONFIGURATION : "configured for"
-    USER ||--o{ ACTION_CONFIGURATION : creates
-    CONNECTOR ||--o{ ACTION_CONFIGURATION : "provides action"
-    CREDENTIAL ||--o{ ACTION_CONFIGURATION : "bound to (nullable)"
     AGENT ||--o{ APPROVAL_REQUEST : submits
     USER ||--o{ APPROVAL_REQUEST : reviews
     APPROVAL_REQUEST ||--o| TOKEN : "issues (on approve)"
     USER ||--o{ STANDING_APPROVAL : creates
     AGENT ||--o{ STANDING_APPROVAL : "authorized by"
+    CONNECTOR ||--o{ STANDING_APPROVAL_TEMPLATE : "authors presets"
     STANDING_APPROVAL ||--o{ STANDING_APPROVAL_EXECUTION : "tracks executions"
     STANDING_APPROVAL ||--o{ AUDIT_EVENT : "generates (per execution)"
     USER ||--o{ AUDIT_EVENT : owns

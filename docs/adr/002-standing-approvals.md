@@ -1,6 +1,6 @@
 # ADR-002: Standing Approvals (Pre-approved, Time-bound, Multi-use Actions)
 
-**Status:** Accepted
+**Status:** Accepted (amended by [ADR-010](010-remove-action-configurations.md))
 **Date:** 2026-02-14
 **Authors:** SuperSuit team
 **Supersedes:** Partially amends ADR-001 Decision 6 (single-use tokens)
@@ -162,7 +162,10 @@ STANDING_APPROVAL {
     string  user_id               FK
     string  action_type           "email.read | email.send"
     string  action_version        "1"
-    json    constraints           "same schema as ACTION_CONFIG"
+    json    constraints           "per-parameter fixed value, pattern, or wildcard"
+    string  name                  "nullable; user-facing label"
+    string  description           "nullable"
+    string  connector_instance_id "nullable; account scope"
     string  status                "active | expired | revoked"
     timestamp starts_at
     timestamp expires_at          "nullable; null = until revoked"
@@ -212,5 +215,5 @@ Every execution under a standing approval also writes to `AUDIT_LOG` with `event
 | Constraints | Same per-action constraints from ADR-001, enforced every execution |
 | Coexistence | Falls through to one-off approval if no standing approval matches |
 | Revocation | Instant, from web UI |
-| Account scope | Editable in place on action configs and standing approvals; linked rules auto-follow config scope changes |
+| Account scope | Editable in place on standing approvals (`connector_instance_id`) from the connector config page |
 | Audit | Every execution logged, even under standing approvals |
