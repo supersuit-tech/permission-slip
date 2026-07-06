@@ -1,10 +1,9 @@
 /**
  * Shared types and parsing for connector action parameter schemas.
  *
- * Both the approval review UI (SchemaParameterDetails) and the action
- * standing-approval form (ConstraintParameterFields) consume parameter
- * schemas from the API. This module provides a single parsing function
- * to avoid duplication.
+ * Both the approval review UI (SchemaParameterDetails) and standing-approval
+ * constraint editors consume parameter schemas from the API. This module
+ * provides a single parsing function to avoid duplication.
  */
 
 /** Conditional visibility rule: show a field only when another field has a specific value. */

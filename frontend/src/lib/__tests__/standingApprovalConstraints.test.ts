@@ -1,38 +1,23 @@
 import { describe, expect, it } from "vitest";
 import {
-  buildMetaConstraintsFromForm,
   isBoilerplateStandingApprovalDescription,
-  mergeStandingApprovalConstraints,
-  metaValuesFromConstraints,
+  preservedNamespacesFromConstraints,
 } from "../standingApprovalConstraints";
 
 describe("standingApprovalConstraints", () => {
-  it("reads $meta.from from stored constraints", () => {
+  it("preserves $data_window from stored constraints", () => {
     expect(
-      metaValuesFromConstraints({
+      preservedNamespacesFromConstraints({
         message_id: "*",
-        $meta: { from: "automated@airbnb.com" },
+        $data_window: { last_days: 7 },
       }),
-    ).toEqual({ from: "automated@airbnb.com" });
+    ).toEqual({ data_window: { last_days: 7 } });
   });
 
-  it("builds $meta constraints from form values", () => {
+  it("returns empty object when no data window is present", () => {
     expect(
-      buildMetaConstraintsFromForm({ from: "automated@airbnb.com" }),
-    ).toEqual({ from: "automated@airbnb.com" });
-  });
-
-  it("merges parameter and meta constraints", () => {
-    expect(
-      mergeStandingApprovalConstraints(
-        { message_id: "*", folder: "*" },
-        { from: "automated@airbnb.com" },
-      ),
-    ).toEqual({
-      message_id: "*",
-      folder: "*",
-      $meta: { from: "automated@airbnb.com" },
-    });
+      preservedNamespacesFromConstraints({ message_id: "*" }),
+    ).toEqual({});
   });
 
   it("detects boilerplate auto-created descriptions", () => {

@@ -20,6 +20,7 @@
  *   changelog      Show CLI updates since your last session (read before multi-step work)
  *   config        Show or update saved configuration and registrations
  *   whoami        Show agent identity and registration info
+ *   auto-approve  Propose auto-approve rules (request / format)
  *
  * All commands output compact JSON by default. Pass --pretty for pretty-printed JSON.
  */
@@ -37,6 +38,7 @@ import { changelogCommand } from "./commands/changelog.js";
 import { configCommand } from "./commands/config.js";
 import { whoamiCommand } from "./commands/whoami.js";
 import { autoApproveRequestCommand } from "./commands/autoApproveRequest.js";
+import { formatConstraintsCommand } from "./commands/formatConstraints.js";
 import { watchCommand } from "./commands/watch.js";
 import { pendingCommand } from "./commands/pending.js";
 import { webhookCommand } from "./commands/webhook.js";
@@ -75,6 +77,7 @@ changelogCommand(program);
 configCommand(program);
 whoamiCommand(program);
 autoApproveRequestCommand(program);
+formatConstraintsCommand(program);
 
 // Surface unread changelog entries unless this IS the changelog command.
 const invoked = process.argv[2];

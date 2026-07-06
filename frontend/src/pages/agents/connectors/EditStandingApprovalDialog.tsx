@@ -19,7 +19,7 @@ import {
   ConstraintScenariosEditor,
   ensureScenarioFieldRows,
 } from "./ConstraintScenariosEditor";
-import { parseParametersSchema } from "./ConstraintParameterFields";
+import { parseParametersSchema } from "@/lib/parameterSchema";
 import { NameField, DescriptionField } from "./StandingApprovalFormFields";
 import {
   buildStructuredConstraintsFromForm,
