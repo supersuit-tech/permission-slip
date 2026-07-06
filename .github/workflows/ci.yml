@@ -116,7 +116,7 @@ jobs:
       - name: Install dependencies
         run: |
           cd frontend && npm ci --ignore-scripts
-          make shared-constraints-build
+          make -C .. shared-constraints-build
 
       - name: Bundle OpenAPI spec and verify it is committed
         run: |
