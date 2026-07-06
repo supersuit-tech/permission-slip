@@ -53,6 +53,11 @@ type denyResponse struct {
 	Reason     *string   `json:"reason,omitempty"`
 }
 
+type denyAllResponse struct {
+	DeniedCount  int `json:"denied_count"`
+	SkippedCount int `json:"skipped_count"`
+}
+
 type denyApprovalRequest struct {
 	Reason string `json:"reason,omitempty" validate:"omitempty,max=500"`
 }
@@ -85,6 +90,7 @@ func init() {
 func RegisterApprovalRoutes(mux *http.ServeMux, deps *Deps) {
 	requireProfile := RequireProfile(deps)
 	mux.Handle("GET /approvals", requireProfile(handleListApprovals(deps)))
+	mux.Handle("POST /approvals/deny-all", requireProfile(handleDenyAllApprovals(deps)))
 	mux.Handle("GET /approvals/{approval_id}", requireProfile(handleGetApproval(deps)))
 	mux.Handle("POST /approvals/{approval_id}/approve", requireProfile(handleApproveApproval(deps)))
 	mux.Handle("POST /approvals/{approval_id}/deny", requireProfile(handleDenyApproval(deps)))
@@ -305,6 +311,33 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 	}
 
 	return execStatus, resultJSON
+}
+
+func handleDenyAllApprovals(deps *Deps) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		profile := Profile(r.Context())
+
+		approvals, agentMeta, err := db.DenyAllPendingStandaloneApprovals(r.Context(), deps.DB, profile.ID)
+		if err != nil {
+			log.Printf("[%s] DenyAllPendingStandaloneApprovals: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to deny approvals"))
+			return
+		}
+
+		for i := range approvals {
+			appr := &approvals[i]
+			meta := agentMeta[appr.AgentID]
+			emitApprovalAuditEvent(r.Context(), deps.DB, profile.ID, appr, meta)
+			notifyApprovalChange(deps, profile.ID, "approval_resolved", appr.ApprovalID)
+			notifyAgentApprovalResolved(deps, appr)
+		}
+
+		RespondJSON(w, http.StatusOK, denyAllResponse{
+			DeniedCount:  len(approvals),
+			SkippedCount: 0,
+		})
+	}
 }
 
 func handleDenyApproval(deps *Deps) http.HandlerFunc {

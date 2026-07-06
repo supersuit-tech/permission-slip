@@ -3155,6 +3155,48 @@ paths:
           $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /v1/approvals/deny-all:
+    post:
+      operationId: denyAllApprovals
+      summary: Deny All Pending Standalone Approvals
+      description: |
+        Deny every pending, non-expired standalone approval request for the
+        authenticated approver. Bulk-group items and rule proposals are not
+        affected. Already resolved or expired items are skipped. Idempotent:
+        repeat calls return `denied_count: 0` when nothing remains pending.
+
+        Emits the same per-approval side effects (agent notification and
+        `approval_resolved` SSE events) as the single-item deny endpoint.
+      tags:
+        - Approvals
+      security:
+        - SupabaseSession: []
+      responses:
+        '200':
+          description: Bulk deny completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DenyAllApprovalsResponse'
+              examples:
+                denied_some:
+                  summary: Denied pending approvals
+                  value:
+                    denied_count: 3
+                    skipped_count: 0
+                nothing_pending:
+                  summary: No pending standalone approvals
+                  value:
+                    denied_count: 0
+                    skipped_count: 0
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /v1/approvals/events:
     get:
       operationId: approvalEvents
@@ -10791,6 +10833,25 @@ components:
             recently downgraded from a paid plan. After this time, the shorter
             retention window takes effect.
           example: '2026-03-08T14:30:00Z'
+    DenyAllApprovalsResponse:
+      type: object
+      required:
+        - denied_count
+        - skipped_count
+      properties:
+        denied_count:
+          type: integer
+          minimum: 0
+          description: Number of pending standalone approvals denied in this call.
+          example: 3
+        skipped_count:
+          type: integer
+          minimum: 0
+          description: |
+            Number of items skipped because they were already resolved or expired.
+            Always zero for the current implementation because skipped rows are
+            simply not matched by the bulk update.
+          example: 0
     BulkApprovalRequestItem:
       type: object
       required:

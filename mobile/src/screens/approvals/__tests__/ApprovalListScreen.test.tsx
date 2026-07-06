@@ -42,6 +42,35 @@ jest.mock("../../../hooks/useApprovals", () => ({
   useApprovals: () => mockUseApprovalsReturn,
 }));
 
+const mockDenyApproval = jest.fn().mockResolvedValue(undefined);
+const mockDenyAllApprovals = jest.fn().mockResolvedValue({ denied_count: 1, skipped_count: 0 });
+const mockDenyRuleRequest = jest.fn().mockResolvedValue({});
+
+jest.mock("../../../hooks/useDenyApproval", () => ({
+  useDenyApproval: () => ({
+    denyApproval: mockDenyApproval,
+    isPending: false,
+    error: null,
+    reset: jest.fn(),
+  }),
+}));
+
+jest.mock("../../../hooks/useDenyAllApprovals", () => ({
+  useDenyAllApprovals: () => ({
+    denyAllApprovals: mockDenyAllApprovals,
+    isPending: false,
+    error: null,
+    reset: jest.fn(),
+  }),
+}));
+
+jest.mock("../../../hooks/useDenyStandingApprovalRequest", () => ({
+  useDenyStandingApprovalRequest: () => ({
+    mutateAsync: mockDenyRuleRequest,
+    isPending: false,
+  }),
+}));
+
 let mockUseStandingApprovalRequestsReturn = {
   requests: [] as Array<Record<string, unknown>>,
   isLoading: false,
@@ -127,6 +156,13 @@ function getAllText(renderer: ReactTestRenderer): string {
   }).join(" ");
 }
 
+/** Finds a pressable node by testID. */
+function findPressableByTestId(renderer: ReactTestRenderer, testID: string) {
+  return renderer.root.findAll(
+    (node) => node.props.testID === testID && typeof node.props.onPress === "function",
+  )[0];
+}
+
 // --- Tests ---
 
 describe("ApprovalListScreen", () => {
@@ -134,6 +170,9 @@ describe("ApprovalListScreen", () => {
 
   beforeEach(() => {
     jest.useFakeTimers();
+    mockDenyApproval.mockClear();
+    mockDenyAllApprovals.mockClear();
+    mockDenyRuleRequest.mockClear();
     mockUseStandingApprovalInstanceScope.mockReturnValue({
       scopeLabel: "Applies to all accounts",
     });
@@ -338,5 +377,75 @@ describe("ApprovalListScreen", () => {
 
     const allText = getAllText(renderer);
     expect(allText).toContain("Applies to Personal");
+  });
+
+  it("shows decline all button for standalone pending approvals", async () => {
+    await act(async () => {
+      renderer = renderList();
+    });
+
+    const declineAllButton = findPressableByTestId(renderer, "decline-all-button");
+    expect(declineAllButton).toBeTruthy();
+    expect(declineAllButton!.props.accessibilityLabel).toBe(
+      "Decline all 1 pending requests",
+    );
+  });
+
+  it("declines a single approval when inline X is pressed", async () => {
+    await act(async () => {
+      renderer = renderList();
+    });
+
+    const declineButton = findPressableByTestId(renderer, "decline-approval-appr_001");
+
+    await act(async () => {
+      declineButton!.props.onPress();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockDenyApproval).toHaveBeenCalledWith("appr_001");
+  });
+
+  it("declines a rule proposal when inline X is pressed", async () => {
+    mockUseApprovalsReturn = {
+      ...mockUseApprovalsReturn,
+      approvals: [],
+    };
+    mockUseStandingApprovalRequestsReturn = {
+      ...mockUseStandingApprovalRequestsReturn,
+      requests: [
+        {
+          request_id: "sar_001",
+          agent_id: 42,
+          user_id: "user-1",
+          action_type: "protonmail.read_email",
+          action_version: "1",
+          constraints: { from: "auto-confirm@amazon.com" },
+          connector_name: "Proton Mail",
+          status: "pending",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+      ],
+    };
+
+    await act(async () => {
+      renderer = renderList();
+    });
+
+    const declineButton = findPressableByTestId(renderer, "decline-rule-sar_001");
+
+    await act(async () => {
+      declineButton!.props.onPress();
+    });
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(mockDenyRuleRequest).toHaveBeenCalledWith("sar_001");
   });
 });

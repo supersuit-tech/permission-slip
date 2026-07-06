@@ -203,6 +203,9 @@ paths:
   /v1/approvals:
     $ref: './components/paths/approvals.yaml#/listApprovals'
 
+  /v1/approvals/deny-all:
+    $ref: './components/paths/approvals.yaml#/denyAllApprovals'
+
   /v1/approvals/events:
     $ref: './components/paths/approvals.yaml#/approvalEvents'
 

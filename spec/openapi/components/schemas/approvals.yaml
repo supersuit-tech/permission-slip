@@ -527,6 +527,26 @@ DenyApprovalResponse:
         Optional human-readable explanation provided by the approver when denying.
       example: "Recipient not on approved contacts list."
 
+DenyAllApprovalsResponse:
+  type: object
+  required:
+    - denied_count
+    - skipped_count
+  properties:
+    denied_count:
+      type: integer
+      minimum: 0
+      description: Number of pending standalone approvals denied in this call.
+      example: 3
+    skipped_count:
+      type: integer
+      minimum: 0
+      description: |
+        Number of items skipped because they were already resolved or expired.
+        Always zero for the current implementation because skipped rows are
+        simply not matched by the bulk update.
+      example: 0
+
 BulkApprovalRequestItem:
   type: object
   required:

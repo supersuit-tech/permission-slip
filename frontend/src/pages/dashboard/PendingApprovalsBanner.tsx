@@ -1,18 +1,25 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { Bot, Shield } from "lucide-react";
+import { toast } from "sonner";
 import { useApprovals, type ApprovalSummary } from "@/hooks/useApprovals";
 import {
   useStandingApprovalRequests,
   type StandingApprovalRequestSummary,
 } from "@/hooks/useStandingApprovalRequests";
 import { useAgents, type Agent } from "@/hooks/useAgents";
+import { useDenyApproval } from "@/hooks/useDenyApproval";
+import { useDenyStandingApprovalRequest } from "@/hooks/useDenyStandingApprovalRequest";
+import { useDenyAllApprovals } from "@/hooks/useDenyAllApprovals";
 import { getAgentDisplayName } from "@/lib/agents";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { buildSummary } from "@/components/ActionPreviewSummary";
 import { CountdownBadge, RiskBadge } from "./approval-components";
 import { ReviewApprovalDialog } from "./ReviewApprovalDialog";
 import { ReviewBulkApprovalDialog } from "./ReviewBulkApprovalDialog";
 import { ReviewStandingApprovalRequestDialog } from "./ReviewStandingApprovalRequestDialog";
+import { DeclineRequestButton } from "./DeclineRequestButton";
+import { DeclineAllApprovalsDialog } from "./DeclineAllApprovalsDialog";
 
 function resolveAgentName(
   agentId: number,
@@ -27,30 +34,41 @@ function RuleProposalBannerItem({
   request,
   agentDisplayName,
   onOpenDialog,
+  onDecline,
+  isDeclining,
 }: {
   request: StandingApprovalRequestSummary;
   agentDisplayName: string;
   onOpenDialog: (request: StandingApprovalRequestSummary, agentDisplayName: string) => void;
+  onDecline: (requestId: string) => Promise<void>;
+  isDeclining: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={() => onOpenDialog(request, agentDisplayName)}
-      className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-violet-500/30 bg-violet-500/5 px-4 py-3 text-left text-sm text-foreground shadow-sm transition-colors hover:bg-violet-500/10"
-      aria-label={`Rule proposal: ${request.action_type} from ${agentDisplayName}`}
-    >
-      <Shield className="size-5 shrink-0 text-violet-600 dark:text-violet-400" />
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="font-medium">{request.action_type}</span>
-        <Badge variant="secondary" className="text-xs">
-          Rule proposal
-        </Badge>
-        <span className="text-xs opacity-75">{agentDisplayName}</span>
-      </div>
-      <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
-        Review
-      </span>
-    </button>
+    <div className="flex w-full items-center gap-2 rounded-lg border border-violet-500/30 bg-violet-500/5 px-4 py-3 text-sm text-foreground shadow-sm transition-colors hover:bg-violet-500/10">
+      <button
+        type="button"
+        onClick={() => onOpenDialog(request, agentDisplayName)}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent p-0 text-left"
+        aria-label={`Rule proposal: ${request.action_type} from ${agentDisplayName}`}
+      >
+        <Shield className="size-5 shrink-0 text-violet-600 dark:text-violet-400" />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-medium">{request.action_type}</span>
+          <Badge variant="secondary" className="text-xs">
+            Rule proposal
+          </Badge>
+          <span className="text-xs opacity-75">{agentDisplayName}</span>
+        </div>
+        <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
+          Review
+        </span>
+      </button>
+      <DeclineRequestButton
+        ariaLabel="Decline request"
+        disabled={isDeclining}
+        onDecline={() => onDecline(request.request_id)}
+      />
+    </div>
   );
 }
 
@@ -96,10 +114,14 @@ function ApprovalBannerItem({
   approval,
   agentDisplayName,
   onOpenDialog,
+  onDecline,
+  isDeclining,
 }: {
   approval: ApprovalSummary;
   agentDisplayName: string;
   onOpenDialog: (approval: ApprovalSummary, agentDisplayName: string) => void;
+  onDecline: (approvalId: string) => Promise<void>;
+  isDeclining: boolean;
 }) {
   const summary = buildSummary(
     approval.action.type,
@@ -111,28 +133,35 @@ function ApprovalBannerItem({
   );
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpenDialog(approval, agentDisplayName)}
-      className="flex w-full cursor-pointer items-center gap-3 rounded-lg border border-info/30 bg-info/5 px-4 py-3 text-left text-sm text-foreground shadow-sm transition-colors hover:bg-info/10"
-      aria-label={`Pending approval: ${approval.action.type} from ${agentDisplayName}`}
-    >
-      <Bot className="size-5 shrink-0" />
-      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
-        <span className="font-medium">
-          {approval.action.type}
+    <div className="flex w-full items-center gap-2 rounded-lg border border-info/30 bg-info/5 px-4 py-3 text-sm text-foreground shadow-sm transition-colors hover:bg-info/10">
+      <button
+        type="button"
+        onClick={() => onOpenDialog(approval, agentDisplayName)}
+        className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent p-0 text-left"
+        aria-label={`Pending approval: ${approval.action.type} from ${agentDisplayName}`}
+      >
+        <Bot className="size-5 shrink-0" />
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1">
+          <span className="font-medium">
+            {approval.action.type}
+          </span>
+          <RiskBadge level={approval.context.risk_level} />
+          <span className="text-muted-foreground truncate text-xs" title={summary}>
+            {summary}
+          </span>
+          <span className="text-xs opacity-75">{agentDisplayName}</span>
+          <CountdownBadge expiresAt={approval.expires_at} />
+        </div>
+        <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
+          Review
         </span>
-        <RiskBadge level={approval.context.risk_level} />
-        <span className="text-muted-foreground truncate text-xs" title={summary}>
-          {summary}
-        </span>
-        <span className="text-xs opacity-75">{agentDisplayName}</span>
-        <CountdownBadge expiresAt={approval.expires_at} />
-      </div>
-      <span className="shrink-0 text-xs font-medium underline underline-offset-2 opacity-75">
-        Review
-      </span>
-    </button>
+      </button>
+      <DeclineRequestButton
+        ariaLabel="Decline request"
+        disabled={isDeclining}
+        onDecline={() => onDecline(approval.approval_id)}
+      />
+    </div>
   );
 }
 
@@ -145,6 +174,17 @@ export function PendingApprovalsBanner() {
     refetch: refetchRules,
   } = useStandingApprovalRequests();
   const { agents } = useAgents();
+  const { denyApproval, isPending: isDenyingApproval } = useDenyApproval();
+  const { denyRequest, isPending: isDenyingRule } = useDenyStandingApprovalRequest();
+  const { denyAllApprovals, isPending: isDenyingAll } = useDenyAllApprovals();
+
+  const [declineAllOpen, setDeclineAllOpen] = useState(false);
+  const [dismissedApprovalIds, setDismissedApprovalIds] = useState<Set<string>>(
+    () => new Set(),
+  );
+  const [dismissedRuleIds, setDismissedRuleIds] = useState<Set<string>>(
+    () => new Set(),
+  );
 
   // Dialog state is lifted here so it survives the approval being removed
   // from the pending list (e.g. after approve + query invalidation).
@@ -232,6 +272,22 @@ export function PendingApprovalsBanner() {
     };
   }, [approvals]);
 
+  const visibleStandaloneApprovals = useMemo(
+    () =>
+      standaloneApprovals.filter(
+        (approval) => !dismissedApprovalIds.has(approval.approval_id),
+      ),
+    [standaloneApprovals, dismissedApprovalIds],
+  );
+
+  const visibleRuleProposals = useMemo(
+    () =>
+      ruleProposals.filter(
+        (request) => !dismissedRuleIds.has(request.request_id),
+      ),
+    [ruleProposals, dismissedRuleIds],
+  );
+
   const handleOpenBulkDialog = useCallback(
     (bulkGroupId: string, agentDisplayName: string) => {
       activeBulkGroupIdRef.current = bulkGroupId;
@@ -248,6 +304,56 @@ export function PendingApprovalsBanner() {
       activeBulkAgentNameRef.current = "";
     }
   }, []);
+
+  const handleDeclineApproval = useCallback(
+    async (approvalId: string) => {
+      setDismissedApprovalIds((prev) => new Set(prev).add(approvalId));
+      try {
+        await denyApproval(approvalId);
+        toast.success("Request declined");
+      } catch {
+        setDismissedApprovalIds((prev) => {
+          const next = new Set(prev);
+          next.delete(approvalId);
+          return next;
+        });
+        throw new Error("Failed to decline request");
+      }
+    },
+    [denyApproval],
+  );
+
+  const handleDeclineRule = useCallback(
+    async (requestId: string) => {
+      setDismissedRuleIds((prev) => new Set(prev).add(requestId));
+      try {
+        await denyRequest(requestId);
+        toast.success("Rule proposal declined");
+      } catch {
+        setDismissedRuleIds((prev) => {
+          const next = new Set(prev);
+          next.delete(requestId);
+          return next;
+        });
+        throw new Error("Failed to decline rule proposal");
+      }
+    },
+    [denyRequest],
+  );
+
+  const handleConfirmDeclineAll = useCallback(async () => {
+    try {
+      const result = await denyAllApprovals();
+      setDeclineAllOpen(false);
+      toast.success(
+        result?.denied_count === 1
+          ? "Declined 1 request"
+          : `Declined ${result?.denied_count ?? 0} requests`,
+      );
+    } catch {
+      toast.error("Failed to decline pending requests. Please try again.");
+    }
+  }, [denyAllApprovals]);
 
   if (isLoading || rulesLoading) return null;
 
@@ -270,7 +376,9 @@ export function PendingApprovalsBanner() {
   }
 
   const totalPending =
-    standaloneApprovals.length + bulkGroups.length + ruleProposals.length;
+    visibleStandaloneApprovals.length +
+    bulkGroups.length +
+    visibleRuleProposals.length;
   if (totalPending === 0 && !dialogOpen && !ruleDialogOpen && !bulkDialogOpen) {
     return null;
   }
@@ -280,16 +388,31 @@ export function PendingApprovalsBanner() {
       <span className="sr-only" aria-live="polite" aria-atomic="true">
         {totalPending} pending item{totalPending !== 1 ? "s" : ""}
       </span>
-      {(ruleProposals.length > 0 ||
-        standaloneApprovals.length > 0 ||
+      {(visibleRuleProposals.length > 0 ||
+        visibleStandaloneApprovals.length > 0 ||
         bulkGroups.length > 0) && (
         <div className="space-y-2" aria-label="Pending approvals and rule proposals">
-          {ruleProposals.map((request) => (
+          {visibleStandaloneApprovals.length > 0 && (
+            <div className="flex justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isDenyingAll}
+                onClick={() => setDeclineAllOpen(true)}
+              >
+                Decline all ({visibleStandaloneApprovals.length})
+              </Button>
+            </div>
+          )}
+          {visibleRuleProposals.map((request) => (
             <RuleProposalBannerItem
               key={request.request_id}
               request={request}
               agentDisplayName={resolveAgentName(request.agent_id, agentMap)}
               onOpenDialog={handleOpenRuleDialog}
+              onDecline={handleDeclineRule}
+              isDeclining={isDenyingRule}
             />
           ))}
           {bulkGroups.map((group) => (
@@ -303,16 +426,26 @@ export function PendingApprovalsBanner() {
               onOpenDialog={handleOpenBulkDialog}
             />
           ))}
-          {standaloneApprovals.map((approval) => (
+          {visibleStandaloneApprovals.map((approval) => (
             <ApprovalBannerItem
               key={approval.approval_id}
               approval={approval}
               agentDisplayName={resolveAgentName(approval.agent_id, agentMap)}
               onOpenDialog={handleOpenDialog}
+              onDecline={handleDeclineApproval}
+              isDeclining={isDenyingApproval}
             />
           ))}
         </div>
       )}
+
+      <DeclineAllApprovalsDialog
+        open={declineAllOpen}
+        onOpenChange={setDeclineAllOpen}
+        pendingCount={visibleStandaloneApprovals.length}
+        onConfirm={handleConfirmDeclineAll}
+        isPending={isDenyingAll}
+      />
 
       {/* Dialog rendered at banner level so it survives approval list changes */}
       {activeApprovalRef.current && (

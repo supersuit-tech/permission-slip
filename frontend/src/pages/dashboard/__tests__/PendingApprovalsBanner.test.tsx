@@ -12,6 +12,13 @@ import { PendingApprovalsBanner } from "../PendingApprovalsBanner";
 
 vi.mock("../../../api/client");
 
+vi.mock("sonner", () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}));
+
 vi.mock("@/hooks/useStandingApprovalRequests", () => ({
   useStandingApprovalRequests: () => ({
     requests: [],
@@ -304,5 +311,81 @@ describe("PendingApprovalsBanner", () => {
     await waitFor(() => {
       expect(screen.getByText("Expired")).toBeInTheDocument();
     });
+  });
+
+  it("renders decline all button for standalone pending approvals", async () => {
+    mockApprovalsFetch();
+
+    render(<PendingApprovalsBanner />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Decline all (2)" }),
+      ).toBeInTheDocument();
+    });
+  });
+
+  it("confirms decline all and calls deny-all endpoint", async () => {
+    mockApprovalsFetch();
+    mockPost.mockResolvedValue({
+      data: { denied_count: 2, skipped_count: 0 },
+    });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<PendingApprovalsBanner />, { wrapper });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Decline all (2)" }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Decline all (2)" }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: "Decline all" }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: "Decline all" }));
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith("/v1/approvals/deny-all", {
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
+      });
+    });
+  });
+
+  it("declines a single approval via inline X without opening dialog", async () => {
+    mockApprovalsFetch();
+    mockPost.mockResolvedValue({
+      data: {
+        approval_id: "appr_abc123",
+        status: "denied",
+        denied_at: "2026-02-21T10:00:05Z",
+      },
+    });
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(<PendingApprovalsBanner />, { wrapper });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("button", { name: "Decline request" })).toHaveLength(2);
+    });
+
+    await user.click(screen.getAllByRole("button", { name: "Decline request" })[0]!);
+
+    await waitFor(() => {
+      expect(mockPost).toHaveBeenCalledWith(
+        "/v1/approvals/{approval_id}/deny",
+        expect.objectContaining({
+          params: { path: { approval_id: "appr_abc123" } },
+        }),
+      );
+    });
+    expect(
+      screen.queryByText("Send welcome email to new user"),
+    ).not.toBeInTheDocument();
   });
 });

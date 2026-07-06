@@ -842,3 +842,222 @@ func TestDenyApproval_Unauthenticated(t *testing.T) {
 		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
 	}
 }
+
+// ── POST /approvals/deny-all ─────────────────────────────────────────────────
+
+func TestDenyAllApprovals_Success(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	appr1 := testhelper.GenerateID(t, "appr_")
+	appr2 := testhelper.GenerateID(t, "appr_")
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertApproval(t, tx, appr1, agentID, uid)
+	testhelper.InsertApproval(t, tx, appr2, agentID, uid)
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/approvals/deny-all", uid)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp denyAllResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.DeniedCount != 2 {
+		t.Errorf("expected denied_count 2, got %d", resp.DeniedCount)
+	}
+
+	for _, id := range []string{appr1, appr2} {
+		appr, err := db.GetApprovalByIDAndApprover(context.Background(), tx, id, uid)
+		if err != nil {
+			t.Fatalf("get approval %s: %v", id, err)
+		}
+		if appr == nil || appr.Status != "denied" {
+			t.Errorf("expected approval %s to be denied, got %+v", id, appr)
+		}
+	}
+}
+
+func TestDenyAllApprovals_Idempotent(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	apprID := testhelper.GenerateID(t, "appr_")
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertApproval(t, tx, apprID, agentID, uid)
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r1 := authenticatedRequest(t, http.MethodPost, "/approvals/deny-all", uid)
+	w1 := httptest.NewRecorder()
+	router.ServeHTTP(w1, r1)
+	if w1.Code != http.StatusOK {
+		t.Fatalf("first call: expected 200, got %d: %s", w1.Code, w1.Body.String())
+	}
+
+	r2 := authenticatedRequest(t, http.MethodPost, "/approvals/deny-all", uid)
+	w2 := httptest.NewRecorder()
+	router.ServeHTTP(w2, r2)
+	if w2.Code != http.StatusOK {
+		t.Fatalf("second call: expected 200, got %d: %s", w2.Code, w2.Body.String())
+	}
+
+	var resp denyAllResponse
+	if err := json.Unmarshal(w2.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.DeniedCount != 0 {
+		t.Errorf("expected denied_count 0 on repeat call, got %d", resp.DeniedCount)
+	}
+}
+
+func TestDenyAllApprovals_LeavesResolvedAndExpiredUntouched(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	pendingID := testhelper.GenerateID(t, "appr_")
+	approvedID := testhelper.GenerateID(t, "appr_")
+	deniedID := testhelper.GenerateID(t, "appr_")
+	expiredID := testhelper.GenerateID(t, "appr_")
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertApproval(t, tx, pendingID, agentID, uid)
+	testhelper.InsertApprovalWithStatus(t, tx, approvedID, agentID, uid, "approved")
+	testhelper.InsertApprovalWithStatus(t, tx, deniedID, agentID, uid, "denied")
+	testhelper.InsertApprovalWithExpiresAt(t, tx, expiredID, agentID, uid, time.Now().Add(-1*time.Hour))
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/approvals/deny-all", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp denyAllResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.DeniedCount != 1 {
+		t.Errorf("expected denied_count 1, got %d", resp.DeniedCount)
+	}
+
+	for _, tc := range []struct {
+		id     string
+		status string
+	}{
+		{approvedID, "approved"},
+		{deniedID, "denied"},
+		{expiredID, "pending"},
+	} {
+		appr, err := db.GetApprovalByIDAndApprover(context.Background(), tx, tc.id, uid)
+		if err != nil {
+			t.Fatalf("get approval %s: %v", tc.id, err)
+		}
+		if appr == nil || appr.Status != tc.status {
+			t.Errorf("expected approval %s status %q, got %+v", tc.id, tc.status, appr)
+		}
+	}
+}
+
+func TestDenyAllApprovals_SkipsBulkGroupItems(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	standaloneID := testhelper.GenerateID(t, "appr_")
+	bulkID := testhelper.GenerateID(t, "appr_")
+	groupID := testhelper.GenerateID(t, "grp_")
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertApproval(t, tx, standaloneID, agentID, uid)
+	testhelper.MustExec(t, tx,
+		`INSERT INTO approvals (approval_id, agent_id, approver_id, bulk_group_id, action, context, status, expires_at)
+		 VALUES ($1, $2, $3, $4, '{"type":"test"}', '{"description":"test"}', 'pending', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'))`,
+		bulkID, agentID, uid, groupID)
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/approvals/deny-all", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp denyAllResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	if resp.DeniedCount != 1 {
+		t.Errorf("expected denied_count 1, got %d", resp.DeniedCount)
+	}
+
+	bulkAppr, err := db.GetApprovalByIDAndApprover(context.Background(), tx, bulkID, uid)
+	if err != nil {
+		t.Fatalf("get bulk approval: %v", err)
+	}
+	if bulkAppr == nil || bulkAppr.Status != "pending" {
+		t.Errorf("expected bulk approval to remain pending, got %+v", bulkAppr)
+	}
+}
+
+func TestDenyAllApprovals_OtherUsersApprovalsUntouched(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid1 := testhelper.GenerateUID(t)
+	appr1 := testhelper.GenerateID(t, "appr_")
+	agent1 := testhelper.InsertUserWithAgent(t, tx, uid1, "u1_"+uid1[:6])
+	testhelper.InsertApproval(t, tx, appr1, agent1, uid1)
+
+	uid2 := testhelper.GenerateUID(t)
+	appr2 := testhelper.GenerateID(t, "appr_")
+	agent2 := testhelper.InsertUserWithAgent(t, tx, uid2, "u2_"+uid2[:6])
+	testhelper.InsertApproval(t, tx, appr2, agent2, uid2)
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/approvals/deny-all", uid1)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	appr2Row, err := db.GetApprovalByIDAndApprover(context.Background(), tx, appr2, uid2)
+	if err != nil {
+		t.Fatalf("get uid2 approval: %v", err)
+	}
+	if appr2Row == nil || appr2Row.Status != "pending" {
+		t.Errorf("expected uid2 approval to remain pending, got %+v", appr2Row)
+	}
+}
+
+func TestDenyAllApprovals_Unauthenticated(t *testing.T) {
+	t.Parallel()
+	deps := &Deps{JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := httptest.NewRequest(http.MethodPost, "/approvals/deny-all", nil)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
+	}
+}
