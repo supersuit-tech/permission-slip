@@ -11,11 +11,10 @@ import (
 )
 
 type agentStandingApprovalRequestBody struct {
-	ActionType                  string          `json:"action_type" validate:"required"`
-	ActionVersion               string          `json:"action_version"`
-	Constraints                 json.RawMessage `json:"constraints" validate:"required"`
-	SourceActionConfigurationID *string         `json:"source_action_configuration_id"`
-	ConnectorInstance           *string         `json:"connector_instance"`
+	ActionType        string          `json:"action_type" validate:"required"`
+	ActionVersion     string          `json:"action_version"`
+	Constraints       json.RawMessage `json:"constraints" validate:"required"`
+	ConnectorInstance *string         `json:"connector_instance"`
 }
 
 type agentStandingApprovalRequestResponse struct {
@@ -72,19 +71,6 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		if req.SourceActionConfigurationID != nil {
-			id := strings.TrimSpace(*req.SourceActionConfigurationID)
-			if id == "" {
-				req.SourceActionConfigurationID = nil
-			} else {
-				req.SourceActionConfigurationID = &id
-				if len(id) > maxActionConfigIDLength {
-					RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id exceeds maximum length"))
-					return
-				}
-			}
-		}
-
 		var connectorInstanceSelector string
 		if req.ConnectorInstance != nil {
 			connectorInstanceSelector = strings.TrimSpace(*req.ConnectorInstance)
@@ -103,7 +89,7 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 
 		display := resolveStandingApprovalRequestDisplay(
 			r.Context(), deps.DB, agent.AgentID, agent.ApproverID,
-			req.ActionType, req.SourceActionConfigurationID,
+			req.ActionType,
 		)
 		var connectorName, connectorInstanceID, connectorInstanceDisplay *string
 		if display.ConnectorName != "" {
@@ -133,46 +119,18 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 					connectorInstanceDisplay = resolved.ConnectorInstanceDisplay
 				}
 			}
-
-			if req.SourceActionConfigurationID != nil {
-				ac, err := db.GetActionConfigByID(r.Context(), deps.DB, *req.SourceActionConfigurationID, agent.ApproverID)
-				if err != nil {
-					log.Printf("[%s] GetActionConfigByID for instance conflict check: %v", TraceID(r.Context()), err)
-					CaptureError(r.Context(), err)
-					RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval request"))
-					return
-				}
-				if ac == nil || ac.AgentID != agent.AgentID {
-					RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id not found"))
-					return
-				}
-				if connectorInstanceID != nil {
-					if err := validateStandingApprovalRequestInstanceAgainstPinnedConfig(
-						r.Context(), deps.DB, agent.AgentID, agent.ApproverID, ac, *connectorInstanceID,
-					); err != nil {
-						if respondConnectorInstanceResolutionError(w, r, err) {
-							return
-						}
-						log.Printf("[%s] validateStandingApprovalRequestInstanceAgainstPinnedConfig: %v", TraceID(r.Context()), err)
-						CaptureError(r.Context(), err)
-						RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval request"))
-						return
-					}
-				}
-			}
 		}
 
 		sar, err := db.InsertStandingApprovalRequest(r.Context(), deps.DB, db.InsertStandingApprovalRequestParams{
-			RequestID:                   requestID,
-			AgentID:                     agent.AgentID,
-			UserID:                      agent.ApproverID,
-			ActionType:                  req.ActionType,
-			ActionVersion:               req.ActionVersion,
-			Constraints:                 constraintsBytes,
-			SourceActionConfigurationID: req.SourceActionConfigurationID,
-			ConnectorName:               connectorName,
-			ConnectorInstanceID:         connectorInstanceID,
-			ConnectorInstanceDisplay:    connectorInstanceDisplay,
+			RequestID:                requestID,
+			AgentID:                  agent.AgentID,
+			UserID:                   agent.ApproverID,
+			ActionType:               req.ActionType,
+			ActionVersion:            req.ActionVersion,
+			Constraints:              constraintsBytes,
+			ConnectorName:            connectorName,
+			ConnectorInstanceID:      connectorInstanceID,
+			ConnectorInstanceDisplay: connectorInstanceDisplay,
 		})
 		if err != nil {
 			log.Printf("[%s] InsertStandingApprovalRequest: %v", TraceID(r.Context()), err)

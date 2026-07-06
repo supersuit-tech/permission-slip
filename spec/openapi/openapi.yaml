@@ -230,20 +230,14 @@ paths:
   /v1/approval-groups/{group_id}/status:
     $ref: './components/paths/approvals.yaml#/bulkGroupStatus'
 
-  /v1/action-config-templates:
-    $ref: './components/paths/action_config_templates.yaml#/actionConfigTemplates'
+  /v1/standing-approval-templates:
+    $ref: './components/paths/standing_approval_templates.yaml#/standingApprovalTemplates'
 
-  /v1/action-config-templates/bulk-apply:
-    $ref: './components/paths/action_config_templates.yaml#/bulkApplyActionConfigTemplates'
+  /v1/standing-approval-templates/bulk-apply:
+    $ref: './components/paths/standing_approval_templates.yaml#/bulkApplyStandingApprovalTemplates'
 
-  /v1/action-config-templates/{id}/apply:
-    $ref: './components/paths/action_config_templates.yaml#/applyActionConfigTemplate'
-
-  /v1/action-configurations:
-    $ref: './components/paths/action_configurations.yaml#/actionConfigurations'
-
-  /v1/action-configurations/{config_id}:
-    $ref: './components/paths/action_configurations.yaml#/actionConfigurationById'
+  /v1/standing-approval-templates/{id}/apply:
+    $ref: './components/paths/standing_approval_templates.yaml#/applyStandingApprovalTemplate'
 
   /v1/credentials:
     $ref: './components/paths/credentials.yaml#/credentials'
@@ -393,23 +387,19 @@ components:
     BulkApprovalGroupStatusResponse:
       $ref: './components/schemas/approvals.yaml#/BulkApprovalGroupStatusResponse'
 
-    # Action Configuration Templates
-    ActionConfigTemplate:
-      $ref: './components/schemas/action_config_templates.yaml#/ActionConfigTemplate'
-    ActionConfigTemplateListResponse:
-      $ref: './components/schemas/action_config_templates.yaml#/ActionConfigTemplateListResponse'
-
-    # Action Configurations
-    ActionConfiguration:
-      $ref: './components/schemas/action_configurations.yaml#/ActionConfiguration'
-    CreateActionConfigRequest:
-      $ref: './components/schemas/action_configurations.yaml#/CreateActionConfigRequest'
-    UpdateActionConfigRequest:
-      $ref: './components/schemas/action_configurations.yaml#/UpdateActionConfigRequest'
-    ActionConfigListResponse:
-      $ref: './components/schemas/action_configurations.yaml#/ActionConfigListResponse'
-    DeleteActionConfigResponse:
-      $ref: './components/schemas/action_configurations.yaml#/DeleteActionConfigResponse'
+    # Standing Approval Templates
+    StandingApprovalTemplate:
+      $ref: './components/schemas/standing_approval_templates.yaml#/StandingApprovalTemplate'
+    StandingApprovalTemplateListResponse:
+      $ref: './components/schemas/standing_approval_templates.yaml#/StandingApprovalTemplateListResponse'
+    ApplyStandingApprovalTemplateRequest:
+      $ref: './components/schemas/standing_approval_templates.yaml#/ApplyStandingApprovalTemplateRequest'
+    ApplyStandingApprovalTemplateResponse:
+      $ref: './components/schemas/standing_approval_templates.yaml#/ApplyStandingApprovalTemplateResponse'
+    BulkApplyStandingApprovalTemplateRequest:
+      $ref: './components/schemas/standing_approval_templates.yaml#/BulkApplyStandingApprovalTemplateRequest'
+    BulkApplyStandingApprovalTemplateResponse:
+      $ref: './components/schemas/standing_approval_templates.yaml#/BulkApplyStandingApprovalTemplateResponse'
 
     # Credentials
     StoreCredentialRequest:
@@ -492,8 +482,6 @@ components:
       $ref: './components/schemas/capabilities.yaml#/ActionCapability'
     StandingApprovalCapability:
       $ref: './components/schemas/capabilities.yaml#/StandingApprovalCapability'
-    ActionConfigCapability:
-      $ref: './components/schemas/capabilities.yaml#/ActionConfigCapability'
 
     # Agent Connectors
     AgentConnectorListResponse:
@@ -644,8 +632,6 @@ components:
       $ref: './components/schemas/errors.yaml#/ErrorResponse'
   
   parameters:
-    ActionConfigId:
-      $ref: './components/parameters/common.yaml#/ActionConfigId'
     AgentId:
       $ref: './components/parameters/common.yaml#/AgentId'
     AgentIdSigned:

@@ -26,9 +26,6 @@ StandingApprovalRequest:
     constraints:
       type: object
       additionalProperties: true
-    source_action_configuration_id:
-      type: string
-      nullable: true
     connector_name:
       type: string
       nullable: true
@@ -39,15 +36,13 @@ StandingApprovalRequest:
       nullable: true
       description: |
         Connector instance UUID frozen at proposal time when the agent declared
-        connector_instance on the request, or when the backing action configuration
-        pins a fixed instance.
+        connector_instance on the request.
     connector_instance_display:
       type: string
       nullable: true
       description: |
         Human-readable connector instance label when the agent declared
-        connector_instance or the backing action configuration resolves to a
-        specific account (e.g. "Personal"). Mirrors `_connector_instance_display`
+        connector_instance (e.g. "Personal"). Mirrors `_connector_instance_display`
         on regular approvals.
     status:
       type: string
@@ -95,15 +90,11 @@ AgentCreateStandingApprovalRequestBody:
     constraints:
       type: object
       additionalProperties: true
-    source_action_configuration_id:
-      type: string
     connector_instance:
       type: string
       description: |
         Optional connector instance selector (UUID or display name) declaring which
-        account this rule proposal applies to. When omitted, instance display is
-        resolved only from a pinned connector_instance on the backing action
-        configuration.
+        account this rule proposal applies to.
 
 AgentCreateStandingApprovalRequestResponse:
   type: object

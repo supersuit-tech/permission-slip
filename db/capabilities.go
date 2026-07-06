@@ -9,14 +9,12 @@ import (
 
 // AgentCapabilities holds all data needed to build the capabilities response
 // for an authenticated agent. The caller assembles ConnectorCapability,
-// ActionCapability, StandingApprovalCapability, and CapabilityActionConfig
-// structs from these rows.
+// ActionCapability, and StandingApprovalCapability structs from these rows.
 type AgentCapabilities struct {
 	Connectors         []CapabilityConnector
 	ConnectorInstances []CapabilityConnectorInstance
 	Actions            []CapabilityAction
 	StandingApprovals  []CapabilityStandingApproval
-	ActionConfigs      []CapabilityActionConfig
 }
 
 // CapabilityConnector represents an enabled connector with credential readiness.
@@ -45,22 +43,11 @@ type CapabilityAction struct {
 	ParametersSchema json.RawMessage // raw JSONB
 }
 
-// CapabilityActionConfig represents an active action configuration for an agent.
-// Each configuration defines a pre-approved parameter set that the agent can
-// reference when requesting approval or executing actions.
-type CapabilityActionConfig struct {
-	ConfigurationID string
-	ConnectorID     string
-	ActionType      string
-	Name            string
-	Description     *string
-	Parameters      json.RawMessage // includes wildcards ("*")
-}
-
 // CapabilityStandingApproval represents an active, non-expired standing approval.
 type CapabilityStandingApproval struct {
 	StandingApprovalID  string
 	ActionType          string
+	Name                *string
 	Constraints         json.RawMessage // raw JSONB
 	ExpiresAt           *time.Time
 	ConnectorInstanceID *string
@@ -238,7 +225,7 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 
 	// 3. Active, non-expired standing approvals for this agent.
 	saRows, err := db.Query(ctx, `
-		SELECT sa.standing_approval_id, sa.action_type, sa.constraints,
+		SELECT sa.standing_approval_id, sa.action_type, sa.name, sa.constraints,
 		       sa.expires_at, sa.connector_instance_id
 		FROM standing_approvals sa
 		WHERE sa.agent_id = $1
@@ -257,10 +244,15 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	for saRows.Next() {
 		var sa CapabilityStandingApproval
 		var instID sql.NullString
+		var name sql.NullString
 		var expiresAt sql.NullString
 		var constraints []byte
-		if err := saRows.Scan(&sa.StandingApprovalID, &sa.ActionType, &constraints, &expiresAt, &instID); err != nil {
+		if err := saRows.Scan(&sa.StandingApprovalID, &sa.ActionType, &name, &constraints, &expiresAt, &instID); err != nil {
 			return nil, err
+		}
+		if name.Valid {
+			s := name.String
+			sa.Name = &s
 		}
 		if len(constraints) > 0 {
 			sa.Constraints = json.RawMessage(constraints)
@@ -280,39 +272,5 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 		return nil, err
 	}
 
-	// 4. Active action configurations for this agent.
-	//
-	// Each configuration defines a pre-approved set of parameters (with
-	// optional wildcards). The agent picks from these when requesting
-	// approval or executing actions.
-	acArgs := append([]any{agentID, approverID}, StringsToArgs(connectorIDs)...)
-	acRows, err := db.Query(ctx,
-		`SELECT ac.id, ac.connector_id, ac.action_type, ac.name, ac.description,
-		       ac.parameters
-		FROM action_configurations ac
-		WHERE ac.agent_id = $1
-		  AND ac.user_id = $2
-		  AND ac.status = 'active'
-		  AND ac.connector_id IN (`+InPlaceholders(3, len(connectorIDs))+`)
-		ORDER BY ac.connector_id, ac.action_type, ac.created_at`,
-		acArgs...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer acRows.Close()
-
-	for acRows.Next() {
-		var ac CapabilityActionConfig
-		var params []byte
-		if err := acRows.Scan(&ac.ConfigurationID, &ac.ConnectorID, &ac.ActionType,
-			&ac.Name, &ac.Description, &params); err != nil {
-			return nil, err
-		}
-		if len(params) > 0 {
-			ac.Parameters = json.RawMessage(params)
-		}
-		caps.ActionConfigs = append(caps.ActionConfigs, ac)
-	}
-	return caps, acRows.Err()
+	return caps, nil
 }

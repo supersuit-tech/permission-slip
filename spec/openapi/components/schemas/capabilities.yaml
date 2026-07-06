@@ -16,7 +16,7 @@ AgentCapabilitiesResponse:
         - $ref: '../schemas/shared.yaml#/ApproverInfo'
       description: |
         The user (approver) whose capabilities are being returned. Identifies
-        which user's connectors, standing approvals, and action configurations
+        which user's connectors and standing approvals
         are represented in this response.
 
     connectors:
@@ -62,18 +62,11 @@ AgentCapabilitiesResponse:
                   type: "string"
             standing_approvals:
               - standing_approval_id: "sa_def456"
+                name: "Company sends"
                 constraints:
                   recipient_pattern: "*@mycompany.com"
                   max_recipients: 5
                 expires_at: "2026-05-15T00:00:00Z"
-            action_configurations:
-              - configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
-                action_type: "email.send"
-                name: "Send to team"
-                parameters:
-                  to: "team@mycompany.com"
-                  subject: "*"
-                  body: "*"
           - action_type: "email.read"
             name: "Read Email"
             description: "Read emails from Gmail inbox"
@@ -88,7 +81,6 @@ AgentCapabilitiesResponse:
                   minimum: 1
                   maximum: 100
             standing_approvals: []
-            action_configurations: []
       - id: "stripe"
         name: "Stripe"
         description: "Payment processing via Stripe API"
@@ -110,8 +102,7 @@ AgentCapabilitiesResponse:
                 currency:
                   type: "string"
             standing_approvals: []
-            action_configurations: []
-
+            
 ConnectorInstanceCapability:
   type: object
   required:
@@ -222,15 +213,13 @@ ConnectorCapability:
             - "subject"
             - "body"
         standing_approvals: []
-        action_configurations: []
-
+        
 ActionCapability:
   type: object
   required:
     - action_type
     - name
     - standing_approvals
-    - action_configurations
   properties:
     action_type:
       type: string
@@ -343,28 +332,7 @@ ActionCapability:
         request falls through to the one-off approval flow automatically (Permission
         Slip returns `404` with a hint to use `POST /v1/approvals/request`).
 
-    action_configurations:
-      type: array
-      items:
-        $ref: '../schemas/capabilities.yaml#/ActionConfigCapability'
-      description: |
-        Active action configurations for this action type. Each configuration
-        defines a pre-approved set of parameters (with optional wildcards) and
-        a credential binding that the agent can reference when requesting
-        approval or executing actions.
 
-        **The configuration IS the permission.** The agent picks from user-created
-        configurations rather than composing requests from scratch.
-
-        **Agent workflow:**
-        1. Find a configuration matching the desired action
-        2. Reference `configuration_id` in approval requests or execution calls
-        3. For wildcard parameters (`"*"`), supply the actual value
-        4. For fixed parameters, supply values that exactly match the configuration;
-           missing or mismatched fixed parameters are rejected
-
-        **If no configuration fits:** The agent cannot proceed and should ask
-        the human to create a suitable configuration.
 
   example:
     action_type: "email.send"
@@ -379,139 +347,33 @@ ActionCapability:
         - "body"
     standing_approvals:
       - standing_approval_id: "sa_def456"
+        name: "Company sends"
         constraints:
           recipient_pattern: "*@mycompany.com"
         expires_at: "2026-05-15T00:00:00Z"
-    action_configurations:
-      - configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
-        action_type: "email.send"
-        name: "Send to team"
-        parameters:
-          to: "team@mycompany.com"
-          subject: "*"
-          body: "*"
 
 StandingApprovalCapability:
   type: object
   required:
     - standing_approval_id
     - constraints
-    - expires_at
   properties:
     standing_approval_id:
       type: string
       pattern: '^sa_[a-zA-Z0-9]{6,64}$'
       maxLength: 70
-      description: |
-        Unique standing approval identifier. Included in execution responses
-        so the agent can correlate which standing approval was used.
-      example: "sa_def456"
-
+    name:
+      type: string
+      nullable: true
+      maxLength: 255
     constraints:
       type: object
       additionalProperties: true
-      description: |
-        Constraint boundaries for this standing approval. Every execution is
-        validated against these constraints — parameters that fall outside the
-        bounds are rejected and fall through to one-off approval.
-
-        Constraint semantics are action-type-specific. Common patterns:
-
-        - **Pattern matching**: `"sender": "*@github.com"` — parameter must match glob
-        - **Numeric bounds**: `"max_results": 10` — parameter must not exceed value
-        - **Enum restriction**: `"priority": ["low", "medium"]` — parameter must be one of these
-      example:
-        recipient_pattern: "*@mycompany.com"
-        max_recipients: 5
-
     expires_at:
       type: string
       format: date-time
-      description: |
-        When this standing approval expires (ISO 8601, UTC). After this time,
-        the standing approval is inactive and the agent must use one-off
-        approval or the user must create a new standing approval.
-      example: "2026-05-15T00:00:00Z"
-
+      nullable: true
     connector_instance_id:
       type: string
       format: uuid
       nullable: true
-      description: |
-        When set, this standing approval applies only to that connector instance.
-        Omitted or null means type-wide (legacy) and matches any instance.
-
-  example:
-    standing_approval_id: "sa_def456"
-    constraints:
-      recipient_pattern: "*@mycompany.com"
-      max_recipients: 5
-    expires_at: "2026-05-15T00:00:00Z"
-
-ActionConfigCapability:
-  type: object
-  required:
-    - configuration_id
-    - action_type
-    - name
-    - parameters
-  properties:
-    configuration_id:
-      type: string
-      pattern: '^ac_[a-f0-9]{32}$'
-      maxLength: 36
-      description: |
-        Unique action configuration identifier. Reference this value as
-        `configuration_id` when submitting approval requests or executing
-        actions.
-      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
-
-    action_type:
-      type: string
-      maxLength: 128
-      description: |
-        Action type this configuration applies to (e.g., `email.send`).
-      example: "email.send"
-
-    name:
-      type: string
-      maxLength: 255
-      description: |
-        User-facing name for this configuration.
-      example: "Send to team"
-
-    description:
-      type: string
-      maxLength: 1024
-      nullable: true
-      description: |
-        Optional longer description of what this configuration permits.
-      example: "Send emails to anyone at the company about anything"
-
-    parameters:
-      type: object
-      additionalProperties: true
-      description: |
-        Configured parameter values. Fixed parameters are locked in by the user;
-        wildcard parameters use `"*"` to indicate the agent has freedom.
-
-        - **Fixed value** (e.g., `"repo": "supersuit-tech/webapp"`): The agent
-          must use this exact value. Permission Slip enforces the match.
-        - **Wildcard** (e.g., `"title": "*"`): The agent supplies any value
-          that passes the action's `parameters_schema` validation.
-
-        The agent should examine this map to understand what freedom it has.
-      example:
-        to: "team@mycompany.com"
-        subject: "*"
-        body: "*"
-
-  example:
-    configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
-    action_type: "email.send"
-    name: "Send to team"
-    description: "Send emails to anyone at the company about anything"
-    parameters:
-      to: "team@mycompany.com"
-      subject: "*"
-      body: "*"

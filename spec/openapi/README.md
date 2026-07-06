@@ -21,8 +21,7 @@ spec/openapi/
     │   ├── registration.yaml    # Agent registration schemas
     │   ├── approvals.yaml       # Approval request/response schemas
     │   ├── actions.yaml         # Action execution schemas
-    │   ├── action_config_templates.yaml # Action config template schemas
-    │   ├── action_configurations.yaml   # Action configuration schemas
+    │   ├── standing_approval_templates.yaml # Standing approval template schemas
     │   ├── agents.yaml          # Agent management schemas
     │   ├── agent_connectors.yaml # Agent-connector relationship schemas
     │   ├── audit_events.yaml    # Audit event and log schemas
@@ -41,8 +40,7 @@ spec/openapi/
     │   └── errors.yaml          # Error response schemas
     ├── paths/                   # API endpoints
     │   ├── actions.yaml         # POST /v1/actions/execute
-    │   ├── action_config_templates.yaml # Action config template discovery
-    │   ├── action_configurations.yaml   # Action configuration CRUD
+    │   ├── standing_approval_templates.yaml # Standing approval template discovery
     │   ├── agents.yaml          # Agent management endpoints
     │   ├── agent_connectors.yaml # Agent-connector management
     │   ├── approvals.yaml       # Approval lifecycle endpoints

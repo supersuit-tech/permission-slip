@@ -1,0 +1,83 @@
+standingApprovalTemplates:
+  get:
+    operationId: listStandingApprovalTemplates
+    summary: List standing approval templates for a connector
+    tags:
+      - Standing Approvals
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: connector_id
+        in: query
+        required: true
+        schema:
+          type: string
+          maxLength: 128
+    responses:
+      '200':
+        description: Templates for the connector
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approval_templates.yaml#/StandingApprovalTemplateListResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+
+bulkApplyStandingApprovalTemplates:
+  post:
+    operationId: bulkApplyStandingApprovalTemplates
+    summary: Apply multiple standing approval templates to an agent
+    tags:
+      - Standing Approvals
+    security:
+      - SupabaseSession: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/standing_approval_templates.yaml#/BulkApplyStandingApprovalTemplateRequest'
+    responses:
+      '200':
+        description: Per-template apply results
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approval_templates.yaml#/BulkApplyStandingApprovalTemplateResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'
+
+applyStandingApprovalTemplate:
+  post:
+    operationId: applyStandingApprovalTemplate
+    summary: Apply a standing approval template to an agent
+    tags:
+      - Standing Approvals
+    security:
+      - SupabaseSession: []
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          maxLength: 255
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '../schemas/standing_approval_templates.yaml#/ApplyStandingApprovalTemplateRequest'
+    responses:
+      '201':
+        description: Standing approval created from template
+        content:
+          application/json:
+            schema:
+              $ref: '../schemas/standing_approval_templates.yaml#/ApplyStandingApprovalTemplateResponse'
+      '400':
+        $ref: '../responses/errors.yaml#/BadRequest'
+      '404':
+        $ref: '../responses/errors.yaml#/NotFound'

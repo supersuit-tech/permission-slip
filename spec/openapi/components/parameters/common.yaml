@@ -2,10 +2,10 @@ ActionConfigId:
   name: config_id
   in: path
   required: true
+  deprecated: true
   description: |
-    Unique action configuration identifier assigned by Permission Slip.
-
-    Format: `ac_` prefix followed by 32 hex characters.
+    **Removed.** Action configurations no longer exist. This parameter is retained
+    only for historical OpenAPI compatibility and is not referenced by any path.
   schema:
     type: string
     pattern: '^ac_[a-f0-9]{32}$'

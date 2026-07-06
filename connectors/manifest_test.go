@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+
+	"github.com/supersuit-tech/permission-slip/db"
 )
 
 func TestParseManifest_Valid(t *testing.T) {
@@ -823,9 +825,7 @@ func TestParseManifest_XUIAllWidgetTypes(t *testing.T) {
 }
 
 // TestToDBManifest_StandingApprovalRoundTrip verifies that ToDBManifest only
-// emits a StandingApprovalSpec when the template explicitly declares one.
-// There is no inferred/default behavior — each manifest template decides for
-// itself whether it supports auto-approval.
+// emits standing-approval presets when the template explicitly opts in.
 func TestToDBManifest_StandingApprovalRoundTrip(t *testing.T) {
 	t.Parallel()
 
@@ -838,57 +838,49 @@ func TestToDBManifest_StandingApprovalRoundTrip(t *testing.T) {
 			{ActionType: "x.delete_thing", Name: "Delete"},
 		},
 		Templates: []ManifestTemplate{
-			// Opts in to never-expire.
 			{
 				ID: "tpl_x_create_auto", ActionType: "x.create_thing", Name: "CA",
-				Parameters:       json.RawMessage(`{}`),
+				Constraints:      json.RawMessage(`{}`),
 				StandingApproval: &ManifestStandingApproval{},
 			},
-			// Opts in with an explicit duration.
 			{
 				ID: "tpl_x_create_7d", ActionType: "x.create_thing", Name: "C7",
-				Parameters:       json.RawMessage(`{}`),
+				Constraints:      json.RawMessage(`{}`),
 				StandingApproval: &ManifestStandingApproval{DurationDays: &sevenDays},
 			},
-			// No opt-in — default is no standing approval, regardless of action type.
-			{ID: "tpl_x_create_manual", ActionType: "x.create_thing", Name: "CM", Parameters: json.RawMessage(`{}`)},
-			{ID: "tpl_x_delete_manual", ActionType: "x.delete_thing", Name: "DM", Parameters: json.RawMessage(`{}`)},
-			// Delete can still opt in explicitly if the manifest author wants it.
+			{ID: "tpl_x_create_manual", ActionType: "x.create_thing", Name: "CM", Constraints: json.RawMessage(`{}`)},
+			{ID: "tpl_x_delete_manual", ActionType: "x.delete_thing", Name: "DM", Constraints: json.RawMessage(`{}`)},
 			{
 				ID: "tpl_x_delete_auto", ActionType: "x.delete_thing", Name: "DA",
-				Parameters:       json.RawMessage(`{}`),
+				Constraints:      json.RawMessage(`{}`),
 				StandingApproval: &ManifestStandingApproval{},
 			},
 		},
 	}
 
-	db := m.ToDBManifest()
+	dbManifest := m.ToDBManifest()
 
-	byID := make(map[string][]byte, len(db.Templates))
-	for _, t := range db.Templates {
-		byID[t.ID] = t.StandingApprovalSpec
+	byID := make(map[string]db.ExternalConnectorTemplate, len(dbManifest.Templates))
+	for _, tpl := range dbManifest.Templates {
+		byID[tpl.ID] = tpl
 	}
 
-	// Templates that opted in keep a non-empty spec.
 	for _, id := range []string{"tpl_x_create_auto", "tpl_x_create_7d", "tpl_x_delete_auto"} {
-		if len(byID[id]) == 0 {
-			t.Errorf("template %s: StandingApprovalSpec is empty; want round-tripped spec", id)
+		if _, ok := byID[id]; !ok {
+			t.Errorf("template %s: expected in ToDBManifest output", id)
 		}
 	}
 
-	// Duration is preserved when explicitly set.
-	var sa7d ManifestStandingApproval
-	if err := json.Unmarshal(byID["tpl_x_create_7d"], &sa7d); err != nil {
-		t.Fatalf("unmarshaling 7d spec: %v", err)
+	if tpl := byID["tpl_x_create_7d"]; tpl.DurationDays == nil || *tpl.DurationDays != 7 {
+		t.Errorf("tpl_x_create_7d duration = %v, want 7", tpl.DurationDays)
 	}
-	if sa7d.DurationDays == nil || *sa7d.DurationDays != 7 {
-		t.Errorf("tpl_x_create_7d duration = %v, want 7", sa7d.DurationDays)
+	if tpl := byID["tpl_x_create_auto"]; tpl.DurationDays != nil {
+		t.Errorf("tpl_x_create_auto duration = %v, want nil", tpl.DurationDays)
 	}
 
-	// Templates that did not opt in get nil — no hidden inference based on action type.
 	for _, id := range []string{"tpl_x_create_manual", "tpl_x_delete_manual"} {
-		if len(byID[id]) != 0 {
-			t.Errorf("template %s: StandingApprovalSpec = %q, want empty (no opt-in)", id, byID[id])
+		if _, ok := byID[id]; ok {
+			t.Errorf("template %s: should be omitted (no standing-approval opt-in)", id)
 		}
 	}
 }

@@ -155,8 +155,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		// Rejects unregistered action types immediately so agents get a clear
 		// error instead of approvals that silently fail at execution time.
 		// Then rewrites flat aliases (ParameterAliaser) and applies nested
-		// normalization (Normalizer). Must run before ValidateConfigurationReference
-		// so constraints are evaluated against canonical keys.
+		// normalization (Normalizer).
 		if deps.Connectors != nil {
 			action, conn, ok := deps.Connectors.GetActionWithConnector(actionType)
 			if !ok {
@@ -237,12 +236,10 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		// Optional: validate configuration reference — sees canonical keys after normalization.
-		if req.Configuration != nil {
-			result := ValidateConfigurationReference(w, r, deps, req.Configuration.ConfigurationID, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID, actionParams)
-			if result == nil {
-				return // error already written
-			}
+		// Deprecated: configuration field is accepted but ignored (removed in a future release).
+		if req.Configuration != nil && strings.TrimSpace(req.Configuration.ConfigurationID) != "" {
+			log.Printf("[%s] AgentRequestApproval: configuration field is deprecated and ignored (configuration_id=%q)",
+				TraceID(r.Context()), req.Configuration.ConfigurationID)
 		}
 
 		// ── Check for matching standing approval (auto-approve) ─────

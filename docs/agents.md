@@ -324,7 +324,7 @@ Use `parameters_schema` (JSON Schema) to validate your parameters before submitt
 
 ### Your Agent's Capabilities (Authenticated)
 
-See what **you specifically** can do — which connectors are enabled for you, what action configurations are available, and what standing approvals you have:
+See what **you specifically** can do — which connectors are enabled for you, what standing approvals you have, and whether credentials are ready:
 
 ```http
 GET /agents/42/capabilities
@@ -353,31 +353,10 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
               "body": { "type": "string" }
             }
           },
-          "action_configurations": [
-            {
-              "configuration_id": "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
-              "name": "Send weekly report to Alice",
-              "parameters": {
-                "to": "alice@example.com",
-                "subject": "Weekly Report",
-                "body": "*"
-              },
-              "credential_ready": true
-            },
-            {
-              "configuration_id": "ac_9f8e7d6c5b4a39281706f5e4d3c2b1a0",
-              "name": "Email anyone at the company",
-              "parameters": {
-                "to": "*",
-                "subject": "*",
-                "body": "*"
-              },
-              "credential_ready": true
-            }
-          ],
           "standing_approvals": [
             {
               "standing_approval_id": "sa_def456",
+              "name": "Company recipients",
               "constraints": { "recipient_pattern": "*@mycompany.com" },
               "expires_at": "2026-05-15T00:00:00Z"
             }
@@ -398,41 +377,17 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
 
 `credentials_ready` is `true` only when a credential or OAuth connection is **bound** to this agent for that connector (the same binding used at execution time). Storing credentials on the account without assigning them to the agent still yields `credentials_ready: false`.
 
-#### Action Configurations
-
-**Action configurations are the core unit of permission.** A user creates configurations that define exactly how an agent is allowed to use an action — which parameters are locked to specific values, which are free (wildcard `"*"`), and which credential to use. The agent selects from these pre-configured options rather than composing requests from scratch.
-
-Each configuration in the response includes:
-
-| Field | Description |
-|---|---|
-| `configuration_id` | Unique ID to reference when requesting approval or executing |
-| `name` | User-facing label describing what this configuration permits |
-| `parameters` | The configured values — fixed values are locked, `"*"` means the agent chooses |
-| `credential_ready` | Whether a credential is bound and available for execution |
-
-**Wildcard examples:**
-
-- `"to": "alice@example.com"` — locked: must be exactly this value
-- `"to": "*"` — wildcard: agent can use any value that passes schema validation
-- `"to": "*@mycompany.com"` — pattern wildcard (future): restricted to a pattern
-
-The `parameters_schema` is still included on the action for context so the agent understands what each parameter means and what values are valid.
-
 #### Decision Tree
 
 ```
-Has action_configurations for this action?
-├─ YES → Pick the configuration that fits your task
-│        └─ credential_ready?
-│           ├─ NO  → Tell user: "Configuration X needs a credential"
-│           └─ YES → Has standing_approvals with matching constraints?
-│                    ├─ YES → Execute directly (reference configuration_id)
-│                    └─ NO  → Request one-off approval (reference configuration_id)
-└─ NO  → Tell user: "I need <action> configured — can you set that up?"
+Connector enabled + credentials_ready?
+├─ NO  → Tell user what to connect
+└─ YES → Does a standing approval match your action + params?
+         ├─ YES → Submit; executes immediately
+         └─ NO  → Submit; user gets a one-off approval prompt
 ```
 
-If no configuration matches what you need to do, you **cannot proceed** — requests for unconfigured actions are rejected. Ask the user to create an appropriate configuration from their dashboard.
+You may request approval for **any action** on an enabled connector. No per-action setup is required. Standing approvals are optional pre-authorization rules the user configures to skip repeated prompts.
 
 ---
 
@@ -444,7 +399,7 @@ For actions without a matching standing approval, you need per-request approval:
 
 #### 4a-1. Request Approval
 
-Reference the `configuration_id` from your capabilities response. For wildcard parameters, provide the actual values you want to use:
+Submit a structured action with validated parameters. Permission Slip checks for a matching standing approval; otherwise it creates a pending approval for the user.
 
 ```http
 POST /approvals/request
@@ -452,11 +407,14 @@ Content-Type: application/json
 X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
 
 {
-  "agent_id": 42,
   "request_id": "unique-uuid-here",
-  "configuration_id": "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d",
-  "parameters": {
-    "body": "Here are this week's highlights..."
+  "action": {
+    "type": "email.send",
+    "parameters": {
+      "to": ["alice@example.com"],
+      "subject": "Weekly Report",
+      "body": "Here are this week's highlights..."
+    }
   },
   "context": {
     "description": "Sending weekly report email to Alice",
@@ -464,6 +422,8 @@ X-Permission-Slip-Signature: agent_id="42", algorithm="Ed25519", ...
   }
 }
 ```
+
+> **Note:** The legacy `configuration` field is accepted but ignored (deprecated). Do not rely on it.
 
 **Response** (200):
 
@@ -743,15 +703,9 @@ Use `GET /connectors` to see which action types are available.
 2. RECEIVE INVITE   User shares invite URL
 3. REGISTER         POST /invite/{code}              → get agent_id
 4. VERIFY           POST /agents/{id}/verify         → status: registered
-5. DISCOVER         GET  /agents/{id}/capabilities   → action configurations + standing approvals
-6. PICK CONFIG      Select a configuration_id that fits the task
-7. REQUEST          POST /approvals/request          (planned) → reference configuration_id
-8. GET CODE         User approves, shares confirmation code
-9. VERIFY APPROVAL  POST /approvals/{id}/verify      (planned) → get token
-10. EXECUTE         POST /approvals/request           → action result (via token or standing approval)
+5. DISCOVER         GET  /agents/{id}/capabilities   → connectors, actions, standing approvals
+6. REQUEST          POST /approvals/request          → auto-execute or pending approval
 ```
-
-Steps 6-10 repeat for each action. With standing approvals, steps 7-9 are skipped. If no configuration matches, ask the user to create one.
 
 ---
 
@@ -764,7 +718,7 @@ Steps 6-10 repeat for each action. With standing approvals, steps 7-9 are skippe
 | `POST /invite/{code}` | Signature | Implemented | Register with an invite URL (served at host root, not under API base) |
 | `POST /agents/{id}/verify` | Signature | Implemented | Verify registration with confirmation code |
 | `GET /agents/me` | Signature | Implemented | Get your own agent record (status, metadata, timestamps) |
-| `GET /agents/{id}/capabilities` | Signature | Implemented | Discover action configurations, connectors, actions, and standing approvals |
+| `GET /agents/{id}/capabilities` | Signature | Implemented | Discover connectors, actions, and standing approvals |
 | `POST /approvals/request` | Signature | Implemented | Request approval; auto-executes if standing approval matches, otherwise creates pending approval |
 | `GET /approvals/{id}/status` | Signature | Implemented | Poll approval status (pending → approved/denied/cancelled/expired) |
 | `POST /approvals/{id}/cancel` | Signature | Implemented | Cancel a pending approval request |

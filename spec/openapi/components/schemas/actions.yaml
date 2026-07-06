@@ -13,7 +13,7 @@ ExecuteActionRequest:
     - description: |
         Execute an action via Permission Slip using a standing approval.
 
-        The agent provides a `request_id`, `action` object, and optionally a `configuration_id`.
+        The agent provides a `request_id` and `action` object.
         Permission Slip matches an active standing approval for the agent + action type + constraints
         and executes the action using the user's stored credentials.
 

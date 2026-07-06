@@ -18,7 +18,6 @@ type standingApprovalRequestResponse struct {
 	ActionType                  string     `json:"action_type"`
 	ActionVersion               string     `json:"action_version"`
 	Constraints                 any        `json:"constraints"`
-	SourceActionConfigurationID *string    `json:"source_action_configuration_id,omitempty"`
 	ConnectorName               *string    `json:"connector_name,omitempty"`
 	ConnectorInstanceID         *string    `json:"connector_instance_id,omitempty"`
 	ConnectorInstanceDisplay    *string    `json:"connector_instance_display,omitempty"`
@@ -79,7 +78,6 @@ func toStandingApprovalRequestResponse(sar db.StandingApprovalRequest) standingA
 		ActionType:                  sar.ActionType,
 		ActionVersion:               sar.ActionVersion,
 		Constraints:                 constraints,
-		SourceActionConfigurationID: sar.SourceActionConfigurationID,
 		ConnectorName:               sar.ConnectorName,
 		ConnectorInstanceID:         sar.ConnectorInstanceID,
 		ConnectorInstanceDisplay:    sar.ConnectorInstanceDisplay,
@@ -209,6 +207,7 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 		}
 
 		startsAt := time.Now().UTC()
+		ruleName := autoCreatedFromRuleProposalName
 
 		saID, err := generatePrefixedID("sa_", 16)
 		if err != nil {
@@ -229,32 +228,18 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			defer db.RollbackTx(r.Context(), tx)
 		}
 
-		sourceConfigIDPtr, ok := resolveSourceActionConfigForStandingApproval(w, r, tx, profile.ID, createStandingApprovalRequest{
-			AgentID:                     sar.AgentID,
-			ActionType:                  sar.ActionType,
-			SourceActionConfigurationID: sar.SourceActionConfigurationID,
-		}, sourceActionConfigResolveOptions{
-			LogLabel:              "ApproveStandingApprovalRequest",
-			AutoCreateName:        autoCreatedFromRuleProposalConfigName,
-			AutoCreateDescription: &autoCreatedFromRuleProposalConfigDescription,
-			FailureMessage:        "Failed to approve standing approval request",
-		})
-		if !ok {
-			return
-		}
-		sourceConfigID := *sourceConfigIDPtr
-
 		sa, err := db.CreateStandingApproval(r.Context(), tx, db.CreateStandingApprovalParams{
-			StandingApprovalID:          saID,
-			AgentID:                     sar.AgentID,
-			UserID:                      profile.ID,
-			ActionType:                  sar.ActionType,
-			ActionVersion:               sar.ActionVersion,
-			Constraints:                 sar.Constraints,
-			SourceActionConfigurationID: &sourceConfigID,
-			ConnectorInstanceID:         sar.ConnectorInstanceID,
-			StartsAt:                    startsAt,
-			ExpiresAt:                   nil,
+			StandingApprovalID:  saID,
+			AgentID:             sar.AgentID,
+			UserID:              profile.ID,
+			ActionType:          sar.ActionType,
+			ActionVersion:       sar.ActionVersion,
+			Constraints:         sar.Constraints,
+			Name:                &ruleName,
+			Description:         &autoCreatedFromRuleProposalDescription,
+			ConnectorInstanceID: sar.ConnectorInstanceID,
+			StartsAt:            startsAt,
+			ExpiresAt:           nil,
 		})
 		if err != nil {
 			if handleStandingApprovalError(w, r, err) {

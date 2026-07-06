@@ -52,9 +52,9 @@ var userEmails = map[string]string{
 
 // Connector ID constants for use in scenario seed data below.
 const (
-	connectorGitHub  = "github"
-	connectorSlack   = "slack"
-	connectorGoogle  = "google"
+	connectorGitHub = "github"
+	connectorSlack  = "slack"
+	connectorGoogle = "google"
 )
 
 // supabaseClient holds config for Supabase Admin API calls.
@@ -823,22 +823,14 @@ func seedUserHasActivity(ctx context.Context, tx db.DBTX, supa *supabaseClient) 
 			createdAt)
 	}
 
-	// Backing action config + 1 active standing approval
+	// Backing standing approval for activity user
 	exec(ctx, tx,
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
-		"ac-activity-ci-create-issue", agentCI, userHasActivity,
-		"github", "github.create_issue",
-		`{"repo": "supersuit-tech/ci-actions", "title": "*", "body": "*"}`,
-		"CI: create issues in ci-actions",
-		"Seed standing approval backing for activity user.")
-	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, constraints, starts_at, expires_at)
 		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8)`,
 		"sa-activity-1", agentCI, userHasActivity,
 		"github.create_issue",
+		"CI: auto-approve issues in ci-actions",
 		`{"repo": "supersuit-tech/ci-actions"}`,
-		"ac-activity-ci-create-issue",
 		now.Add(-7*24*time.Hour),
 		now.Add(23*24*time.Hour))
 
@@ -1224,79 +1216,38 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 		"00000000-0000-0000-0000-000000000098")
 
 	// ---------------------------------------------------------------
-	// Action configurations (4: mix of active/disabled, with/without credentials)
-	// ---------------------------------------------------------------
-
-	// Claude Code → github.create_issue (locked repo, wildcard title/body)
-	exec(ctx, tx,
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
-		"ac-claude-create-issue", claude, userHasEverything,
-		connectorGitHub, "github.create_issue",
-		`{"repo": "supersuit-tech/permission-slip", "title": "*", "body": "*", "label": "bug"}`,
-		"Create bug issues in permission-slip",
-		"Agent can create issues labeled 'bug' in the main repo. Title and body are freeform.")
-
-	// Claude Code → github.merge_pr (locked repo, wildcard PR number)
-	exec(ctx, tx,
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
-		"ac-claude-merge-pr", claude, userHasEverything,
-		connectorGitHub, "github.merge_pr",
-		`{"repo": "supersuit-tech/permission-slip", "pr": "*"}`,
-		"Merge PRs in permission-slip",
-		"Agent can merge any PR in the main repo.")
-
-	// Slack Notifier → slack.send_message (locked channel, wildcard message)
-	exec(ctx, tx,
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, 'active', $7, $8)`,
-		"ac-slack-send-releases", slack, userHasEverything,
-		connectorSlack, "slack.send_message",
-		`{"channel": "#releases", "message": "*"}`,
-		"Post to #releases",
-		"Agent can send any message to the #releases channel.")
-
-	// Disabled config — Datadog → slack.send_message (no credential yet)
-	exec(ctx, tx,
-		`INSERT INTO action_configurations (id, agent_id, user_id, connector_id, action_type, parameters, status, name, description)
-		 VALUES ($1, $2, $3, $4, $5, $6, 'disabled', $7, $8)`,
-		"ac-datadog-send-alerts", datadog, userHasEverything,
-		connectorSlack, "slack.send_message",
-		`{"channel": "#incidents", "message": "*"}`,
-		"Post to #incidents (disabled)",
-		"Disabled — credential needs to be assigned before activation.")
-
-	// ---------------------------------------------------------------
-	// Standing approvals (2 active, 1 expired) — after action configs (FK)
+	// Standing approvals (2 active, 1 expired)
 	// ---------------------------------------------------------------
 	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8)`,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, description, constraints, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8, $9)`,
 		"sa-everything-1", claude, userHasEverything,
 		"github.create_issue",
+		"Create bug issues in permission-slip",
+		"Agent can create issues labeled 'bug' in the main repo. Title and body are freeform.",
 		`{"repo": "supersuit-tech/permission-slip", "title": "*"}`,
-		"ac-claude-create-issue",
 		now.Add(-7*24*time.Hour),
 		now.Add(23*24*time.Hour))
 
 	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8)`,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, description, constraints, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8, $9)`,
 		"sa-everything-2", slack, userHasEverything,
 		"slack.send_message",
+		"Post to #releases",
+		"Agent can send any message to the #releases channel.",
 		`{"channel": "#engineering"}`,
-		"ac-slack-send-releases",
 		now.Add(-3*24*time.Hour),
 		now.Add(27*24*time.Hour))
 
 	exec(ctx, tx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, starts_at, expires_at, expired_at)
-		 VALUES ($1, $2, $3, $4, 'expired', $5, $6, $7, $7)`,
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, description, constraints, starts_at, expires_at, expired_at)
+		 VALUES ($1, $2, $3, $4, 'expired', $5, $6, $7, $8, $8)`,
 		"sa-everything-expired", github, userHasEverything,
 		"github.merge_pr",
+		"Merge PRs in permission-slip",
+		"Agent can merge any PR in the main repo.",
 		`{"pr": "supersuit-tech/permission-slip#123"}`,
-		"ac-claude-merge-pr",
 		now.Add(-60*24*time.Hour),
 		now.Add(-30*24*time.Hour))
 
@@ -1316,9 +1267,9 @@ func seedUserHasEverything(ctx context.Context, tx db.DBTX, supa *supabaseClient
 	}
 
 	if os.Getenv("TEST_AGENT_PUB_KEY") != "" {
-		fmt.Println("  ✓ has-everything@test.local (11 agents (incl. Openclaw), 13 agent-connectors, 29 approvals, 2 credentials, 2 oauth connections, 7 agent-connector-credentials, 3 standing approvals, 4 action configs, 1 invite)")
+		fmt.Println("  ✓ has-everything@test.local (11 agents (incl. Openclaw), 13 agent-connectors, 29 approvals, 2 credentials, 2 oauth connections, 7 agent-connector-credentials, 3 standing approvals, 1 invite)")
 	} else {
-		fmt.Println("  ✓ has-everything@test.local (10 agents, 13 agent-connectors, 29 approvals, 2 credentials, 2 oauth connections, 7 agent-connector-credentials, 3 standing approvals, 4 action configs, 1 invite)")
+		fmt.Println("  ✓ has-everything@test.local (10 agents, 13 agent-connectors, 29 approvals, 2 credentials, 2 oauth connections, 7 agent-connector-credentials, 3 standing approvals, 1 invite)")
 	}
 }
 

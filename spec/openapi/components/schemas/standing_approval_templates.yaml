@@ -1,0 +1,134 @@
+StandingApprovalTemplate:
+  type: object
+  required:
+    - id
+    - connector_id
+    - action_type
+    - name
+    - constraints
+    - created_at
+  properties:
+    id:
+      type: string
+      maxLength: 255
+      description: Unique template identifier.
+      example: "tpl_github_create_issue_all"
+    connector_id:
+      type: string
+      maxLength: 128
+      description: Connector this template applies to.
+      example: "github"
+    action_type:
+      type: string
+      maxLength: 128
+      description: Action type this template pre-authorizes.
+      example: "github.create_issue"
+    name:
+      type: string
+      maxLength: 255
+      description: Human-readable name for the standing approval created from this template.
+      example: "Create issues (all fields open)"
+    description:
+      type: string
+      maxLength: 4096
+      nullable: true
+      description: Longer description of what this template pre-authorizes.
+    constraints:
+      type: object
+      additionalProperties: true
+      description: |
+        Constraint preset values. Uses the same syntax as standing approval
+        constraints: fixed values, `"*"` wildcards, and `{"$pattern": "<glob>"}` patterns.
+    duration_days:
+      type: integer
+      nullable: true
+      minimum: 1
+      description: |
+        Number of days until the created standing approval expires. `null` means no
+        expiry (until revoked).
+    created_at:
+      type: string
+      format: date-time
+      description: ISO 8601 timestamp when this template was created.
+
+StandingApprovalTemplateListResponse:
+  type: object
+  required:
+    - data
+  properties:
+    data:
+      type: array
+      items:
+        $ref: '../schemas/standing_approval_templates.yaml#/StandingApprovalTemplate'
+
+ApplyStandingApprovalTemplateRequest:
+  type: object
+  required:
+    - agent_id
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+      description: Agent to attach the new standing approval to.
+
+ApplyStandingApprovalTemplateResponse:
+  type: object
+  required:
+    - standing_approval
+  properties:
+    standing_approval:
+      $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
+
+BulkApplyStandingApprovalTemplateRequest:
+  type: object
+  required:
+    - agent_id
+    - template_ids
+  properties:
+    agent_id:
+      type: integer
+      format: int64
+    template_ids:
+      type: array
+      items:
+        type: string
+        maxLength: 255
+      minItems: 1
+      maxItems: 50
+      description: Template IDs to apply. All templates must belong to the same connector.
+
+BulkApplyResultError:
+  type: object
+  required:
+    - code
+    - message
+  properties:
+    code:
+      type: string
+    message:
+      type: string
+
+BulkApplyStandingApprovalResult:
+  type: object
+  required:
+    - template_id
+    - success
+  properties:
+    template_id:
+      type: string
+    success:
+      type: boolean
+    standing_approval:
+      $ref: '../schemas/standing_approvals.yaml#/StandingApproval'
+    error:
+      $ref: '../schemas/standing_approval_templates.yaml#/BulkApplyResultError'
+
+BulkApplyStandingApprovalTemplateResponse:
+  type: object
+  required:
+    - results
+  properties:
+    results:
+      type: array
+      items:
+        $ref: '../schemas/standing_approval_templates.yaml#/BulkApplyStandingApprovalResult'

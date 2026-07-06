@@ -13,7 +13,7 @@ import (
 
 const standingApprovalScopeTestConstraints = `{"scope":"test-scope","ping":"*"}`
 
-func setupActionConfigScopeTest(t *testing.T) (db.DBTX, *Deps, http.Handler, int64, string, string, string, *db.AgentConnectorInstance, *db.AgentConnectorInstance) {
+func setupStandingApprovalScopeTest(t *testing.T) (db.DBTX, *Deps, http.Handler, int64, string, string, string, *db.AgentConnectorInstance, *db.AgentConnectorInstance) {
 	t.Helper()
 	tx := testhelper.SetupTestDB(t)
 	ctx := context.Background()
@@ -44,21 +44,13 @@ func setupActionConfigScopeTest(t *testing.T) (db.DBTX, *Deps, http.Handler, int
 
 func TestUpdateStandingApproval_ScopeOmittedPreserves(t *testing.T) {
 	t.Parallel()
-	tx, deps, router, agentID, uid, connID, actionType, instDefault, instOther := setupActionConfigScopeTest(t)
+	tx, deps, router, agentID, uid, _, actionType, instDefault, instOther := setupStandingApprovalScopeTest(t)
 	_ = deps
-
-	configID := testhelper.GenerateID(t, "ac_")
-	params, _ := json.Marshal(map[string]string{"connector_instance": instOther.ConnectorInstanceID})
-	testhelper.InsertActionConfigFull(t, tx, configID, agentID, uid, connID, actionType, testhelper.ActionConfigOpts{
-		Parameters: params,
-		Name:       "Scoped config",
-	})
 
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:                  actionType,
-		SourceActionConfigurationID: &configID,
-		Constraints:                 []byte(standingApprovalScopeTestConstraints),
+		ActionType:  actionType,
+		Constraints: []byte(standingApprovalScopeTestConstraints),
 	})
 
 	if _, err := tx.Exec(context.Background(),
@@ -88,16 +80,12 @@ func TestUpdateStandingApproval_ScopeOmittedPreserves(t *testing.T) {
 
 func TestUpdateStandingApproval_ScopeNullSetsAllAccounts(t *testing.T) {
 	t.Parallel()
-	tx, _, router, agentID, uid, connID, actionType, _, instOther := setupActionConfigScopeTest(t)
-
-	configID := testhelper.GenerateID(t, "ac_")
-	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
+	tx, _, router, agentID, uid, _, actionType, _, instOther := setupStandingApprovalScopeTest(t)
 
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:                  actionType,
-		SourceActionConfigurationID: &configID,
-		Constraints:                 []byte(standingApprovalScopeTestConstraints),
+		ActionType:  actionType,
+		Constraints: []byte(standingApprovalScopeTestConstraints),
 	})
 	if _, err := tx.Exec(context.Background(),
 		`UPDATE standing_approvals SET connector_instance_id = $1 WHERE standing_approval_id = $2`,
@@ -125,16 +113,12 @@ func TestUpdateStandingApproval_ScopeNullSetsAllAccounts(t *testing.T) {
 
 func TestUpdateStandingApproval_ScopeToSpecificInstance(t *testing.T) {
 	t.Parallel()
-	tx, _, router, agentID, uid, connID, actionType, _, instOther := setupActionConfigScopeTest(t)
-
-	configID := testhelper.GenerateID(t, "ac_")
-	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
+	tx, _, router, agentID, uid, _, actionType, _, instOther := setupStandingApprovalScopeTest(t)
 
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:                  actionType,
-		SourceActionConfigurationID: &configID,
-		Constraints:                 []byte(standingApprovalScopeTestConstraints),
+		ActionType:  actionType,
+		Constraints: []byte(standingApprovalScopeTestConstraints),
 	})
 
 	body := `{"constraints":` + standingApprovalScopeTestConstraints + `,"connector_instance_id":"` + instOther.ConnectorInstanceID + `"}`
@@ -152,67 +136,6 @@ func TestUpdateStandingApproval_ScopeToSpecificInstance(t *testing.T) {
 	if resp.ConnectorInstanceID == nil || *resp.ConnectorInstanceID != instOther.ConnectorInstanceID {
 		t.Fatalf("expected scoped instance, got %v", resp.ConnectorInstanceID)
 	}
-}
-
-func TestUpdateActionConfig_PropagatesScopeToLinkedStandingApproval(t *testing.T) {
-	t.Parallel()
-	tx, _, router, agentID, uid, connID, actionType, instDefault, instOther := setupActionConfigScopeTest(t)
-
-	configID := testhelper.GenerateID(t, "ac_")
-	params, _ := json.Marshal(map[string]string{"connector_instance": "*", "ping": "*"})
-	testhelper.InsertActionConfigFull(t, tx, configID, agentID, uid, connID, actionType, testhelper.ActionConfigOpts{
-		Parameters: params,
-		Name:       "All accounts config",
-	})
-
-	saID := testhelper.GenerateID(t, "sa_")
-	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:                  actionType,
-		SourceActionConfigurationID: &configID,
-		Constraints:                 []byte(standingApprovalScopeTestConstraints),
-	})
-
-	newParams, _ := json.Marshal(map[string]string{
-		"connector_instance": instOther.ConnectorInstanceID,
-		"ping":               "*",
-	})
-	body := `{"parameters":` + string(newParams) + `}`
-	r := authenticatedJSONRequest(t, http.MethodPut, "/action-configurations/"+configID, uid, body)
-	w := httptest.NewRecorder()
-	router.ServeHTTP(w, r)
-	if w.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
-	}
-
-	sa, err := db.GetStandingApprovalByIDAndUser(context.Background(), tx, saID, uid)
-	if err != nil {
-		t.Fatalf("get standing approval: %v", err)
-	}
-	if sa == nil {
-		t.Fatal("standing approval not found")
-	}
-	if sa.ConnectorInstanceID == nil || *sa.ConnectorInstanceID != instOther.ConnectorInstanceID {
-		t.Fatalf("expected linked SA scope %q, got %v", instOther.ConnectorInstanceID, sa.ConnectorInstanceID)
-	}
-
-	// Narrow back to all accounts.
-	allParams, _ := json.Marshal(map[string]string{"connector_instance": "*", "ping": "*"})
-	body2 := `{"parameters":` + string(allParams) + `}`
-	r2 := authenticatedJSONRequest(t, http.MethodPut, "/action-configurations/"+configID, uid, body2)
-	w2 := httptest.NewRecorder()
-	router.ServeHTTP(w2, r2)
-	if w2.Code != http.StatusOK {
-		t.Fatalf("expected 200 on widen, got %d: %s", w2.Code, w2.Body.String())
-	}
-
-	sa2, err := db.GetStandingApprovalByIDAndUser(context.Background(), tx, saID, uid)
-	if err != nil {
-		t.Fatalf("get standing approval after widen: %v", err)
-	}
-	if sa2.ConnectorInstanceID != nil {
-		t.Fatalf("expected linked SA all accounts, got %v", sa2.ConnectorInstanceID)
-	}
-	_ = instDefault
 }
 
 func TestConnectorInstanceIDPtrDifferent(t *testing.T) {

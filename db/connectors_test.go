@@ -503,7 +503,7 @@ func TestUpsertConnectorFromManifest_WithTemplates(t *testing.T) {
 				ActionType:  "ext-tpl.create",
 				Name:        "Default create",
 				Description: "Pre-filled template",
-				Parameters:  []byte(`{"key":"*"}`),
+				Constraints: []byte(`{"key":"*"}`),
 			},
 		},
 	}
@@ -513,9 +513,9 @@ func TestUpsertConnectorFromManifest_WithTemplates(t *testing.T) {
 	}
 
 	// Verify template was created.
-	templates, err := db.ListTemplatesByConnector(ctx, tx, "ext-tpl")
+	templates, err := db.ListStandingApprovalTemplatesByConnector(ctx, tx, "ext-tpl")
 	if err != nil {
-		t.Fatalf("ListTemplatesByConnector: %v", err)
+		t.Fatalf("ListStandingApprovalTemplatesByConnector: %v", err)
 	}
 	if len(templates) != 1 {
 		t.Fatalf("expected 1 template, got %d", len(templates))
@@ -540,23 +540,23 @@ func TestUpsertConnectorFromManifest_TemplateUpdate(t *testing.T) {
 			{ActionType: "ext-tplupd.do", Name: "Do"},
 		},
 		Templates: []db.ExternalConnectorTemplate{
-			{ID: "tpl_upd", ActionType: "ext-tplupd.do", Name: "Original", Parameters: []byte(`{"a":"*"}`)},
+			{ID: "tpl_upd", ActionType: "ext-tplupd.do", Name: "Original", Constraints: []byte(`{"a":"*"}`)},
 		},
 	}
 	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
 		t.Fatalf("initial upsert: %v", err)
 	}
 
-	// Update template name and parameters.
+	// Update template name and constraints.
 	m.Templates[0].Name = "Updated"
-	m.Templates[0].Parameters = []byte(`{"a":"fixed"}`)
+	m.Templates[0].Constraints = []byte(`{"a":"fixed"}`)
 	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
 		t.Fatalf("update upsert: %v", err)
 	}
 
-	templates, err := db.ListTemplatesByConnector(ctx, tx, "ext-tplupd")
+	templates, err := db.ListStandingApprovalTemplatesByConnector(ctx, tx, "ext-tplupd")
 	if err != nil {
-		t.Fatalf("ListTemplatesByConnector: %v", err)
+		t.Fatalf("ListStandingApprovalTemplatesByConnector: %v", err)
 	}
 	if len(templates) != 1 {
 		t.Fatalf("expected 1 template, got %d", len(templates))
@@ -578,8 +578,8 @@ func TestUpsertConnectorFromManifest_RemovesStaleTemplates(t *testing.T) {
 			{ActionType: "ext-tplstale.do", Name: "Do"},
 		},
 		Templates: []db.ExternalConnectorTemplate{
-			{ID: "tpl_keep", ActionType: "ext-tplstale.do", Name: "Keep", Parameters: []byte(`{"a":"*"}`)},
-			{ID: "tpl_remove", ActionType: "ext-tplstale.do", Name: "Remove", Parameters: []byte(`{"b":"*"}`)},
+			{ID: "tpl_keep", ActionType: "ext-tplstale.do", Name: "Keep", Constraints: []byte(`{"a":"*"}`)},
+			{ID: "tpl_remove", ActionType: "ext-tplstale.do", Name: "Remove", Constraints: []byte(`{"b":"*"}`)},
 		},
 	}
 	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
@@ -588,15 +588,15 @@ func TestUpsertConnectorFromManifest_RemovesStaleTemplates(t *testing.T) {
 
 	// Re-upsert with only one template — the other should be removed.
 	m.Templates = []db.ExternalConnectorTemplate{
-		{ID: "tpl_keep", ActionType: "ext-tplstale.do", Name: "Keep", Parameters: []byte(`{"a":"*"}`)},
+		{ID: "tpl_keep", ActionType: "ext-tplstale.do", Name: "Keep", Constraints: []byte(`{"a":"*"}`)},
 	}
 	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
 		t.Fatalf("second upsert: %v", err)
 	}
 
-	templates, err := db.ListTemplatesByConnector(ctx, tx, "ext-tplstale")
+	templates, err := db.ListStandingApprovalTemplatesByConnector(ctx, tx, "ext-tplstale")
 	if err != nil {
-		t.Fatalf("ListTemplatesByConnector: %v", err)
+		t.Fatalf("ListStandingApprovalTemplatesByConnector: %v", err)
 	}
 	if len(templates) != 1 {
 		t.Fatalf("expected 1 template (stale removed), got %d", len(templates))
@@ -619,7 +619,7 @@ func TestUpsertConnectorFromManifest_NoTemplates(t *testing.T) {
 			{ActionType: "ext-tplnone.do", Name: "Do"},
 		},
 		Templates: []db.ExternalConnectorTemplate{
-			{ID: "tpl_will_remove", ActionType: "ext-tplnone.do", Name: "T", Parameters: []byte(`{"a":"*"}`)},
+			{ID: "tpl_will_remove", ActionType: "ext-tplnone.do", Name: "T", Constraints: []byte(`{"a":"*"}`)},
 		},
 	}
 	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
@@ -632,9 +632,9 @@ func TestUpsertConnectorFromManifest_NoTemplates(t *testing.T) {
 		t.Fatalf("second upsert: %v", err)
 	}
 
-	templates, err := db.ListTemplatesByConnector(ctx, tx, "ext-tplnone")
+	templates, err := db.ListStandingApprovalTemplatesByConnector(ctx, tx, "ext-tplnone")
 	if err != nil {
-		t.Fatalf("ListTemplatesByConnector: %v", err)
+		t.Fatalf("ListStandingApprovalTemplatesByConnector: %v", err)
 	}
 	if len(templates) != 0 {
 		t.Errorf("expected 0 templates after removal, got %d", len(templates))
