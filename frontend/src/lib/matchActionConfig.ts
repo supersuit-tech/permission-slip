@@ -9,7 +9,8 @@ function matchPattern(pattern: string, value: string): boolean {
   const parts = pattern.split("*");
   let regex = "^";
   for (let i = 0; i < parts.length; i++) {
-    regex += parts[i].replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const part = parts[i] ?? "";
+    regex += part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     if (i < parts.length - 1) regex += ".*";
   }
   regex += "$";

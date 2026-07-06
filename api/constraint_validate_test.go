@@ -275,10 +275,11 @@ func TestRequestApproval_Fallthrough_SurfacesMetadataUnavailableInContext(t *tes
 		Constraints: []byte(`{"message_id":"*","folder":"*","$meta":{"from":{"$pattern":"auto-confirm@amazon.com"}}}`),
 	})
 
+	action := &mockAction{result: &connectors.ActionResult{Data: json.RawMessage(`{"uid":42}`)}}
 	metaConn := &mockMetadataConnector{
 		mockConnector: mockConnector{
 			id:      "protonmail",
-			actions: map[string]connectors.Action{},
+			actions: map[string]connectors.Action{"protonmail.read_email": action},
 		},
 		metaErr: connectors.ErrConstraintMetadataUnavailable,
 	}
