@@ -156,7 +156,8 @@ export default function ApprovalListScreen({ navigation }: Props) {
   const visibleRuleProposals = useMemo(
     () =>
       ruleProposals.filter(
-        (request) => !dismissedRuleIds.has(request.request_id),
+        (request: StandingApprovalRequestSummary) =>
+          !dismissedRuleIds.has(request.request_id),
       ),
     [ruleProposals, dismissedRuleIds],
   );
