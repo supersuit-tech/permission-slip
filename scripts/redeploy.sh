@@ -44,6 +44,10 @@
 # reachable from HEAD matches the last successfully published tag (recorded in
 # .mobile-ota-deployed-tag), the EAS step is skipped. When no mobile/v* tag is
 # reachable from HEAD yet, the script keeps the legacy always-publish behavior.
+# The deploy summary compares each component's current release tag against durable
+# state from the last successful redeploy (.web-deployed-version for web,
+# .mobile-ota-deployed-tag for mobile) so it stays accurate even when the
+# checkout was already up to date before this run started.
 # Force a publish regardless of tag state:
 #
 #   PS_FORCE_EAS_UPDATE=1 make redeploy
@@ -74,9 +78,32 @@ release_version() {
   fi
 }
 
-# Capture release versions before pulling so we can report upgrades afterward.
-OLD_WEB_VERSION="$(release_version web)"
-OLD_MOBILE_VERSION="$(release_version mobile)"
+WEB_DEPLOYED_VERSION_FILE="$REPO_ROOT/.web-deployed-version"
+MOBILE_OTA_DEPLOYED_TAG_FILE="$REPO_ROOT/.mobile-ota-deployed-tag"
+
+# Read the version recorded by the last successful redeploy (not the current
+# checkout) so the deploy summary stays accurate even when the user already ran
+# `git pull` before `make redeploy`.
+read_recorded_version() {
+  local file="$1"
+  local strip_prefix="${2:-}"
+  if [ ! -f "$file" ]; then
+    return 0
+  fi
+  local raw
+  raw="$(tr -d '[:space:]' < "$file")"
+  if [ -z "$raw" ]; then
+    return 0
+  fi
+  if [ -n "$strip_prefix" ]; then
+    echo "${raw#${strip_prefix}}"
+  else
+    echo "$raw"
+  fi
+}
+
+LAST_WEB_VERSION="$(read_recorded_version "$WEB_DEPLOYED_VERSION_FILE")"
+LAST_MOBILE_VERSION="$(read_recorded_version "$MOBILE_OTA_DEPLOYED_TAG_FILE" "mobile/v")"
 
 # Loud macOS reminder: iMessage reads need Full Disk Access on the server and imsg.
 "$REPO_ROOT/scripts/print-macos-full-disk-access-notice.sh"
@@ -184,7 +211,6 @@ eas_is_authenticated() {
   ) </dev/null >/dev/null 2>&1
 }
 
-MOBILE_OTA_DEPLOYED_TAG_FILE="$REPO_ROOT/.mobile-ota-deployed-tag"
 LATEST_MOBILE_TAG="$(git tag --list 'mobile/v*' --merged HEAD | sort -V | tail -n1 || true)"
 DEPLOYED_MOBILE_TAG=""
 if [ -f "$MOBILE_OTA_DEPLOYED_TAG_FILE" ]; then
@@ -215,29 +241,33 @@ else
   fi
 fi
 
-NEW_WEB_VERSION="$(release_version web)"
-NEW_MOBILE_VERSION="$(release_version mobile)"
+DEPLOYED_WEB_VERSION="$(release_version web)"
+DEPLOYED_MOBILE_VERSION="$(release_version mobile)"
 CLI_VERSION="$(release_version cli)"
 
-format_upgrade_line() {
+format_deploy_line() {
   local name="$1"
-  local old="$2"
-  local new="$3"
-  if [ -z "$new" ]; then
+  local last="$2"
+  local current="$3"
+  if [ -z "$current" ]; then
     echo "  $name: version unknown"
-  elif [ -z "$old" ]; then
-    echo "  $name is now at $new"
-  elif [ "$old" = "$new" ]; then
-    echo "  $name is at $new (unchanged)"
+  elif [ -z "$last" ]; then
+    echo "  $name is now at $current"
+  elif [ "$last" = "$current" ]; then
+    echo "  $name rebuilt and redeployed at $current"
   else
-    echo "  Upgraded $name from $old to $new"
+    echo "  Upgraded $name from $last to $current"
   fi
 }
 
+if [ -n "$DEPLOYED_WEB_VERSION" ]; then
+  printf '%s\n' "$DEPLOYED_WEB_VERSION" > "$WEB_DEPLOYED_VERSION_FILE"
+fi
+
 echo "==> Done."
 echo "  Deploy summary:"
-format_upgrade_line "Web" "$OLD_WEB_VERSION" "$NEW_WEB_VERSION"
-format_upgrade_line "Mobile" "$OLD_MOBILE_VERSION" "$NEW_MOBILE_VERSION"
+format_deploy_line "Web" "$LAST_WEB_VERSION" "$DEPLOYED_WEB_VERSION"
+format_deploy_line "Mobile" "$LAST_MOBILE_VERSION" "$DEPLOYED_MOBILE_VERSION"
 if [ -n "$CLI_VERSION" ]; then
   echo "  CLI version: $CLI_VERSION"
 else
