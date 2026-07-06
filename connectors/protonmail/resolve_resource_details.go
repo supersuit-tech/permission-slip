@@ -228,7 +228,7 @@ func (c *ProtonMailConnector) resolveMessageDetailsForUIDs(ctx context.Context, 
 	return map[string]any{"messages": messages}, nil
 }
 
-func resolveMessageEnvelopesIMAP(ctx context.Context, conn *ProtonMailConnector, creds connectors.Credentials, folder string, uids []uint32, store connectors.MailboxUIDValidityStore) (map[uint32]emailEnvelopeMetadata, error) {
+func resolveMessageEnvelopesIMAPImpl(ctx context.Context, conn *ProtonMailConnector, creds connectors.Credentials, folder string, uids []uint32, store connectors.MailboxUIDValidityStore) (map[uint32]emailEnvelopeMetadata, error) {
 	if len(uids) == 0 {
 		return nil, nil
 	}
@@ -269,6 +269,9 @@ func resolveMessageEnvelopesIMAP(ctx context.Context, conn *ProtonMailConnector,
 
 	return fetchEnvelopeMetadataByUID(session, uidSet)
 }
+
+// resolveMessageEnvelopesIMAP is the single-attempt IMAP fetch. Tests may replace it.
+var resolveMessageEnvelopesIMAP = resolveMessageEnvelopesIMAPImpl
 
 func resolveMessageEnvelopesWithRetry(ctx context.Context, conn *ProtonMailConnector, creds connectors.Credentials, folder string, uids []uint32, store connectors.MailboxUIDValidityStore) (map[uint32]emailEnvelopeMetadata, error) {
 	var lastErr error
