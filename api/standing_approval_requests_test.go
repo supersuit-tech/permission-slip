@@ -298,7 +298,7 @@ func TestApproveStandingApprovalRequest_UnknownActionType(t *testing.T) {
 		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
 	}
 	body := w.Body.String()
-	if !strings.Contains(body, "not registered for connector") {
+	if !strings.Contains(body, "not registered") {
 		t.Errorf("expected clear error about unregistered action type, got: %s", body)
 	}
 }

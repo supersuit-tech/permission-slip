@@ -241,24 +241,6 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 
 		var constraintsBytes []byte
 		if len(req.Constraints) > 0 {
-			s := strings.TrimSpace(string(req.Constraints))
-			if s == "{}" || s == "null" {
-				// Match-all parameters for this action type (trusted when tied to a source config,
-				// e.g. template customize with all-wildcard parameters). Stored as NULL in DB.
-				constraintsBytes = nil
-			} else {
-				var cErr error
-				constraintsBytes, cErr = validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, req.ActionType, req.Constraints)
-				if cErr != nil {
-					resp := BadRequest(ErrInvalidConstraints, cErr.Error())
-					resp.Error.Details = map[string]any{
-						"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
-					}
-					RespondError(w, r, http.StatusBadRequest, resp)
-					return
-				}
-			}
-		} else {
 			var cErr error
 			constraintsBytes, cErr = validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, req.ActionType, req.Constraints)
 			if cErr != nil {
@@ -269,6 +251,21 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 				RespondError(w, r, http.StatusBadRequest, resp)
 				return
 			}
+		} else {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidConstraints, "constraints are required for standing approvals"))
+			return
+		}
+
+		actionSchema, err := db.GetActionParametersSchema(r.Context(), deps.DB, req.ActionType)
+		if err != nil {
+			log.Printf("[%s] CreateStandingApproval: lookup action: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+			return
+		}
+		if actionSchema == nil {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "action type is not registered for any connector"))
+			return
 		}
 
 		// Wrap insert in a transaction.

@@ -209,6 +209,18 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 		startsAt := time.Now().UTC()
 		ruleName := autoCreatedFromRuleProposalName
 
+		actionSchema, err := db.GetActionParametersSchema(r.Context(), tx, sar.ActionType)
+		if err != nil {
+			log.Printf("[%s] ApproveStandingApprovalRequest lookup action: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to approve standing approval request"))
+			return
+		}
+		if actionSchema == nil {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "action type is not registered for any connector"))
+			return
+		}
+
 		saID, err := generatePrefixedID("sa_", 16)
 		if err != nil {
 			log.Printf("[%s] ApproveStandingApprovalRequest generate SA id: %v", TraceID(r.Context()), err)

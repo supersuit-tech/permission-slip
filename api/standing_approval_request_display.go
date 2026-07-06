@@ -21,12 +21,16 @@ func resolveStandingApprovalRequestDisplay(
 ) standingApprovalRequestDisplay {
 	out := standingApprovalRequestDisplay{}
 
-	connectorIDPtr := connectorIDFromActionType(actionType)
-	if connectorIDPtr == nil {
-		return out
+	schema, err := db.GetActionParametersSchema(ctx, d, actionType)
+	if err != nil || schema == nil {
+		connectorIDPtr := connectorIDFromActionType(actionType)
+		if connectorIDPtr == nil {
+			return out
+		}
+		schema = &db.ActionSchema{ConnectorID: *connectorIDPtr}
 	}
 
-	if conn, err := db.GetConnectorByID(ctx, d, *connectorIDPtr); err == nil && conn != nil {
+	if conn, err := db.GetConnectorByID(ctx, d, schema.ConnectorID); err == nil && conn != nil {
 		out.ConnectorName = strings.TrimSpace(conn.Name)
 	}
 

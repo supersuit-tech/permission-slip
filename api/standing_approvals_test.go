@@ -587,8 +587,8 @@ func TestCreateStandingApproval_AgentNotFound(t *testing.T) {
 
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
@@ -613,8 +613,8 @@ func TestCreateStandingApproval_OtherUsersAgent(t *testing.T) {
 
 	router.ServeHTTP(w, r)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d: %s", w.Code, w.Body.String())
 	}
 }
 
