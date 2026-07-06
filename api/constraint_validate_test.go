@@ -288,7 +288,7 @@ func TestRequestApproval_AutoApprove_ReadEmailMetaOnlyConstraintMatch(t *testing
 		[]byte(`{"$meta":{"from":"automated@example.com"}}`),
 		map[string]any{
 			"messages": []map[string]any{{
-				"from": "Vendor <automated@example.com>",
+				"from": "automated@example.com",
 				"to":   []string{"me@example.com"},
 				"cc":   []string{},
 				"bcc":  []string{},
