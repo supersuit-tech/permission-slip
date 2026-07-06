@@ -68,7 +68,10 @@ export function StandingApprovalsSection({
   const connectorRules = useMemo(
     () =>
       standingApprovals.filter(
-        (sa) => sa.agent_id === agentId && actionTypeSet.has(sa.action_type),
+        (sa) =>
+          sa.agent_id === agentId &&
+          actionTypeSet.has(sa.action_type) &&
+          sa.status !== "revoked",
       ),
     [standingApprovals, agentId, actionTypeSet],
   );
