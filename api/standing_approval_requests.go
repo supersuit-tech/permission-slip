@@ -209,7 +209,7 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 		startsAt := time.Now().UTC()
 		ruleName := autoCreatedFromRuleProposalName
 
-		actionSchema, err := db.GetActionParametersSchema(r.Context(), tx, sar.ActionType)
+		actionSchema, err := db.GetActionParametersSchema(r.Context(), deps.DB, sar.ActionType)
 		if err != nil {
 			log.Printf("[%s] ApproveStandingApprovalRequest lookup action: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
