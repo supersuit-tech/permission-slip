@@ -27,7 +27,7 @@ import {
   StepPickAction,
   StepLimits,
 } from "./StandingApprovalSteps";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
+import type { AgentActionOption } from "@/hooks/useAgentConnectorActions";
 import type { ParametersSchema, SchemaProperty } from "@/lib/parameterSchema";
 
 // ---------------------------------------------------------------------------
@@ -63,46 +63,24 @@ const MOCK_AGENTS = [
   },
 ];
 
-const MOCK_CONFIGS_BY_CONNECTOR: Record<string, ActionConfiguration[]> = {
+const MOCK_ACTIONS_BY_CONNECTOR: Record<string, AgentActionOption[]> = {
   "google-calendar": [
     {
-      id: "cfg-1",
-      agent_id: 1,
-      name: "Create Event",
-      action_type: "google_calendar.create_event",
       connector_id: "google-calendar",
-      status: "active",
-      parameters: {
-        summary: "Team Standup",
-        calendar_id: "primary",
-        attendees: "*",
-      },
-      created_at: "2026-03-01T00:00:00Z",
-      updated_at: "2026-03-01T00:00:00Z",
+      action_type: "google_calendar.create_event",
+      name: "Create Event",
     },
     {
-      id: "cfg-2",
-      agent_id: 1,
-      name: "Delete Event",
-      action_type: "google_calendar.delete_event",
       connector_id: "google-calendar",
-      status: "active",
-      parameters: { calendar_id: "primary", event_id: "*" },
-      created_at: "2026-03-01T00:00:00Z",
-      updated_at: "2026-03-01T00:00:00Z",
+      action_type: "google_calendar.delete_event",
+      name: "Delete Event",
     },
   ],
   github: [
     {
-      id: "cfg-3",
-      agent_id: 2,
-      name: "Create Issue",
-      action_type: "github.create_issue",
       connector_id: "github",
-      status: "active",
-      parameters: { repo: "supersuit-tech/permission-slip", title: "*" },
-      created_at: "2026-03-02T00:00:00Z",
-      updated_at: "2026-03-02T00:00:00Z",
+      action_type: "github.create_issue",
+      name: "Create Issue",
     },
   ],
 };
@@ -392,8 +370,8 @@ function CreateStandingApprovalWizard({
   const [agentId, setAgentId] = useState<number | "">(
     initialStep > 1 ? 1 : "",
   );
-  const [selectedConfigId, setSelectedConfigId] = useState(
-    initialStep > 1 ? "cfg-1" : "",
+  const [selectedActionType, setSelectedActionType] = useState(
+    initialStep > 1 ? "google_calendar.create_event" : "",
   );
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
@@ -403,12 +381,7 @@ function CreateStandingApprovalWizard({
 
   const effectiveSchema = schema ?? (step >= 3 ? CALENDAR_SCHEMA : null);
 
-  const effectiveActionType =
-    selectedConfigId === "cfg-1"
-      ? "google_calendar.create_event"
-      : selectedConfigId === "cfg-3"
-        ? "github.create_issue"
-        : "";
+  const effectiveActionType = selectedActionType;
 
   return (
     <Dialog open>
@@ -469,10 +442,10 @@ function CreateStandingApprovalWizard({
 
           {step === 2 && (
             <StepPickAction
-              selectedConfigId={selectedConfigId}
-              onConfigChange={setSelectedConfigId}
-              configsByConnector={MOCK_CONFIGS_BY_CONNECTOR}
-              configsLoading={false}
+              selectedActionType={selectedActionType}
+              onActionChange={setSelectedActionType}
+              actionsByConnector={MOCK_ACTIONS_BY_CONNECTOR}
+              actionsLoading={false}
             />
           )}
 

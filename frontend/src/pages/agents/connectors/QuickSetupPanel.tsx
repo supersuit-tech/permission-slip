@@ -1,13 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { approvalModeOptions, type ApprovalMode } from "./recommendedTemplatesTypes";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export function QuickSetupPanel({
   quickRead,
@@ -22,14 +14,14 @@ export function QuickSetupPanel({
   disabled,
   applyDisabled,
 }: {
-  quickRead: ApprovalMode;
-  quickWrite: ApprovalMode;
-  quickEdit: ApprovalMode;
-  quickDelete: ApprovalMode;
-  onQuickReadChange: (v: ApprovalMode) => void;
-  onQuickWriteChange: (v: ApprovalMode) => void;
-  onQuickEditChange: (v: ApprovalMode) => void;
-  onQuickDeleteChange: (v: ApprovalMode) => void;
+  quickRead: boolean;
+  quickWrite: boolean;
+  quickEdit: boolean;
+  quickDelete: boolean;
+  onQuickReadChange: (v: boolean) => void;
+  onQuickWriteChange: (v: boolean) => void;
+  onQuickEditChange: (v: boolean) => void;
+  onQuickDeleteChange: (v: boolean) => void;
   onApply: () => void;
   disabled: boolean;
   applyDisabled: boolean;
@@ -37,12 +29,16 @@ export function QuickSetupPanel({
   return (
     <div className="bg-muted/40 space-y-3 rounded-lg border border-input p-3">
       <p className="text-sm font-semibold">Quick setup</p>
+      <p className="text-muted-foreground text-xs">
+        Select standing approval templates by action category, then apply to
+        enable auto-approve for those actions.
+      </p>
       <div className="space-y-2">
         <QuickSetupRow
           id="quick-read"
           testId="quick-setup-read"
           label="Read actions"
-          value={quickRead}
+          checked={quickRead}
           onChange={onQuickReadChange}
           disabled={disabled}
         />
@@ -50,7 +46,7 @@ export function QuickSetupPanel({
           id="quick-write"
           testId="quick-setup-write"
           label="Write actions"
-          value={quickWrite}
+          checked={quickWrite}
           onChange={onQuickWriteChange}
           disabled={disabled}
         />
@@ -58,7 +54,7 @@ export function QuickSetupPanel({
           id="quick-edit"
           testId="quick-setup-edit"
           label="Edit actions"
-          value={quickEdit}
+          checked={quickEdit}
           onChange={onQuickEditChange}
           disabled={disabled}
         />
@@ -66,7 +62,7 @@ export function QuickSetupPanel({
           id="quick-delete"
           testId="quick-setup-delete"
           label="Delete actions"
-          value={quickDelete}
+          checked={quickDelete}
           onChange={onQuickDeleteChange}
           disabled={disabled}
         />
@@ -79,7 +75,7 @@ export function QuickSetupPanel({
         onClick={onApply}
         disabled={disabled || applyDisabled}
       >
-        Apply
+        Select matching templates
       </Button>
     </div>
   );
@@ -89,46 +85,30 @@ function QuickSetupRow({
   id,
   testId,
   label,
-  value,
+  checked,
   onChange,
   disabled,
 }: {
   id: string;
   testId: string;
   label: string;
-  value: ApprovalMode;
-  onChange: (v: ApprovalMode) => void;
+  checked: boolean;
+  onChange: (v: boolean) => void;
   disabled: boolean;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-      <Label
-        htmlFor={id}
-        className="text-muted-foreground w-28 shrink-0 text-xs sm:text-sm"
-      >
-        {label}
-      </Label>
-      <Select
-        value={value}
-        onValueChange={(v) => onChange(v as ApprovalMode)}
+    <label
+      htmlFor={id}
+      className="flex flex-wrap items-center gap-2 sm:gap-3"
+      data-testid={testId}
+    >
+      <Checkbox
+        id={id}
+        checked={checked}
+        onCheckedChange={(v) => onChange(v === true)}
         disabled={disabled}
-      >
-        <SelectTrigger
-          id={id}
-          data-testid={testId}
-          size="sm"
-          className="max-w-[11rem] min-w-0 flex-1"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {approvalModeOptions.map((o) => (
-            <SelectItem key={o.value} value={o.value}>
-              {o.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+      />
+      <span className="text-muted-foreground text-xs sm:text-sm">{label}</span>
+    </label>
   );
 }

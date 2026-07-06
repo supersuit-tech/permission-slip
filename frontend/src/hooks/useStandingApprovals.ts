@@ -7,12 +7,12 @@ import type { components } from "@/api/schema";
 export type StandingApproval = components["schemas"]["StandingApproval"];
 
 export function useStandingApprovals(options?: {
-  sourceActionConfigurationId?: string;
+  status?: "active" | "expired" | "revoked" | "all";
 }) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
   const userId = session?.user?.id;
-  const sourceConfig = options?.sourceActionConfigurationId;
+  const status = options?.status ?? "active";
 
   // Keep the latest token in a ref so the query key stays stable across
   // token refreshes (e.g. Supabase re-issues tokens on AAL promotion).
@@ -22,19 +22,14 @@ export function useStandingApprovals(options?: {
   }
 
   const query = useQuery({
-    queryKey: ["standing-approvals", userId ?? "", sourceConfig ?? ""],
+    queryKey: ["standing-approvals", userId ?? "", status],
     queryFn: async () => {
       const token = tokenRef.current;
       if (!token) throw new Error("Missing access token");
       const { data, error } = await client.GET("/v1/standing-approvals", {
         headers: { Authorization: `Bearer ${token}` },
         params: {
-          query: {
-            status: "active",
-            ...(sourceConfig
-              ? { source_action_configuration_id: sourceConfig }
-              : {}),
-          },
+          query: { status },
         },
       });
       if (error) throw new Error("Failed to load standing approvals");

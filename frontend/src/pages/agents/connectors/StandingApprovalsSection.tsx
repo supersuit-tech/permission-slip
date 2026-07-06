@@ -1,7 +1,5 @@
 import { useMemo, useState } from "react";
-import { useStandingApprovalsForConfigs } from "@/hooks/useStandingApprovalsForConfigs";
-import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
-import { Loader2, Plus, Settings } from "lucide-react";
+import { Loader2, Plus, ShieldCheck } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -15,87 +13,90 @@ import {
   TableBody,
   TableHead,
   TableRow,
-  TableCell,
 } from "@/components/ui/table";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
-import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
-import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
+import {
+  useStandingApprovals,
+  type StandingApproval,
+} from "@/hooks/useStandingApprovals";
+import { useStandingApprovalTemplates } from "@/hooks/useStandingApprovalTemplates";
+import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
+import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
-import type { ApprovalMode } from "./RecommendedTemplatesDialog";
-import { ActionConfigRow } from "./ActionConfigRow";
-import { AddActionConfigDialog } from "./AddActionConfigDialog";
-import { EditActionConfigDialog } from "./EditActionConfigDialog";
-import { DeleteActionConfigDialog } from "./DeleteActionConfigDialog";
+import { StandingApprovalRow } from "./StandingApprovalRow";
+import { AddStandingApprovalDialog } from "./AddStandingApprovalDialog";
+import { EditStandingApprovalDialog } from "./EditStandingApprovalDialog";
+import { RevokeStandingApprovalDialog } from "./RevokeStandingApprovalDialog";
 import { RecommendedTemplatesDialog } from "./RecommendedTemplatesDialog";
 import { templateIsApplied } from "./templateMatching";
 
-interface ActionConfigurationsSectionProps {
+interface StandingApprovalsSectionProps {
   agentId: number;
   connectorId: string;
   connectorName: string;
   actions: ConnectorAction[];
-  configs: ActionConfiguration[];
-  isLoading: boolean;
-  error: string | null;
-  onConfigsChanged?: () => void;
 }
 
-export function ActionConfigurationsSection({
+export function StandingApprovalsSection({
   agentId,
   connectorId,
   actions,
-  configs,
-  isLoading,
-  error,
-  onConfigsChanged,
-}: ActionConfigurationsSectionProps) {
+}: StandingApprovalsSectionProps) {
   const [addDialogOpen, setAddDialogOpen] = useState(false);
   const [initialTemplateForAdd, setInitialTemplateForAdd] =
-    useState<ActionConfigTemplate | null>(null);
-  const [initialApprovalModeForAdd, setInitialApprovalModeForAdd] =
-    useState<ApprovalMode | undefined>(undefined);
+    useState<StandingApprovalTemplate | null>(null);
   const [recommendedDialogOpen, setRecommendedDialogOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<ActionConfiguration | null>(
-    null,
-  );
-  const [deleteTarget, setDeleteTarget] = useState<ActionConfiguration | null>(
+  const [editTarget, setEditTarget] = useState<StandingApproval | null>(null);
+  const [revokeTarget, setRevokeTarget] = useState<StandingApproval | null>(
     null,
   );
 
+  const {
+    standingApprovals,
+    isLoading,
+    error,
+    refetch,
+  } = useStandingApprovals({ status: "all" });
+
   const { templates, isLoading: templatesLoading } =
-    useActionConfigTemplates(connectorId);
+    useStandingApprovalTemplates(connectorId);
 
   const actionTypeSet = useMemo(
     () => new Set(actions.map((a) => a.action_type)),
     [actions],
   );
+
+  const connectorRules = useMemo(
+    () =>
+      standingApprovals.filter(
+        (sa) => sa.agent_id === agentId && actionTypeSet.has(sa.action_type),
+      ),
+    [standingApprovals, agentId, actionTypeSet],
+  );
+
+  const activeRules = useMemo(
+    () => connectorRules.filter((sa) => sa.status === "active"),
+    [connectorRules],
+  );
+
   const hasRecommendedTemplates =
     !templatesLoading &&
     templates.some(
       (t) =>
         actionTypeSet.has(t.action_type) &&
-        !templateIsApplied(t, configs),
+        !templateIsApplied(t, activeRules),
     );
 
-  const configIds = useMemo(() => configs.map((c) => c.id), [configs]);
   const { instances } = useAgentConnectorInstances(agentId, connectorId);
   const showAccountColumn = instances.length >= 1;
-  const {
-    byConfigId: standingByConfig,
-    error: standingError,
-    refetch: refetchStanding,
-  } = useStandingApprovalsForConfigs(configIds);
 
-  function openAddDialog(fromTemplate?: ActionConfigTemplate | null, approvalMode?: ApprovalMode) {
+  function openAddDialog(fromTemplate?: StandingApprovalTemplate | null) {
     setInitialTemplateForAdd(fromTemplate ?? null);
-    setInitialApprovalModeForAdd(approvalMode);
     setAddDialogOpen(true);
   }
 
   function handleAddDialogOpenChange(open: boolean) {
     if (!open) {
       setInitialTemplateForAdd(null);
-      setInitialApprovalModeForAdd(undefined);
     }
     setAddDialogOpen(open);
   }
@@ -104,10 +105,10 @@ export function ActionConfigurationsSection({
     <Card>
       <CardHeader className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-2">
-          <Settings className="text-muted-foreground size-5" />
-          <CardTitle>Action Configurations</CardTitle>
+          <ShieldCheck className="text-muted-foreground size-5" />
+          <CardTitle>Standing Approvals</CardTitle>
         </div>
-        {configs.length > 0 && (
+        {connectorRules.length > 0 && (
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
             {hasRecommendedTemplates && (
               <Button
@@ -129,7 +130,7 @@ export function ActionConfigurationsSection({
               disabled={actions.length === 0}
             >
               <Plus className="size-4" />
-              Add Configuration
+              Add Standing Approval
             </Button>
           </div>
         )}
@@ -144,7 +145,7 @@ export function ActionConfigurationsSection({
           </div>
         ) : error ? (
           <p className="text-destructive text-sm">{error}</p>
-        ) : configs.length === 0 ? (
+        ) : connectorRules.length === 0 ? (
           <EmptyState
             onAddCustom={() => openAddDialog()}
             onBrowseRecommendedTemplates={() =>
@@ -165,7 +166,7 @@ export function ActionConfigurationsSection({
                     Action
                   </TableHead>
                   <TableHead className="font-semibold text-primary-foreground">
-                    Parameters
+                    Constraints
                   </TableHead>
                   {showAccountColumn && (
                     <TableHead className="font-semibold text-primary-foreground">
@@ -173,44 +174,26 @@ export function ActionConfigurationsSection({
                     </TableHead>
                   )}
                   <TableHead className="font-semibold text-primary-foreground">
-                    Status
+                    Expires
                   </TableHead>
                   <TableHead className="font-semibold text-primary-foreground">
-                    Standing Approval
+                    Status
                   </TableHead>
                   <TableHead className="w-[100px] font-semibold text-primary-foreground" />
                 </TableRow>
               </TableHeader>
               <TableBody className="[&>tr:nth-child(even)]:bg-muted">
-                {standingError && (
-                  <TableRow>
-                    <TableCell
-                      colSpan={showAccountColumn ? 7 : 6}
-                      className="text-destructive bg-destructive/5 py-2 text-sm"
-                    >
-                      {standingError}
-                    </TableCell>
-                  </TableRow>
-                )}
-                {configs.map((config) => (
-                  <ActionConfigRow
-                    key={config.id}
+                {connectorRules.map((rule) => (
+                  <StandingApprovalRow
+                    key={rule.standing_approval_id}
                     agentId={agentId}
-                    config={config}
+                    rule={rule}
                     actions={actions}
                     instances={instances}
                     showAccountColumn={showAccountColumn}
-                    standingRows={standingByConfig.get(config.id) ?? []}
-                    onStandingSuccess={() => {
-                      void refetchStanding();
-                      onConfigsChanged?.();
-                    }}
                     onEdit={setEditTarget}
-                    onDelete={setDeleteTarget}
-                    onConfigChanged={() => {
-                      onConfigsChanged?.();
-                      void refetchStanding();
-                    }}
+                    onRevoke={setRevokeTarget}
+                    onChanged={() => void refetch()}
                   />
                 ))}
               </TableBody>
@@ -219,14 +202,14 @@ export function ActionConfigurationsSection({
         )}
       </CardContent>
 
-      <AddActionConfigDialog
+      <AddStandingApprovalDialog
         open={addDialogOpen}
         onOpenChange={handleAddDialogOpenChange}
         agentId={agentId}
         connectorId={connectorId}
         actions={actions}
         initialTemplate={initialTemplateForAdd}
-        initialApprovalMode={initialApprovalModeForAdd}
+        onCreated={() => void refetch()}
       />
 
       <RecommendedTemplatesDialog
@@ -235,33 +218,34 @@ export function ActionConfigurationsSection({
         agentId={agentId}
         connectorId={connectorId}
         actions={actions}
-        existingConfigs={configs}
-        onCustomize={(template, approvalMode) => {
-          openAddDialog(template, approvalMode);
+        existingRules={activeRules}
+        onCustomize={(template) => {
+          openAddDialog(template);
         }}
       />
 
       {editTarget && (
-        <EditActionConfigDialog
+        <EditStandingApprovalDialog
           open={!!editTarget}
           onOpenChange={(open) => {
             if (!open) setEditTarget(null);
           }}
-          config={editTarget}
+          rule={editTarget}
           agentId={agentId}
           connectorId={connectorId}
           actions={actions}
+          onUpdated={() => void refetch()}
         />
       )}
 
-      {deleteTarget && (
-        <DeleteActionConfigDialog
-          open={!!deleteTarget}
+      {revokeTarget && (
+        <RevokeStandingApprovalDialog
+          open={!!revokeTarget}
           onOpenChange={(open) => {
-            if (!open) setDeleteTarget(null);
+            if (!open) setRevokeTarget(null);
           }}
-          config={deleteTarget}
-          agentId={agentId}
+          rule={revokeTarget}
+          onRevoked={() => void refetch()}
         />
       )}
     </Card>
@@ -284,11 +268,11 @@ function EmptyState({
       <div className="space-y-3">
         <Button size="lg" onClick={onAddCustom} disabled={actionsDisabled}>
           <Plus className="size-4" />
-          Add Configuration
+          Add Standing Approval
         </Button>
         <p className="text-muted-foreground mx-auto max-w-md text-sm">
-          Define which actions this agent can use and lock in parameter values
-          or mark them as wildcards to give the agent freedom.
+          Every request from this agent will ask for your approval. Add a
+          standing approval to pre-authorize trusted, repetitive actions.
         </p>
         {showRecommendedLink && (
           <div>

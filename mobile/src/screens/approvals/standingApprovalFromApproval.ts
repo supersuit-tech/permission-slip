@@ -1,6 +1,5 @@
 import type { components } from "../../api/schema";
 import type { ApprovalSummary } from "../../hooks/useApprovals";
-import { findMatchingActionConfigForApproval } from "./matchActionConfig";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -76,12 +75,7 @@ function deriveEmailSenderConstraint(
 
 function deriveStandingApprovalConstraints(
   approval: ApprovalSummary,
-  sourceActionConfigurationId?: string,
 ): Record<string, unknown> {
-  if (sourceActionConfigurationId !== undefined) {
-    return {};
-  }
-
   const params = approval.action.parameters as Record<string, unknown>;
   const resourceDetails = approval.resource_details as Record<string, unknown> | undefined;
 
@@ -98,28 +92,19 @@ function deriveStandingApprovalConstraints(
   return standingApprovalConstraintsForCreate(params);
 }
 
-export { findMatchingActionConfigForApproval };
-
 export function buildCreateStandingApprovalFromApproval(
   approval: ApprovalSummary,
-  sourceActionConfigurationId?: string,
 ): CreateStandingApprovalRequest {
   const version =
     typeof approval.action.version === "string" && approval.action.version !== ""
       ? approval.action.version
       : "1";
 
-  const request: CreateStandingApprovalRequest = {
+  return {
     agent_id: approval.agent_id,
     action_type: approval.action.type,
     action_version: version,
-    constraints: deriveStandingApprovalConstraints(approval, sourceActionConfigurationId),
+    constraints: deriveStandingApprovalConstraints(approval),
     expires_at: null,
   };
-
-  if (sourceActionConfigurationId !== undefined) {
-    request.source_action_configuration_id = sourceActionConfigurationId;
-  }
-
-  return request;
 }

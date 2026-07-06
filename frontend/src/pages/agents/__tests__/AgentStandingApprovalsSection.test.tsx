@@ -3,67 +3,45 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { setupAuthMocks, settleAuthHydration } from "../../../auth/__tests__/fixtures";
 import { createAuthWrapper } from "../../../test-helpers";
 import { mockGet, resetClientMocks } from "../../../api/__mocks__/client";
+import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import { AgentStandingApprovalsSection } from "../AgentStandingApprovalsSection";
 
 vi.mock("../../../api/client");
 
-const mockActionConfigs = [
-  {
-    id: "ac_config1",
-    agent_id: 1,
-    connector_id: "gmail",
-    action_type: "email.send",
-    parameters: {},
-    status: "active" as const,
-    name: "Send company emails",
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-01T00:00:00Z",
-  },
-  {
-    id: "ac_config2",
-    agent_id: 2,
-    connector_id: "slack",
-    action_type: "slack.send_message",
-    parameters: {},
-    status: "active" as const,
-    name: "Post to Slack",
-    created_at: "2026-01-01T00:00:00Z",
-    updated_at: "2026-01-01T00:00:00Z",
-  },
-];
-
-const mockStandingApprovals = [
+const mockStandingApprovals: StandingApproval[] = [
   {
     standing_approval_id: "sa_test1",
     action_type: "email.send",
     agent_id: 1,
+    user_id: "user-1",
+    name: "Send company emails",
+    action_version: "1",
     status: "active" as const,
+    starts_at: "2026-01-01T00:00:00Z",
+    created_at: "2026-01-01T00:00:00Z",
     expires_at: null,
     constraints: { to: { $pattern: "*@mycompany.com" }, subject: "*" },
-    source_action_configuration_id: "ac_config1",
   },
   {
     standing_approval_id: "sa_test2",
     action_type: "slack.send_message",
     agent_id: 2,
+    user_id: "user-1",
+    name: "Post to Slack",
+    action_version: "1",
     status: "active" as const,
+    starts_at: "2026-01-01T00:00:00Z",
+    created_at: "2026-01-01T00:00:00Z",
     expires_at: "2099-12-31T00:00:00Z",
     constraints: {},
-    source_action_configuration_id: "ac_config2",
   },
 ];
 
-function mockApiFetch(
-  standingApprovals = mockStandingApprovals,
-  actionConfigs = mockActionConfigs,
-) {
+function mockApiFetch(standingApprovals = mockStandingApprovals) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
     if (url === "/v1/standing-approvals") {
       return Promise.resolve({ data: { data: standingApprovals } });
-    }
-    if (url === "/v1/action-configurations") {
-      return Promise.resolve({ data: { data: actionConfigs } });
     }
     return Promise.resolve({ data: { data: [], has_more: false } });
   });
@@ -78,7 +56,7 @@ describe("AgentStandingApprovalsSection", () => {
     wrapper = createAuthWrapper();
   });
 
-  it("renders linked standing approval for the current agent only", async () => {
+  it("renders standing approvals for the current agent only", async () => {
     mockApiFetch();
 
     render(<AgentStandingApprovalsSection agentId={1} />, { wrapper });
@@ -95,7 +73,7 @@ describe("AgentStandingApprovalsSection", () => {
     render(<AgentStandingApprovalsSection agentId={1} />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("Configuration")).toBeInTheDocument();
+      expect(screen.getByText("Rule")).toBeInTheDocument();
     });
     expect(screen.queryByText("Agent")).not.toBeInTheDocument();
   });
@@ -108,7 +86,7 @@ describe("AgentStandingApprovalsSection", () => {
     await waitFor(() => {
       expect(screen.getByRole("link", { name: /Manage/i })).toHaveAttribute(
         "href",
-        "/agents/1/connectors/gmail",
+        "/agents/1/connectors/email",
       );
     });
   });
@@ -166,13 +144,29 @@ describe("AgentStandingApprovalsSection", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows unknown configuration when source config is not found", async () => {
-    mockApiFetch(mockStandingApprovals.filter((sa) => sa.agent_id === 1), []);
+  it("falls back to action type when rule has no name", async () => {
+    mockApiFetch([
+      {
+        standing_approval_id: "sa_noname",
+        action_type: "email.send",
+        agent_id: 1,
+        user_id: "user-1",
+        name: null,
+        description: null,
+        action_version: "1",
+        status: "active",
+        starts_at: "2026-01-01T00:00:00Z",
+        created_at: "2026-01-01T00:00:00Z",
+        expires_at: null,
+        constraints: {},
+        connector_instance_id: null,
+      },
+    ]);
 
     render(<AgentStandingApprovalsSection agentId={1} />, { wrapper });
 
     await waitFor(() => {
-      expect(screen.getByText("Unknown configuration")).toBeInTheDocument();
+      expect(screen.getAllByText("email.send").length).toBeGreaterThan(0);
     });
   });
 });

@@ -88,8 +88,9 @@ const mockAgentResponse = {
   created_at: "2026-02-10T10:00:00Z",
 };
 
-const mockActionConfigsResponse = {
+const mockStandingApprovalsResponse = {
   data: [],
+  has_more: false,
 };
 
 function renderPage(route = "/agents/42/connectors/github") {
@@ -146,8 +147,8 @@ describe("ConnectorConfigPage", () => {
       if (path === "/v1/credentials") {
         return Promise.resolve({ data: mockCredentialsResponse });
       }
-      if (path === "/v1/action-configurations") {
-        return Promise.resolve({ data: mockActionConfigsResponse });
+      if (path === "/v1/standing-approvals") {
+        return Promise.resolve({ data: mockStandingApprovalsResponse });
       }
       if (path === "/v1/agents/{agent_id}/connectors/{connector_id}/instances") {
         return Promise.resolve({
@@ -239,8 +240,8 @@ describe("ConnectorConfigPage", () => {
       if (path === "/v1/agents/{agent_id}/connectors") {
         return Promise.resolve({ error: { message: "Not found" } });
       }
-      if (path === "/v1/action-configurations") {
-        return Promise.resolve({ data: mockActionConfigsResponse });
+      if (path === "/v1/standing-approvals") {
+        return Promise.resolve({ data: mockStandingApprovalsResponse });
       }
       return Promise.resolve({ data: {} });
     });

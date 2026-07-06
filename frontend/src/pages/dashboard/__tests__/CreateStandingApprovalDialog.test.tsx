@@ -28,29 +28,52 @@ const mockAgents: Agent[] = [
   },
 ];
 
-const mockConfigs = [
-  {
-    id: "ac_config1",
-    agent_id: 1,
-    connector_id: "github",
-    action_type: "github.create_issue",
-    parameters: { repo: "supersuit-tech/webapp", title: "*", body: "*" },
-    status: "active" as const,
-    name: "Create bug issues",
-    description: "Create issues in the webapp repo",
-    created_at: "2026-01-01T00:00:00Z",
-  },
-];
-
 function setupMocks() {
   setupAuthMocks({ authenticated: true });
-  mockGet.mockImplementation((url: string, opts?: { params?: { query?: { agent_id?: number } } }) => {
-    if (url === "/v1/action-configurations") {
-      const agentId = opts?.params?.query?.agent_id;
+  mockGet.mockImplementation((url: string, opts?: { params?: { path?: { agent_id?: number; connector_id?: string } } }) => {
+    if (url === "/v1/agents/{agent_id}/connectors") {
+      const agentId = opts?.params?.path?.agent_id;
       if (agentId === 1) {
-        return Promise.resolve({ data: { data: mockConfigs } });
+        return Promise.resolve({
+          data: {
+            data: [
+              {
+                id: "github",
+                name: "GitHub",
+                description: "GitHub integration",
+                actions: ["github.create_issue"],
+                required_credentials: ["github"],
+                enabled_at: "2026-01-01T00:00:00Z",
+              },
+            ],
+          },
+        });
       }
       return Promise.resolve({ data: { data: [] } });
+    }
+    if (url === "/v1/connectors/{connector_id}") {
+      return Promise.resolve({
+        data: {
+          id: "github",
+          name: "GitHub",
+          actions: [
+            {
+              action_type: "github.create_issue",
+              operation_type: "write",
+              name: "Create Issue",
+              parameters_schema: {
+                type: "object",
+                properties: {
+                  repo: { type: "string", description: "Repository" },
+                  title: { type: "string", description: "Issue title" },
+                  body: { type: "string", description: "Issue body" },
+                },
+                required: ["repo"],
+              },
+            },
+          ],
+        },
+      });
     }
     if (url === "/v1/connectors/github") {
       return Promise.resolve({
@@ -158,7 +181,7 @@ describe("CreateStandingApprovalDialog", () => {
     expect(screen.getByText(/Step 1 of 4/)).toBeInTheDocument();
   });
 
-  it("shows action configs grouped by connector on step 2", async () => {
+  it("shows actions grouped by connector on step 2", async () => {
     const user = userEvent.setup();
     render(
       <CreateStandingApprovalDialog
@@ -177,10 +200,10 @@ describe("CreateStandingApprovalDialog", () => {
       expect(screen.getByText(/Step 2 of 4/)).toBeInTheDocument();
     });
 
-    // Wait for configs to load
+    // Wait for actions to load
     await waitFor(() => {
       expect(
-        screen.getByText("Create bug issues (github.create_issue)"),
+        screen.getByText("Create Issue (github.create_issue)"),
       ).toBeInTheDocument();
     });
 
@@ -252,13 +275,13 @@ describe("CreateStandingApprovalDialog", () => {
     // Wait for configs and select one
     await waitFor(() => {
       expect(
-        screen.getByText("Create bug issues (github.create_issue)"),
+        screen.getByText("Create Issue (github.create_issue)"),
       ).toBeInTheDocument();
     });
 
     await user.selectOptions(
-      screen.getByLabelText("Action Configuration"),
-      "ac_config1",
+      screen.getByLabelText("Action"),
+      "github.create_issue",
     );
     await user.click(screen.getByText("Next"));
 
@@ -290,7 +313,7 @@ describe("CreateStandingApprovalDialog", () => {
     expect(screen.getByText(/Set Constraints/)).toBeInTheDocument();
   });
 
-  it("auto-selected matching config submits create with source_action_configuration_id", async () => {
+  it("submits create with action type and constraints from initial context", async () => {
     const user = userEvent.setup();
     mockPost.mockResolvedValue({ data: { standing_approval_id: "sa_test" } });
 
@@ -332,14 +355,13 @@ describe("CreateStandingApprovalDialog", () => {
           body: expect.objectContaining({
             agent_id: 1,
             action_type: "github.create_issue",
-            source_action_configuration_id: "ac_config1",
           }),
         }),
       );
     });
   });
 
-  it("shows empty state on step 2 when agent has no action configurations", async () => {
+  it("shows empty state on step 2 when agent has no enabled connectors", async () => {
     const user = userEvent.setup();
     render(
       <CreateStandingApprovalDialog
@@ -359,7 +381,7 @@ describe("CreateStandingApprovalDialog", () => {
 
     expect(
       screen.getByText(
-        /No active action configurations found for this agent/,
+        /No enabled connectors found for this agent/,
       ),
     ).toBeInTheDocument();
   });

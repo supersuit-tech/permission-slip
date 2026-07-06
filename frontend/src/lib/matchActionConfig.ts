@@ -1,5 +1,4 @@
 import { isPatternWrapper, META_NAMESPACE_KEY, DATA_WINDOW_NAMESPACE_KEY } from "@/lib/constraints";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 
 function isWildcard(value: unknown): boolean {
   return value === "*";
@@ -170,24 +169,6 @@ export function execParamsSatisfyConfigConstraints(
   return true;
 }
 
-function configSpecificityScore(configParams: Record<string, unknown>): number {
-  let score = 0;
-  for (const [key, value] of Object.entries(configParams)) {
-    if (key === DATA_WINDOW_NAMESPACE_KEY) {
-      score += 2;
-      continue;
-    }
-    if (key === META_NAMESPACE_KEY && value && typeof value === "object" && !Array.isArray(value)) {
-      for (const metaValue of Object.values(value as Record<string, unknown>)) {
-        if (!isWildcard(metaValue)) score += 2;
-      }
-      continue;
-    }
-    if (!isWildcard(value)) score += 1;
-  }
-  return score;
-}
-
 function normalizeEmailAddress(raw: string): string {
   const trimmed = raw.trim();
   const match = /<([^>]+)>/.exec(trimmed);
@@ -229,36 +210,4 @@ export function resourceDetailsToConstraintMeta(
       },
     ],
   };
-}
-
-/**
- * Pick the most specific active action configuration whose constraints accept the
- * approval's execution parameters (and verified metadata when $meta is configured).
- */
-export function findBestMatchingActionConfig(
-  configs: ReadonlyArray<Pick<ActionConfiguration, "id" | "status" | "action_type" | "parameters">>,
-  actionType: string,
-  execParams: Record<string, unknown>,
-  resolvedMeta?: Record<string, unknown> | null,
-): ActionConfiguration | null {
-  const candidates = configs.filter(
-    (config) => config.status === "active" && config.action_type === actionType,
-  );
-
-  let best: ActionConfiguration | null = null;
-  let bestScore = -1;
-
-  for (const config of candidates) {
-    const params = (config.parameters ?? {}) as Record<string, unknown>;
-    if (!execParamsSatisfyConfigConstraints(params, execParams, resolvedMeta)) {
-      continue;
-    }
-    const score = configSpecificityScore(params);
-    if (score > bestScore) {
-      best = config as ActionConfiguration;
-      bestScore = score;
-    }
-  }
-
-  return best;
 }

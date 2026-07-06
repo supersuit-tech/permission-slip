@@ -1,4 +1,4 @@
-import { type FormEvent, useState, useMemo, useEffect, useRef } from "react";
+import { type FormEvent, useState } from "react";
 import { Loader2, ChevronLeft, ChevronRight, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -14,19 +14,19 @@ import {
 import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
 import { useUpdateStandingApproval } from "@/hooks/useUpdateStandingApproval";
 import type { StandingApproval } from "@/hooks/useStandingApprovals";
-import { useActionConfigs } from "@/hooks/useActionConfigs";
+import { useAgentConnectorActions } from "@/hooks/useAgentConnectorActions";
 import { useActionSchema } from "@/hooks/useActionSchema";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { Agent } from "@/hooks/useAgents";
 import {
   buildParametersFromForm,
   isPatternWrapper,
+  NameField,
+  DescriptionField,
   type ParamMode,
 } from "@/pages/agents/connectors/ActionConfigFormFields";
 import {
   buildDataWindowConstraint,
   dataWindowCountsAsConstraint,
-  DEFAULT_DATA_WINDOW_FORM,
   parseDataWindowFormState,
   type DataWindowFormState,
 } from "@/lib/dataWindow";
@@ -44,8 +44,6 @@ export interface CreateStandingApprovalDialogProps {
   onOpenChange: (open: boolean) => void;
   initialAgentId?: number;
   initialActionType?: string;
-  /** When known, pins the backing action configuration for create (required by API). */
-  initialSourceActionConfigurationId?: string;
   initialConstraints?: Record<string, unknown>;
   /** When provided, the dialog operates in edit mode for the given standing approval. */
   editTarget?: StandingApproval;
@@ -99,7 +97,6 @@ export function CreateStandingApprovalDialog({
   onOpenChange,
   initialAgentId,
   initialActionType,
-  initialSourceActionConfigurationId,
   initialConstraints,
   editTarget,
   onCreated,
@@ -121,8 +118,14 @@ export function CreateStandingApprovalDialog({
   const hasInitialContext = !!(ctxAgentId && ctxActionType);
   const [step, setStep] = useState<Step>(hasInitialContext ? 3 : 1);
   const [agentId, setAgentId] = useState<number | "">(ctxAgentId ?? "");
-  const [selectedConfigId, setSelectedConfigId] = useState<string>(
-    isEditMode ? (editTarget.source_action_configuration_id ?? "") : "",
+  const [selectedActionType, setSelectedActionType] = useState<string>(
+    ctxActionType ?? "",
+  );
+  const [ruleName, setRuleName] = useState(
+    isEditMode ? (editTarget.name ?? "") : "",
+  );
+  const [ruleDescription, setRuleDescription] = useState(
+    isEditMode ? (editTarget.description ?? "") : "",
   );
   // Pre-populate constraint form values when initial constraints are provided
   const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
@@ -166,71 +169,11 @@ export function CreateStandingApprovalDialog({
 
   const activeAgents = agents.filter((a) => a.status !== "deactivated");
 
-  const { configs, isLoading: configsLoading, isFetched: configsFetched } =
-    useActionConfigs(typeof agentId === "number" ? agentId : 0);
+  const numericAgentId = typeof agentId === "number" ? agentId : 0;
+  const { actionsByConnector, isLoading: actionsLoading } =
+    useAgentConnectorActions(numericAgentId, open);
 
-  const activeConfigs = useMemo(
-    () => configs.filter((c) => c.status === "active"),
-    [configs],
-  );
-
-  const selectedConfig = useMemo(
-    () =>
-      selectedConfigId
-        ? activeConfigs.find((c) => c.id === selectedConfigId) ?? null
-        : null,
-    [activeConfigs, selectedConfigId],
-  );
-
-  // Invariant: each agent should have at most one active config per action_type.
-  // If duplicates exist, Array.find picks the first match — which may not be the
-  // intended config. The backend enforces uniqueness, so this is a defensive note.
-  const matchingConfigForContext = useMemo(() => {
-    if (!ctxActionType) return null;
-    return activeConfigs.find((c) => c.action_type === ctxActionType) ?? null;
-  }, [activeConfigs, ctxActionType]);
-
-  /** Avoid resetting selectedConfigId when configs refetch mid-wizard (e.g. refetchOnWindowFocus). */
-  const didApplyInitialConfigSelectionRef = useRef(false);
-
-  useEffect(() => {
-    if (!open) {
-      didApplyInitialConfigSelectionRef.current = false;
-      return;
-    }
-    const shouldSyncFromContext =
-      (isEditMode && !!editTarget) || hasInitialContext;
-    if (!shouldSyncFromContext) return;
-    if (configsLoading) return;
-    if (typeof agentId === "number" && agentId > 0 && !configsFetched) return;
-    if (didApplyInitialConfigSelectionRef.current) return;
-
-    if (isEditMode && editTarget) {
-      if (editTarget.source_action_configuration_id) {
-        setSelectedConfigId(editTarget.source_action_configuration_id);
-      } else {
-        setSelectedConfigId(matchingConfigForContext?.id ?? "");
-      }
-    } else if (initialSourceActionConfigurationId) {
-      setSelectedConfigId(initialSourceActionConfigurationId);
-    } else if (hasInitialContext) {
-      setSelectedConfigId(matchingConfigForContext?.id ?? "");
-    }
-    didApplyInitialConfigSelectionRef.current = true;
-  }, [
-    open,
-    configsLoading,
-    configsFetched,
-    agentId,
-    isEditMode,
-    editTarget,
-    hasInitialContext,
-    matchingConfigForContext,
-    initialSourceActionConfigurationId,
-  ]);
-
-  const effectiveActionType =
-    selectedConfig?.action_type ?? ctxActionType ?? "";
+  const effectiveActionType = selectedActionType || ctxActionType || "";
 
   const {
     schema: fetchedSchema,
@@ -243,29 +186,12 @@ export function CreateStandingApprovalDialog({
 
   const configSchema = fetchedSchema;
 
-  const configsByConnector = useMemo(() => {
-    const groups: Record<string, ActionConfiguration[]> = {};
-    for (const config of activeConfigs) {
-      const key = config.connector_id;
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(config);
-    }
-    return groups;
-  }, [activeConfigs]);
-
   function resetForm() {
     setStep(hasInitialContext ? 3 : 1);
     setAgentId(ctxAgentId ?? "");
-    let nextConfigId = "";
-    if (isEditMode && editTarget) {
-      nextConfigId =
-        editTarget.source_action_configuration_id ??
-        matchingConfigForContext?.id ??
-        "";
-    } else if (hasInitialContext) {
-      nextConfigId = matchingConfigForContext?.id ?? "";
-    }
-    setSelectedConfigId(nextConfigId);
+    setSelectedActionType(ctxActionType ?? "");
+    setRuleName(isEditMode ? (editTarget.name ?? "") : "");
+    setRuleDescription(isEditMode ? (editTarget.description ?? "") : "");
     if (hasInitialContext && ctxConstraints) {
       const values: Record<string, string> = {};
       const modes: Record<string, ParamMode> = {};
@@ -296,29 +222,6 @@ export function CreateStandingApprovalDialog({
     }
   }
 
-  function initConstraintsFromRecord(record: Record<string, unknown>) {
-    const values: Record<string, string> = {};
-    const modes: Record<string, ParamMode> = {};
-    for (const [key, value] of Object.entries(record)) {
-      if (value === "*") {
-        values[key] = "*";
-        modes[key] = "wildcard";
-      } else if (isPatternWrapper(value)) {
-        values[key] = value.$pattern;
-        modes[key] = "pattern";
-      } else if (value === null || value === undefined) {
-        values[key] = "";
-        modes[key] = "fixed";
-      } else {
-        values[key] = String(value);
-        modes[key] = "fixed";
-      }
-    }
-    setParamValues(values);
-    setParamModes(modes);
-    setDataWindowForm({ ...DEFAULT_DATA_WINDOW_FORM });
-  }
-
   function handleNext() {
     if (step === 1) {
       if (!agentId) {
@@ -327,24 +230,17 @@ export function CreateStandingApprovalDialog({
       }
       setStep(2);
     } else if (step === 2) {
-      if (configsLoading) {
-        toast.error("Please wait for configurations to finish loading");
+      if (actionsLoading) {
+        toast.error("Please wait for actions to finish loading");
         return;
       }
-      if (!selectedConfigId || !selectedConfig) {
-        toast.error("Please select an action configuration");
+      if (!selectedActionType) {
+        toast.error("Please select an action");
         return;
       }
-      initConstraintsFromRecord(selectedConfig.parameters);
       setManualConstraintsJson("");
       setStep(3);
     } else if (step === 3) {
-      // When we skip step 2 (hasInitialContext), configs may still be loading.
-      // Guard here so source_action_configuration_id is resolved before submit.
-      if (configsLoading) {
-        toast.error("Please wait for configurations to finish loading");
-        return;
-      }
       if (schemaLoading) {
         toast.error("Please wait for the parameter schema to finish loading");
         return;
@@ -463,6 +359,8 @@ export function CreateStandingApprovalDialog({
     try {
       if (isEditMode) {
         await updateStandingApproval(editTarget.standing_approval_id, {
+          name: ruleName.trim() || null,
+          description: ruleDescription.trim() || null,
           constraints,
           expires_at: noExpiry ? null : new Date(expiresAt).toISOString(),
         });
@@ -471,17 +369,13 @@ export function CreateStandingApprovalDialog({
         onUpdated?.();
         onOpenChange(false);
       } else {
-        const sourceId = selectedConfig?.id;
-        if (!sourceId) {
-          toast.error("Select an action configuration before creating a standing approval");
-          return;
-        }
         await createStandingApproval({
           agent_id: agentId,
           action_type: effectiveActionType,
           action_version: "1",
+          name: ruleName.trim() || null,
+          description: ruleDescription.trim() || null,
           constraints,
-          source_action_configuration_id: sourceId,
           ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
         });
         toast.success("Standing approval created");
@@ -571,7 +465,7 @@ export function CreateStandingApprovalDialog({
               agentId={agentId}
               onAgentChange={(id) => {
                 setAgentId(id);
-                setSelectedConfigId("");
+                setSelectedActionType("");
                 setParamValues({});
                 setParamModes({});
               }}
@@ -581,15 +475,28 @@ export function CreateStandingApprovalDialog({
 
           {step === 2 && (
             <StepPickAction
-              selectedConfigId={selectedConfigId}
-              onConfigChange={setSelectedConfigId}
-              configsByConnector={configsByConnector}
-              configsLoading={configsLoading}
+              selectedActionType={selectedActionType}
+              onActionChange={setSelectedActionType}
+              actionsByConnector={actionsByConnector}
+              actionsLoading={actionsLoading}
             />
           )}
 
           {step === 3 && (
-            <StepConstraints
+            <>
+              <NameField
+                id="sa-rule-name"
+                value={ruleName}
+                onChange={setRuleName}
+                disabled={isPending}
+              />
+              <DescriptionField
+                id="sa-rule-description"
+                value={ruleDescription}
+                onChange={setRuleDescription}
+                disabled={isPending}
+              />
+              <StepConstraints
               configSchema={configSchema}
               schemaLoading={schemaLoading}
               paramValues={paramValues}
@@ -607,6 +514,7 @@ export function CreateStandingApprovalDialog({
               onDataWindowFormChange={setDataWindowForm}
               isPending={isPending}
             />
+            </>
           )}
 
           {step === 4 && (
@@ -647,8 +555,8 @@ export function CreateStandingApprovalDialog({
                 type="button"
                 onClick={handleNext}
                 disabled={
-                  (step === 2 && configsLoading) ||
-                  (step === 3 && (schemaLoading || configsLoading))
+                  (step === 2 && actionsLoading) ||
+                  (step === 3 && schemaLoading)
                 }
               >
                 Next

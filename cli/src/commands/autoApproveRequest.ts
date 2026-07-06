@@ -19,7 +19,6 @@ export function autoApproveRequestCommand(program: Command): void {
     .requiredOption("--action-type <type>", "Action type (e.g. email.send)")
     .requiredOption("--constraints <json>", "Constraints JSON (use $meta for verified sender/recipient rules on supported actions)")
     .option("--action-version <version>", "Action version (digits only)", "1")
-    .option("--source-action-configuration-id <id>", "Backing action configuration ID")
     .option("--server <url>", "Permission Slip server URL")
     .option("--agent-id <id>", "Agent ID (from saved registration)")
     .option("--pretty", "Pretty-printed JSON")
@@ -27,7 +26,6 @@ export function autoApproveRequestCommand(program: Command): void {
       actionType: string;
       constraints: string;
       actionVersion?: string;
-      sourceActionConfigurationId?: string;
       server?: string;
       agentId?: string;
       pretty?: boolean;
@@ -49,7 +47,6 @@ export function autoApproveRequestCommand(program: Command): void {
           action_type: opts.actionType,
           action_version: opts.actionVersion,
           constraints,
-          source_action_configuration_id: opts.sourceActionConfigurationId,
         });
 
         output(

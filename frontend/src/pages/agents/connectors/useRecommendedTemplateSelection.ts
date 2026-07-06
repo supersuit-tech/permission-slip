@@ -1,32 +1,17 @@
 import { useCallback, useState } from "react";
-import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
-import type { ApprovalMode, OperationTypeUI } from "./recommendedTemplatesTypes";
+import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
+import type { OperationTypeUI } from "./recommendedTemplatesTypes";
 
 export function useRecommendedTemplateSelection(
-  liveTemplates: ActionConfigTemplate[],
-  getOperationType: (template: ActionConfigTemplate) => OperationTypeUI,
+  liveTemplates: StandingApprovalTemplate[],
+  getOperationType: (template: StandingApprovalTemplate) => OperationTypeUI,
 ) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [approvalModes, setApprovalModes] = useState<Record<string, ApprovalMode>>({});
 
-  const [quickRead, setQuickRead] = useState<ApprovalMode>("auto_approve");
-  const [quickWrite, setQuickWrite] = useState<ApprovalMode>("requires_approval");
-  const [quickEdit, setQuickEdit] = useState<ApprovalMode>("requires_approval");
-  const [quickDelete, setQuickDelete] = useState<ApprovalMode>("requires_approval");
-
-  const getApprovalMode = useCallback(
-    (template: ActionConfigTemplate): ApprovalMode =>
-      approvalModes[template.id] ??
-      (template.standing_approval != null ? "auto_approve" : "requires_approval"),
-    [approvalModes],
-  );
-
-  const handleApprovalModeChange = useCallback(
-    (templateId: string, mode: ApprovalMode) => {
-      setApprovalModes((prev) => ({ ...prev, [templateId]: mode }));
-    },
-    [],
-  );
+  const [quickRead, setQuickRead] = useState(true);
+  const [quickWrite, setQuickWrite] = useState(false);
+  const [quickEdit, setQuickEdit] = useState(false);
+  const [quickDelete, setQuickDelete] = useState(false);
 
   const toggleSelected = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -88,30 +73,27 @@ export function useRecommendedTemplateSelection(
   );
 
   const handleQuickApply = useCallback(() => {
-    setApprovalModes((prev) => {
-      const next = { ...prev };
-      for (const t of liveTemplates) {
-        const op = getOperationType(t);
-        next[t.id] =
-          op === "read"
-            ? quickRead
-            : op === "write"
-              ? quickWrite
-              : op === "edit"
-                ? quickEdit
-                : quickDelete;
+    const next = new Set<string>();
+    for (const t of liveTemplates) {
+      const op = getOperationType(t);
+      const include =
+        op === "read"
+          ? quickRead
+          : op === "write"
+            ? quickWrite
+            : op === "edit"
+              ? quickEdit
+              : quickDelete;
+      if (include) {
+        next.add(t.id);
       }
-      return next;
-    });
-    setSelectedIds(new Set(liveTemplates.map((t) => t.id)));
+    }
+    setSelectedIds(next);
   }, [liveTemplates, getOperationType, quickRead, quickWrite, quickEdit, quickDelete]);
 
   return {
     selectedIds,
     setSelectedIds,
-    approvalModes,
-    getApprovalMode,
-    handleApprovalModeChange,
     allSelected,
     toggleSelectAll,
     toggleSelected,

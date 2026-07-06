@@ -1,11 +1,7 @@
 import type { components } from "@/api/schema";
 import type { ApprovalSummary } from "@/hooks/useApprovals";
 import { META_NAMESPACE_KEY } from "@/lib/constraints";
-import {
-  findBestMatchingActionConfig,
-  resourceDetailsToConstraintMeta,
-} from "@/lib/matchActionConfig";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
+import { resourceDetailsToConstraintMeta } from "@/lib/matchActionConfig";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -39,7 +35,6 @@ export function deriveConstraintsFromParams(
   return constraints;
 }
 
-/** With source_action_configuration_id, `{}` means match-all (backend stores NULL constraints). */
 export function standingApprovalConstraintsForCreate(
   params: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -69,14 +64,11 @@ function deriveEmailSenderConstraint(
 
 function deriveStandingApprovalConstraints(
   approval: ApprovalSummary,
-  sourceActionConfigurationId?: string,
 ): Record<string, unknown> {
-  if (sourceActionConfigurationId !== undefined) {
-    return {};
-  }
-
   const params = approval.action.parameters as Record<string, unknown>;
-  const resourceDetails = approval.resource_details as Record<string, unknown> | undefined;
+  const resourceDetails = approval.resource_details as
+    | Record<string, unknown>
+    | undefined;
 
   if (UID_EMAIL_ACTION_TYPES.has(approval.action.type)) {
     const senderConstraint = deriveEmailSenderConstraint(resourceDetails);
@@ -91,42 +83,19 @@ function deriveStandingApprovalConstraints(
   return standingApprovalConstraintsForCreate(params);
 }
 
-export function findMatchingActionConfigForApproval(
-  configs: ReadonlyArray<ActionConfiguration>,
-  approval: ApprovalSummary,
-): ActionConfiguration | null {
-  const params = approval.action.parameters as Record<string, unknown>;
-  const resolvedMeta = resourceDetailsToConstraintMeta(
-    approval.resource_details as Record<string, unknown> | undefined,
-  );
-  return findBestMatchingActionConfig(
-    configs,
-    approval.action.type,
-    params,
-    resolvedMeta,
-  );
-}
-
 export function buildCreateStandingApprovalFromApproval(
   approval: ApprovalSummary,
-  sourceActionConfigurationId?: string,
 ): CreateStandingApprovalRequest {
   const version =
     typeof approval.action.version === "string" && approval.action.version !== ""
       ? approval.action.version
       : "1";
 
-  const request: CreateStandingApprovalRequest = {
+  return {
     agent_id: approval.agent_id,
     action_type: approval.action.type,
     action_version: version,
-    constraints: deriveStandingApprovalConstraints(approval, sourceActionConfigurationId),
+    constraints: deriveStandingApprovalConstraints(approval),
     expires_at: null,
   };
-
-  if (sourceActionConfigurationId !== undefined) {
-    request.source_action_configuration_id = sourceActionConfigurationId;
-  }
-
-  return request;
 }
