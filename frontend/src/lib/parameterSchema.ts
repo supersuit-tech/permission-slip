@@ -2,7 +2,7 @@
  * Shared types and parsing for connector action parameter schemas.
  *
  * Both the approval review UI (SchemaParameterDetails) and the action
- * configuration form (ActionConfigParameterFields) consume parameter
+ * standing-approval form (ConstraintParameterFields) consume parameter
  * schemas from the API. This module provides a single parsing function
  * to avoid duplication.
  */

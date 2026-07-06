@@ -32,8 +32,8 @@ export function ConnectorActionsDialog({
         <DialogHeader>
           <DialogTitle>Available Actions</DialogTitle>
           <DialogDescription>
-            All actions this connector supports. Configure how your agent uses
-            them by adding action configurations.
+            All actions this connector supports. Add standing approvals below to
+            pre-authorize trusted actions for auto-approve.
           </DialogDescription>
         </DialogHeader>
         {actions.length === 0 ? (

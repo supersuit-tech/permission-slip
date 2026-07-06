@@ -23,7 +23,7 @@ describe("useApproveStandingApprovalRequest", () => {
       error: {
         error: {
           code: "invalid_request",
-          message: "Cannot auto-create action configuration: action type is not registered for connector",
+          message: "Cannot create standing approval: action type is not registered for connector",
         },
       },
     });
@@ -43,7 +43,7 @@ describe("useApproveStandingApprovalRequest", () => {
     });
 
     expect(error?.message).toBe(
-      "Cannot auto-create action configuration: action type is not registered for connector",
+      "Cannot create standing approval: action type is not registered for connector",
     );
   });
 });

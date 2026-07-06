@@ -1,7 +1,7 @@
 import type { components } from "@/api/schema";
 import type { ApprovalSummary } from "@/hooks/useApprovals";
 import { META_NAMESPACE_KEY } from "@/lib/constraints";
-import { resourceDetailsToConstraintMeta } from "@/lib/matchActionConfig";
+import { resourceDetailsToConstraintMeta } from "@/lib/approvalConstraintMeta";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -91,10 +91,18 @@ export function buildCreateStandingApprovalFromApproval(
       ? approval.action.version
       : "1";
 
+  const description =
+    typeof approval.context.description === "string" &&
+    approval.context.description.trim() !== ""
+      ? approval.context.description.trim()
+      : null;
+
   return {
     agent_id: approval.agent_id,
     action_type: approval.action.type,
     action_version: version,
+    name: description ?? approval.action.type,
+    description,
     constraints: deriveStandingApprovalConstraints(approval),
     expires_at: null,
   };
