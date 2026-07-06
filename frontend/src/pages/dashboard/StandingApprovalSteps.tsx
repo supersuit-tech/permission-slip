@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Loader2, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -6,10 +7,13 @@ import type { Agent } from "@/hooks/useAgents";
 import type { AgentActionOption } from "@/hooks/useAgentConnectorActions";
 import { getAgentDisplayName } from "@/lib/agents";
 import type { ParametersSchema } from "@/lib/parameterSchema";
-import { ConstraintParameterFields } from "@/pages/agents/connectors/ConstraintParameterFields";
-import type { ParamMode } from "@/pages/agents/connectors/StandingApprovalFormFields";
+import {
+  ConstraintScenariosEditor,
+  ensureScenarioFieldRows,
+} from "@/pages/agents/connectors/ConstraintScenariosEditor";
 import { DataWindowPicker } from "@/components/DataWindowPicker";
 import type { DataWindowFormState } from "@/lib/dataWindow";
+import type { StructuredConstraintFormState } from "@/lib/structuredConstraints";
 
 const selectClassName =
   "border-input bg-background ring-offset-background focus-visible:ring-ring flex h-9 w-full rounded-md border px-3 py-1 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50";
@@ -111,10 +115,9 @@ export function StepPickAction({
 export function StepConstraints({
   configSchema,
   schemaLoading,
-  paramValues,
-  paramModes,
-  onParamValueChange,
-  onParamModeChange,
+  constraintForm,
+  onConstraintFormChange,
+  metaFields,
   manualConstraintsJson,
   onManualConstraintsJsonChange,
   dataWindowSupported,
@@ -124,10 +127,9 @@ export function StepConstraints({
 }: {
   configSchema: ParametersSchema | null;
   schemaLoading: boolean;
-  paramValues: Record<string, string>;
-  paramModes: Record<string, ParamMode>;
-  onParamValueChange: (key: string, value: string) => void;
-  onParamModeChange: (key: string, mode: ParamMode) => void;
+  constraintForm: StructuredConstraintFormState;
+  onConstraintFormChange: (form: StructuredConstraintFormState) => void;
+  metaFields: string[];
   manualConstraintsJson: string;
   onManualConstraintsJsonChange: (value: string) => void;
   dataWindowSupported?: boolean;
@@ -135,6 +137,16 @@ export function StepConstraints({
   onDataWindowFormChange: (value: DataWindowFormState) => void;
   isPending: boolean;
 }) {
+  const paramKeys = useMemo(
+    () => (configSchema?.properties ? Object.keys(configSchema.properties) : []),
+    [configSchema],
+  );
+
+  const preparedForm = useMemo(
+    () => ensureScenarioFieldRows(constraintForm, paramKeys, metaFields),
+    [constraintForm, paramKeys, metaFields],
+  );
+
   if (schemaLoading) {
     return (
       <div className="flex items-center gap-2 py-4">
@@ -152,19 +164,19 @@ export function StepConstraints({
         <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
         <p className="text-muted-foreground text-sm">
           Standing approvals require parameter constraints. At least one
-          parameter must be Fixed or Pattern — not all wildcards.
+          constraint must be fixed, a pattern, or a &quot;does not match&quot;
+          rule — not all wildcards.
         </p>
       </div>
 
       {configSchema?.properties ? (
         <div className="space-y-2">
           <Label>Constraints</Label>
-          <ConstraintParameterFields
+          <ConstraintScenariosEditor
+            form={preparedForm}
+            onChange={onConstraintFormChange}
             parametersSchema={configSchema}
-            values={paramValues}
-            onValueChange={onParamValueChange}
-            modes={paramModes}
-            onModeChange={onParamModeChange}
+            metaFields={metaFields}
             disabled={isPending}
           />
         </div>
@@ -174,23 +186,18 @@ export function StepConstraints({
           <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
             <p className="text-muted-foreground text-xs leading-relaxed">
               No parameter schema found for this action. Enter constraints
-              manually as a JSON object.
+              manually as a JSON object (legacy flat map or v2 structured
+              format with <code className="font-mono">$version: 2</code>).
             </p>
           </div>
           <textarea
             id="sa-manual-constraints"
             className="border-input bg-background ring-offset-background focus-visible:ring-ring flex min-h-[100px] w-full rounded-md border px-3 py-2 font-mono text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            placeholder={'{\n  "recipient": "*@mycompany.com",\n  "subject": "*"\n}'}
+            placeholder={'{\n  "$version": 2,\n  "match": "any",\n  "groups": [...]\n}'}
             value={manualConstraintsJson}
             onChange={(e) => onManualConstraintsJsonChange(e.target.value)}
             disabled={isPending}
           />
-          <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
-            <p className="text-muted-foreground text-xs leading-relaxed">
-              Use <code className="rounded bg-muted px-1 font-mono text-foreground/70">&quot;*&quot;</code> for wildcard
-              parameters, but at least one must be non-wildcard.
-            </p>
-          </div>
         </div>
       )}
 
@@ -246,7 +253,7 @@ export function StepLimits({
         <p className="text-muted-foreground text-sm">
           {noExpiry
             ? "This standing approval will remain active until you revoke it."
-            : "Set a specific expiration date, or check \"Until revoked\" for no expiry."}
+            : 'Set a specific expiration date, or check "Until revoked" for no expiry.'}
         </p>
       </div>
     </div>

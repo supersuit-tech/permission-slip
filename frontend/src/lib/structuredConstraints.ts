@@ -285,6 +285,29 @@ export function buildStructuredConstraintsFromForm(
   };
 }
 
+export function constraintsObjectHasNonWildcard(
+  constraints: Record<string, unknown>,
+  dataWindowForm?: DataWindowFormState,
+): boolean {
+  if (isStructuredConstraints(constraints)) {
+    return formStateHasNonWildcardConstraint(
+      constraintsToFormState(constraints),
+      dataWindowForm,
+    );
+  }
+  if (dataWindowForm && buildDataWindowConstraint(dataWindowForm)) {
+    return true;
+  }
+  for (const [key, value] of Object.entries(constraints)) {
+    if (key === META_NAMESPACE_KEY || key === DATA_WINDOW_NAMESPACE_KEY) {
+      if (key === DATA_WINDOW_NAMESPACE_KEY) return true;
+      continue;
+    }
+    if (value !== "*") return true;
+  }
+  return false;
+}
+
 export function formStateHasNonWildcardConstraint(
   form: StructuredConstraintFormState,
   dataWindowForm?: DataWindowFormState,

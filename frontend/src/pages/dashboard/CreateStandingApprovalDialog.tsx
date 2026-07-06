@@ -17,20 +17,20 @@ import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import { useAgentConnectorActions } from "@/hooks/useAgentConnectorActions";
 import { useActionSchema } from "@/hooks/useActionSchema";
 import type { Agent } from "@/hooks/useAgents";
-import {
-  buildParametersFromForm,
-  isPatternWrapper,
-  NameField,
-  DescriptionField,
-  type ParamMode,
-} from "@/pages/agents/connectors/StandingApprovalFormFields";
+import { NameField, DescriptionField } from "@/pages/agents/connectors/StandingApprovalFormFields";
 import {
   buildDataWindowConstraint,
-  dataWindowCountsAsConstraint,
   parseDataWindowFormState,
   type DataWindowFormState,
 } from "@/lib/dataWindow";
-import { DATA_WINDOW_NAMESPACE_KEY } from "@/lib/constraints";
+import {
+  buildStructuredConstraintsFromForm,
+  constraintsObjectHasNonWildcard,
+  constraintsToFormState,
+  formStateHasNonWildcardConstraint,
+  isStructuredConstraints,
+  type StructuredConstraintFormState,
+} from "@/lib/structuredConstraints";
 import {
   StepPickAgent,
   StepPickAction,
@@ -68,29 +68,6 @@ function defaultExpiresAt(): string {
   return local.toISOString().slice(0, 16);
 }
 
-/**
- * Returns true when at least one parameter constraint is non-wildcard.
- */
-function hasNonWildcardConstraint(
-  paramValues: Record<string, string>,
-  paramModes: Record<string, ParamMode>,
-  dataWindowForm: DataWindowFormState,
-): boolean {
-  if (dataWindowCountsAsConstraint(dataWindowForm)) {
-    return true;
-  }
-  for (const key of Object.keys(paramValues)) {
-    const mode = paramModes[key] ?? "fixed";
-    if (mode !== "wildcard") {
-      const value = paramValues[key];
-      if (value !== undefined && value !== "") {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
 export function CreateStandingApprovalDialog({
   agents,
   open,
@@ -107,14 +84,12 @@ export function CreateStandingApprovalDialog({
   const isPending = isCreatePending || isUpdatePending;
   const isEditMode = !!editTarget;
 
-  // In edit mode, derive initial values from the target approval.
   const ctxAgentId = isEditMode ? editTarget.agent_id : initialAgentId;
   const ctxActionType = isEditMode ? editTarget.action_type : initialActionType;
   const ctxConstraints = isEditMode
     ? (editTarget.constraints as Record<string, unknown>)
     : initialConstraints;
 
-  // Skip straight to constraints when agent + action are pre-filled
   const hasInitialContext = !!(ctxAgentId && ctxActionType);
   const [step, setStep] = useState<Step>(hasInitialContext ? 3 : 1);
   const [agentId, setAgentId] = useState<number | "">(ctxAgentId ?? "");
@@ -127,28 +102,9 @@ export function CreateStandingApprovalDialog({
   const [ruleDescription, setRuleDescription] = useState(
     isEditMode ? (editTarget.description ?? "") : "",
   );
-  // Pre-populate constraint form values when initial constraints are provided
-  const [paramValues, setParamValues] = useState<Record<string, string>>(() => {
-    if (!hasInitialContext || !ctxConstraints) return {};
-    const values: Record<string, string> = {};
-    for (const [key, value] of Object.entries(ctxConstraints)) {
-      if (value === "*") values[key] = "*";
-      else if (isPatternWrapper(value)) values[key] = value.$pattern;
-      else if (value === null || value === undefined) values[key] = "";
-      else values[key] = String(value);
-    }
-    return values;
-  });
-  const [paramModes, setParamModes] = useState<Record<string, ParamMode>>(() => {
-    if (!hasInitialContext || !ctxConstraints) return {};
-    const modes: Record<string, ParamMode> = {};
-    for (const [key, value] of Object.entries(ctxConstraints)) {
-      if (value === "*") modes[key] = "wildcard";
-      else if (isPatternWrapper(value)) modes[key] = "pattern";
-      else modes[key] = "fixed";
-    }
-    return modes;
-  });
+  const [constraintForm, setConstraintForm] = useState<StructuredConstraintFormState>(
+    () => constraintsToFormState(ctxConstraints),
+  );
   const [manualConstraintsJson, setManualConstraintsJson] = useState(
     hasInitialContext && ctxConstraints
       ? JSON.stringify(ctxConstraints, null, 2)
@@ -182,6 +138,7 @@ export function CreateStandingApprovalDialog({
     actionName,
     connectorLogoSvg,
     dataWindow,
+    metaConstraintFields,
   } = useActionSchema(effectiveActionType);
 
   const configSchema = fetchedSchema;
@@ -192,20 +149,7 @@ export function CreateStandingApprovalDialog({
     setSelectedActionType(ctxActionType ?? "");
     setRuleName(isEditMode ? (editTarget.name ?? "") : "");
     setRuleDescription(isEditMode ? (editTarget.description ?? "") : "");
-    if (hasInitialContext && ctxConstraints) {
-      const values: Record<string, string> = {};
-      const modes: Record<string, ParamMode> = {};
-      for (const [key, value] of Object.entries(ctxConstraints)) {
-        if (value === "*") { values[key] = "*"; modes[key] = "wildcard"; }
-        else if (isPatternWrapper(value)) { values[key] = value.$pattern; modes[key] = "pattern"; }
-        else { values[key] = value === null || value === undefined ? "" : String(value); modes[key] = "fixed"; }
-      }
-      setParamValues(values);
-      setParamModes(modes);
-    } else {
-      setParamValues({});
-      setParamModes({});
-    }
+    setConstraintForm(constraintsToFormState(ctxConstraints));
     setManualConstraintsJson(
       hasInitialContext && ctxConstraints
         ? JSON.stringify(ctxConstraints, null, 2)
@@ -220,6 +164,41 @@ export function CreateStandingApprovalDialog({
     } else {
       setExpiresAt(defaultExpiresAt());
     }
+  }
+
+  function validateConstraintsStep(): boolean {
+    const useManualJson = !configSchema?.properties;
+    if (useManualJson) {
+      try {
+        const parsed = JSON.parse(manualConstraintsJson) as Record<string, unknown>;
+        if (
+          parsed === null ||
+          typeof parsed !== "object" ||
+          Array.isArray(parsed)
+        ) {
+          toast.error("Constraints must be a JSON object");
+          return false;
+        }
+        if (
+          !constraintsObjectHasNonWildcard(parsed, dataWindowForm)
+        ) {
+          toast.error(
+            "At least one parameter constraint must be non-wildcard",
+          );
+          return false;
+        }
+      } catch {
+        toast.error("Constraints must be valid JSON");
+        return false;
+      }
+      return true;
+    }
+
+    if (!formStateHasNonWildcardConstraint(constraintForm, dataWindowForm)) {
+      toast.error("At least one parameter constraint must be non-wildcard");
+      return false;
+    }
+    return true;
   }
 
   function handleNext() {
@@ -239,47 +218,15 @@ export function CreateStandingApprovalDialog({
         return;
       }
       setManualConstraintsJson("");
+      setConstraintForm(constraintsToFormState(null));
       setStep(3);
     } else if (step === 3) {
       if (schemaLoading) {
         toast.error("Please wait for the parameter schema to finish loading");
         return;
       }
-      // Use manual JSON path when no schema properties are available —
-      // matches the rendering condition in StepConstraints.
-      const useManualJson = !configSchema?.properties;
-      if (useManualJson) {
-        try {
-          const parsed = JSON.parse(manualConstraintsJson) as Record<
-            string,
-            unknown
-          >;
-          if (
-            parsed === null ||
-            typeof parsed !== "object" ||
-            Array.isArray(parsed)
-          ) {
-            toast.error("Constraints must be a JSON object");
-            return;
-          }
-          const allWildcard = Object.values(parsed).every((v) => v === "*");
-          if (Object.keys(parsed).length === 0 || allWildcard) {
-            toast.error(
-              "At least one parameter constraint must be non-wildcard",
-            );
-            return;
-          }
-        } catch {
-          toast.error("Constraints must be valid JSON");
-          return;
-        }
-      } else {
-        if (!hasNonWildcardConstraint(paramValues, paramModes, dataWindowForm)) {
-          toast.error(
-            "At least one parameter constraint must be non-wildcard",
-          );
-          return;
-        }
+      if (!validateConstraintsStep()) {
+        return;
       }
       setStep(4);
     }
@@ -290,6 +237,65 @@ export function CreateStandingApprovalDialog({
     if (step === 2 && minStep <= 1) setStep(1);
     else if (step === 3 && minStep <= 2) setStep(2);
     else if (step === 4) setStep(3);
+  }
+
+  function buildConstraintsPayload(): Record<string, unknown> | null {
+    const useManualJson = !configSchema?.properties;
+    let constraints: Record<string, unknown>;
+
+    if (useManualJson) {
+      try {
+        constraints = JSON.parse(manualConstraintsJson) as Record<string, unknown>;
+      } catch {
+        toast.error("Constraints must be valid JSON");
+        return null;
+      }
+      if (
+        constraints === null ||
+        typeof constraints !== "object" ||
+        Array.isArray(constraints)
+      ) {
+        toast.error("Constraints must be a JSON object");
+        return null;
+      }
+      if (!isStructuredConstraints(constraints)) {
+        for (const [key, value] of Object.entries(constraints)) {
+          if (
+            typeof value === "string" &&
+            value !== "*" &&
+            value.includes("*")
+          ) {
+            constraints[key] = { $pattern: value };
+          }
+        }
+      }
+      if (!constraintsObjectHasNonWildcard(constraints, dataWindowForm)) {
+        toast.error("At least one parameter constraint must be non-wildcard");
+        return null;
+      }
+    } else {
+      const dw = buildDataWindowConstraint(dataWindowForm);
+      constraints = buildStructuredConstraintsFromForm(
+        constraintForm,
+        dw ?? undefined,
+      );
+    }
+
+    if (!useManualJson) {
+      return constraints;
+    }
+
+    const dw = buildDataWindowConstraint(dataWindowForm);
+    if (dw) {
+      if (isStructuredConstraints(constraints)) {
+        return buildStructuredConstraintsFromForm(
+          constraintsToFormState(constraints),
+          dw,
+        );
+      }
+      return { ...constraints, $data_window: dw };
+    }
+    return constraints;
   }
 
   async function handleSubmit(e: FormEvent) {
@@ -306,55 +312,8 @@ export function CreateStandingApprovalDialog({
       return;
     }
 
-    let constraints: Record<string, unknown>;
-
-    // Use manual JSON path when no schema properties are available —
-    // matches the rendering condition in StepConstraints.
-    const useManualJson = !configSchema?.properties;
-    if (useManualJson) {
-      try {
-        constraints = JSON.parse(manualConstraintsJson) as Record<
-          string,
-          unknown
-        >;
-      } catch {
-        toast.error("Constraints must be valid JSON");
-        return;
-      }
-      if (
-        constraints === null ||
-        typeof constraints !== "object" ||
-        Array.isArray(constraints)
-      ) {
-        toast.error("Constraints must be a JSON object");
-        return;
-      }
-      // Auto-wrap bare strings containing "*" (except the bare wildcard "*")
-      // as pattern objects so the backend treats them as glob patterns.
-      for (const [key, value] of Object.entries(constraints)) {
-        if (typeof value === "string" && value !== "*" && value.includes("*")) {
-          constraints[key] = { $pattern: value };
-        }
-      }
-      const allWildcard = Object.values(constraints).every((v) => v === "*");
-      if (Object.keys(constraints).length === 0 || allWildcard) {
-        toast.error("At least one parameter constraint must be non-wildcard");
-        return;
-      }
-    } else {
-      constraints = buildParametersFromForm(
-        paramValues,
-        configSchema?.properties,
-        paramModes,
-      );
-    }
-
-    const dw = buildDataWindowConstraint(dataWindowForm);
-    if (dw) {
-      constraints[DATA_WINDOW_NAMESPACE_KEY] = dw;
-    } else {
-      delete constraints[DATA_WINDOW_NAMESPACE_KEY];
-    }
+    const constraints = buildConstraintsPayload();
+    if (!constraints) return;
 
     try {
       if (isEditMode) {
@@ -466,8 +425,7 @@ export function CreateStandingApprovalDialog({
               onAgentChange={(id) => {
                 setAgentId(id);
                 setSelectedActionType("");
-                setParamValues({});
-                setParamModes({});
+                setConstraintForm(constraintsToFormState(null));
               }}
               activeAgents={activeAgents}
             />
@@ -497,23 +455,18 @@ export function CreateStandingApprovalDialog({
                 disabled={isPending}
               />
               <StepConstraints
-              configSchema={configSchema}
-              schemaLoading={schemaLoading}
-              paramValues={paramValues}
-              paramModes={paramModes}
-              onParamValueChange={(key, value) =>
-                setParamValues((prev) => ({ ...prev, [key]: value }))
-              }
-              onParamModeChange={(key, mode) =>
-                setParamModes((prev) => ({ ...prev, [key]: mode }))
-              }
-              manualConstraintsJson={manualConstraintsJson}
-              onManualConstraintsJsonChange={setManualConstraintsJson}
-              dataWindowSupported={!!dataWindow}
-              dataWindowForm={dataWindowForm}
-              onDataWindowFormChange={setDataWindowForm}
-              isPending={isPending}
-            />
+                configSchema={configSchema}
+                schemaLoading={schemaLoading}
+                constraintForm={constraintForm}
+                onConstraintFormChange={setConstraintForm}
+                metaFields={metaConstraintFields}
+                manualConstraintsJson={manualConstraintsJson}
+                onManualConstraintsJsonChange={setManualConstraintsJson}
+                dataWindowSupported={!!dataWindow}
+                dataWindowForm={dataWindowForm}
+                onDataWindowFormChange={setDataWindowForm}
+                isPending={isPending}
+              />
             </>
           )}
 
