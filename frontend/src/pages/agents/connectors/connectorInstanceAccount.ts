@@ -74,6 +74,26 @@ export function parametersWithoutConnectorInstance(
   return rest;
 }
 
+export function hasConnectorInstanceDisplayName(
+  instance: AgentConnectorInstance,
+): boolean {
+  return !!instance.display?.trim();
+}
+
+export function selectableConnectorInstancesForAccount(
+  instances: AgentConnectorInstance[],
+  selectedInstanceId: string,
+): AgentConnectorInstance[] {
+  const keepSelected =
+    selectedInstanceId !== "*" ? selectedInstanceId.trim() : "";
+
+  return instances.filter(
+    (instance) =>
+      hasConnectorInstanceDisplayName(instance) ||
+      instance.connector_instance_id === keepSelected,
+  );
+}
+
 export function instanceSelectLabel(instance: AgentConnectorInstance): string {
   return instance.display?.trim() || "Unnamed account";
 }

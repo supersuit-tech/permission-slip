@@ -14,6 +14,7 @@ import type { AgentConnectorInstance } from "@/hooks/useAgentConnectorInstances"
 import {
   connectorInstanceFromStandingApprovalId,
   instanceSelectLabel,
+  selectableConnectorInstancesForAccount,
   standingApprovalConnectorInstanceIdForUpdate,
 } from "./connectorInstanceAccount";
 
@@ -34,6 +35,10 @@ export function StandingApprovalAccountRescopeCell({
 
   const currentValue = connectorInstanceFromStandingApprovalId(
     rule.connector_instance_id,
+  );
+  const selectableInstances = selectableConnectorInstancesForAccount(
+    instances,
+    currentValue,
   );
   const accountLabel =
     currentValue === "*"
@@ -85,7 +90,7 @@ export function StandingApprovalAccountRescopeCell({
         <DropdownMenuItem onClick={() => void handleSelect("*")}>
           All accounts
         </DropdownMenuItem>
-        {instances.map((instance) => (
+        {selectableInstances.map((instance) => (
           <DropdownMenuItem
             key={instance.connector_instance_id}
             onClick={() =>
