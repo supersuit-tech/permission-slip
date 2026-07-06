@@ -6,6 +6,15 @@ about new capabilities since their last use.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.26] - 2026-07-06
+
+### Changed
+
+- **`permission-slip capabilities`** — response no longer includes per-action `action_configurations`.
+  Agents can request any connector action when the connector is enabled; standing approvals are
+  the only user-configured auto-approve rules. Update any code that read `action_configurations`
+  from capabilities output ([#1425](https://github.com/supersuit-tech/permission-slip/issues/1425)).
+
 ## [0.1.22] - 2026-07-03
 
 ### Added

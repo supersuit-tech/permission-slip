@@ -9,7 +9,7 @@
  *   register      Generate keys and register with a Permission Slip server
  *   verify        Complete registration with the confirmation code
  *   status        Show registration state, or check approval status
- *   capabilities  List available action configurations and standing approvals
+ *   capabilities  List connector actions, standing approvals, and credential readiness
  *   connectors    List available connectors
  *   request        Request approval for an action (auto-approves if standing approval matches)
  *   watch          Poll a pending approval in the background and wake the session on resolve
