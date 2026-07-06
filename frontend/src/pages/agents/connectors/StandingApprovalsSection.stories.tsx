@@ -37,9 +37,6 @@ function StandingApprovalsSectionLayoutMirror({
         </div>
         {variant === "populated" && (
           <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
-            <Button type="button" variant="outline" size="sm" disabled>
-              Recommended Templates
-            </Button>
             <Button type="button" size="sm" disabled>
               <Plus className="size-4" />
               Add Standing Approval
@@ -58,13 +55,6 @@ function StandingApprovalsSectionLayoutMirror({
               Every request from this agent will ask for your approval. Add a
               standing approval to pre-authorize trusted, repetitive actions.
             </p>
-            <button
-              type="button"
-              disabled
-              className="text-muted-foreground text-sm underline-offset-4"
-            >
-              Or start from a recommended template →
-            </button>
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg">

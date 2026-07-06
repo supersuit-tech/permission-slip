@@ -484,9 +484,9 @@ func TestUpsertConnectorFromManifest_InstructionsURLNull(t *testing.T) {
 	}
 }
 
-// ── Template Upsert Tests ────────────────────────────────────────────────────
+// ── Template sync disabled (issue #1436) ─────────────────────────────────────
 
-func TestUpsertConnectorFromManifest_WithTemplates(t *testing.T) {
+func TestUpsertConnectorFromManifest_TemplatesNotSynced(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	tx := testhelper.SetupTestDB(t)
@@ -512,61 +512,16 @@ func TestUpsertConnectorFromManifest_WithTemplates(t *testing.T) {
 		t.Fatalf("upsert: %v", err)
 	}
 
-	// Verify template was created.
 	templates, err := db.ListStandingApprovalTemplatesByConnector(ctx, tx, "ext-tpl")
 	if err != nil {
 		t.Fatalf("ListStandingApprovalTemplatesByConnector: %v", err)
 	}
-	if len(templates) != 1 {
-		t.Fatalf("expected 1 template, got %d", len(templates))
-	}
-	if templates[0].ID != "tpl_ext_create" {
-		t.Errorf("template ID = %q, want %q", templates[0].ID, "tpl_ext_create")
-	}
-	if templates[0].Name != "Default create" {
-		t.Errorf("template name = %q, want %q", templates[0].Name, "Default create")
+	if len(templates) != 0 {
+		t.Fatalf("expected 0 templates while sync is disabled, got %d", len(templates))
 	}
 }
 
-func TestUpsertConnectorFromManifest_TemplateUpdate(t *testing.T) {
-	t.Parallel()
-	ctx := context.Background()
-	tx := testhelper.SetupTestDB(t)
-
-	m := db.ExternalConnectorManifest{
-		ID:   "ext-tplupd",
-		Name: "Template Update",
-		Actions: []db.ExternalConnectorAction{
-			{ActionType: "ext-tplupd.do", Name: "Do"},
-		},
-		Templates: []db.ExternalConnectorTemplate{
-			{ID: "tpl_upd", ActionType: "ext-tplupd.do", Name: "Original", Constraints: []byte(`{"a":"*"}`)},
-		},
-	}
-	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
-		t.Fatalf("initial upsert: %v", err)
-	}
-
-	// Update template name and constraints.
-	m.Templates[0].Name = "Updated"
-	m.Templates[0].Constraints = []byte(`{"a":"fixed"}`)
-	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
-		t.Fatalf("update upsert: %v", err)
-	}
-
-	templates, err := db.ListStandingApprovalTemplatesByConnector(ctx, tx, "ext-tplupd")
-	if err != nil {
-		t.Fatalf("ListStandingApprovalTemplatesByConnector: %v", err)
-	}
-	if len(templates) != 1 {
-		t.Fatalf("expected 1 template, got %d", len(templates))
-	}
-	if templates[0].Name != "Updated" {
-		t.Errorf("template name = %q, want %q", templates[0].Name, "Updated")
-	}
-}
-
-func TestUpsertConnectorFromManifest_RemovesStaleTemplates(t *testing.T) {
+func TestUpsertConnectorFromManifest_ClearsExistingTemplates(t *testing.T) {
 	t.Parallel()
 	ctx := context.Background()
 	tx := testhelper.SetupTestDB(t)
@@ -577,16 +532,19 @@ func TestUpsertConnectorFromManifest_RemovesStaleTemplates(t *testing.T) {
 		Actions: []db.ExternalConnectorAction{
 			{ActionType: "ext-tplstale.do", Name: "Do"},
 		},
-		Templates: []db.ExternalConnectorTemplate{
-			{ID: "tpl_keep", ActionType: "ext-tplstale.do", Name: "Keep", Constraints: []byte(`{"a":"*"}`)},
-			{ID: "tpl_remove", ActionType: "ext-tplstale.do", Name: "Remove", Constraints: []byte(`{"b":"*"}`)},
-		},
 	}
 	if err := db.UpsertConnectorFromManifest(ctx, tx, m); err != nil {
 		t.Fatalf("initial upsert: %v", err)
 	}
 
-	// Re-upsert with only one template — the other should be removed.
+	_, err := tx.Exec(ctx, `
+		INSERT INTO standing_approval_templates (id, connector_id, action_type, name, constraints)
+		VALUES ('tpl_keep', 'ext-tplstale', 'ext-tplstale.do', 'Keep', '{"a":"*"}'),
+		       ('tpl_remove', 'ext-tplstale', 'ext-tplstale.do', 'Remove', '{"b":"*"}')`)
+	if err != nil {
+		t.Fatalf("seed templates: %v", err)
+	}
+
 	m.Templates = []db.ExternalConnectorTemplate{
 		{ID: "tpl_keep", ActionType: "ext-tplstale.do", Name: "Keep", Constraints: []byte(`{"a":"*"}`)},
 	}
@@ -598,11 +556,8 @@ func TestUpsertConnectorFromManifest_RemovesStaleTemplates(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListStandingApprovalTemplatesByConnector: %v", err)
 	}
-	if len(templates) != 1 {
-		t.Fatalf("expected 1 template (stale removed), got %d", len(templates))
-	}
-	if templates[0].ID != "tpl_keep" {
-		t.Errorf("template ID = %q, want %q", templates[0].ID, "tpl_keep")
+	if len(templates) != 0 {
+		t.Fatalf("expected connector templates cleared on sync, got %d", len(templates))
 	}
 }
 

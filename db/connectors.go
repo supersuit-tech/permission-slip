@@ -501,56 +501,10 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 		return err
 	}
 
-	// Upsert standing approval templates (auto-approve presets only).
-	templateIDs := make([]string, 0, len(m.Templates))
-	for _, tpl := range m.Templates {
-		if !tpl.IsStandingApprovalPreset() {
-			continue
-		}
-		templateIDs = append(templateIDs, tpl.ID)
-
-		var existingConnector *string
-		_ = tx.QueryRow(ctx,
-			`SELECT connector_id FROM standing_approval_templates WHERE id = $1`, tpl.ID,
-		).Scan(&existingConnector)
-		if existingConnector != nil && *existingConnector != m.ID {
-			return fmt.Errorf("template id %q already belongs to connector %q, cannot reassign to %q", tpl.ID, *existingConnector, m.ID)
-		}
-
-		constraints := tpl.EffectiveConstraints()
-		if len(constraints) == 0 {
-			constraints = []byte("{}")
-		}
-
-		var durationDays *int
-		if d := tpl.EffectiveDurationDays(); d != nil {
-			durationDays = d
-		}
-
-		_, err := tx.Exec(ctx, `
-			INSERT INTO standing_approval_templates (id, connector_id, action_type, name, description, constraints, duration_days)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			ON CONFLICT (id) DO UPDATE SET
-				action_type = EXCLUDED.action_type,
-				name = EXCLUDED.name,
-				description = EXCLUDED.description,
-				constraints = EXCLUDED.constraints,
-				duration_days = EXCLUDED.duration_days`,
-			tpl.ID, m.ID, tpl.ActionType, tpl.Name, nilIfEmpty(tpl.Description), constraints, durationDays)
-		if err != nil {
-			return err
-		}
-	}
-
-	if len(templateIDs) > 0 {
-		tplArgs := append([]any{m.ID}, StringsToArgs(templateIDs)...)
-		_, err = tx.Exec(ctx,
-			`DELETE FROM standing_approval_templates WHERE connector_id = $1 AND id NOT IN (`+InPlaceholders(2, len(templateIDs))+`)`,
-			tplArgs...)
-	} else {
-		_, err = tx.Exec(ctx,
-			`DELETE FROM standing_approval_templates WHERE connector_id = $1`, m.ID)
-	}
+	// Standing-approval templates are disabled for now — plumbing kept intentionally; see issue #1436.
+	// Clear any stale rows for this connector; do not upsert from manifest.
+	_, err = tx.Exec(ctx,
+		`DELETE FROM standing_approval_templates WHERE connector_id = $1`, m.ID)
 	if err != nil {
 		return err
 	}
