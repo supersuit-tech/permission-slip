@@ -38,7 +38,16 @@ const config: ExpoConfig = {
   slug: "permission-slip",
   owner: process.env.EXPO_OWNER || "supersuit-tech",
   version: appVersion,
-  runtimeVersion: { policy: "appVersion" as const },
+  // runtimeVersion is intentionally pinned and decoupled from `version`. EAS
+  // only delivers an OTA to a native binary whose runtimeVersion matches the
+  // published update's. With the previous `policy: "appVersion"`, every
+  // auto-incremented mobile/v* tag bumped runtimeVersion and orphaned all
+  // existing installs from OTA updates — defeating the point of OTA. Keep this
+  // pinned to the value shipped in the installed native builds ("1.0.1") so
+  // JS-only OTA updates keep reaching them. Only bump it when the native layer
+  // actually changes (new native module, Expo SDK upgrade), which genuinely
+  // requires a fresh native build anyway.
+  runtimeVersion: "1.0.1",
   scheme: "permissionslip",
   orientation: "portrait",
   icon: "./assets/icon.png",
