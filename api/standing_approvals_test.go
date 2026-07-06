@@ -574,7 +574,7 @@ func TestCreateStandingApproval_AgentNotFound(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
-	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	standingApprovalTestSetupConnector(t, tx, "email.send")
 
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
