@@ -215,29 +215,22 @@ Join table controlling which connectors are enabled for each agent. Users enable
 - Deleting a connector cascades to remove it from all agents
 - This is the connector-level gating layer; a future `agent_service_actions` table may provide more granular action-level gating
 
-### `action_configurations`
+### `standing_approval_templates`
 
-User-created configurations that define exactly how an agent is allowed to use a connector action. The configuration IS the permission — agents select from pre-configured options rather than composing requests from scratch. Parameters can be locked to specific values or set to `"*"` (wildcard) to give the agent freedom on that parameter.
+Connector-authored presets synced from connector manifests. Users apply templates from the connector config page to create standing approvals — templates are optional convenience, not a permission gate.
 
 | Column | Type | Constraints |
 |---|---|---|
 | `id` | text | PK, max 255 chars |
-| `agent_id` | bigint | NOT NULL, FK → agents(agent_id) ON DELETE CASCADE |
-| `user_id` | uuid | NOT NULL, FK → profiles(id) ON DELETE CASCADE |
-| `connector_id` | text | NOT NULL, FK → connectors(id) ON DELETE CASCADE, max 255 chars |
+| `connector_id` | text | NOT NULL, FK → connectors ON DELETE CASCADE, max 255 chars |
 | `action_type` | text | NOT NULL, max 255 chars, FK (composite with connector_id) → connector_actions ON DELETE CASCADE |
-| `parameters` | jsonb | NOT NULL, DEFAULT '{}', max 64 KB |
-| `status` | text | NOT NULL, DEFAULT 'active', CHECK IN ('active', 'disabled') |
 | `name` | text | NOT NULL, max 255 chars |
 | `description` | text | max 4096 chars |
+| `constraints` | jsonb | NOT NULL, DEFAULT '{}', max 64 KB |
+| `duration_days` | integer | Nullable, CHECK > 0 when set — suggested expiry when applied |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
-| `updated_at` | timestamptz | NOT NULL, DEFAULT now() |
 
-**Indexes:** `idx_action_configurations_agent` on `(agent_id, user_id)`, `idx_action_configurations_connector_action` on `(connector_id, action_type)`
-
-**Behavior:**
-- An agent can have multiple configurations for the same action type (e.g., `email.send` to alice vs `email.send` to bob)
-- Parameters use `"*"` as a wildcard convention: fixed parameters must match exactly at execution time, wildcard parameters accept any value that passes the action's schema validation
+**Indexes:** `idx_standing_approval_templates_connector` on `(connector_id)`
 
 ### `standing_approvals`
 
@@ -251,6 +244,9 @@ Pre-authorized rules that let agents act without per-request approval, within co
 | `action_type` | text | NOT NULL, max 128 chars |
 | `action_version` | text | NOT NULL, DEFAULT '1', max 10 chars |
 | `constraints` | jsonb | max 64 KB |
+| `name` | text | max 255 chars — user-facing label |
+| `description` | text | max 4096 chars |
+| `connector_instance_id` | text | Nullable — account scope; NULL = type-wide |
 | `status` | text | NOT NULL, CHECK IN ('active', 'expired', 'revoked') |
 | `starts_at` | timestamptz | NOT NULL |
 | `expires_at` | timestamptz | NULLABLE, CHECK >= starts_at when set |
@@ -259,6 +255,10 @@ Pre-authorized rules that let agents act without per-request approval, within co
 | `expired_at` | timestamptz | |
 
 **Indexes:** `idx_standing_approvals_agent_action_status` on `(agent_id, action_type, status)`
+
+**Behavior:**
+- Constraints use the same semantics as approval parameters: fixed values must match exactly, patterns constrain allowed values, `"*"` wildcards accept any schema-valid value
+- Account scope is editable in place from the connector config page without revoking the rule
 
 ### `standing_approval_executions`
 
@@ -344,7 +344,6 @@ agents (PK: agent_id, bigserial)
   ├── request_ids (agent_id → agents, CASCADE)
   ├── standing_approvals (agent_id → agents, CASCADE)
   ├── agent_connectors (agent_id → agents, CASCADE)
-  ├── action_configurations (agent_id → agents, CASCADE)
   └── audit_events (agent_id → agents, RESTRICT)
 
 standing_approvals
@@ -354,10 +353,10 @@ connectors
   ├── connector_actions (connector_id → connectors, CASCADE)
   ├── connector_required_credentials (connector_id → connectors, CASCADE)
   ├── agent_connectors (connector_id → connectors, CASCADE)
-  └── action_configurations (connector_id → connectors, CASCADE)
+  └── standing_approval_templates (connector_id → connectors, CASCADE)
 
 connector_actions
-  └── action_configurations ((connector_id, action_type) → connector_actions, CASCADE)
+  └── standing_approval_templates ((connector_id, action_type) → connector_actions, CASCADE)
 
 credentials
   └── agent_connector_credentials (credential_id → credentials, CASCADE)
@@ -483,8 +482,7 @@ Helpers are split by responsibility:
 | `InsertStandingApprovalWithStatus(t, pool, ..., status)` | `fixtures_standing_approvals.go` | Creates a standing approval with specific status |
 | `InsertStandingApprovalExecution(t, pool, saID)` | `fixtures_standing_approvals.go` | Records a standing approval execution |
 | `InsertStandingApprovalExecutionWithParams(t, pool, saID, params)` | `fixtures_standing_approvals.go` | Records a standing approval execution with parameters |
-| `InsertActionConfig(t, pool, configID, agentID, userID, connectorID, actionType)` | `fixtures_action_configurations.go` | Creates an active action configuration with minimal defaults |
-| `InsertActionConfigFull(t, pool, configID, agentID, userID, connectorID, actionType, opts)` | `fixtures_action_configurations.go` | Creates an action configuration with full control over all fields |
+| `InsertStandingApprovalFull(t, pool, saID, agentID, userID, opts)` | `fixtures_standing_approvals.go` | Creates a standing approval with full control over all fields |
 
 **`assertions.go`** — Schema and constraint assertions:
 
@@ -510,7 +508,6 @@ Tests are split by domain. Each domain file owns its own schema assertions, CASC
 - `approvals_test.go` — schema, cascades, CHECK constraints, indexes, consumed tokens, pg_cron jobs
 - `credentials_test.go` — schema, cascades, unique constraints (including NULL label), indexes
 - `agent_connectors_test.go` — schema, cascades, indexes
-- `standing_approvals_test.go` — schema, cascades, CHECK constraints (status, nullable expires_at), indexes, standing_approval_executions table
-- `action_configurations_test.go` — schema, cascades, CHECK constraints (status, parameters size), credential SET NULL behavior, CRUD function tests (create, get, list, update, delete), user scoping
+- `standing_approvals_test.go` — schema, cascades, CHECK constraints (status, nullable expires_at), indexes, standing_approval_executions table, name/description columns
 - `audit_events_test.go` — ListAuditEvents query: all event types, filters (agent_id, event_type, outcome), pagination, user isolation, ordering
 - `usage_periods_test.go` — schema, atomic increments, JSONB breakdown, cascade delete

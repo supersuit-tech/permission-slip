@@ -92,7 +92,9 @@ Accepted
 Users need more granularity than just "agent X can use `email.send`." They want to say "agent X can send emails, but only to people at @mycompany.com."
 
 ### Decision
-Users configure **constraints** on each action for each agent. Constraints are enforced at request validation time, before the approval prompt is shown.
+Users configure **constraints** on standing approvals for each agent. Constraints are enforced at request validation time — either matching a standing approval (auto-execute) or before the one-off approval prompt is shown.
+
+> **Amended by [ADR-010](010-remove-action-configurations.md):** Action configurations were removed. Standing approvals are now the sole user-configured constraint surface; agents may request any action on an enabled connector without prior setup.
 
 ### Constraints for `email.read`:
 - Subject filter, sender filter, max results, date range
