@@ -19,8 +19,6 @@ import {
   useStandingApprovals,
   type StandingApproval,
 } from "@/hooks/useStandingApprovals";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
-import { useActionConfigMap } from "@/hooks/useActionConfigMap";
 
 function formatExpiresIn(expiresAt: string | null | undefined): string {
   if (expiresAt === null) return "Never";
@@ -41,35 +39,26 @@ function formatExpiresIn(expiresAt: string | null | undefined): string {
   return `${diffDays}d`;
 }
 
-function StandingApprovalSummaryRow({
-  sa,
-  config,
-}: {
-  sa: StandingApproval;
-  config: ActionConfiguration | undefined;
-}) {
-  const href =
-    config != null
-      ? `/agents/${sa.agent_id}/connectors/${encodeURIComponent(config.connector_id)}`
-      : `/agents/${sa.agent_id}`;
+function connectorIdFromActionType(actionType: string): string {
+  const dot = actionType.indexOf(".");
+  return dot === -1 ? actionType : actionType.slice(0, dot);
+}
+
+function StandingApprovalSummaryRow({ sa }: { sa: StandingApproval }) {
+  const connectorId = connectorIdFromActionType(sa.action_type);
+  const href = `/agents/${sa.agent_id}/connectors/${encodeURIComponent(connectorId)}`;
 
   return (
     <TableRow>
       <TableCell className="font-medium">
         <div className="min-w-0">
-          <p className="truncate">
-            {config?.name ?? "Unknown configuration"}
+          <p className="truncate">{sa.name ?? sa.action_type}</p>
+          <p className="text-muted-foreground truncate font-mono text-xs">
+            {sa.action_type}
           </p>
-          {config && (
-            <p className="text-muted-foreground truncate font-mono text-xs">
-              {config.action_type}
-            </p>
-          )}
         </div>
       </TableCell>
-      <TableCell className="text-sm">
-        {config?.connector_id ?? "\u2014"}
-      </TableCell>
+      <TableCell className="text-sm">{connectorId}</TableCell>
       <TableCell>{formatExpiresIn(sa.expires_at)}</TableCell>
       <TableCell className="text-right">
         <Link
@@ -92,9 +81,9 @@ function EmptyState() {
         No active standing approvals
       </p>
       <p className="text-muted-foreground mb-4 max-w-md text-xs leading-relaxed">
-        Standing approvals are created from an agent&apos;s connector page, on each
-        action configuration. Open a connector, then use the Standing Approval column
-        to enable auto-approve with expiry you control.
+        Standing approvals are created from an agent&apos;s connector page.
+        Open a connector, then add a standing approval to enable auto-approve
+        with expiry you control.
       </p>
     </div>
   );
@@ -109,18 +98,13 @@ export function AgentStandingApprovalsSection({
 }: AgentStandingApprovalsSectionProps) {
   const { standingApprovals, isLoading, error, refetch } = useStandingApprovals();
 
-  const linkedActiveForAgent = useMemo(
+  const activeForAgent = useMemo(
     () =>
       standingApprovals.filter(
-        (sa) =>
-          sa.agent_id === agentId &&
-          !!sa.source_action_configuration_id &&
-          sa.status === "active",
+        (sa) => sa.agent_id === agentId && sa.status === "active",
       ),
     [standingApprovals, agentId],
   );
-
-  const configMap = useActionConfigMap([agentId]);
 
   return (
     <Card>
@@ -129,8 +113,8 @@ export function AgentStandingApprovalsSection({
           <CardTitle>Standing approvals</CardTitle>
         </div>
         <p className="text-muted-foreground text-sm">
-          Action configurations with an active standing approval. Manage expiry and
-          revocation on each connector&apos;s configuration page.
+          Pre-authorized rules that auto-approve matching requests. Manage
+          expiry and revocation on each connector&apos;s standing approvals page.
         </p>
       </CardHeader>
       <CardContent className="px-3 md:px-6">
@@ -149,7 +133,7 @@ export function AgentStandingApprovalsSection({
               Retry
             </button>
           </div>
-        ) : linkedActiveForAgent.length === 0 ? (
+        ) : activeForAgent.length === 0 ? (
           <EmptyState />
         ) : (
           <div className="overflow-x-auto">
@@ -157,7 +141,7 @@ export function AgentStandingApprovalsSection({
               <Table>
                 <TableHeader>
                   <TableRow className="border-none bg-muted/50 hover:bg-muted/50">
-                    <TableHead>Configuration</TableHead>
+                    <TableHead>Rule</TableHead>
                     <TableHead>Connector</TableHead>
                     <TableHead>Expires</TableHead>
                     <TableHead className="text-right">
@@ -166,18 +150,12 @@ export function AgentStandingApprovalsSection({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {linkedActiveForAgent.map((sa) => {
-                    const cid = sa.source_action_configuration_id;
-                    const config =
-                      cid != null ? configMap.get(cid) : undefined;
-                    return (
-                      <StandingApprovalSummaryRow
-                        key={sa.standing_approval_id}
-                        sa={sa}
-                        config={config}
-                      />
-                    );
-                  })}
+                  {activeForAgent.map((sa) => (
+                    <StandingApprovalSummaryRow
+                      key={sa.standing_approval_id}
+                      sa={sa}
+                    />
+                  ))}
                 </TableBody>
               </Table>
             </div>

@@ -16,9 +16,8 @@ func standingApprovalFixtureConnectorID(t *testing.T) string {
 	return "sa_fixture_c_" + hex.EncodeToString(mustRandBytes(t, 8))
 }
 
-// ensureStandingApprovalSourceConfig creates connector, action, and action_configuration
-// rows so standing_approvals.source_action_configuration_id FK is satisfied.
-func ensureStandingApprovalSourceConfig(t *testing.T, d db.DBTX, agentID int64, userID, actionType string) string {
+// ensureStandingApprovalFixtureConnector creates connector and action rows for tests.
+func ensureStandingApprovalFixtureConnector(t *testing.T, d db.DBTX, actionType string) string {
 	t.Helper()
 	connectorID := standingApprovalFixtureConnectorID(t)
 	mustExec(t, d,
@@ -27,16 +26,12 @@ func ensureStandingApprovalSourceConfig(t *testing.T, d db.DBTX, agentID int64, 
 	mustExec(t, d,
 		`INSERT INTO connector_actions (connector_id, action_type, name) VALUES ($1, $2, $2)`,
 		connectorID, actionType)
-	configID := "ac_" + hex.EncodeToString(mustRandBytes(t, 16))
-	InsertActionConfig(t, d, configID, agentID, userID, connectorID, actionType)
 	t.Cleanup(func() {
 		ctx := context.Background()
-		_, _ = d.Exec(ctx, `DELETE FROM standing_approvals WHERE source_action_configuration_id = $1`, configID)
-		_, _ = d.Exec(ctx, `DELETE FROM action_configurations WHERE id = $1`, configID)
 		_, _ = d.Exec(ctx, `DELETE FROM connector_actions WHERE connector_id = $1`, connectorID)
 		_, _ = d.Exec(ctx, `DELETE FROM connectors WHERE id = $1`, connectorID)
 	})
-	return configID
+	return connectorID
 }
 
 // InsertStandingApproval creates an active standing approval for the given agent and user.
@@ -51,11 +46,12 @@ func InsertStandingApproval(t *testing.T, d db.DBTX, saID string, agentID int64,
 func InsertStandingApprovalWithStatus(t *testing.T, d db.DBTX, saID string, agentID int64, userID, status string) {
 	t.Helper()
 	actionType := "test.action"
-	configID := ensureStandingApprovalSourceConfig(t, d, agentID, userID, actionType)
+	ensureStandingApprovalFixtureConnector(t, d, actionType)
+	name := "Test standing approval"
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, starts_at, expires_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'))`,
-		saID, agentID, userID, actionType, status, configID)
+		saID, agentID, userID, actionType, status, name)
 }
 
 // InsertStandingApprovalWithCreatedAt creates an active standing approval with an explicit created_at timestamp.
@@ -63,12 +59,13 @@ func InsertStandingApprovalWithStatus(t *testing.T, d db.DBTX, saID string, agen
 func InsertStandingApprovalWithCreatedAt(t *testing.T, d db.DBTX, saID string, agentID int64, userID string, createdAt time.Time) {
 	t.Helper()
 	actionType := "test.action"
-	configID := ensureStandingApprovalSourceConfig(t, d, agentID, userID, actionType)
+	ensureStandingApprovalFixtureConnector(t, d, actionType)
+	name := "Test standing approval"
 	expiresAt := createdAt.Add(30 * 24 * time.Hour)
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at, created_at)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, starts_at, expires_at, created_at)
 		 VALUES ($1, $2, $3, $4, 'active', $5, $6, $7, $8)`,
-		saID, agentID, userID, actionType, configID,
+		saID, agentID, userID, actionType, name,
 		db.TimestampForSQLite(createdAt),
 		db.TimestampForSQLite(expiresAt),
 		db.TimestampForSQLite(createdAt),
@@ -79,11 +76,12 @@ func InsertStandingApprovalWithCreatedAt(t *testing.T, d db.DBTX, saID string, a
 // The agent and user must already exist via InsertUser and InsertAgent.
 func InsertStandingApprovalWithActionType(t *testing.T, d db.DBTX, saID string, agentID int64, userID, actionType string) {
 	t.Helper()
-	configID := ensureStandingApprovalSourceConfig(t, d, agentID, userID, actionType)
+	ensureStandingApprovalFixtureConnector(t, d, actionType)
+	name := "Test standing approval"
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, starts_at, expires_at)
 		 VALUES ($1, $2, $3, $4, 'active', $5, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'))`,
-		saID, agentID, userID, actionType, configID)
+		saID, agentID, userID, actionType, name)
 }
 
 // InsertStandingApprovalExecution records a standing approval execution with no parameters.
@@ -103,13 +101,14 @@ func InsertStandingApprovalExecutionWithParams(t *testing.T, d db.DBTX, saID str
 
 // StandingApprovalOpts holds optional fields for InsertStandingApprovalFull.
 type StandingApprovalOpts struct {
-	ActionType                  string
-	Status                      string
-	Constraints                 []byte
-	SourceActionConfigurationID *string
-	ConnectorInstanceID         *string
-	StartsAt                    time.Time
-	ExpiresAt                   time.Time
+	ActionType          string
+	Status              string
+	Constraints         []byte
+	Name                *string
+	Description         *string
+	ConnectorInstanceID *string
+	StartsAt            time.Time
+	ExpiresAt           time.Time
 }
 
 // InsertStandingApprovalFull creates a standing approval with full control over all fields.
@@ -127,17 +126,18 @@ func InsertStandingApprovalFull(t *testing.T, d db.DBTX, saID string, agentID in
 	if opts.ExpiresAt.IsZero() {
 		opts.ExpiresAt = time.Now().Add(30 * 24 * time.Hour)
 	}
-	sourceID := opts.SourceActionConfigurationID
-	if sourceID == nil || *sourceID == "" {
-		id := ensureStandingApprovalSourceConfig(t, d, agentID, userID, opts.ActionType)
-		sourceID = &id
+	name := opts.Name
+	if name == nil {
+		defaultName := "Test standing approval"
+		name = &defaultName
 	}
+	ensureStandingApprovalFixtureConnector(t, d, opts.ActionType)
 	startsStr := opts.StartsAt.UTC().Format("2006-01-02T15:04:05.000000Z")
 	expiresStr := opts.ExpiresAt.UTC().Format("2006-01-02T15:04:05.000000Z")
 	mustExec(t, d,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, source_action_configuration_id, connector_instance_id, starts_at, expires_at)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
-		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, sourceID, opts.ConnectorInstanceID, startsStr, expiresStr)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, constraints, name, description, connector_instance_id, starts_at, expires_at)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+		saID, agentID, userID, opts.ActionType, opts.Status, opts.Constraints, name, opts.Description, opts.ConnectorInstanceID, startsStr, expiresStr)
 }
 
 // RequireStandingApprovalExecutionCount asserts the number of rows in

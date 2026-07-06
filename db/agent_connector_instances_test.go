@@ -221,14 +221,12 @@ func TestFindActiveStandingApprovalsForAgent_FiltersByInstance(t *testing.T) {
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)
 	}
 
-	configID := testhelper.GenerateID(t, "ac_")
-	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
-
 	saID := testhelper.GenerateID(t, "sa_")
+	name := "Instance-scoped rule"
 	_, err = tx.Exec(ctx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, connector_instance_id, starts_at, expires_at)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, connector_instance_id, starts_at, expires_at)
 		 VALUES ($1, $2, $3, $4, 'active', $5, $6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'))`,
-		saID, agentID, uid, actionType, configID, inst2.ConnectorInstanceID,
+		saID, agentID, uid, actionType, name, inst2.ConnectorInstanceID,
 	)
 	if err != nil {
 		t.Fatalf("insert standing approval: %v", err)
@@ -282,14 +280,12 @@ func TestDeleteAgentConnectorInstance_RevokesInstanceScopedStandingApproval(t *t
 		t.Fatalf("CreateAgentConnectorInstance: %v", err)
 	}
 
-	configID := testhelper.GenerateID(t, "ac_")
-	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
-
 	saID := testhelper.GenerateID(t, "sa_")
+	name := "Instance-scoped rule"
 	_, err = tx.Exec(ctx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, connector_instance_id, starts_at, expires_at)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, connector_instance_id, starts_at, expires_at)
 		 VALUES ($1, $2, $3, $4, 'active', $5, $6, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'), strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+30 days'))`,
-		saID, agentID, uid, actionType, configID, inst2.ConnectorInstanceID,
+		saID, agentID, uid, actionType, name, inst2.ConnectorInstanceID,
 	)
 	if err != nil {
 		t.Fatalf("insert standing approval: %v", err)

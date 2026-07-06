@@ -18,19 +18,20 @@ import (
 // Response types for the dashboard standing approval endpoints.
 
 type standingApprovalResponse struct {
-	StandingApprovalID          string     `json:"standing_approval_id"`
-	AgentID                     int64      `json:"agent_id"`
-	UserID                      string     `json:"user_id"`
-	ActionType                  string     `json:"action_type"`
-	ActionVersion               string     `json:"action_version"`
-	Constraints                 any        `json:"constraints"`
-	SourceActionConfigurationID *string    `json:"source_action_configuration_id"`
-	ConnectorInstanceID         *string    `json:"connector_instance_id,omitempty"`
-	Status                      string     `json:"status"`
-	StartsAt                    time.Time  `json:"starts_at"`
-	ExpiresAt                   *time.Time `json:"expires_at"`
-	CreatedAt                   time.Time  `json:"created_at"`
-	RevokedAt                   *time.Time `json:"revoked_at,omitempty"`
+	StandingApprovalID  string     `json:"standing_approval_id"`
+	AgentID             int64      `json:"agent_id"`
+	UserID              string     `json:"user_id"`
+	ActionType          string     `json:"action_type"`
+	ActionVersion       string     `json:"action_version"`
+	Constraints         any        `json:"constraints"`
+	Name                *string    `json:"name,omitempty"`
+	Description         *string    `json:"description,omitempty"`
+	ConnectorInstanceID *string    `json:"connector_instance_id,omitempty"`
+	Status              string     `json:"status"`
+	StartsAt            time.Time  `json:"starts_at"`
+	ExpiresAt           *time.Time `json:"expires_at"`
+	CreatedAt           time.Time  `json:"created_at"`
+	RevokedAt           *time.Time `json:"revoked_at,omitempty"`
 }
 
 type standingApprovalListResponse struct {
@@ -46,18 +47,23 @@ type revokeStandingApprovalResponse struct {
 }
 
 type createStandingApprovalRequest struct {
-	AgentID                     int64           `json:"agent_id" validate:"gt=0"`
-	ActionType                  string          `json:"action_type" validate:"required"`
-	ActionVersion               string          `json:"action_version"`
-	Constraints                 json.RawMessage `json:"constraints"`
-	SourceActionConfigurationID *string         `json:"source_action_configuration_id"`
-	StartsAt                    *time.Time      `json:"starts_at"`
-	ExpiresAt                   *time.Time      `json:"expires_at"`
+	AgentID       int64           `json:"agent_id" validate:"gt=0"`
+	ActionType    string          `json:"action_type" validate:"required"`
+	ActionVersion string          `json:"action_version"`
+	Constraints   json.RawMessage `json:"constraints"`
+	Name          *string         `json:"name,omitempty"`
+	Description   *string         `json:"description,omitempty"`
+	StartsAt      *time.Time      `json:"starts_at"`
+	ExpiresAt     *time.Time      `json:"expires_at"`
 }
 
 type updateStandingApprovalRequest struct {
-	Constraints json.RawMessage `json:"constraints"`
-	ExpiresAt   *time.Time      `json:"expires_at"`
+	Constraints    json.RawMessage `json:"constraints"`
+	Name           *string         `json:"name,omitempty"`
+	Description    *string         `json:"description,omitempty"`
+	NameSet        bool            `json:"-"`
+	DescriptionSet bool            `json:"-"`
+	ExpiresAt      *time.Time      `json:"expires_at"`
 	// ExpiresAtSet is true when the JSON payload explicitly included the "expires_at" key
 	// (even if the value was null). This distinguishes "field omitted" (preserve existing)
 	// from "field set to null" (clear expiry → until revoked).
@@ -79,6 +85,8 @@ func (r *updateStandingApprovalRequest) UnmarshalJSON(data []byte) error {
 	}
 	_, r.ExpiresAtSet = raw["expires_at"]
 	_, r.ConnectorInstanceIDSet = raw["connector_instance_id"]
+	_, r.NameSet = raw["name"]
+	_, r.DescriptionSet = raw["description"]
 
 	// Unmarshal into an alias to avoid infinite recursion.
 	type alias updateStandingApprovalRequest
@@ -105,9 +113,8 @@ var validStandingApprovalStatusFilters = map[string]bool{
 
 var actionVersionPattern = regexp.MustCompile(`^\d+$`)
 
-// maxActionConfigIDLength is the maximum length for source_action_configuration_id.
-// Generated IDs are ~35 chars (prefix + 32 hex); 128 is generous headroom.
-const maxActionConfigIDLength = 128
+// maxStandingApprovalNameLength is the maximum length for standing approval names.
+const maxStandingApprovalNameLength = 255
 
 func init() {
 	RegisterRouteGroup(RegisterStandingApprovalRoutes)
@@ -152,16 +159,7 @@ func handleListStandingApprovals(deps *Deps) http.HandlerFunc {
 			cursor = c
 		}
 
-		var sourceConfigID *string
-		if v := strings.TrimSpace(r.URL.Query().Get("source_action_configuration_id")); v != "" {
-			if len(v) > maxActionConfigIDLength {
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id exceeds maximum length"))
-				return
-			}
-			sourceConfigID = &v
-		}
-
-		page, err := db.ListStandingApprovalsByUser(r.Context(), deps.DB, profile.ID, statusFilter, sourceConfigID, limit, cursor)
+		page, err := db.ListStandingApprovalsByUser(r.Context(), deps.DB, profile.ID, statusFilter, limit, cursor)
 		if err != nil {
 			log.Printf("[%s] ListStandingApprovals: %v", TraceID(r.Context()), err)
 			CaptureError(r.Context(), err)
@@ -243,24 +241,6 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 
 		var constraintsBytes []byte
 		if len(req.Constraints) > 0 {
-			s := strings.TrimSpace(string(req.Constraints))
-			if s == "{}" || s == "null" {
-				// Match-all parameters for this action type (trusted when tied to a source config,
-				// e.g. template customize with all-wildcard parameters). Stored as NULL in DB.
-				constraintsBytes = nil
-			} else {
-				var cErr error
-				constraintsBytes, cErr = validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, req.ActionType, req.Constraints)
-				if cErr != nil {
-					resp := BadRequest(ErrInvalidConstraints, cErr.Error())
-					resp.Error.Details = map[string]any{
-						"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
-					}
-					RespondError(w, r, http.StatusBadRequest, resp)
-					return
-				}
-			}
-		} else {
 			var cErr error
 			constraintsBytes, cErr = validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, req.ActionType, req.Constraints)
 			if cErr != nil {
@@ -271,6 +251,21 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 				RespondError(w, r, http.StatusBadRequest, resp)
 				return
 			}
+		} else {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidConstraints, "constraints are required for standing approvals"))
+			return
+		}
+
+		actionSchema, err := db.GetActionParametersSchema(r.Context(), deps.DB, req.ActionType)
+		if err != nil {
+			log.Printf("[%s] CreateStandingApproval: lookup action: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to create standing approval"))
+			return
+		}
+		if actionSchema == nil {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "action type is not registered for any connector"))
+			return
 		}
 
 		// Wrap insert in a transaction.
@@ -285,25 +280,17 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			defer db.RollbackTx(r.Context(), tx)
 		}
 
-		sourceConfigIDPtr, ok := resolveSourceActionConfigForStandingApproval(w, r, tx, profile.ID, req, sourceActionConfigResolveOptions{
-			LogLabel:       "CreateStandingApproval",
-			AutoCreateName: autoApprovedFromRequestConfigName,
-			FailureMessage: "Failed to create standing approval",
-		})
-		if !ok {
-			return
-		}
-
 		sa, err := db.CreateStandingApproval(r.Context(), tx, db.CreateStandingApprovalParams{
-			StandingApprovalID:          saID,
-			AgentID:                     req.AgentID,
-			UserID:                      profile.ID,
-			ActionType:                  req.ActionType,
-			ActionVersion:               req.ActionVersion,
-			Constraints:                 constraintsBytes,
-			SourceActionConfigurationID: sourceConfigIDPtr,
-			StartsAt:                    startsAt,
-			ExpiresAt:                   req.ExpiresAt,
+			StandingApprovalID: saID,
+			AgentID:            req.AgentID,
+			UserID:             profile.ID,
+			ActionType:         req.ActionType,
+			ActionVersion:      req.ActionVersion,
+			Constraints:        constraintsBytes,
+			Name:               req.Name,
+			Description:        req.Description,
+			StartsAt:           startsAt,
+			ExpiresAt:          req.ExpiresAt,
 		})
 		if err != nil {
 			var saErr *db.StandingApprovalError
@@ -330,158 +317,11 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 	}
 }
 
-const autoApprovedFromRequestConfigName = "Auto-approved from request"
+const autoApprovedFromRequestName = "Auto-approved from request"
 
-const autoCreatedFromRuleProposalConfigName = "Auto-created from approved rule proposal"
+const autoCreatedFromRuleProposalName = "Auto-created from approved rule proposal"
 
-var autoCreatedFromRuleProposalConfigDescription = "Created automatically when approving a standing auto-approve rule proposal"
-
-type sourceActionConfigResolveOptions struct {
-	LogLabel              string
-	AutoCreateName        string
-	AutoCreateDescription *string
-	FailureMessage        string
-}
-
-// resolveSourceActionConfigForStandingApproval validates an explicit source config
-// or auto-creates/reactivates a backing action configuration when omitted.
-// Returns the config ID and true on success; false if an HTTP error was written.
-func resolveSourceActionConfigForStandingApproval(
-	w http.ResponseWriter,
-	r *http.Request,
-	tx db.DBTX,
-	userID string,
-	req createStandingApprovalRequest,
-	opts sourceActionConfigResolveOptions,
-) (*string, bool) {
-	if req.SourceActionConfigurationID != nil {
-		sourceConfigID := strings.TrimSpace(*req.SourceActionConfigurationID)
-		if sourceConfigID == "" {
-			// Empty string is treated as omitted — fall through to auto-create.
-		} else {
-			if len(sourceConfigID) > maxActionConfigIDLength {
-				log.Printf("[%s] %s: source_action_configuration_id too long", TraceID(r.Context()), opts.LogLabel)
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id must be between 1 and 128 characters"))
-				return nil, false
-			}
-
-			ac, err := db.GetActionConfigByID(r.Context(), tx, sourceConfigID, userID)
-			if err != nil {
-				log.Printf("[%s] %s: load action config: %v", TraceID(r.Context()), opts.LogLabel, err)
-				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
-				return nil, false
-			}
-			if ac == nil {
-				log.Printf("[%s] %s: source_action_configuration_id not found: %s", TraceID(r.Context()), opts.LogLabel, sourceConfigID)
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "source_action_configuration_id must reference an existing action configuration"))
-				return nil, false
-			}
-			if ac.AgentID != req.AgentID {
-				log.Printf("[%s] %s: action config %s belongs to agent %d, expected %d", TraceID(r.Context()), opts.LogLabel, sourceConfigID, ac.AgentID, req.AgentID)
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action configuration does not belong to the specified agent"))
-				return nil, false
-			}
-			if ac.ActionType != req.ActionType {
-				log.Printf("[%s] %s: action config %s action_type mismatch: %q vs %q", TraceID(r.Context()), opts.LogLabel, sourceConfigID, ac.ActionType, req.ActionType)
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "action_type must match the referenced action configuration"))
-				return nil, false
-			}
-			return &sourceConfigID, true
-		}
-	}
-
-	existing, err := db.FindLatestActionConfigForAgentActionType(r.Context(), tx, req.AgentID, userID, req.ActionType)
-	if err != nil {
-		log.Printf("[%s] %s: find backing action config: %v", TraceID(r.Context()), opts.LogLabel, err)
-		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
-		return nil, false
-	}
-	if existing != nil {
-		if existing.Status == "active" {
-			id := existing.ID
-			return &id, true
-		}
-		if existing.Status == "disabled" {
-			active := "active"
-			updated, err := db.UpdateActionConfig(r.Context(), tx, db.UpdateActionConfigParams{
-				ID:     existing.ID,
-				UserID: userID,
-				Status: &active,
-			})
-			if err != nil {
-				log.Printf("[%s] %s: reactivate action config: %v", TraceID(r.Context()), opts.LogLabel, err)
-				CaptureError(r.Context(), err)
-				RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
-				return nil, false
-			}
-			id := updated.ID
-			return &id, true
-		}
-	}
-
-	connectorIDPtr := connectorIDFromActionType(req.ActionType)
-	if connectorIDPtr == nil {
-		log.Printf("[%s] %s: action type %q has no connector prefix", TraceID(r.Context()), opts.LogLabel, req.ActionType)
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "Cannot auto-create action configuration: action type has no connector prefix"))
-		return nil, false
-	}
-	connectorID := *connectorIDPtr
-
-	exists, err := db.ConnectorActionExists(r.Context(), tx, connectorID, req.ActionType)
-	if err != nil {
-		log.Printf("[%s] %s: check connector action: %v", TraceID(r.Context()), opts.LogLabel, err)
-		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
-		return nil, false
-	}
-	if !exists {
-		log.Printf("[%s] %s: action type %q not registered for connector %q", TraceID(r.Context()), opts.LogLabel, req.ActionType, connectorID)
-		RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Cannot auto-create action configuration: action type is not registered for connector"))
-		return nil, false
-	}
-
-	configID, err := generatePrefixedID("ac_", 16)
-	if err != nil {
-		log.Printf("[%s] %s: generate action config ID: %v", TraceID(r.Context()), opts.LogLabel, err)
-		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
-		return nil, false
-	}
-
-	ac, err := db.CreateActionConfig(r.Context(), tx, db.CreateActionConfigParams{
-		ID:          configID,
-		AgentID:     req.AgentID,
-		UserID:      userID,
-		ConnectorID: connectorID,
-		ActionType:  req.ActionType,
-		Parameters:  []byte("{}"),
-		Name:        opts.AutoCreateName,
-		Description: opts.AutoCreateDescription,
-	})
-	if err != nil {
-		var acErr *db.ActionConfigError
-		if errors.As(err, &acErr) {
-			switch acErr.Code {
-			case db.ActionConfigErrAgentNotFound:
-				RespondError(w, r, http.StatusNotFound, NotFound(ErrAgentNotFound, "Agent not found"))
-				return nil, false
-			case db.ActionConfigErrInvalidRef:
-				log.Printf("[%s] %s: invalid connector or action type reference for %q", TraceID(r.Context()), opts.LogLabel, req.ActionType)
-				RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidReference, "Cannot auto-create action configuration: invalid connector or action type reference"))
-				return nil, false
-			}
-		}
-		log.Printf("[%s] %s: create backing action config: %v", TraceID(r.Context()), opts.LogLabel, err)
-		CaptureError(r.Context(), err)
-		RespondError(w, r, http.StatusInternalServerError, InternalError(opts.FailureMessage))
-		return nil, false
-	}
-
-	id := ac.ID
-	return &id, true
-}
+var autoCreatedFromRuleProposalDescription = "Created automatically when approving a standing auto-approve rule proposal"
 
 func handleRevokeStandingApproval(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -704,10 +544,23 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			connectorInstanceID = req.ConnectorInstanceID
 		}
 
+		name := existing.Name
+		if req.NameSet {
+			name = req.Name
+		}
+		description := existing.Description
+		if req.DescriptionSet {
+			description = req.Description
+		}
+
 		sa, err := db.UpdateStandingApproval(r.Context(), deps.DB, db.UpdateStandingApprovalParams{
 			StandingApprovalID:     saID,
 			UserID:                 profile.ID,
 			Constraints:            constraintsBytes,
+			Name:                   name,
+			Description:            description,
+			NameSet:                req.NameSet,
+			DescriptionSet:         req.DescriptionSet,
 			ExpiresAt:              req.ExpiresAt,
 			ConnectorInstanceID:    connectorInstanceID,
 			ConnectorInstanceIDSet: req.ConnectorInstanceIDSet,
@@ -768,18 +621,19 @@ func emitStandingApprovalAuditEvent(ctx context.Context, d db.DBTX, userID strin
 
 func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse {
 	resp := standingApprovalResponse{
-		StandingApprovalID:          sa.StandingApprovalID,
-		AgentID:                     sa.AgentID,
-		UserID:                      sa.UserID,
-		ActionType:                  sa.ActionType,
-		ActionVersion:               sa.ActionVersion,
-		SourceActionConfigurationID: sa.SourceActionConfigurationID,
-		ConnectorInstanceID:         sa.ConnectorInstanceID,
-		Status:                      sa.Status,
-		StartsAt:                    sa.StartsAt,
-		ExpiresAt:                   sa.ExpiresAt,
-		CreatedAt:                   sa.CreatedAt,
-		RevokedAt:                   sa.RevokedAt,
+		StandingApprovalID:  sa.StandingApprovalID,
+		AgentID:             sa.AgentID,
+		UserID:              sa.UserID,
+		ActionType:          sa.ActionType,
+		ActionVersion:       sa.ActionVersion,
+		Name:                sa.Name,
+		Description:         sa.Description,
+		ConnectorInstanceID: sa.ConnectorInstanceID,
+		Status:              sa.Status,
+		StartsAt:            sa.StartsAt,
+		ExpiresAt:           sa.ExpiresAt,
+		CreatedAt:           sa.CreatedAt,
+		RevokedAt:           sa.RevokedAt,
 	}
 
 	if len(sa.Constraints) > 0 {

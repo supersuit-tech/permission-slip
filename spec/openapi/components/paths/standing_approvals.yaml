@@ -81,7 +81,6 @@ listStandingApprovals:
                   expires_at: "2026-02-21T00:00:00Z"
                   created_at: "2026-02-14T10:30:00Z"
                   revoked_at: null
-                  source_action_configuration_id: null
                 - standing_approval_id: "sa_def456"
                   agent_id: 42
                   user_id: "alice"
@@ -95,7 +94,6 @@ listStandingApprovals:
                   expires_at: "2026-05-15T00:00:00Z"
                   created_at: "2026-02-14T10:35:00Z"
                   revoked_at: null
-                  source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
               has_more: true
               next_cursor: "2026-02-14T10:30:00.000000000Z,sa_abc123"
 
@@ -200,16 +198,6 @@ userListStandingApprovals:
           type: string
         example: "2026-02-14T10:30:00Z,sa_abc123"
 
-      - name: source_action_configuration_id
-        in: query
-        required: false
-        description: |
-          When set, only standing approvals whose `source_action_configuration_id`
-          matches this value are returned (e.g. to filter approvals linked to a
-          specific action configuration).
-        schema:
-          type: string
-          maxLength: 128
 
     responses:
       '200':
@@ -232,7 +220,6 @@ userListStandingApprovals:
                   expires_at: "2026-02-21T00:00:00Z"
                   created_at: "2026-02-14T10:30:00Z"
                   revoked_at: null
-                  source_action_configuration_id: null
               has_more: false
 
       '400':
@@ -304,7 +291,6 @@ createStandingApproval:
             action_version: "1"
             constraints:
               recipient_pattern: "*@mycompany.com"
-            source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
             expires_at: "2026-03-14T00:00:00Z"
 
     responses:

@@ -221,7 +221,6 @@ describe("ReviewApprovalDialog — auto-approve future requests", () => {
       action_type: "email.send",
       action_version: "1",
       constraints: {},
-      source_action_configuration_id: "ac_config1",
       expires_at: null,
     });
 

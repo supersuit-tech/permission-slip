@@ -291,7 +291,6 @@ export class ApiClient {
     action_type: string;
     action_version?: string;
     constraints: unknown;
-    source_action_configuration_id?: string;
     connector_instance?: string;
   }) {
     return this.request<{

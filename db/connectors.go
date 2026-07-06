@@ -355,14 +355,29 @@ type ExternalConnectorCredential struct {
 	AuthOptionGroup string
 }
 
-// ExternalConnectorTemplate describes a configuration template from a connector manifest.
+// ExternalConnectorTemplate describes a standing approval preset from a connector manifest.
 type ExternalConnectorTemplate struct {
-	ID                   string
-	ActionType           string
-	Name                 string
-	Description          string
-	Parameters           []byte // raw JSON
-	StandingApprovalSpec []byte // raw JSON; nil = no bundled standing approval
+	ID           string
+	ActionType   string
+	Name         string
+	Description  string
+	Constraints  []byte // raw JSON
+	DurationDays *int
+}
+
+// IsStandingApprovalPreset reports whether this template should be synced.
+func (t ExternalConnectorTemplate) IsStandingApprovalPreset() bool {
+	return len(t.Constraints) > 0
+}
+
+// EffectiveConstraints returns constraint JSON for sync.
+func (t ExternalConnectorTemplate) EffectiveConstraints() []byte {
+	return t.Constraints
+}
+
+// EffectiveDurationDays returns the expiry duration in days.
+func (t ExternalConnectorTemplate) EffectiveDurationDays() *int {
+	return t.DurationDays
 }
 
 // UpsertConnectorFromManifest inserts or updates a connector and its actions
@@ -486,54 +501,55 @@ func UpsertConnectorFromManifest(ctx context.Context, d DBTX, m ExternalConnecto
 		return err
 	}
 
-	// Upsert configuration templates.
+	// Upsert standing approval templates (auto-approve presets only).
 	templateIDs := make([]string, 0, len(m.Templates))
 	for _, tpl := range m.Templates {
+		if !tpl.IsStandingApprovalPreset() {
+			continue
+		}
 		templateIDs = append(templateIDs, tpl.ID)
 
-		// Guard against cross-connector ID collisions: if a template with
-		// this ID already exists for a different connector, fail loudly
-		// rather than silently reassigning it.
 		var existingConnector *string
 		_ = tx.QueryRow(ctx,
-			`SELECT connector_id FROM action_config_templates WHERE id = $1`, tpl.ID,
+			`SELECT connector_id FROM standing_approval_templates WHERE id = $1`, tpl.ID,
 		).Scan(&existingConnector)
 		if existingConnector != nil && *existingConnector != m.ID {
 			return fmt.Errorf("template id %q already belongs to connector %q, cannot reassign to %q", tpl.ID, *existingConnector, m.ID)
 		}
 
-		// Defensively default empty parameters to '{}' to honour the NOT NULL constraint.
-		params := tpl.Parameters
-		if len(params) == 0 {
-			params = []byte("{}")
+		constraints := tpl.EffectiveConstraints()
+		if len(constraints) == 0 {
+			constraints = []byte("{}")
 		}
 
-		saSpec := nilIfEmptyBytes(tpl.StandingApprovalSpec)
+		var durationDays *int
+		if d := tpl.EffectiveDurationDays(); d != nil {
+			durationDays = d
+		}
 
 		_, err := tx.Exec(ctx, `
-			INSERT INTO action_config_templates (id, connector_id, action_type, name, description, parameters, standing_approval_spec)
+			INSERT INTO standing_approval_templates (id, connector_id, action_type, name, description, constraints, duration_days)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (id) DO UPDATE SET
 				action_type = EXCLUDED.action_type,
 				name = EXCLUDED.name,
 				description = EXCLUDED.description,
-				parameters = EXCLUDED.parameters,
-				standing_approval_spec = EXCLUDED.standing_approval_spec`,
-			tpl.ID, m.ID, tpl.ActionType, tpl.Name, nilIfEmpty(tpl.Description), params, saSpec)
+				constraints = EXCLUDED.constraints,
+				duration_days = EXCLUDED.duration_days`,
+			tpl.ID, m.ID, tpl.ActionType, tpl.Name, nilIfEmpty(tpl.Description), constraints, durationDays)
 		if err != nil {
 			return err
 		}
 	}
 
-	// Remove templates no longer in the manifest.
 	if len(templateIDs) > 0 {
 		tplArgs := append([]any{m.ID}, StringsToArgs(templateIDs)...)
 		_, err = tx.Exec(ctx,
-			`DELETE FROM action_config_templates WHERE connector_id = $1 AND id NOT IN (`+InPlaceholders(2, len(templateIDs))+`)`,
+			`DELETE FROM standing_approval_templates WHERE connector_id = $1 AND id NOT IN (`+InPlaceholders(2, len(templateIDs))+`)`,
 			tplArgs...)
 	} else {
 		_, err = tx.Exec(ctx,
-			`DELETE FROM action_config_templates WHERE connector_id = $1`, m.ID)
+			`DELETE FROM standing_approval_templates WHERE connector_id = $1`, m.ID)
 	}
 	if err != nil {
 		return err

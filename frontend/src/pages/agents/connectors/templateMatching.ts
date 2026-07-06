@@ -1,5 +1,5 @@
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
-import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
+import type { StandingApproval } from "@/hooks/useStandingApprovals";
+import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
 
 /**
  * Stable deep-equality for JSON-shaped values. Ignores object key order so
@@ -35,30 +35,29 @@ export function deepEqualJSON(a: unknown, b: unknown): boolean {
 }
 
 /**
- * True iff `config` represents the same permission scope as `template`:
- * same `action_type` and deep-equal `parameters`. Ignores name, description,
- * status, and approval mode (those don't affect the constraint scope).
- *
- * Wildcard configs (`action_type === "*"`) never match any template — they
- * are the "Enable All" escape hatch, not a template equivalent.
+ * True iff `rule` represents the same permission scope as `template`:
+ * same `action_type` and deep-equal `constraints`.
  */
-export function templateMatchesConfig(
-  template: Pick<ActionConfigTemplate, "action_type" | "parameters">,
-  config: Pick<ActionConfiguration, "action_type" | "parameters">,
+export function templateMatchesStandingApproval(
+  template: Pick<StandingApprovalTemplate, "action_type" | "constraints">,
+  rule: Pick<StandingApproval, "action_type" | "constraints">,
 ): boolean {
-  if (config.action_type === "*") return false;
-  if (config.action_type !== template.action_type) return false;
-  return deepEqualJSON(template.parameters, config.parameters);
+  if (rule.action_type === "*") return false;
+  if (rule.action_type !== template.action_type) return false;
+  return deepEqualJSON(template.constraints, rule.constraints);
 }
 
 /**
- * True iff any config in `configs` is an equivalent of `template`.
+ * True iff any active standing approval in `rules` is an equivalent of `template`.
  */
 export function templateIsApplied(
-  template: Pick<ActionConfigTemplate, "action_type" | "parameters">,
-  configs: ReadonlyArray<
-    Pick<ActionConfiguration, "action_type" | "parameters">
+  template: Pick<StandingApprovalTemplate, "action_type" | "constraints">,
+  rules: ReadonlyArray<
+    Pick<StandingApproval, "action_type" | "constraints" | "status">
   >,
 ): boolean {
-  return configs.some((c) => templateMatchesConfig(template, c));
+  return rules.some(
+    (r) =>
+      r.status === "active" && templateMatchesStandingApproval(template, r),
+  );
 }

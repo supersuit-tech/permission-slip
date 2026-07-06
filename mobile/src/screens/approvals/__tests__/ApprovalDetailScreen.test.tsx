@@ -9,17 +9,6 @@ import { makeApproval, MOCK_AGENTS, mockGetAgentDisplayName } from "../testFixtu
 const mockApproveApproval = jest.fn();
 const mockDenyApproval = jest.fn();
 const mockCreateStandingApproval = jest.fn();
-let mockActionConfigs = [
-  {
-    id: "ac_config1",
-    agent_id: 42,
-    connector_id: "email",
-    action_type: "email.send",
-    status: "active",
-    name: "Send",
-    parameters: {},
-  },
-];
 
 jest.mock("../../../hooks/useApproveApproval", () => ({
   useApproveApproval: () => ({
@@ -53,13 +42,6 @@ jest.mock("../../../hooks/useCreateStandingApproval", () => ({
   }),
 }));
 
-jest.mock("../../../hooks/useActionConfigs", () => ({
-  useActionConfigs: () => ({
-    configs: mockActionConfigs,
-    isLoading: false,
-    isFetched: true,
-  }),
-}));
 
 jest.mock("../../../hooks/useAgents", () => ({
   useAgents: () => ({
@@ -127,17 +109,6 @@ describe("ApprovalDetailScreen", () => {
   beforeEach(() => {
     jest.useFakeTimers();
     jest.clearAllMocks();
-    mockActionConfigs = [
-      {
-        id: "ac_config1",
-        agent_id: 42,
-        connector_id: "email",
-        action_type: "email.send",
-        status: "active",
-        name: "Send",
-        parameters: {},
-      },
-    ];
   });
 
   afterEach(async () => {
@@ -769,15 +740,13 @@ describe("ApprovalDetailScreen", () => {
       expect.objectContaining({
         agent_id: 42,
         action_type: "email.send",
-        source_action_configuration_id: "ac_config1",
         expires_at: null,
       }),
     );
     expect(hasTestId(renderer, "standing-approval-success")).toBe(true);
   });
 
-  it("creates standing approval without config id when no action configuration exists", async () => {
-    mockActionConfigs = [];
+  it("creates standing approval directly from the approval", async () => {
     mockApproveApproval.mockResolvedValueOnce({
       approval_id: "appr_test123",
       status: "approved",

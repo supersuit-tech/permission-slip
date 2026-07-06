@@ -21,7 +21,6 @@ import { useActionSchema } from "@/hooks/useActionSchema";
 import type { ApprovalSummary } from "@/hooks/useApprovals";
 import { useStandingApprovals } from "@/hooks/useStandingApprovals";
 import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
-import { useActionConfigs } from "@/hooks/useActionConfigs";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { ActionPreviewCard } from "@/components/previews/ActionPreviewCard";
 import {
@@ -52,7 +51,6 @@ import { shouldShowEmailApprovalSection } from "@/lib/emailApprovalDetails";
 import { parseStandingApprovalFallthrough } from "@/lib/standingApprovalFallthrough";
 import {
   buildCreateStandingApprovalFromApproval,
-  findMatchingActionConfigForApproval,
 } from "./standingApprovalFromApproval";
 
 /** Auto-close delay (ms) after a successful approval. */
@@ -186,7 +184,6 @@ export function ReviewApprovalDialog({
   const isBusy = pendingAction !== null || isDenying;
 
   const { standingApprovals, isLoading: standingApprovalsLoading } = useStandingApprovals();
-  const { configs } = useActionConfigs(approval.agent_id);
   const params = approval.action.parameters as Record<string, unknown>;
   const hasParams = Object.keys(params).length > 0;
   const timelineEntries = useMemo(
@@ -201,10 +198,6 @@ export function ReviewApprovalDialog({
           sa.action_type === approval.action.type,
       ),
     [standingApprovals, approval.agent_id, approval.action.type],
-  );
-  const matchingActionConfig = useMemo(
-    () => findMatchingActionConfigForApproval(configs, approval),
-    [configs, approval],
   );
   const showAutoApproveCheckbox =
     !standingApprovalsLoading && !hasExistingStandingApproval;
@@ -260,10 +253,7 @@ export function ReviewApprovalDialog({
       if (autoApproveFuture && result.execution_status !== "error") {
         try {
           await createStandingApproval(
-            buildCreateStandingApprovalFromApproval(
-              approval,
-              matchingActionConfig?.id,
-            ),
+            buildCreateStandingApprovalFromApproval(approval),
           );
           setStandingApprovalCreated(true);
         } catch (err) {
@@ -283,7 +273,6 @@ export function ReviewApprovalDialog({
     approveApproval,
     approval,
     autoApproveFuture,
-    matchingActionConfig,
     createStandingApproval,
   ]);
 

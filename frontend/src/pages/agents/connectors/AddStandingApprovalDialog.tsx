@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from "react";
-import { Loader2, AlertTriangle } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,12 +11,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { SegmentedControl } from "@/components/ui/segmented-control";
-import { useCreateActionConfig } from "@/hooks/useCreateActionConfig";
 import { useCreateStandingApproval } from "@/hooks/useCreateStandingApproval";
 import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
-import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
-import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
+import { useStandingApprovalTemplates } from "@/hooks/useStandingApprovalTemplates";
+import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import {
   ActionConfigParameterFields,
@@ -38,47 +36,34 @@ import {
   riskCardClass,
   riskDialogAccentClass,
 } from "./RiskBadge";
-import type { ApprovalMode } from "./RecommendedTemplatesDialog";
 import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
 import {
-  connectorInstanceFromParameters,
   mergeConnectorInstanceIntoParameters,
-  parametersWithoutConnectorInstance,
 } from "./connectorInstanceAccount";
+import { StepLimits } from "@/pages/dashboard/StandingApprovalSteps";
 
-const approvalModeOptions: { label: string; value: ApprovalMode }[] = [
-  { label: "Auto-approve", value: "auto_approve" },
-  { label: "Requires approval", value: "requires_approval" },
-];
-
-interface AddActionConfigDialogProps {
+interface AddStandingApprovalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
-  /** When the dialog opens, apply this template (action type, fields, parameters). */
-  initialTemplate?: ActionConfigTemplate | null;
-  /** Override the template's default approval mode. */
-  initialApprovalMode?: ApprovalMode;
+  initialTemplate?: StandingApprovalTemplate | null;
+  onCreated?: () => void;
 }
 
-export function AddActionConfigDialog({
+export function AddStandingApprovalDialog({
   open,
   onOpenChange,
   agentId,
   connectorId,
   actions,
   initialTemplate = null,
-  initialApprovalMode,
-}: AddActionConfigDialogProps) {
-  const { createActionConfig, isPending: isCreatingConfig } =
-    useCreateActionConfig();
-  const { createStandingApproval, isPending: isCreatingStanding } =
-    useCreateStandingApproval();
-  const isPending = isCreatingConfig || isCreatingStanding;
+  onCreated,
+}: AddStandingApprovalDialogProps) {
+  const { createStandingApproval, isPending } = useCreateStandingApproval();
   const { templates, isLoading: templatesLoading } =
-    useActionConfigTemplates(connectorId);
+    useStandingApprovalTemplates(connectorId);
   const { instances } = useAgentConnectorInstances(agentId, connectorId);
   const showAccountSelect = instances.length > 1;
 
@@ -88,8 +73,11 @@ export function AddActionConfigDialog({
   const [paramValues, setParamValues] = useState<Record<string, string>>({});
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>({});
   const [connectorInstance, setConnectorInstance] = useState("*");
-  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(null);
-  const [approvalMode, setApprovalMode] = useState<ApprovalMode>("requires_approval");
+  const [appliedTemplateId, setAppliedTemplateId] = useState<string | null>(
+    null,
+  );
+  const [noExpiry, setNoExpiry] = useState(true);
+  const [expiresAt, setExpiresAt] = useState(() => defaultExpiresAtLocal());
 
   const prevOpenRef = useRef(false);
 
@@ -99,11 +87,8 @@ export function AddActionConfigDialog({
   );
 
   const riskLevel = selectedAction?.risk_level;
-  const isElevatedRisk = riskLevel === "high" || riskLevel === "medium";
 
   const schema = useMemo(
-    // Cast is safe: parameters_schema is typed as `{ [key: string]: unknown }` in
-    // the generated OpenAPI types, which is structurally identical to Record<string, unknown>.
     () =>
       parseParametersSchema(
         selectedAction?.parameters_schema as
@@ -121,7 +106,8 @@ export function AddActionConfigDialog({
     setParamModes({});
     setConnectorInstance("*");
     setAppliedTemplateId(null);
-    setApprovalMode("requires_approval");
+    setNoExpiry(true);
+    setExpiresAt(defaultExpiresAtLocal());
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -139,7 +125,7 @@ export function AddActionConfigDialog({
 
   const handleTemplateSelect = useCallback(
     (
-      template: ActionConfigTemplate,
+      template: StandingApprovalTemplate,
       options?: { fromInitial?: boolean },
     ) => {
       setSelectedActionType(template.action_type);
@@ -148,9 +134,7 @@ export function AddActionConfigDialog({
 
       const values: Record<string, string> = {};
       const modes: Record<string, ParamMode> = {};
-      for (const [key, value] of Object.entries(
-        parametersWithoutConnectorInstance(template.parameters),
-      )) {
+      for (const [key, value] of Object.entries(template.constraints)) {
         if (value === "*") {
           values[key] = "*";
           modes[key] = "wildcard";
@@ -167,17 +151,18 @@ export function AddActionConfigDialog({
       }
       setParamValues(values);
       setParamModes(modes);
-      setConnectorInstance(
-        connectorInstanceFromParameters(template.parameters),
-      );
+      setConnectorInstance("*");
       setAppliedTemplateId(template.id);
 
-      // When selecting a new template via the picker (not from initial),
-      // reset approval mode to the template's default.
+      if (template.duration_days != null) {
+        setNoExpiry(false);
+        const d = new Date();
+        d.setUTCDate(d.getUTCDate() + template.duration_days);
+        const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+        setExpiresAt(local.toISOString().slice(0, 16));
+      }
+
       if (!options?.fromInitial) {
-        setApprovalMode(
-          template.standing_approval != null ? "auto_approve" : "requires_approval",
-        );
         toast.success(`Template "${template.name}" applied`);
       }
     },
@@ -189,12 +174,8 @@ export function AddActionConfigDialog({
     prevOpenRef.current = open;
     if (open && !wasOpen && initialTemplate) {
       handleTemplateSelect(initialTemplate, { fromInitial: true });
-      setApprovalMode(
-        initialApprovalMode ??
-          (initialTemplate.standing_approval != null ? "auto_approve" : "requires_approval"),
-      );
     }
-  }, [open, initialTemplate, initialApprovalMode, handleTemplateSelect]);
+  }, [open, initialTemplate, handleTemplateSelect]);
 
   function handleParamChange(key: string, value: string) {
     setParamValues((prev) => ({ ...prev, [key]: value }));
@@ -208,77 +189,63 @@ export function AddActionConfigDialog({
       return;
     }
     if (!name.trim()) {
-      toast.error("Please enter a name for this configuration");
+      toast.error("Please enter a name for this standing approval");
       return;
     }
 
-    const emptyRequired = getEmptyRequiredParams(paramValues, schema?.required, schema?.properties);
+    const emptyRequired = getEmptyRequiredParams(
+      paramValues,
+      schema?.required,
+      schema?.properties,
+    );
     if (emptyRequired.length > 0) {
-      toast.error(`Required parameters need a value or wildcard: ${emptyRequired.join(", ")}`);
+      toast.error(
+        `Required parameters need a value or wildcard: ${emptyRequired.join(", ")}`,
+      );
       return;
     }
 
     try {
-      let builtParams = buildParametersFromForm(
+      let builtConstraints = buildParametersFromForm(
         paramValues,
         schema?.properties,
         paramModes,
       );
       if (showAccountSelect) {
-        builtParams = mergeConnectorInstanceIntoParameters(
-          builtParams,
+        builtConstraints = mergeConnectorInstanceIntoParameters(
+          builtConstraints,
           connectorInstance,
         );
       }
-      const ac = await createActionConfig({
+
+      const activeTemplate =
+        appliedTemplateId != null
+          ? (templates.find((t) => t.id === appliedTemplateId) ?? null)
+          : null;
+      const constraints = standingApprovalConstraintsForCreate(
+        builtConstraints as Record<string, unknown>,
+        activeTemplate ?? initialTemplate,
+      );
+
+      await createStandingApproval({
         agent_id: agentId,
-        connector_id: connectorId,
         action_type: selectedActionType,
+        action_version: "1",
         name: name.trim(),
-        description: description.trim() || undefined,
-        parameters: builtParams,
+        description: description.trim() || null,
+        constraints,
+        ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
       });
 
-      if (approvalMode === "auto_approve" && ac?.id) {
-        const activeTemplate =
-          appliedTemplateId != null
-            ? templates.find((t) => t.id === appliedTemplateId) ?? null
-            : null;
-        const standingSpec =
-          activeTemplate?.standing_approval ?? initialTemplate?.standing_approval;
-        const startsAt = new Date();
-        let expiresAt: string | null = null;
-        if (standingSpec?.duration_days != null) {
-          const exp = new Date(startsAt);
-          exp.setUTCDate(exp.getUTCDate() + standingSpec.duration_days);
-          expiresAt = exp.toISOString();
-        }
-        const constraints = standingApprovalConstraintsForCreate(
-          builtParams as Record<string, unknown>,
-        );
-        await createStandingApproval({
-          agent_id: agentId,
-          action_type: selectedActionType,
-          action_version: "1",
-          constraints,
-          source_action_configuration_id: ac.id,
-          starts_at: startsAt.toISOString(),
-          expires_at: expiresAt,
-        });
-      }
-
-      toast.success(
-        approvalMode === "auto_approve"
-          ? `Configuration "${name.trim()}" created with auto-approval`
-          : `Configuration "${name.trim()}" created`,
-      );
+      toast.success(`Standing approval "${name.trim()}" created`);
       resetForm();
       onOpenChange(false);
+      onCreated?.();
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Failed to create action configuration",
+          : "Failed to create standing approval",
       );
     }
   }
@@ -290,16 +257,16 @@ export function AddActionConfigDialog({
       >
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Add Action Configuration</DialogTitle>
+            <DialogTitle>Add Standing Approval</DialogTitle>
             <DialogDescription>
-              Define how this agent can use an action. Lock in parameter values
-              or mark them as wildcards to give the agent freedom.
+              Pre-authorize matching requests so this agent can run them
+              automatically. Set constraint boundaries for each parameter.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <ActionSelect
-              id="config-action"
+              id="standing-approval-action"
               value={selectedActionType}
               onChange={handleActionChange}
               actions={actions}
@@ -328,46 +295,15 @@ export function AddActionConfigDialog({
               />
             )}
 
-            <div className="space-y-2">
-              <Label>Approval mode</Label>
-              <SegmentedControl
-                options={approvalModeOptions}
-                value={approvalMode}
-                onChange={setApprovalMode}
-                ariaLabel="Approval mode"
-              />
-              <p className="text-muted-foreground text-xs">
-                {approvalMode === "auto_approve"
-                  ? "A standing approval will be created so matching requests run automatically."
-                  : "Each request will require your explicit approval before it runs."}
-              </p>
-              {approvalMode === "auto_approve" && isElevatedRisk && (
-                <div
-                  role="alert"
-                  className="bg-destructive/10 border-destructive/20 flex items-start gap-2 rounded-lg border p-3"
-                >
-                  <AlertTriangle
-                    className="text-destructive mt-0.5 size-4 shrink-0"
-                    aria-hidden="true"
-                  />
-                  <p className="text-destructive text-sm">
-                    Auto-approving a {riskLevel}-risk action lets this agent run
-                    it without your review every time. Make sure that's what you
-                    want.
-                  </p>
-                </div>
-              )}
-            </div>
-
             <NameField
-              id="config-name"
+              id="standing-approval-name"
               value={name}
               onChange={setName}
               disabled={isPending}
             />
 
             <DescriptionField
-              id="config-description"
+              id="standing-approval-description"
               value={description}
               onChange={setDescription}
               disabled={isPending}
@@ -375,7 +311,7 @@ export function AddActionConfigDialog({
 
             {showAccountSelect && (
               <ConnectorInstanceAccountSelect
-                id="config-account"
+                id="standing-approval-account"
                 value={connectorInstance}
                 onChange={setConnectorInstance}
                 instances={instances}
@@ -385,19 +321,28 @@ export function AddActionConfigDialog({
 
             {selectedAction && (
               <div className="space-y-2">
-                <Label>Parameters</Label>
+                <Label>Constraints</Label>
                 <ActionConfigParameterFields
                   parametersSchema={schema}
                   values={paramValues}
                   onValueChange={handleParamChange}
                   modes={paramModes}
-                  onModeChange={(key, mode) => setParamModes((prev) => ({ ...prev, [key]: mode }))}
+                  onModeChange={(key, mode) =>
+                    setParamModes((prev) => ({ ...prev, [key]: mode }))
+                  }
                   disabled={isPending}
                   agentId={agentId}
                   connectorId={connectorId}
                 />
               </div>
             )}
+
+            <StepLimits
+              expiresAt={expiresAt}
+              onExpiresAtChange={setExpiresAt}
+              noExpiry={noExpiry}
+              onNoExpiryChange={setNoExpiry}
+            />
           </div>
 
           <DialogFooter>
@@ -411,7 +356,7 @@ export function AddActionConfigDialog({
             </Button>
             <Button type="submit" disabled={isPending || !selectedActionType}>
               {isPending && <Loader2 className="animate-spin" />}
-              Create Configuration
+              Create Standing Approval
             </Button>
           </DialogFooter>
         </form>
@@ -420,13 +365,20 @@ export function AddActionConfigDialog({
   );
 }
 
-/** With source_action_configuration_id, `{}` means match-all (backend stores NULL constraints). */
+function defaultExpiresAtLocal(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 function standingApprovalConstraintsForCreate(
   params: Record<string, unknown>,
+  template?: StandingApprovalTemplate | null,
 ): Record<string, unknown> {
   const entries = Object.entries(params);
-  if (entries.length === 0) {
-    return {};
+  if (entries.length === 0 || template) {
+    return params;
   }
   const allBareWildcard = entries.every(([, v]) => v === "*");
   if (allBareWildcard) {

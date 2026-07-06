@@ -1141,8 +1141,7 @@ paths:
       description: |
         Returns everything an agent needs to know about what it can do on behalf of
         a specific user — enabled connectors, available actions with full parameter
-        schemas, active standing approvals, action configurations, and credential
-        readiness.
+        schemas, active standing approvals, and credential readiness.
 
         This is the primary **discovery endpoint** for agents. Call it at startup
         (or periodically) to build a complete picture of available capabilities
@@ -1159,25 +1158,13 @@ paths:
           - Human-readable name and description
           - Risk level (`low`, `medium`, `high`)
           - Parameter JSON Schema (for client-side validation)
-          - Active standing approvals (constraints, remaining executions, expiration)
-          - Active action configurations (pre-approved parameter sets with wildcards)
-
-        ## Action Configurations
-
-        Each action may have one or more **action configurations** — user-created
-        parameter presets that define what the agent is allowed to do. Configurations
-        are the primary mechanism for granting agents permission to act.
-
-        - **Fixed parameters** are locked in by the user and cannot be changed
-        - **Wildcard parameters** (`"*"`) let the agent supply any value
-        - The agent references a `configuration_id` in approval requests and executions
+          - Active standing approvals (name, constraints, expiration, account scope)
 
         ## What's NOT Included
 
         - Connectors that are not enabled for this agent (use `GET /v1/connectors` for
           the full global catalog)
         - Deactivated or expired standing approvals
-        - Disabled action configurations
         - Credential values, types, or metadata (only presence/absence)
 
         ## Agent Workflow
@@ -1190,7 +1177,7 @@ paths:
         4. **What actions exist** → `connectors[].actions[]`
         5. **What parameters each action expects** → `parameters_schema`
         6. **Which verified metadata fields support standing approval `$meta` constraints** → `meta_constraint_fields` (when present)
-        7. **What configurations are available** → `action_configurations[]` with `configuration_id`
+        7. **What standing approvals exist** → `standing_approvals[]` with constraint details
         8. **Which actions can execute immediately** → `standing_approvals` is non-empty
         9. **Which need one-off approval** → `standing_approvals` is empty
         10. **What constraints apply** → `standing_approvals[].constraints`
@@ -1200,12 +1187,9 @@ paths:
         For a given action the agent wants to perform:
 
         ```
-        Has action configuration?
-          ├─ YES → Reference configuration_id in requests
-          │        Has standing approval with matching constraints?
-          │          ├─ YES → POST /v1/actions/execute (no token, agent signature only)
-          │          └─ NO  → POST /v1/approvals/request → user approves → agent polls status
-          └─ NO  → Ask user to create an action configuration
+        Has active standing approval with matching constraints?
+          ├─ YES → POST /v1/actions/execute (no token, agent signature only)
+          └─ NO  → POST /v1/approvals/request → user approves → agent polls status
         ```
 
         If `credentials_ready` is `false` for the connector, the agent should prompt
@@ -1274,18 +1258,11 @@ paths:
                                   description: Email body (plain text or HTML)
                             standing_approvals:
                               - standing_approval_id: sa_def456
+                                name: Company sends
                                 constraints:
                                   recipient_pattern: '*@mycompany.com'
                                   max_recipients: 5
                                 expires_at: '2026-05-15T00:00:00Z'
-                            action_configurations:
-                              - configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-                                action_type: email.send
-                                name: Send to team
-                                parameters:
-                                  to: team@mycompany.com
-                                  subject: '*'
-                                  body: '*'
                           - action_type: email.read
                             name: Read Email
                             description: Read emails from Gmail inbox
@@ -1303,11 +1280,11 @@ paths:
                                   description: Maximum number of emails to return
                             standing_approvals:
                               - standing_approval_id: sa_abc123
+                                name: GitHub notifications
                                 constraints:
                                   sender: '*@github.com'
                                   max_results: 10
                                 expires_at: '2026-02-28T00:00:00Z'
-                            action_configurations: []
                       - id: stripe
                         name: Stripe
                         description: Payment processing via Stripe API
@@ -1338,50 +1315,15 @@ paths:
                                   description: Stripe customer identifier
                                 description:
                                   type: string
-                                  maxLength: 500
-                                  description: Payment description
+                                  description: Charge description shown on statement
                             standing_approvals: []
-                            action_configurations: []
                 no_connectors:
                   summary: Agent with no enabled connectors
                   value:
-                    agent_id: 43
+                    agent_id: 99
                     approver:
                       username: bob
                     connectors: []
-                standing_approval_only:
-                  summary: Single connector, all actions with standing approvals
-                  value:
-                    agent_id: 44
-                    approver:
-                      username: carol
-                    connectors:
-                      - id: gmail
-                        name: Gmail
-                        description: Send and manage emails via Gmail API
-                        credentials_ready: true
-                        actions:
-                          - action_type: email.read
-                            name: Read Email
-                            description: Read emails from Gmail inbox
-                            risk_level: low
-                            parameters_schema:
-                              type: object
-                              properties:
-                                sender:
-                                  type: string
-                                max_results:
-                                  type: integer
-                            standing_approvals:
-                              - standing_approval_id: sa_read01
-                                constraints:
-                                  sender: '*@github.com'
-                                expires_at: '2026-03-15T00:00:00Z'
-                              - standing_approval_id: sa_read02
-                                constraints:
-                                  sender: '*@linear.app'
-                                expires_at: '2026-03-01T00:00:00Z'
-                            action_configurations: []
         '400':
           description: Invalid request or agent ID mismatch
           content:
@@ -1400,7 +1342,7 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
-          description: Agent not found or not registered
+          description: Agent not found
           content:
             application/json:
               schema:
@@ -1408,15 +1350,9 @@ paths:
               example:
                 error:
                   code: agent_not_found
-                  message: Agent is not registered
+                  message: Agent not found
                   retryable: false
-                  details:
-                    agent_id: 42
                   trace_id: trace_xyz789
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
   /v1/agents/{agent_id}/payment-method:
@@ -3906,78 +3842,36 @@ paths:
           $ref: '#/components/responses/NotFound'
         '500':
           $ref: '#/components/responses/InternalServerError'
-  /v1/action-config-templates:
+  /v1/standing-approval-templates:
     get:
-      operationId: listActionConfigTemplates
-      summary: List Action Configuration Templates
-      description: |
-        List predefined configuration templates for a specific connector.
-        Templates provide ready-made parameter presets for common use cases
-        (e.g., "Create issues (all fields open)", "Post to a channel") that
-        users can apply when creating a new action configuration.
-
-        Templates are system-level — they are defined in connector manifests
-        and are the same for all users. Each template ID is namespaced by
-        connector to prevent cross-connector collisions.
-
-        ## Security
-
-        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
+      operationId: listStandingApprovalTemplates
+      summary: List standing approval templates for a connector
       tags:
-        - Action Configurations
+        - Standing Approvals
       security:
         - SupabaseSession: []
       parameters:
         - name: connector_id
           in: query
           required: true
-          description: |
-            Connector ID to list templates for.
           schema:
             type: string
             maxLength: 128
-          example: github
       responses:
         '200':
-          description: Templates listed successfully
+          description: Templates for the connector
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ActionConfigTemplateListResponse'
+                $ref: '#/components/schemas/StandingApprovalTemplateListResponse'
         '400':
-          description: Missing or invalid connector_id query parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: invalid_request
-                  message: connector_id query parameter is required
-                  retryable: false
-                  trace_id: trace_xyz789
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /v1/action-config-templates/bulk-apply:
+          $ref: '#/components/responses/BadRequest'
+  /v1/standing-approval-templates/bulk-apply:
     post:
-      operationId: bulkApplyActionConfigTemplates
-      summary: Bulk Apply Action Configuration Templates
-      description: |
-        Apply multiple templates in a single request. Creates an action
-        configuration (and optional standing approval) for each template.
-
-        All templates must belong to the same connector. The connector is
-        automatically enabled for the agent if not already enabled.
-
-        Each template is applied independently — if one fails (e.g., standing
-        approval limit reached), the others still succeed. The response
-        includes per-template results.
+      operationId: bulkApplyStandingApprovalTemplates
+      summary: Apply multiple standing approval templates to an agent
       tags:
-        - Action Configurations
+        - Standing Approvals
       security:
         - SupabaseSession: []
       requestBody:
@@ -3985,59 +3879,30 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/BulkApplyActionConfigTemplateRequest'
+              $ref: '#/components/schemas/BulkApplyStandingApprovalTemplateRequest'
       responses:
         '200':
-          description: |
-            Bulk apply completed. Check individual `results[].success` for
-            per-template outcomes.
+          description: Per-template apply results
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/BulkApplyActionConfigTemplateResponse'
+                $ref: '#/components/schemas/BulkApplyStandingApprovalTemplateResponse'
         '400':
-          description: Invalid request (empty list, mixed connectors, etc.)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+          $ref: '#/components/responses/BadRequest'
         '404':
-          description: |
-            A requested template ID was not found. This is an upfront
-            validation error — no configurations are created.
-            Per-template failures (e.g., agent not found, standing approval
-            limit) are reported in `results[]` with `success: false`, not
-            as HTTP-level errors.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /v1/action-config-templates/{id}/apply:
+          $ref: '#/components/responses/NotFound'
+  /v1/standing-approval-templates/{id}/apply:
     post:
-      operationId: applyActionConfigTemplate
-      summary: Apply Action Configuration Template
-      description: |
-        Create an action configuration from a template in one step. When the
-        template defines `standing_approval`, also creates an active standing
-        approval in the same transaction.
-
-        If the connector is not yet enabled for the agent, it is enabled
-        automatically so the configuration can be created.
+      operationId: applyStandingApprovalTemplate
+      summary: Apply a standing approval template to an agent
       tags:
-        - Action Configurations
+        - Standing Approvals
       security:
         - SupabaseSession: []
       parameters:
         - name: id
           in: path
           required: true
-          description: Template ID (from list templates).
           schema:
             type: string
             maxLength: 255
@@ -4046,364 +3911,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ApplyActionConfigTemplateRequest'
+              $ref: '#/components/schemas/ApplyStandingApprovalTemplateRequest'
       responses:
         '201':
-          description: Configuration created (and standing approval if applicable)
+          description: Standing approval created from template
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ApplyActionConfigTemplateResponse'
+                $ref: '#/components/schemas/ApplyStandingApprovalTemplateResponse'
         '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          description: Standing approval plan limit reached
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
+          $ref: '#/components/responses/BadRequest'
         '404':
-          description: Template or agent not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /v1/action-configurations:
-    post:
-      operationId: createActionConfiguration
-      summary: Create Action Configuration
-      description: |
-        Create a new action configuration for an agent. The configuration defines exactly
-        what the agent is allowed to do — which action, which parameters are locked in,
-        and which credential to use.
-
-        The agent must belong to the authenticated user. The configuration is created
-        with status `active` by default.
-
-        ## Parameter Configuration
-
-        - Fixed parameters are locked to specific values the user sets
-        - Wildcard parameters use `"*"` to allow the agent to fill in any value
-        - This gives users fine-grained control: lock down what matters, leave open what doesn't
-
-        ## Security
-
-        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
-        - The agent must be owned by the authenticated user
-        - Connector, action type, and credential references are validated
-      tags:
-        - Action Configurations
-      security:
-        - SupabaseSession: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/CreateActionConfigRequest'
-            examples:
-              with_params:
-                summary: Configuration with locked parameters
-                value:
-                  agent_id: 42
-                  connector_id: github
-                  action_type: github.create_issue
-                  parameters:
-                    repo: supersuit-tech/webapp
-                    title: '*'
-                    body: '*'
-                    label: bug
-                  name: Create bug issues in webapp
-                  description: Agent can create issues labeled 'bug'. Title and body are freeform.
-              minimal:
-                summary: Configuration with minimal fields
-                value:
-                  agent_id: 42
-                  connector_id: slack
-                  action_type: slack.send_message
-                  parameters:
-                    channel: '#releases'
-                    message: '*'
-                  name: 'Post to #releases'
-      responses:
-        '201':
-          description: Action configuration created successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActionConfiguration'
-        '400':
-          description: Invalid request (validation errors, invalid references)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                missing_field:
-                  value:
-                    error:
-                      code: invalid_request
-                      message: name is required
-                      retryable: false
-                      trace_id: trace_xyz789
-                invalid_ref:
-                  value:
-                    error:
-                      code: invalid_reference
-                      message: Invalid connector, action type, or credential reference
-                      retryable: false
-                      trace_id: trace_xyz789
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: Agent not found or not owned by user
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: agent_not_found
-                  message: Agent not found or not owned by user
-                  retryable: false
-                  trace_id: trace_xyz789
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-    get:
-      operationId: listActionConfigurations
-      summary: List Action Configurations
-      description: |
-        List action configurations for a specific agent. Returns all configurations
-        (both active and disabled) belonging to the authenticated user for the given agent.
-
-        ## Security
-
-        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
-        - Only returns configurations belonging to the authenticated user
-      tags:
-        - Action Configurations
-      security:
-        - SupabaseSession: []
-      parameters:
-        - name: agent_id
-          in: query
-          required: true
-          description: |
-            Agent ID to list configurations for. The agent must belong to the
-            authenticated user.
-          schema:
-            type: integer
-            format: int64
-          example: 42
-      responses:
-        '200':
-          description: Action configurations listed successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActionConfigListResponse'
-        '400':
-          description: Missing or invalid agent_id query parameter
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: invalid_request
-                  message: agent_id query parameter is required
-                  retryable: false
-                  trace_id: trace_xyz789
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-  /v1/action-configurations/{config_id}:
-    get:
-      operationId: getActionConfiguration
-      summary: Get Action Configuration
-      description: |
-        Retrieve a single action configuration by ID. The configuration must
-        belong to the authenticated user.
-
-        ## Security
-
-        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
-        - Only the user who created the configuration can view it
-      tags:
-        - Action Configurations
-      security:
-        - SupabaseSession: []
-      parameters:
-        - $ref: '#/components/parameters/ActionConfigId'
-      responses:
-        '200':
-          description: Action configuration retrieved successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActionConfiguration'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: Action configuration not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: action_config_not_found
-                  message: Action configuration not found
-                  retryable: false
-                  trace_id: trace_xyz789
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-    put:
-      operationId: updateActionConfiguration
-      summary: Update Action Configuration
-      description: |
-        Update a single action configuration. Only provided fields are changed
-        (partial update). At least one field must be provided.
-
-        Immutable fields (agent_id, connector_id, action_type) cannot be changed.
-        To change these, delete the configuration and create a new one.
-
-        ## Security
-
-        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
-        - Only the user who created the configuration can update it
-      tags:
-        - Action Configurations
-      security:
-        - SupabaseSession: []
-      parameters:
-        - $ref: '#/components/parameters/ActionConfigId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/UpdateActionConfigRequest'
-            examples:
-              disable:
-                summary: Disable a configuration
-                value:
-                  status: disabled
-              update_params:
-                summary: Update parameters and name
-                value:
-                  name: Updated config name
-                  parameters:
-                    repo: supersuit-tech/api
-                    title: '*'
-      responses:
-        '200':
-          description: Action configuration updated successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ActionConfiguration'
-        '400':
-          description: Invalid request (validation errors, invalid references)
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              examples:
-                empty_update:
-                  value:
-                    error:
-                      code: invalid_request
-                      message: at least one field must be provided for update
-                      retryable: false
-                      trace_id: trace_xyz789
-                invalid_status:
-                  value:
-                    error:
-                      code: invalid_request
-                      message: status must be 'active' or 'disabled'
-                      retryable: false
-                      trace_id: trace_xyz789
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: Action configuration not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: action_config_not_found
-                  message: Action configuration not found
-                  retryable: false
-                  trace_id: trace_xyz789
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
-    delete:
-      operationId: deleteActionConfiguration
-      summary: Delete Action Configuration
-      description: |
-        Permanently delete an action configuration. This action is irreversible.
-        The agent will no longer be able to reference this configuration.
-
-        ## Security
-
-        - Request MUST include valid Supabase session JWT (Authorization: Bearer <token>)
-        - Only the user who created the configuration can delete it
-      tags:
-        - Action Configurations
-      security:
-        - SupabaseSession: []
-      parameters:
-        - $ref: '#/components/parameters/ActionConfigId'
-      responses:
-        '200':
-          description: Action configuration deleted successfully
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/DeleteActionConfigResponse'
-              example:
-                id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-                deleted_at: '2026-02-25T15:00:00Z'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          description: Action configuration not found
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/ErrorResponse'
-              example:
-                error:
-                  code: action_config_not_found
-                  message: Action configuration not found
-                  retryable: false
-                  trace_id: trace_xyz789
-        '429':
-          $ref: '#/components/responses/TooManyRequests'
-        '500':
-          $ref: '#/components/responses/InternalServerError'
+          $ref: '#/components/responses/NotFound'
   /v1/credentials:
     post:
       operationId: storeCredential
@@ -5019,7 +4538,6 @@ paths:
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
                     revoked_at: null
-                    source_action_configuration_id: null
                   - standing_approval_id: sa_def456
                     agent_id: 42
                     user_id: alice
@@ -5033,7 +4551,6 @@ paths:
                     expires_at: '2026-05-15T00:00:00Z'
                     created_at: '2026-02-14T10:35:00Z'
                     revoked_at: null
-                    source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
                 has_more: true
                 next_cursor: 2026-02-14T10:30:00.000000000Z,sa_abc123
         '400':
@@ -5123,16 +4640,6 @@ paths:
           schema:
             type: string
           example: 2026-02-14T10:30:00Z,sa_abc123
-        - name: source_action_configuration_id
-          in: query
-          required: false
-          description: |
-            When set, only standing approvals whose `source_action_configuration_id`
-            matches this value are returned (e.g. to filter approvals linked to a
-            specific action configuration).
-          schema:
-            type: string
-            maxLength: 128
       responses:
         '200':
           description: Standing approvals retrieved successfully
@@ -5154,7 +4661,6 @@ paths:
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
                     revoked_at: null
-                    source_action_configuration_id: null
                 has_more: false
         '400':
           description: Invalid query parameters
@@ -5216,7 +4722,6 @@ paths:
               action_version: '1'
               constraints:
                 recipient_pattern: '*@mycompany.com'
-              source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
               expires_at: '2026-03-14T00:00:00Z'
       responses:
         '201':
@@ -6891,30 +6396,21 @@ components:
             exist, or `403 Forbidden` with error code `agent_not_authorized` if approver is
             not authorized for this agent.
           example: alice
-        configuration_id:
-          type: string
-          pattern: ^ac_[a-f0-9]{32}$
-          maxLength: 36
+        configuration:
+          type: object
+          deprecated: true
           description: |
-            Optional reference to an action configuration. When provided, Permission Slip
-            validates:
-
-            - The configuration exists and belongs to this agent
-            - The configuration is active (not disabled)
-            - The `action.type` matches the configuration's `action_type`
-            - The `action.parameters` comply with the configuration constraints:
-              fixed parameters must match exactly, wildcard parameters accept any value
-
-            If the configuration reference is invalid, Permission Slip returns
-            `400 Bad Request` with error code `invalid_configuration`. If the
-            configuration is disabled, returns `403 Forbidden` with error code
-            `configuration_disabled`. If the configuration's `action_type` does not
-            match the request's `action.type`, returns `400 Bad Request` with error
-            code `configuration_action_type_mismatch`.
-
-            When omitted, the approval request proceeds through the standard flow
-            without configuration-based validation.
-          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+            **Deprecated — accepted but ignored.** Action configurations were removed.
+            Clients may still send this field for backward compatibility; Permission Slip
+            logs a deprecation warning and proceeds without configuration-based validation.
+          properties:
+            configuration_id:
+              type: string
+              pattern: ^ac_[a-f0-9]{32}$
+              maxLength: 36
+              description: Former action configuration identifier (ignored).
+          example:
+            configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         action:
           $ref: '#/components/schemas/Action'
         context:
@@ -6938,7 +6434,8 @@ components:
         agent_id: 42
         request_id: a925fbe0-db83-4969-9dc5-27f40385f12c
         approver: alice
-        configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+        configuration:
+          configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         action:
           type: email.send
           version: '1'
@@ -7506,382 +7003,109 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BulkApprovalResult'
-    ActionConfigTemplate:
+    StandingApprovalTemplate:
       type: object
       required:
         - id
         - connector_id
         - action_type
         - name
-        - parameters
+        - constraints
         - created_at
       properties:
         id:
           type: string
           maxLength: 255
-          description: |
-            Unique template identifier.
+          description: Unique template identifier.
           example: tpl_github_create_issue_all
         connector_id:
           type: string
           maxLength: 128
-          description: |
-            Connector this template applies to.
+          description: Connector this template applies to.
           example: github
         action_type:
           type: string
           maxLength: 128
-          description: |
-            Action type this template is designed for.
+          description: Action type this template pre-authorizes.
           example: github.create_issue
         name:
           type: string
           maxLength: 255
-          description: |
-            Human-readable name for this template.
+          description: Human-readable name for the standing approval created from this template.
           example: Create issues (all fields open)
         description:
           type: string
           maxLength: 4096
           nullable: true
-          description: |
-            Longer description of what this template configures.
-          example: Agent can create issues in any repo with any title and body.
-        parameters:
+          description: Longer description of what this template pre-authorizes.
+        constraints:
           type: object
           additionalProperties: true
           description: |
-            Pre-configured parameter values. Uses the same constraint syntax as
-            action configurations: fixed values, `"*"` wildcards, and
-            `{"$pattern": "<glob>"}` patterns.
-          example:
-            owner: '*'
-            repo: '*'
-            title: '*'
-            body: '*'
+            Constraint preset values. Uses the same syntax as standing approval
+            constraints: fixed values, `"*"` wildcards, and `{"$pattern": "<glob>"}` patterns.
+        duration_days:
+          type: integer
+          nullable: true
+          minimum: 1
+          description: |
+            Number of days until the created standing approval expires. `null` means no
+            expiry (until revoked).
+        created_at:
+          type: string
+          format: date-time
+          description: ISO 8601 timestamp when this template was created.
+    StandingApprovalTemplateListResponse:
+      type: object
+      required:
+        - data
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/StandingApprovalTemplate'
+    ApplyStandingApprovalTemplateRequest:
+      type: object
+      required:
+        - agent_id
+      properties:
+        agent_id:
+          type: integer
+          format: int64
+          description: Agent to attach the new standing approval to.
+    ApplyStandingApprovalTemplateResponse:
+      type: object
+      required:
+        - standing_approval
+      properties:
         standing_approval:
-          $ref: '#/components/schemas/StandingApprovalTemplateSpec'
-          description: |
-            When present, applying this template also creates an active standing
-            approval with constraints derived from `parameters`. Omitted when the
-            template does not bundle auto-approval.
-        created_at:
-          type: string
-          format: date-time
-          description: |
-            ISO 8601 timestamp (RFC 3339 format, UTC) when this template was created.
-          example: '2026-02-28T10:00:00Z'
-      example:
-        id: tpl_github_create_issue_all
-        connector_id: github
-        action_type: github.create_issue
-        name: Create issues (all fields open)
-        description: Agent can create issues in any repo with any title and body.
-        parameters:
-          owner: '*'
-          repo: '*'
-          title: '*'
-          body: '*'
-        created_at: '2026-02-28T10:00:00Z'
-    ActionConfigTemplateListResponse:
-      type: object
-      required:
-        - data
-      properties:
-        data:
-          type: array
-          items:
-            $ref: '#/components/schemas/ActionConfigTemplate'
-          description: |
-            List of action configuration templates for the specified connector.
-      example:
-        data:
-          - id: tpl_github_create_issue_all
-            connector_id: github
-            action_type: github.create_issue
-            name: Create issues (all fields open)
-            description: Agent can create issues in any repo with any title and body.
-            parameters:
-              owner: '*'
-              repo: '*'
-              title: '*'
-              body: '*'
-            created_at: '2026-02-28T10:00:00Z'
-    ActionConfiguration:
-      type: object
-      required:
-        - id
-        - agent_id
-        - connector_id
-        - action_type
-        - parameters
-        - status
-        - name
-        - created_at
-        - updated_at
-      properties:
-        id:
-          type: string
-          pattern: ^ac_[a-f0-9]{32}$
-          maxLength: 36
-          description: |
-            Unique action configuration identifier assigned by Permission Slip.
-          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-        agent_id:
-          type: integer
-          format: int64
-          description: |
-            Agent this configuration applies to.
-          example: 42
-        connector_id:
-          type: string
-          maxLength: 128
-          description: |
-            Connector that provides the action.
-          example: github
-        action_type:
-          type: string
-          maxLength: 128
-          description: |
-            Action type from the connector's action catalog, or `"*"` to enable
-            **all** actions on this connector. A wildcard configuration covers
-            every current and future action — the agent can choose any action and
-            any parameter values. Only one wildcard configuration is allowed per
-            agent + connector pair.
-          example: github.create_issue
-        parameters:
-          type: object
-          additionalProperties: true
-          description: |
-            Configured parameter values for this action. Each parameter can be one of:
-
-            - **Fixed** (any JSON value without `$pattern` wrapper): The agent must supply
-              this exact value. Plain strings containing `*` are treated as fixed values.
-            - **Pattern** (`{"$pattern": "<glob>"}`): The agent must supply a string value
-              matching the glob pattern. `*` in the pattern matches any sequence of characters
-              (including none). Pattern parameters are required — the agent cannot omit them.
-              Examples: `{"$pattern": "*@mycompany.com"}`, `{"$pattern": "supersuit-tech/*"}`
-            - **Wildcard** (`"*"`): The agent may supply any value of any type, or omit
-              the parameter entirely.
-
-            Examples:
-            - `{"repo": "supersuit-tech/webapp", "title": "*", "body": "*"}` — locked repo, free title and body
-            - `{"to": {"$pattern": "*@mycompany.com"}, "subject": "*"}` — email must match domain pattern, free subject
-            - `{"repo": {"$pattern": "supersuit-tech/*"}, "branch": {"$pattern": "release/*"}}` — repo and branch constrained by pattern
-          example:
-            repo:
-              $pattern: supersuit-tech/*
-            title: '*'
-            body: '*'
-            label: bug
-        status:
-          type: string
-          enum:
-            - active
-            - disabled
-          description: |
-            Current status of this action configuration.
-
-            - **active**: Agent can reference this configuration
-            - **disabled**: Configuration exists but is not available to the agent
-          example: active
-        name:
-          type: string
-          maxLength: 255
-          description: |
-            User-facing name for this configuration.
-          example: Create bug issues in webapp
-        description:
-          type: string
-          maxLength: 4096
-          nullable: true
-          description: |
-            Optional longer description of what this configuration permits.
-          example: Agent can create issues labeled 'bug' in the main repo. Title and body are freeform.
-        linked_standing_approvals:
-          type: array
-          description: |
-            Active standing approvals that reference this configuration via
-            `source_action_configuration_id`. Omitted when empty.
-          items:
-            $ref: '#/components/schemas/LinkedStandingApprovalSummary'
-        created_at:
-          type: string
-          format: date-time
-          description: |
-            ISO 8601 timestamp (RFC 3339 format, UTC) when this configuration was created.
-          example: '2026-02-25T10:00:00Z'
-        updated_at:
-          type: string
-          format: date-time
-          description: |
-            ISO 8601 timestamp (RFC 3339 format, UTC) when this configuration was last updated.
-          example: '2026-02-25T10:00:00Z'
-      example:
-        id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-        agent_id: 42
-        connector_id: github
-        action_type: github.create_issue
-        parameters:
-          repo:
-            $pattern: supersuit-tech/*
-          title: '*'
-          body: '*'
-          label: bug
-        status: active
-        name: Create bug issues in supersuit repos
-        description: Agent can create issues labeled 'bug' in any supersuit-tech repo.
-        created_at: '2026-02-25T10:00:00Z'
-        updated_at: '2026-02-25T10:00:00Z'
-    CreateActionConfigRequest:
+          $ref: '#/components/schemas/StandingApproval'
+    BulkApplyStandingApprovalTemplateRequest:
       type: object
       required:
         - agent_id
-        - connector_id
-        - action_type
-        - name
+        - template_ids
       properties:
         agent_id:
           type: integer
           format: int64
-          description: Agent this configuration applies to. Must be owned by the authenticated user.
-          example: 42
-        connector_id:
-          type: string
-          maxLength: 128
-          description: Connector that provides the action.
-          example: github
-        action_type:
-          type: string
-          maxLength: 128
-          description: |
-            Action type from the connector's action catalog, or `"*"` to enable
-            **all** actions on this connector. When `"*"` is used, parameters are
-            forced to `{}` (the agent can choose any parameter values at execution
-            time). Only one wildcard configuration is allowed per agent + connector.
-          example: github.create_issue
-        parameters:
-          type: object
-          additionalProperties: true
-          description: |
-            Parameter values for this configuration. Defaults to `{}` if omitted.
-
-            - Use `"*"` for wildcard parameters the agent can fill in freely.
-            - Use `{"$pattern": "<glob>"}` for glob pattern constraints (e.g.
-              `{"$pattern": "*@mycompany.com"}` or `{"$pattern": "supersuit-tech/*"}`).
-              `*` matches any sequence of characters. Pattern parameters are required.
-            - Any other value is treated as a fixed, exact-match constraint. Plain strings
-              containing `*` are treated as fixed values (not patterns).
-          example:
-            repo:
-              $pattern: supersuit-tech/*
-            title: '*'
-            body: '*'
-            label: bug
-        name:
-          type: string
-          maxLength: 255
-          description: User-facing name for this configuration.
-          example: Create bug issues in webapp
-        description:
-          type: string
-          maxLength: 4096
-          nullable: true
-          description: Optional longer description of what this configuration permits.
-          example: Agent can create issues labeled 'bug' in the main repo.
-      example:
-        agent_id: 42
-        connector_id: github
-        action_type: github.create_issue
-        parameters:
-          repo: supersuit-tech/webapp
-          title: '*'
-          body: '*'
-          label: bug
-        name: Create bug issues in webapp
-        description: Agent can create issues labeled 'bug' in the main repo.
-    UpdateActionConfigRequest:
-      type: object
-      description: |
-        Partial update — only provided fields are changed. At least one field must be provided.
-      properties:
-        parameters:
-          type: object
-          additionalProperties: true
-          description: |
-            Updated parameter values. Cannot be modified on wildcard (`action_type = "*"`)
-            configurations — their parameters are always `{}`.
-          example:
-            repo: supersuit-tech/api
-            title: '*'
-        status:
-          type: string
-          enum:
-            - active
-            - disabled
-          description: New status for this configuration.
-          example: disabled
-        name:
-          type: string
-          maxLength: 255
-          description: Updated name.
-          example: Updated config name
-        description:
-          type: string
-          maxLength: 4096
-          nullable: true
-          description: Updated description.
-          example: Updated description for this config.
-      example:
-        name: Updated config name
-        status: disabled
-    ActionConfigListResponse:
-      type: object
-      required:
-        - data
-      properties:
-        data:
+        template_ids:
           type: array
           items:
-            $ref: '#/components/schemas/ActionConfiguration'
-          description: |
-            List of action configurations for the specified agent.
-      example:
-        data:
-          - id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-            agent_id: 42
-            connector_id: github
-            action_type: github.create_issue
-            parameters:
-              repo: supersuit-tech/webapp
-              title: '*'
-              label: bug
-            status: active
-            name: Create bug issues in webapp
-            created_at: '2026-02-25T10:00:00Z'
-            updated_at: '2026-02-25T10:00:00Z'
-    DeleteActionConfigResponse:
+            type: string
+            maxLength: 255
+          minItems: 1
+          maxItems: 50
+          description: Template IDs to apply. All templates must belong to the same connector.
+    BulkApplyStandingApprovalTemplateResponse:
       type: object
       required:
-        - id
-        - deleted_at
+        - results
       properties:
-        id:
-          type: string
-          pattern: ^ac_[a-f0-9]{32}$
-          maxLength: 36
-          description: |
-            Action configuration identifier that was deleted.
-          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-        deleted_at:
-          type: string
-          format: date-time
-          description: |
-            ISO 8601 timestamp (RFC 3339 format, UTC) when the configuration was deleted.
-          example: '2026-02-25T15:00:00Z'
-      example:
-        id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-        deleted_at: '2026-02-25T15:00:00Z'
+        results:
+          type: array
+          items:
+            $ref: '#/components/schemas/BulkApplyStandingApprovalResult'
     StoreCredentialRequest:
       type: object
       required:
@@ -8594,7 +7818,6 @@ components:
         - status
         - starts_at
         - created_at
-        - source_action_configuration_id
       properties:
         standing_approval_id:
           type: string
@@ -8615,6 +7838,20 @@ components:
           description: |
             User who created this standing approval.
           example: alice
+        name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: |
+            Human-readable label for this standing approval rule.
+          example: GitHub notifications
+        description:
+          type: string
+          nullable: true
+          maxLength: 4096
+          description: |
+            Optional longer description of what this standing approval allows.
+          example: Read emails from GitHub notification senders
         action_type:
           type: string
           maxLength: 128
@@ -8634,9 +7871,9 @@ components:
           type: object
           additionalProperties: true
           description: |
-            Constraint boundaries for this standing approval. Same schema as ACTION_CONFIG
-            constraints. Every execution is validated against these constraints — parameters
-            that fall outside the constraint bounds are rejected.
+            Constraint boundaries for this standing approval. Every execution is validated
+            against these constraints — parameters that fall outside the constraint bounds
+            are rejected.
 
             Examples for `email.read`:
             - `sender`: Sender filter pattern (e.g., `*@github.com`)
@@ -8690,16 +7927,6 @@ components:
             ISO 8601 timestamp (RFC 3339 format, UTC) when this standing approval was revoked.
             `null` if not revoked.
           example: null
-        source_action_configuration_id:
-          type: string
-          minLength: 1
-          maxLength: 128
-          description: |
-            The action configuration this standing approval is tied to. Every standing
-            approval references a backing configuration row.
-            Expected format: `ac_` prefix followed by 32 hex characters, but the
-            backend does not enforce the pattern.
-          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         connector_instance_id:
           type: string
           format: uuid
@@ -8723,7 +7950,6 @@ components:
         expires_at: '2026-02-21T00:00:00Z'
         created_at: '2026-02-14T10:30:00Z'
         revoked_at: null
-        source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
     StandingApprovalExecuteRequest:
       type: object
       required:
@@ -8737,26 +7963,6 @@ components:
           description: |
             Unique request identifier for replay protection and idempotency. UUID v4 recommended.
           example: f47ac10b-58cc-4372-a567-0e02b2c3d479
-        configuration_id:
-          type: string
-          pattern: ^ac_[a-f0-9]{32}$
-          maxLength: 36
-          description: |
-            Optional reference to an action configuration. When provided, Permission Slip
-            validates that the configuration exists, is active, belongs to this agent,
-            and that the `action.parameters` comply with the configuration constraints
-            (fixed parameters must match exactly, wildcard parameters accept any value).
-
-            If the configuration reference is invalid, Permission Slip returns
-            `400 Bad Request` with error code `invalid_configuration`. If the
-            configuration is disabled, returns `403 Forbidden` with error code
-            `configuration_disabled`. If the configuration's `action_type` does not
-            match the request's `action.type`, returns `400 Bad Request` with error
-            code `configuration_action_type_mismatch`.
-
-            When omitted, the execution proceeds through the standard standing approval
-            matching flow without configuration-based validation.
-          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         action:
           $ref: '#/components/schemas/Action'
         payment_method_id:
@@ -8779,7 +7985,6 @@ components:
           example: 4999
       example:
         request_id: f47ac10b-58cc-4372-a567-0e02b2c3d479
-        configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         action:
           type: email.read
           version: '1'
@@ -8859,7 +8064,6 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
-            source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         has_more: false
     UserStandingApprovalListResponse:
       type: object
@@ -8899,7 +8103,6 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
-            source_action_configuration_id: null
         has_more: false
     CreateStandingApprovalRequest:
       type: object
@@ -8925,6 +8128,17 @@ components:
           maxLength: 10
           description: Action type version.
           example: '1'
+        name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Human-readable label for this standing approval rule.
+          example: Company email sends
+        description:
+          type: string
+          nullable: true
+          maxLength: 4096
+          description: Optional longer description of what this standing approval allows.
         constraints:
           type: object
           additionalProperties: true
@@ -8933,27 +8147,11 @@ components:
             contain at least one non-wildcard parameter constraint; the backend rejects
             empty objects or constraints where every value is a wildcard (`"*"`).
 
-            When tied to an action configuration (always required for create), trusted flows
-            such as template customize may send `{}` to mean **match all** parameter values for
-            this action type (stored as empty constraints in the database).
+            Trusted flows such as template customize may send `{}` to mean **match all**
+            parameter values for this action type (stored as empty constraints in the database).
           example:
             recipient_pattern: '*@mycompany.com'
             max_recipients: 5
-        source_action_configuration_id:
-          type: string
-          minLength: 1
-          maxLength: 128
-          description: |
-            Action configuration this standing approval is created from. When omitted,
-            the backend auto-creates or reactivates a backing configuration for the
-            agent and action type.
-
-            When provided, the configuration must exist, belong to the same `agent_id`,
-            and have the same `action_type` as the request. Expected format: `ac_` prefix
-            followed by 32 hex characters (e.g.,
-            `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
-            enforce the pattern — only non-empty and max 128 characters.
-          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         starts_at:
           type: string
           format: date-time
@@ -8973,7 +8171,6 @@ components:
         action_version: '1'
         constraints:
           recipient_pattern: '*@mycompany.com'
-        source_action_configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
         expires_at: null
     RevokeStandingApprovalResponse:
       type: object
@@ -8996,9 +8193,17 @@ components:
           example: '2026-02-21T10:30:00Z'
     UpdateStandingApprovalRequest:
       type: object
-      required:
-        - constraints
       properties:
+        name:
+          type: string
+          nullable: true
+          maxLength: 255
+          description: Updated human-readable label. Omit to preserve the current value.
+        description:
+          type: string
+          nullable: true
+          maxLength: 4096
+          description: Updated description. Omit to preserve the current value.
         constraints:
           type: object
           additionalProperties: true
@@ -9499,7 +8704,7 @@ components:
             - $ref: '#/components/schemas/ApproverInfo'
           description: |
             The user (approver) whose capabilities are being returned. Identifies
-            which user's connectors, standing approvals, and action configurations
+            which user's connectors and standing approvals
             are represented in this response.
         connectors:
           type: array
@@ -9543,18 +8748,11 @@ components:
                       type: string
                 standing_approvals:
                   - standing_approval_id: sa_def456
+                    name: Company sends
                     constraints:
                       recipient_pattern: '*@mycompany.com'
                       max_recipients: 5
                     expires_at: '2026-05-15T00:00:00Z'
-                action_configurations:
-                  - configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-                    action_type: email.send
-                    name: Send to team
-                    parameters:
-                      to: team@mycompany.com
-                      subject: '*'
-                      body: '*'
               - action_type: email.read
                 name: Read Email
                 description: Read emails from Gmail inbox
@@ -9569,7 +8767,6 @@ components:
                       minimum: 1
                       maximum: 100
                 standing_approvals: []
-                action_configurations: []
           - id: stripe
             name: Stripe
             description: Payment processing via Stripe API
@@ -9591,7 +8788,6 @@ components:
                     currency:
                       type: string
                 standing_approvals: []
-                action_configurations: []
     ConnectorCapability:
       type: object
       required:
@@ -9675,14 +8871,12 @@ components:
                 - subject
                 - body
             standing_approvals: []
-            action_configurations: []
     ActionCapability:
       type: object
       required:
         - action_type
         - name
         - standing_approvals
-        - action_configurations
       properties:
         action_type:
           type: string
@@ -9788,28 +8982,6 @@ components:
             **If parameters don't match any standing approval's constraints**: The
             request falls through to the one-off approval flow automatically (Permission
             Slip returns `404` with a hint to use `POST /v1/approvals/request`).
-        action_configurations:
-          type: array
-          items:
-            $ref: '#/components/schemas/ActionConfigCapability'
-          description: |
-            Active action configurations for this action type. Each configuration
-            defines a pre-approved set of parameters (with optional wildcards) and
-            a credential binding that the agent can reference when requesting
-            approval or executing actions.
-
-            **The configuration IS the permission.** The agent picks from user-created
-            configurations rather than composing requests from scratch.
-
-            **Agent workflow:**
-            1. Find a configuration matching the desired action
-            2. Reference `configuration_id` in approval requests or execution calls
-            3. For wildcard parameters (`"*"`), supply the actual value
-            4. For fixed parameters, supply values that exactly match the configuration;
-               missing or mismatched fixed parameters are rejected
-
-            **If no configuration fits:** The agent cannot proceed and should ask
-            the human to create a suitable configuration.
       example:
         action_type: email.send
         name: Send Email
@@ -9823,131 +8995,35 @@ components:
             - body
         standing_approvals:
           - standing_approval_id: sa_def456
+            name: Company sends
             constraints:
               recipient_pattern: '*@mycompany.com'
             expires_at: '2026-05-15T00:00:00Z'
-        action_configurations:
-          - configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-            action_type: email.send
-            name: Send to team
-            parameters:
-              to: team@mycompany.com
-              subject: '*'
-              body: '*'
     StandingApprovalCapability:
       type: object
       required:
         - standing_approval_id
         - constraints
-        - expires_at
       properties:
         standing_approval_id:
           type: string
           pattern: ^sa_[a-zA-Z0-9]{6,64}$
           maxLength: 70
-          description: |
-            Unique standing approval identifier. Included in execution responses
-            so the agent can correlate which standing approval was used.
-          example: sa_def456
+        name:
+          type: string
+          nullable: true
+          maxLength: 255
         constraints:
           type: object
           additionalProperties: true
-          description: |
-            Constraint boundaries for this standing approval. Every execution is
-            validated against these constraints — parameters that fall outside the
-            bounds are rejected and fall through to one-off approval.
-
-            Constraint semantics are action-type-specific. Common patterns:
-
-            - **Pattern matching**: `"sender": "*@github.com"` — parameter must match glob
-            - **Numeric bounds**: `"max_results": 10` — parameter must not exceed value
-            - **Enum restriction**: `"priority": ["low", "medium"]` — parameter must be one of these
-          example:
-            recipient_pattern: '*@mycompany.com'
-            max_recipients: 5
         expires_at:
           type: string
           format: date-time
-          description: |
-            When this standing approval expires (ISO 8601, UTC). After this time,
-            the standing approval is inactive and the agent must use one-off
-            approval or the user must create a new standing approval.
-          example: '2026-05-15T00:00:00Z'
+          nullable: true
         connector_instance_id:
           type: string
           format: uuid
           nullable: true
-          description: |
-            When set, this standing approval applies only to that connector instance.
-            Omitted or null means type-wide (legacy) and matches any instance.
-      example:
-        standing_approval_id: sa_def456
-        constraints:
-          recipient_pattern: '*@mycompany.com'
-          max_recipients: 5
-        expires_at: '2026-05-15T00:00:00Z'
-    ActionConfigCapability:
-      type: object
-      required:
-        - configuration_id
-        - action_type
-        - name
-        - parameters
-      properties:
-        configuration_id:
-          type: string
-          pattern: ^ac_[a-f0-9]{32}$
-          maxLength: 36
-          description: |
-            Unique action configuration identifier. Reference this value as
-            `configuration_id` when submitting approval requests or executing
-            actions.
-          example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-        action_type:
-          type: string
-          maxLength: 128
-          description: |
-            Action type this configuration applies to (e.g., `email.send`).
-          example: email.send
-        name:
-          type: string
-          maxLength: 255
-          description: |
-            User-facing name for this configuration.
-          example: Send to team
-        description:
-          type: string
-          maxLength: 1024
-          nullable: true
-          description: |
-            Optional longer description of what this configuration permits.
-          example: Send emails to anyone at the company about anything
-        parameters:
-          type: object
-          additionalProperties: true
-          description: |
-            Configured parameter values. Fixed parameters are locked in by the user;
-            wildcard parameters use `"*"` to indicate the agent has freedom.
-
-            - **Fixed value** (e.g., `"repo": "supersuit-tech/webapp"`): The agent
-              must use this exact value. Permission Slip enforces the match.
-            - **Wildcard** (e.g., `"title": "*"`): The agent supplies any value
-              that passes the action's `parameters_schema` validation.
-
-            The agent should examine this map to understand what freedom it has.
-          example:
-            to: team@mycompany.com
-            subject: '*'
-            body: '*'
-      example:
-        configuration_id: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
-        action_type: email.send
-        name: Send to team
-        description: Send emails to anyone at the company about anything
-        parameters:
-          to: team@mycompany.com
-          subject: '*'
-          body: '*'
     AgentConnectorListResponse:
       type: object
       required:
@@ -11725,11 +10801,17 @@ components:
           $ref: '#/components/schemas/Action'
         context:
           $ref: '#/components/schemas/ActionContext'
-        configuration_id:
-          type: string
-          pattern: ^ac_[a-f0-9]{32}$
-          maxLength: 36
-          description: Optional action configuration reference for this item.
+        configuration:
+          type: object
+          deprecated: true
+          description: |
+            **Deprecated — accepted but ignored.** Former action configuration reference
+            for this bulk item.
+          properties:
+            configuration_id:
+              type: string
+              pattern: ^ac_[a-f0-9]{32}$
+              maxLength: 36
     BulkApprovalResult:
       type: object
       required:
@@ -11812,75 +10894,6 @@ components:
               type: string
             message:
               type: string
-    StandingApprovalTemplateSpec:
-      type: object
-      description: |
-        Manifest-authored standing approval behavior when a template is applied.
-      properties:
-        duration_days:
-          type: integer
-          nullable: true
-          minimum: 1
-          description: |
-            Number of days until the standing approval expires. `null` means no
-            expiry (until revoked).
-    BulkApplyActionConfigTemplateRequest:
-      type: object
-      required:
-        - agent_id
-        - template_ids
-      properties:
-        agent_id:
-          type: integer
-          format: int64
-          description: Agent to attach the new configurations and standing approvals to.
-          example: 42
-        template_ids:
-          type: array
-          items:
-            type: string
-            maxLength: 255
-          minItems: 1
-          maxItems: 50
-          description: |
-            Template IDs to apply. All templates must belong to the same connector.
-            Duplicates are silently deduplicated.
-          example:
-            - tpl_github_create_issue_all
-            - tpl_github_merge_pr_all
-        approval_modes:
-          type: object
-          additionalProperties:
-            type: string
-            enum:
-              - auto_approve
-              - requires_approval
-          description: |
-            Optional per-template approval mode overrides keyed by template ID.
-            Templates not in this map use their built-in behavior.
-          example:
-            tpl_github_create_issue_all: auto_approve
-    LinkedStandingApprovalSummary:
-      type: object
-      required:
-        - standing_approval_id
-        - action_type
-        - status
-      properties:
-        standing_approval_id:
-          type: string
-          description: Standing approval identifier.
-        action_type:
-          type: string
-          description: Action type covered by this standing approval.
-        status:
-          type: string
-          description: Standing approval status (typically `active` in this summary).
-        expires_at:
-          type: string
-          format: date-time
-          nullable: true
-          description: When the standing approval expires, or null if it lasts until revoked.
     BulkApplyResultError:
       type: object
       required:
@@ -11889,13 +10902,9 @@ components:
       properties:
         code:
           type: string
-          description: Machine-readable error code.
-          example: invalid_configuration
         message:
           type: string
-          description: Human-readable error message.
-          example: Action configuration could not be created from this template
-    BulkApplyResult:
+    BulkApplyStandingApprovalResult:
       type: object
       required:
         - template_id
@@ -11903,60 +10912,12 @@ components:
       properties:
         template_id:
           type: string
-          description: The template ID that was applied (or failed).
         success:
           type: boolean
-          description: Whether this template was applied successfully.
-        action_configuration:
-          $ref: '#/components/schemas/ActionConfiguration'
         standing_approval:
           $ref: '#/components/schemas/StandingApproval'
-          description: Present when the template bundles a standing approval and it was created successfully.
         error:
           $ref: '#/components/schemas/BulkApplyResultError'
-          description: Present when `success` is false.
-    BulkApplyActionConfigTemplateResponse:
-      type: object
-      required:
-        - results
-      properties:
-        results:
-          type: array
-          items:
-            $ref: '#/components/schemas/BulkApplyResult'
-          description: |
-            Per-template results. Order matches the deduplicated input order.
-    ApplyActionConfigTemplateRequest:
-      type: object
-      required:
-        - agent_id
-      properties:
-        agent_id:
-          type: integer
-          format: int64
-          description: Agent to attach the new configuration and standing approval to.
-          example: 42
-        approval_mode:
-          type: string
-          enum:
-            - auto_approve
-            - requires_approval
-          description: |
-            Override the template's built-in approval behavior.
-            `auto_approve` creates a standing approval (using the template's spec
-            if present, otherwise sensible defaults: no expiry, unlimited executions).
-            `requires_approval` skips standing approval creation.
-            When omitted, falls back to the template's built-in behavior.
-    ApplyActionConfigTemplateResponse:
-      type: object
-      required:
-        - action_configuration
-      properties:
-        action_configuration:
-          $ref: '#/components/schemas/ActionConfiguration'
-        standing_approval:
-          $ref: '#/components/schemas/StandingApproval'
-          description: Present when the template bundles a standing approval.
     AgentCreateStandingApprovalRequestBody:
       type: object
       required:
@@ -11970,15 +10931,11 @@ components:
         constraints:
           type: object
           additionalProperties: true
-        source_action_configuration_id:
-          type: string
         connector_instance:
           type: string
           description: |
             Optional connector instance selector (UUID or display name) declaring which
-            account this rule proposal applies to. When omitted, instance display is
-            resolved only from a pinned connector_instance on the backing action
-            configuration.
+            account this rule proposal applies to.
     AgentCreateStandingApprovalRequestResponse:
       type: object
       required:
@@ -12019,9 +10976,6 @@ components:
         constraints:
           type: object
           additionalProperties: true
-        source_action_configuration_id:
-          type: string
-          nullable: true
         connector_name:
           type: string
           nullable: true
@@ -12032,15 +10986,13 @@ components:
           nullable: true
           description: |
             Connector instance UUID frozen at proposal time when the agent declared
-            connector_instance on the request, or when the backing action configuration
-            pins a fixed instance.
+            connector_instance on the request.
         connector_instance_display:
           type: string
           nullable: true
           description: |
             Human-readable connector instance label when the agent declared
-            connector_instance or the backing action configuration resolves to a
-            specific account (e.g. "Personal"). Mirrors `_connector_instance_display`
+            connector_instance (e.g. "Personal"). Mirrors `_connector_instance_display`
             on regular approvals.
         status:
           type: string
@@ -12182,19 +11134,6 @@ components:
           description: Type preferences to update. Types not included are unchanged.
           minItems: 1
   parameters:
-    ActionConfigId:
-      name: config_id
-      in: path
-      required: true
-      description: |
-        Unique action configuration identifier assigned by Permission Slip.
-
-        Format: `ac_` prefix followed by 32 hex characters.
-      schema:
-        type: string
-        pattern: ^ac_[a-f0-9]{32}$
-        maxLength: 36
-      example: ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
     AgentId:
       name: agent_id
       in: path

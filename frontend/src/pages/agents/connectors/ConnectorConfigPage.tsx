@@ -3,12 +3,11 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, ExternalLink, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAgent } from "@/hooks/useAgent";
-import { useActionConfigs } from "@/hooks/useActionConfigs";
 import { useConnectorDetail } from "@/hooks/useConnectorDetail";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
 import { ConnectorOverviewSection } from "./ConnectorOverviewSection";
 import { ConnectorActionsDialog } from "./ConnectorActionsDialog";
-import { ActionConfigurationsSection } from "./ActionConfigurationsSection";
+import { StandingApprovalsSection } from "./StandingApprovalsSection";
 import { ConnectorInstancesSection } from "./ConnectorInstancesSection";
 import { DisableConnectorSection } from "./DisableConnectorSection";
 
@@ -20,13 +19,8 @@ export function ConnectorConfigPage() {
   const parsedAgentId = Number(rawAgentId);
   const paramsValid =
     !isNaN(parsedAgentId) && parsedAgentId > 0 && !!connectorId;
-  // Pass 0 when invalid so the hook's own `enabled: agentId > 0` guard
-  // prevents the fetch without creating a query keyed on NaN.
   const agentId = paramsValid ? parsedAgentId : 0;
 
-  // Verify the current user owns this agent. The backend scopes by user,
-  // so a non-owned agent returns 404. Without this check the page would
-  // still render public connector catalog data for arbitrary agent IDs.
   const { agent, isLoading: agentLoading, error: agentError } = useAgent(agentId);
 
   const {
@@ -38,15 +32,6 @@ export function ConnectorConfigPage() {
 
   const { connectors: agentConnectors, isLoading: agentConnectorsLoading } =
     useAgentConnectors(agentId);
-
-  const {
-    configs,
-    isLoading: configsLoading,
-    error: configsError,
-    refetch: refetchConfigs,
-  } = useActionConfigs(agentId);
-
-  const connectorConfigs = configs.filter((c) => c.connector_id === connectorId);
 
   const [actionsDialogOpen, setActionsDialogOpen] = useState(false);
 
@@ -63,7 +48,6 @@ export function ConnectorConfigPage() {
     );
   }
 
-  // Block access until we confirm the current user owns this agent.
   if (agentLoading) {
     return (
       <div className="space-y-4">
@@ -147,15 +131,11 @@ export function ConnectorConfigPage() {
         onOpenChange={setActionsDialogOpen}
         actions={connector.actions}
       />
-      <ActionConfigurationsSection
+      <StandingApprovalsSection
         agentId={agentId}
         connectorId={connectorId}
         connectorName={connector.name}
         actions={connector.actions}
-        configs={connectorConfigs}
-        isLoading={configsLoading}
-        error={configsError}
-        onConfigsChanged={() => void refetchConfigs()}
       />
       <ConnectorInstancesSection
         agentId={agentId}

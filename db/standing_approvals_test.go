@@ -21,15 +21,11 @@ func insertTestStandingApprovalRow(t *testing.T, tx db.DBTX, agentID int64, uid,
 	_, _ = tx.Exec(ctx,
 		`INSERT INTO connector_actions (connector_id, action_type, name) VALUES ($1, $2, $2) ON CONFLICT (connector_id, action_type) DO NOTHING`,
 		standingApprovalDBTestConnector, actionType)
-	configID := testhelper.GenerateID(t, "ac_")
-	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, standingApprovalDBTestConnector, actionType)
-	t.Cleanup(func() {
-		_, _ = tx.Exec(ctx, `DELETE FROM action_configurations WHERE id = $1`, configID)
-	})
+	name := "Test standing approval"
 	_, err := tx.Exec(ctx,
-		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, source_action_configuration_id, starts_at, expires_at)
+		`INSERT INTO standing_approvals (standing_approval_id, agent_id, user_id, action_type, status, name, starts_at, expires_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-		standingApprovalID, agentID, uid, actionType, status, configID, startsAt, expiresAt)
+		standingApprovalID, agentID, uid, actionType, status, name, startsAt, expiresAt)
 	return err
 }
 
@@ -38,7 +34,7 @@ func TestStandingApprovalsSchema(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireColumns(t, tx, "standing_approvals", []string{
 		"standing_approval_id", "agent_id", "user_id", "action_type",
-		"action_version", "constraints", "status",
+		"action_version", "constraints", "name", "description", "status",
 		"starts_at", "expires_at", "created_at",
 		"revoked_at", "expired_at",
 		"connector_instance_id",
@@ -50,7 +46,6 @@ func TestStandingApprovalsIndex(t *testing.T) {
 	tx := testhelper.SetupTestDB(t)
 	testhelper.RequireIndex(t, tx, "standing_approvals", "idx_standing_approvals_agent_action_status")
 	testhelper.RequireIndex(t, tx, "standing_approvals", "idx_standing_approvals_agent_action_status_connector_instance")
-	testhelper.RequireIndex(t, tx, "standing_approvals", "idx_standing_approvals_source_config_active")
 }
 
 func TestStandingApprovalsCascadeDeleteOnAgentDelete(t *testing.T) {

@@ -2,7 +2,9 @@ package api
 
 import (
 	"context"
+	"encoding/json"
 	"net/http"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip/db"
 )
@@ -97,4 +99,23 @@ func validateStandingApprovalConnectorInstanceID(
 		}
 	}
 	return nil
+}
+
+func fixedConnectorInstanceSelector(parameters []byte) string {
+	if len(parameters) == 0 {
+		return ""
+	}
+	var params map[string]json.RawMessage
+	if err := json.Unmarshal(parameters, &params); err != nil {
+		return ""
+	}
+	raw, ok := params["connector_instance"]
+	if !ok || db.IsWildcard(raw) || db.IsPattern(raw) {
+		return ""
+	}
+	var selector string
+	if err := json.Unmarshal(raw, &selector); err != nil {
+		return ""
+	}
+	return strings.TrimSpace(selector)
 }

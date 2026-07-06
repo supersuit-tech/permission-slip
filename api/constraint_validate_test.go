@@ -63,23 +63,6 @@ func setupProtonArchiveStandingApprovalTest(t *testing.T, constraints []byte, me
 	return tx, router, agentID, privKey, saID
 }
 
-func setupProtonArchiveConfigTest(t *testing.T, params []byte) (db.DBTX, string, int64, string, string) {
-	t.Helper()
-	tx := testhelper.SetupTestDB(t)
-	uid := testhelper.GenerateUID(t)
-	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
-	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
-	testhelper.InsertConnector(t, tx, "protonmail")
-	testhelper.InsertConnectorAction(t, tx, "protonmail", "protonmail.archive_email", "Archive Email")
-
-	configID := testhelper.GenerateID(t, "ac_")
-	testhelper.InsertActionConfigFull(t, tx, configID, agentID, uid, "protonmail", "protonmail.archive_email", testhelper.ActionConfigOpts{
-		Name:       "Archive Alice Only",
-		Parameters: params,
-	})
-	return tx, uid, agentID, configID, "protonmail.archive_email"
-}
-
 func TestRequestApproval_AutoApprove_MetaSenderMatch(t *testing.T) {
 	t.Parallel()
 	tx, router, agentID, privKey, saID := setupProtonArchiveStandingApprovalTest(t,
@@ -155,39 +138,6 @@ func TestRequestApproval_AutoApprove_SpoofedSenderParamIgnored(t *testing.T) {
 		t.Fatal("spoofed sender param must not auto-approve when verified sender differs")
 	}
 	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 0)
-}
-
-func TestValidateConfigurationReference_MetaSenderEnforced(t *testing.T) {
-	t.Parallel()
-	params := []byte(`{"message_id":"*","folder":"*","$meta":{"sender":{"$pattern":"alice@example.com"}}}`)
-	tx, uid, agentID, configID, actionType := setupProtonArchiveConfigTest(t, params)
-
-	conn := &mockMetadataConnector{
-		mockConnector: mockConnector{id: "protonmail"},
-		metadata:      map[string]any{"sender": "alice@example.com"},
-	}
-	registry := connectors.NewRegistry()
-	registry.Register(conn)
-
-	deps, w, r := newTestRequest(tx)
-	deps.Connectors = registry
-
-	execParams := json.RawMessage(`{"message_id":42,"folder":"INBOX"}`)
-	result := ValidateConfigurationReference(w, r, deps, configID, agentID, uid, actionType, "", execParams)
-	if result == nil {
-		t.Fatalf("expected success, got: %s", w.Body.String())
-	}
-
-	conn.metadata = map[string]any{"sender": "bob@example.com"}
-	deps2, w2, r2 := newTestRequest(tx)
-	deps2.Connectors = registry
-	result = ValidateConfigurationReference(w2, r2, deps2, configID, agentID, uid, actionType, "", execParams)
-	if result != nil {
-		t.Fatal("expected metadata mismatch to fail validation")
-	}
-	if w2.Code != http.StatusBadRequest {
-		t.Errorf("expected 400, got %d", w2.Code)
-	}
 }
 
 func TestRequestApproval_AutoApprove_ReadEmailMetaFromMatch(t *testing.T) {

@@ -372,11 +372,9 @@ func prepareBulkItems(w http.ResponseWriter, r *http.Request, deps *Deps, agent 
 			return nil, fmt.Errorf("invalid parameters")
 		}
 
-		if item.Configuration != nil {
-			result := ValidateConfigurationReference(w, r, deps, item.Configuration.ConfigurationID, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID, actionParams)
-			if result == nil {
-				return nil, fmt.Errorf("invalid configuration")
-			}
+		if item.Configuration != nil && strings.TrimSpace(item.Configuration.ConfigurationID) != "" {
+			log.Printf("[%s] BulkRequestApproval: configuration field is deprecated and ignored (configuration_id=%q)",
+				TraceID(r.Context()), item.Configuration.ConfigurationID)
 		}
 
 		resourceDetails := resolveResourceDetailsForBulk(r.Context(), deps, agent, actionType, actionParams, connectorInstanceID)

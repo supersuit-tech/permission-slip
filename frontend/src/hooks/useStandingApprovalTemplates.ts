@@ -4,10 +4,10 @@ import { useAuth } from "@/auth/AuthContext";
 import client from "@/api/client";
 import type { components } from "@/api/schema";
 
-export type ActionConfigTemplate =
-  components["schemas"]["ActionConfigTemplate"];
+export type StandingApprovalTemplate =
+  components["schemas"]["StandingApprovalTemplate"];
 
-export function useActionConfigTemplates(connectorId: string) {
+export function useStandingApprovalTemplates(connectorId: string) {
   const { session } = useAuth();
   const accessToken = session?.access_token;
 
@@ -17,18 +17,20 @@ export function useActionConfigTemplates(connectorId: string) {
   }
 
   const query = useQuery({
-    queryKey: ["action-config-templates", connectorId],
+    queryKey: ["standing-approval-templates", connectorId],
     queryFn: async () => {
       const token = tokenRef.current;
       if (!token) throw new Error("Missing access token");
       const { data, error } = await client.GET(
-        "/v1/action-config-templates",
+        "/v1/standing-approval-templates",
         {
           headers: { Authorization: `Bearer ${token}` },
           params: { query: { connector_id: connectorId } },
         },
       );
-      if (error) throw new Error("Failed to load action configuration templates");
+      if (error) {
+        throw new Error("Failed to load standing approval templates");
+      }
       return data;
     },
     enabled: !!accessToken && !!connectorId,
@@ -38,7 +40,7 @@ export function useActionConfigTemplates(connectorId: string) {
     templates: query.data?.data ?? [],
     isLoading: query.isLoading,
     error: query.isError
-      ? "Unable to load configuration templates. Please try again later."
+      ? "Unable to load standing approval templates. Please try again later."
       : null,
   };
 }

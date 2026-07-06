@@ -17,7 +17,6 @@ type StandingApprovalRequest struct {
 	ActionType                  string
 	ActionVersion               string
 	Constraints                 []byte
-	SourceActionConfigurationID *string
 	ConnectorName               *string
 	ConnectorInstanceID         *string
 	ConnectorInstanceDisplay    *string
@@ -29,8 +28,7 @@ type StandingApprovalRequest struct {
 }
 
 const standingApprovalRequestColumns = `request_id, agent_id, user_id, action_type, action_version,
-	constraints, source_action_configuration_id,
-	connector_name, connector_instance_id, connector_instance_display,
+	constraints, connector_name, connector_instance_id, connector_instance_display,
 	status, decided_at, resulting_standing_approval_id, created_at, updated_at`
 
 // StandingApprovalRequestCursor identifies pagination position.
@@ -69,20 +67,15 @@ const (
 
 func scanStandingApprovalRequest(row rowScanner) (*StandingApprovalRequest, error) {
 	var sar StandingApprovalRequest
-	var sourceConfigID, connectorName, connectorInstanceID, connectorInstanceDisplay, resultingSAID sql.NullString
+	var connectorName, connectorInstanceID, connectorInstanceDisplay, resultingSAID sql.NullString
 	var decidedAt, createdAt, updatedAt sql.NullString
 	err := row.Scan(
 		&sar.RequestID, &sar.AgentID, &sar.UserID, &sar.ActionType, &sar.ActionVersion,
-		&sar.Constraints, &sourceConfigID,
-		&connectorName, &connectorInstanceID, &connectorInstanceDisplay,
+		&sar.Constraints, &connectorName, &connectorInstanceID, &connectorInstanceDisplay,
 		&sar.Status, &decidedAt, &resultingSAID, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return nil, err
-	}
-	if sourceConfigID.Valid {
-		s := sourceConfigID.String
-		sar.SourceActionConfigurationID = &s
 	}
 	if connectorName.Valid {
 		s := connectorName.String
@@ -118,16 +111,15 @@ func scanStandingApprovalRequest(row rowScanner) (*StandingApprovalRequest, erro
 
 // InsertStandingApprovalRequestParams holds insert parameters.
 type InsertStandingApprovalRequestParams struct {
-	RequestID                   string
-	AgentID                     int64
-	UserID                      string
-	ActionType                  string
-	ActionVersion               string
-	Constraints                 []byte
-	SourceActionConfigurationID *string
-	ConnectorName               *string
-	ConnectorInstanceID         *string
-	ConnectorInstanceDisplay    *string
+	RequestID                string
+	AgentID                  int64
+	UserID                   string
+	ActionType               string
+	ActionVersion            string
+	Constraints              []byte
+	ConnectorName            *string
+	ConnectorInstanceID      *string
+	ConnectorInstanceDisplay *string
 }
 
 // InsertStandingApprovalRequest inserts a pending standing approval request.
@@ -135,12 +127,11 @@ func InsertStandingApprovalRequest(ctx context.Context, db DBTX, p InsertStandin
 	row := db.QueryRow(ctx,
 		`INSERT INTO standing_approval_requests
 		   (request_id, agent_id, user_id, action_type, action_version, constraints,
-		    source_action_configuration_id,
 		    connector_name, connector_instance_id, connector_instance_display, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
 		 RETURNING `+standingApprovalRequestColumns,
 		p.RequestID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion, p.Constraints,
-		p.SourceActionConfigurationID, p.ConnectorName, p.ConnectorInstanceID, p.ConnectorInstanceDisplay,
+		p.ConnectorName, p.ConnectorInstanceID, p.ConnectorInstanceDisplay,
 	)
 	return scanStandingApprovalRequest(row)
 }
@@ -222,11 +213,10 @@ func ListStandingApprovalRequestsByUser(ctx context.Context, db DBTX, userID, st
 
 // ApproveStandingApprovalRequestParams holds approve mutation parameters.
 type ApproveStandingApprovalRequestParams struct {
-	RequestID                   string
-	UserID                      string
-	StandingApprovalID          string
-	SourceActionConfigurationID string
-	ExpiresAt                   *time.Time
+	RequestID          string
+	UserID             string
+	StandingApprovalID string
+	ExpiresAt          *time.Time
 }
 
 // ApproveStandingApprovalRequest marks a pending request approved and links the created standing approval.
@@ -294,45 +284,4 @@ func DenyStandingApprovalRequest(ctx context.Context, db DBTX, requestID, userID
 		return existing, nil
 	}
 	return nil, &StandingApprovalRequestError{Code: StandingApprovalRequestErrAlreadyResolved, Status: existing.Status}
-}
-
-// FindActionConfigIDForStandingApprovalRequest resolves source_action_configuration_id
-// for approving a request. Uses explicit ID when set; otherwise finds a unique config
-// for the agent and action type owned by the user.
-func FindActionConfigIDForStandingApprovalRequest(ctx context.Context, db DBTX, agentID int64, userID, actionType string, explicitID *string) (string, error) {
-	if explicitID != nil && *explicitID != "" {
-		ac, err := GetActionConfigByID(ctx, db, *explicitID, userID)
-		if err != nil {
-			return "", err
-		}
-		if ac == nil {
-			return "", fmt.Errorf("source_action_configuration_id not found")
-		}
-		if ac.AgentID != agentID {
-			return "", fmt.Errorf("action configuration does not belong to agent")
-		}
-		if ac.ActionType != actionType {
-			return "", fmt.Errorf("action configuration action_type mismatch")
-		}
-		return *explicitID, nil
-	}
-
-	configs, err := ListActionConfigsByAgent(ctx, db, agentID, userID)
-	if err != nil {
-		return "", err
-	}
-	var matches []string
-	for _, ac := range configs {
-		if ac.ActionType == actionType {
-			matches = append(matches, ac.ID)
-		}
-	}
-	switch len(matches) {
-	case 0:
-		return "", fmt.Errorf("no action configuration found for action_type; create one in the dashboard or pass source_action_configuration_id")
-	case 1:
-		return matches[0], nil
-	default:
-		return "", fmt.Errorf("multiple action configurations match action_type; pass source_action_configuration_id")
-	}
 }

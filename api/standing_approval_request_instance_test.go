@@ -28,7 +28,6 @@ type standingApprovalRequestMISetup struct {
 	actionType  string
 	instDefault *db.AgentConnectorInstance
 	instOther   *db.AgentConnectorInstance
-	configID    string
 }
 
 func setupStandingApprovalRequestMultiInstance(t *testing.T) standingApprovalRequestMISetup {
@@ -92,9 +91,6 @@ func setupStandingApprovalRequestMultiInstance(t *testing.T) standingApprovalReq
 		t.Fatalf("bind sales: %v", err)
 	}
 
-	configID := testhelper.GenerateID(t, "ac_")
-	testhelper.InsertActionConfig(t, tx, configID, agentID, uid, connID, actionType)
-
 	reg := connectors.NewRegistry()
 	reg.Register(newTestStubConnector(connID, actionType))
 	deps := &Deps{DB: tx, Vault: v, Connectors: reg, JWTSigningSecret: testJWTSecret}
@@ -103,7 +99,7 @@ func setupStandingApprovalRequestMultiInstance(t *testing.T) standingApprovalReq
 	return standingApprovalRequestMISetup{
 		tx: tx, deps: deps, router: router, agentID: agentID, privKey: privKey,
 		uid: uid, connID: connID, actionType: actionType,
-		instDefault: instDefault, instOther: instOther, configID: configID,
+		instDefault: instDefault, instOther: instOther,
 	}
 }
 
@@ -140,7 +136,7 @@ func TestAgentCreateStandingApprovalRequest_ExplicitInstanceUUID(t *testing.T) {
 	t.Parallel()
 	s := setupStandingApprovalRequestMultiInstance(t)
 
-	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"source_action_configuration_id":"` + s.configID + `","connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
 	code, createResp := postStandingApprovalRequest(t, s, body)
 	if code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", code)
@@ -209,36 +205,11 @@ func TestAgentCreateStandingApprovalRequest_AmbiguousDisplayName(t *testing.T) {
 	}
 }
 
-func TestAgentCreateStandingApprovalRequest_ConflictsWithPinnedConfig(t *testing.T) {
-	t.Parallel()
-	s := setupStandingApprovalRequestMultiInstance(t)
-
-	pinnedConfigID := testhelper.GenerateID(t, "ac_")
-	params, _ := json.Marshal(map[string]string{
-		"connector_instance": "Default",
-	})
-	testhelper.InsertActionConfigFull(t, s.tx, pinnedConfigID, s.agentID, s.uid, s.connID, s.actionType, testhelper.ActionConfigOpts{
-		Parameters: params,
-		Name:       "Pinned default",
-	})
-
-	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"source_action_configuration_id":"` + pinnedConfigID + `","connector_instance":"` + s.instOther.ConnectorInstanceID + `"}`
-	r := signedJSONRequest(t, http.MethodPost, "/standing-approvals/request", body, s.privKey, s.agentID)
-	w := httptest.NewRecorder()
-	s.router.ServeHTTP(w, r)
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
-	}
-	if !strings.Contains(w.Body.String(), "conflicts with the pinned instance") {
-		t.Errorf("expected conflict error, got: %s", w.Body.String())
-	}
-}
-
 func TestAgentCreateStandingApprovalRequest_OmittedSelectorWithMultipleInstances(t *testing.T) {
 	t.Parallel()
 	s := setupStandingApprovalRequestMultiInstance(t)
 
-	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `,"source_action_configuration_id":"` + s.configID + `"}`
+	body := `{"action_type":"` + s.actionType + `","constraints":` + standingApprovalRequestTestConstraints + `}`
 	code, createResp := postStandingApprovalRequest(t, s, body)
 	if code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", code)

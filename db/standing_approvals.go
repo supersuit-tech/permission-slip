@@ -11,27 +11,32 @@ import (
 
 // StandingApproval represents a row from the standing_approvals table.
 type StandingApproval struct {
-	StandingApprovalID          string
-	AgentID                     int64
-	UserID                      string
-	ActionType                  string
-	ActionVersion               string
-	Constraints                 []byte // raw JSONB
-	SourceActionConfigurationID *string
-	ConnectorInstanceID         *string // nil = type-wide (legacy); non-nil = instance-scoped
-	Status                      string
-	StartsAt                    time.Time
-	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
-	CreatedAt                   time.Time
-	RevokedAt                   *time.Time
-	ExpiredAt                   *time.Time
+	StandingApprovalID  string
+	AgentID             int64
+	UserID              string
+	ActionType          string
+	ActionVersion       string
+	Constraints         []byte // raw JSONB
+	Name                *string
+	Description         *string
+	ConnectorInstanceID *string // nil = type-wide (legacy); non-nil = instance-scoped
+	Status              string
+	StartsAt            time.Time
+	ExpiresAt           *time.Time // nil means no expiry (until revoked)
+	CreatedAt           time.Time
+	RevokedAt           *time.Time
+	ExpiredAt           *time.Time
 }
 
 // standingApprovalColumns is the canonical column list for SELECT on the standing_approvals table.
 // Keep in sync with scanStandingApproval.
 const standingApprovalColumns = `standing_approval_id, agent_id, user_id, action_type, action_version,
-	constraints, source_action_configuration_id, connector_instance_id, status,
+	constraints, name, description, connector_instance_id, status,
 	starts_at, expires_at, created_at, revoked_at, expired_at`
+
+// WildcardActionType is the reserved action_type value that means
+// "all actions on this connector".
+const WildcardActionType = "*"
 
 // MaxStandingApprovalListSize is the maximum number of standing approvals returned per page.
 const MaxStandingApprovalListSize = 100
@@ -59,7 +64,7 @@ func scanStandingApproval(row rowScanner) (*StandingApproval, error) {
 	var startsAt, expiresAt, createdAt, revokedAt, expiredAt sql.NullString
 	err := row.Scan(
 		&sa.StandingApprovalID, &sa.AgentID, &sa.UserID, &sa.ActionType, &sa.ActionVersion,
-		&sa.Constraints, &sa.SourceActionConfigurationID, &sa.ConnectorInstanceID, &sa.Status,
+		&sa.Constraints, &sa.Name, &sa.Description, &sa.ConnectorInstanceID, &sa.Status,
 		&startsAt, &expiresAt, &createdAt, &revokedAt, &expiredAt,
 	)
 	if err != nil {
@@ -129,16 +134,17 @@ const (
 
 // CreateStandingApprovalParams holds the parameters for creating a standing approval.
 type CreateStandingApprovalParams struct {
-	StandingApprovalID          string
-	AgentID                     int64
-	UserID                      string
-	ActionType                  string
-	ActionVersion               string
-	Constraints                 []byte // raw JSONB, may be nil
-	SourceActionConfigurationID *string
-	ConnectorInstanceID         *string
-	StartsAt                    time.Time
-	ExpiresAt                   *time.Time // nil means no expiry (until revoked)
+	StandingApprovalID  string
+	AgentID             int64
+	UserID              string
+	ActionType          string
+	ActionVersion       string
+	Constraints         []byte // raw JSONB, may be nil
+	Name                *string
+	Description         *string
+	ConnectorInstanceID *string
+	StartsAt            time.Time
+	ExpiresAt           *time.Time // nil means no expiry (until revoked)
 }
 
 // CreateStandingApproval inserts a new standing approval with status 'active'.
@@ -151,12 +157,12 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 			SELECT 1 FROM agents WHERE agent_id = $2 AND approver_id = $3
 		)
 		INSERT INTO standing_approvals
-		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, source_action_configuration_id, connector_instance_id, status, starts_at, expires_at)
-		 SELECT $1, $2, $3, $4, $5, $6, $7, $8, 'active', $9, $10
+		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, name, description, connector_instance_id, status, starts_at, expires_at)
+		 SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11
 		 WHERE EXISTS (SELECT 1 FROM agent_check)
 		 RETURNING `+standingApprovalColumns,
 		p.StandingApprovalID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion,
-		p.Constraints, p.SourceActionConfigurationID, p.ConnectorInstanceID,
+		p.Constraints, p.Name, p.Description, p.ConnectorInstanceID,
 		TimestampForSQLite(p.StartsAt), NullableTimestampForSQLite(p.ExpiresAt),
 	)
 	sa, err := scanStandingApproval(row)
@@ -177,10 +183,7 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 //
 // If statusFilter is "active" (or empty), only active standing approvals are
 // returned. Pass "all" to include all statuses.
-//
-// If sourceActionConfigID is non-nil, only rows whose source_action_configuration_id
-// equals that value are returned.
-func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFilter string, sourceActionConfigID *string, limit int, cursor *StandingApprovalCursor) (*StandingApprovalPage, error) {
+func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFilter string, limit int, cursor *StandingApprovalCursor) (*StandingApprovalPage, error) {
 	if limit <= 0 {
 		limit = DefaultStandingApprovalLimit
 	}
@@ -204,11 +207,6 @@ func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFil
 	default:
 		p := b.addArg(statusFilter)
 		where = append(where, "status = "+p)
-	}
-
-	if sourceActionConfigID != nil {
-		p := b.addArg(*sourceActionConfigID)
-		where = append(where, "source_action_configuration_id = "+p)
 	}
 
 	if cursor != nil {
@@ -254,114 +252,6 @@ func ListStandingApprovalsByUser(ctx context.Context, db DBTX, userID, statusFil
 	}
 
 	return &StandingApprovalPage{Approvals: approvals, HasMore: hasMore}, nil
-}
-
-// CountActiveStandingApprovalsBySourceActionConfigID returns how many active
-// standing approvals reference the given action configuration.
-func CountActiveStandingApprovalsBySourceActionConfigID(ctx context.Context, db DBTX, userID, sourceConfigID string) (int, error) {
-	var n int
-	err := db.QueryRow(ctx,
-		`SELECT COUNT(*) FROM standing_approvals
-		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'`,
-		userID, sourceConfigID,
-	).Scan(&n)
-	return n, err
-}
-
-// ListActiveStandingApprovalsBySourceActionConfigID returns active standing
-// approvals linked to the given action configuration via
-// source_action_configuration_id, scoped to the user.
-// ListActiveStandingApprovalsBySourceActionConfigIDs returns active standing
-// approvals grouped by source_action_configuration_id for the given config IDs.
-func ListActiveStandingApprovalsBySourceActionConfigIDs(ctx context.Context, db DBTX, userID string, configIDs []string) (map[string][]StandingApproval, error) {
-	out := make(map[string][]StandingApproval)
-	if len(configIDs) == 0 {
-		return out, nil
-	}
-	rows, err := db.Query(ctx,
-		`SELECT `+standingApprovalColumns+`
-		 FROM standing_approvals
-		 WHERE user_id = $1 AND status = 'active'
-		   AND source_action_configuration_id IN (`+InPlaceholders(2, len(configIDs))+`)`,
-		append([]any{userID}, StringsToArgs(configIDs)...)...,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	for rows.Next() {
-		sa, err := scanStandingApproval(rows)
-		if err != nil {
-			return nil, err
-		}
-		if sa.SourceActionConfigurationID == nil {
-			continue
-		}
-		id := *sa.SourceActionConfigurationID
-		out[id] = append(out[id], *sa)
-	}
-	return out, rows.Err()
-}
-
-func ListActiveStandingApprovalsBySourceActionConfigID(ctx context.Context, db DBTX, userID, sourceConfigID string) ([]StandingApproval, error) {
-	rows, err := db.Query(ctx,
-		`SELECT `+standingApprovalColumns+`
-		 FROM standing_approvals
-		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'
-		 ORDER BY created_at DESC
-		 LIMIT $3`,
-		userID, sourceConfigID, MaxStandingApprovalListSize,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var approvals []StandingApproval
-	for rows.Next() {
-		sa, err := scanStandingApproval(rows)
-		if err != nil {
-			return nil, err
-		}
-		approvals = append(approvals, *sa)
-	}
-	return approvals, rows.Err()
-}
-
-// RevokeActiveStandingApprovalsForSourceActionConfig revokes all active standing
-// approvals that reference the given action configuration ID. Returns the
-// number of rows updated.
-func RevokeActiveStandingApprovalsForSourceActionConfig(ctx context.Context, db DBTX, userID, sourceConfigID string) (int64, error) {
-	tag, err := db.Exec(ctx,
-		`UPDATE standing_approvals
-		 SET status = 'revoked', revoked_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
-		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'`,
-		userID, sourceConfigID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return RowsAffected(tag), nil
-}
-
-// DeleteStandingApprovalsForSourceActionConfig deletes all standing approval rows
-// that reference the given action configuration. Used when removing an action
-// configuration so FK constraints (when present) are satisfied.
-//
-// Trade-off: this removes historical rows (not only active ones). The prior
-// revoke-only path could not satisfy ON DELETE RESTRICT while non-active rows
-// still referenced the config. A future soft-delete on action_configurations
-// could preserve rows without hard-deleting standing_approvals.
-func DeleteStandingApprovalsForSourceActionConfig(ctx context.Context, db DBTX, userID, sourceConfigID string) (int64, error) {
-	tag, err := db.Exec(ctx,
-		`DELETE FROM standing_approvals
-		 WHERE user_id = $1 AND source_action_configuration_id = $2`,
-		userID, sourceConfigID,
-	)
-	if err != nil {
-		return 0, err
-	}
-	return RowsAffected(tag), nil
 }
 
 // ListStandingApprovalsByAgent returns standing approvals for the given agent,
@@ -554,7 +444,11 @@ func diagnoseStandingApprovalFailure(ctx context.Context, db DBTX, saID, userID 
 type UpdateStandingApprovalParams struct {
 	StandingApprovalID     string
 	UserID                 string
-	Constraints            []byte     // raw JSONB
+	Constraints            []byte // raw JSONB
+	Name                   *string
+	Description            *string
+	NameSet                bool
+	DescriptionSet         bool
 	ExpiresAt              *time.Time // nil means no expiry (until revoked)
 	ConnectorInstanceID    *string    // nil = all accounts when ConnectorInstanceIDSet is true
 	ConnectorInstanceIDSet bool       // when false, connector_instance_id is left unchanged
@@ -566,8 +460,19 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 	query := `UPDATE standing_approvals
 		 SET constraints = $3, expires_at = $4`
 	args := []any{p.StandingApprovalID, p.UserID, p.Constraints, NullableTimestampForSQLite(p.ExpiresAt)}
+	argIdx := 5
+	if p.NameSet {
+		query += fmt.Sprintf(`, name = $%d`, argIdx)
+		args = append(args, p.Name)
+		argIdx++
+	}
+	if p.DescriptionSet {
+		query += fmt.Sprintf(`, description = $%d`, argIdx)
+		args = append(args, p.Description)
+		argIdx++
+	}
 	if p.ConnectorInstanceIDSet {
-		query += `, connector_instance_id = $5`
+		query += fmt.Sprintf(`, connector_instance_id = $%d`, argIdx)
 		args = append(args, p.ConnectorInstanceID)
 	}
 	query += `
@@ -595,37 +500,6 @@ func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprov
 		return nil, &StandingApprovalError{Code: StandingApprovalErrAlreadyRevoked, Status: sa.Status}
 	}
 	return nil, &StandingApprovalError{Code: StandingApprovalErrNotActive, Status: sa.Status}
-}
-
-// UpdateStandingApprovalsConnectorInstanceBySourceConfig sets connector_instance_id
-// on every active standing approval linked to the given source action configuration.
-func UpdateStandingApprovalsConnectorInstanceBySourceConfig(
-	ctx context.Context,
-	db DBTX,
-	userID, sourceConfigID string,
-	connectorInstanceID *string,
-) ([]StandingApproval, error) {
-	rows, err := db.Query(ctx,
-		`UPDATE standing_approvals
-		 SET connector_instance_id = $3
-		 WHERE user_id = $1 AND source_action_configuration_id = $2 AND status = 'active'
-		 RETURNING `+standingApprovalColumns,
-		userID, sourceConfigID, connectorInstanceID,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var out []StandingApproval
-	for rows.Next() {
-		sa, err := scanStandingApproval(rows)
-		if err != nil {
-			return nil, err
-		}
-		out = append(out, *sa)
-	}
-	return out, rows.Err()
 }
 
 // FindActiveStandingApprovalsForAgent returns all active standing approvals for

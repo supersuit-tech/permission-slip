@@ -40,30 +40,21 @@ ApprovalRequest:
         not authorized for this agent.
       example: "alice"
 
-    configuration_id:
-      type: string
-      pattern: '^ac_[a-f0-9]{32}$'
-      maxLength: 36
+    configuration:
+      type: object
+      deprecated: true
       description: |
-        Optional reference to an action configuration. When provided, Permission Slip
-        validates:
-
-        - The configuration exists and belongs to this agent
-        - The configuration is active (not disabled)
-        - The `action.type` matches the configuration's `action_type`
-        - The `action.parameters` comply with the configuration constraints:
-          fixed parameters must match exactly, wildcard parameters accept any value
-
-        If the configuration reference is invalid, Permission Slip returns
-        `400 Bad Request` with error code `invalid_configuration`. If the
-        configuration is disabled, returns `403 Forbidden` with error code
-        `configuration_disabled`. If the configuration's `action_type` does not
-        match the request's `action.type`, returns `400 Bad Request` with error
-        code `configuration_action_type_mismatch`.
-
-        When omitted, the approval request proceeds through the standard flow
-        without configuration-based validation.
-      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+        **Deprecated — accepted but ignored.** Action configurations were removed.
+        Clients may still send this field for backward compatibility; Permission Slip
+        logs a deprecation warning and proceeds without configuration-based validation.
+      properties:
+        configuration_id:
+          type: string
+          pattern: '^ac_[a-f0-9]{32}$'
+          maxLength: 36
+          description: Former action configuration identifier (ignored).
+      example:
+        configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
     action:
       $ref: './shared.yaml#/Action'
@@ -92,7 +83,8 @@ ApprovalRequest:
     agent_id: 42
     request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
     approver: "alice"
-    configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
+    configuration:
+      configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
     action:
       type: "email.send"
       version: "1"
@@ -551,11 +543,17 @@ BulkApprovalRequestItem:
       $ref: './shared.yaml#/Action'
     context:
       $ref: './shared.yaml#/ActionContext'
-    configuration_id:
-      type: string
-      pattern: '^ac_[a-f0-9]{32}$'
-      maxLength: 36
-      description: Optional action configuration reference for this item.
+    configuration:
+      type: object
+      deprecated: true
+      description: |
+        **Deprecated — accepted but ignored.** Former action configuration reference
+        for this bulk item.
+      properties:
+        configuration_id:
+          type: string
+          pattern: '^ac_[a-f0-9]{32}$'
+          maxLength: 36
 
 BulkApprovalRequest:
   type: object

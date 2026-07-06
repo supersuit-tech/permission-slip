@@ -43,19 +43,11 @@ type actionCapability struct {
 	ParametersSchema     json.RawMessage              `json:"parameters_schema,omitempty"`
 	MetaConstraintFields []string                     `json:"meta_constraint_fields,omitempty"`
 	StandingApprovals    []standingApprovalCapability `json:"standing_approvals"`
-	ActionConfigurations []actionConfigCapability     `json:"action_configurations"`
-}
-
-type actionConfigCapability struct {
-	ConfigurationID string          `json:"configuration_id"`
-	ActionType      string          `json:"action_type"`
-	Name            string          `json:"name"`
-	Description     *string         `json:"description,omitempty"`
-	Parameters      json.RawMessage `json:"parameters"`
 }
 
 type standingApprovalCapability struct {
 	StandingApprovalID  string          `json:"standing_approval_id"`
+	Name                *string         `json:"name,omitempty"`
 	Constraints         json.RawMessage `json:"constraints"`
 	ExpiresAt           *time.Time      `json:"expires_at"`
 	ConnectorInstanceID *string         `json:"connector_instance_id,omitempty"`
@@ -125,8 +117,7 @@ func handleGetCapabilities(deps *Deps) http.HandlerFunc {
 }
 
 // buildCapabilitiesResponse transforms the DB result into the API response,
-// nesting actions under their connectors, standing approvals under their actions,
-// and action configurations under their actions.
+// nesting actions under their connectors and standing approvals under their actions.
 func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseURL string, registry *connectors.Registry) capabilitiesResponse {
 	// Index actions by connector ID.
 	actionsByConnector := make(map[string][]db.CapabilityAction)
@@ -143,17 +134,6 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 	instancesByConnector := make(map[string][]db.CapabilityConnectorInstance)
 	for _, inst := range caps.ConnectorInstances {
 		instancesByConnector[inst.ConnectorID] = append(instancesByConnector[inst.ConnectorID], inst)
-	}
-
-	// Index action configurations by connector+action_type composite key.
-	// Unlike standing approvals (which lack ConnectorID), action configs
-	// are connector-scoped and must not bleed across connectors that share
-	// the same action type.
-	type connAction struct{ connectorID, actionType string }
-	acByConnAction := make(map[connAction][]db.CapabilityActionConfig)
-	for _, ac := range caps.ActionConfigs {
-		key := connAction{ac.ConnectorID, ac.ActionType}
-		acByConnAction[key] = append(acByConnAction[key], ac)
 	}
 
 	connectors := make([]connectorCapability, 0, len(caps.Connectors))
@@ -199,26 +179,13 @@ func buildCapabilitiesResponse(agentID int64, caps *db.AgentCapabilities, baseUR
 			for _, sa := range dbSAs {
 				sas = append(sas, standingApprovalCapability{
 					StandingApprovalID:  sa.StandingApprovalID,
+					Name:                sa.Name,
 					Constraints:         sa.Constraints,
 					ExpiresAt:           sa.ExpiresAt,
 					ConnectorInstanceID: sa.ConnectorInstanceID,
 				})
 			}
 			acap.StandingApprovals = sas
-
-			// Attach action configurations for this connector + action type.
-			dbACs := acByConnAction[connAction{c.ID, a.ActionType}]
-			acs := make([]actionConfigCapability, 0, len(dbACs))
-			for _, cfg := range dbACs {
-				acs = append(acs, actionConfigCapability{
-					ConfigurationID: cfg.ConfigurationID,
-					ActionType:      cfg.ActionType,
-					Name:            cfg.Name,
-					Description:     cfg.Description,
-					Parameters:      cfg.Parameters,
-				})
-			}
-			acap.ActionConfigurations = acs
 
 			actions = append(actions, acap)
 		}

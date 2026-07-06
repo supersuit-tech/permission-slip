@@ -1,13 +1,13 @@
 import { Check, FileText, Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
+import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
 import { isPatternWrapper } from "@/lib/constraints";
 
 interface TemplatePickerProps {
-  templates: ActionConfigTemplate[];
+  templates: StandingApprovalTemplate[];
   isLoading: boolean;
   actionType: string;
-  onSelect: (template: ActionConfigTemplate) => void;
+  onSelect: (template: StandingApprovalTemplate) => void;
   disabled?: boolean;
   selectedTemplateId?: string | null;
 }
@@ -64,12 +64,12 @@ function TemplateCard({
   disabled,
   isApplied,
 }: {
-  template: ActionConfigTemplate;
-  onSelect: (template: ActionConfigTemplate) => void;
+  template: StandingApprovalTemplate;
+  onSelect: (template: StandingApprovalTemplate) => void;
   disabled?: boolean;
   isApplied?: boolean;
 }) {
-  const paramEntries = Object.entries(template.parameters);
+  const constraintEntries = Object.entries(template.constraints);
 
   return (
     <button
@@ -101,9 +101,9 @@ function TemplateCard({
             {template.description}
           </p>
         )}
-        {paramEntries.length > 0 && (
+        {constraintEntries.length > 0 && (
           <div className="flex flex-wrap gap-1">
-            {paramEntries.map(([key, value]) => (
+            {constraintEntries.map(([key, value]) => (
               <TemplateParamBadge key={key} name={key} value={value} />
             ))}
           </div>

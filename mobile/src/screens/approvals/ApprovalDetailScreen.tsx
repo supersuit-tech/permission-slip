@@ -30,10 +30,7 @@ import {
 } from "../../hooks/useStandingApprovals";
 import { useCreateStandingApproval } from "../../hooks/useCreateStandingApproval";
 import { useActionSchema } from "../../hooks/useActionSchema";
-import {
-  useActionConfigs,
-} from "../../hooks/useActionConfigs";
-import { buildCreateStandingApprovalFromApproval, findMatchingActionConfigForApproval } from "./standingApprovalFromApproval";
+import { buildCreateStandingApprovalFromApproval } from "./standingApprovalFromApproval";
 import { colors } from "../../theme/colors";
 import {
   humanizeActionType,
@@ -119,9 +116,6 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const { standingApprovals, isLoading: standingApprovalsLoading } =
     useStandingApprovals();
   const { createStandingApproval } = useCreateStandingApproval();
-  const { configs } = useActionConfigs(
-    approval.agent_id,
-  );
 
   const agent = useMemo(
     () => agents.find((a: AgentSummary) => a.agent_id === approval.agent_id),
@@ -198,10 +192,6 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       ),
     [standingApprovals, approval.agent_id, approval.action.type],
   );
-  const matchingActionConfig = useMemo(
-    () => findMatchingActionConfigForApproval(configs, approval),
-    [configs, approval],
-  );
   const showAutoApproveCheckbox =
     !standingApprovalsLoading && !hasExistingStandingApproval;
 
@@ -271,10 +261,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
       if (autoApproveFuture) {
         try {
           await createStandingApproval(
-            buildCreateStandingApprovalFromApproval(
-              approval,
-              matchingActionConfig?.id,
-            ),
+            buildCreateStandingApprovalFromApproval(approval),
           );
           setStandingApprovalCreated(true);
         } catch (err) {
@@ -297,7 +284,6 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     approveApproval,
     approval,
     autoApproveFuture,
-    matchingActionConfig,
     createStandingApproval,
     scheduleAutoDismiss,
   ]);

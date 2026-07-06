@@ -2,8 +2,8 @@ import { Loader2, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
 import type { Agent } from "@/hooks/useAgents";
+import type { AgentActionOption } from "@/hooks/useAgentConnectorActions";
 import { getAgentDisplayName } from "@/lib/agents";
 import type { ParametersSchema } from "@/lib/parameterSchema";
 import { ActionConfigParameterFields } from "@/pages/agents/connectors/ActionConfigParameterFields";
@@ -49,49 +49,49 @@ export function StepPickAgent({
 }
 
 export function StepPickAction({
-  selectedConfigId,
-  onConfigChange,
-  configsByConnector,
-  configsLoading,
+  selectedActionType,
+  onActionChange,
+  actionsByConnector,
+  actionsLoading,
 }: {
-  selectedConfigId: string;
-  onConfigChange: (id: string) => void;
-  configsByConnector: Record<string, ActionConfiguration[]>;
-  configsLoading: boolean;
+  selectedActionType: string;
+  onActionChange: (actionType: string) => void;
+  actionsByConnector: Record<string, AgentActionOption[]>;
+  actionsLoading: boolean;
 }) {
-  const connectorIds = Object.keys(configsByConnector);
+  const connectorIds = Object.keys(actionsByConnector);
 
   return (
     <div className="space-y-3">
-      <Label htmlFor="sa-config">Action Configuration</Label>
-      {configsLoading ? (
+      <Label htmlFor="sa-action">Action</Label>
+      {actionsLoading ? (
         <div className="flex items-center gap-2 py-2">
           <Loader2 className="size-4 animate-spin" />
           <span className="text-muted-foreground text-sm">
-            Loading configurations...
+            Loading actions...
           </span>
         </div>
       ) : connectorIds.length === 0 ? (
         <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
           <p className="text-muted-foreground text-xs leading-relaxed">
-            No active action configurations found for this agent. Configure an
-            action in the agent settings before creating a standing approval.
+            No enabled connectors found for this agent. Enable a connector
+            before creating a standing approval.
           </p>
         </div>
       ) : (
         <>
           <select
-            id="sa-config"
-            value={selectedConfigId}
-            onChange={(e) => onConfigChange(e.target.value)}
+            id="sa-action"
+            value={selectedActionType}
+            onChange={(e) => onActionChange(e.target.value)}
             className={selectClassName}
           >
-            <option value="">Select an action configuration...</option>
+            <option value="">Select an action...</option>
             {connectorIds.map((connId) => (
               <optgroup key={connId} label={connId}>
-                {configsByConnector[connId]?.map((config) => (
-                  <option key={config.id} value={config.id}>
-                    {config.name} ({config.action_type})
+                {actionsByConnector[connId]?.map((action) => (
+                  <option key={action.action_type} value={action.action_type}>
+                    {action.name} ({action.action_type})
                   </option>
                 ))}
               </optgroup>
@@ -99,7 +99,7 @@ export function StepPickAction({
           </select>
           <div className="rounded-lg border border-dashed bg-muted/40 px-3 py-2">
             <p className="text-muted-foreground text-xs leading-relaxed">
-              Select an action configuration to pre-populate constraints.
+              Choose the action type this standing approval will pre-authorize.
             </p>
           </div>
         </>

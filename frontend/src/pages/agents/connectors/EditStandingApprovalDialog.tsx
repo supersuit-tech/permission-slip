@@ -11,9 +11,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { useUpdateActionConfig } from "@/hooks/useUpdateActionConfig";
+import { useUpdateStandingApproval } from "@/hooks/useUpdateStandingApproval";
 import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
+import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import {
   ActionConfigParameterFields,
@@ -22,7 +22,6 @@ import {
 import {
   NameField,
   DescriptionField,
-  StatusSelect,
   buildParametersFromForm,
   getEmptyRequiredParams,
   isPatternWrapper,
@@ -30,56 +29,59 @@ import {
 } from "./ActionConfigFormFields";
 import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
 import {
-  connectorInstanceFromParameters,
-  mergeConnectorInstanceIntoParameters,
-  parametersWithoutConnectorInstance,
+  connectorInstanceFromStandingApprovalId,
+  standingApprovalConnectorInstanceIdForUpdate,
 } from "./connectorInstanceAccount";
+import { StepLimits } from "@/pages/dashboard/StandingApprovalSteps";
 
-interface EditActionConfigDialogProps {
+interface EditStandingApprovalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  config: ActionConfiguration;
+  rule: StandingApproval;
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
+  onUpdated?: () => void;
 }
 
-export function EditActionConfigDialog({
+export function EditStandingApprovalDialog({
   open,
   onOpenChange,
-  config,
+  rule,
   agentId,
   connectorId,
   actions,
-}: EditActionConfigDialogProps) {
-  const { updateActionConfig, isPending } = useUpdateActionConfig();
+  onUpdated,
+}: EditStandingApprovalDialogProps) {
+  const { updateStandingApproval, isPending } = useUpdateStandingApproval();
   const { instances } = useAgentConnectorInstances(agentId, connectorId);
   const showAccountSelect = instances.length >= 1;
 
-  // No useEffect needed to sync state: the parent conditionally renders this
-  // component (`{editTarget && <EditActionConfigDialog>}`), so it always
-  // unmounts/remounts when switching configs. useState initializers suffice.
-  const [name, setName] = useState(config.name);
-  const [description, setDescription] = useState(config.description ?? "");
-  const [status, setStatus] = useState<"active" | "disabled">(config.status);
+  const [name, setName] = useState(rule.name ?? "");
+  const [description, setDescription] = useState(rule.description ?? "");
   const [paramValues, setParamValues] = useState<Record<string, string>>(() =>
-    toStringRecord(parametersWithoutConnectorInstance(config.parameters)),
+    toStringRecord(rule.constraints as Record<string, unknown>),
   );
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>(() =>
-    inferModesFromConfig(parametersWithoutConnectorInstance(config.parameters)),
+    inferModesFromConstraints(rule.constraints as Record<string, unknown>),
   );
   const [connectorInstance, setConnectorInstance] = useState(() =>
-    connectorInstanceFromParameters(config.parameters),
+    connectorInstanceFromStandingApprovalId(rule.connector_instance_id),
   );
+  const [noExpiry, setNoExpiry] = useState(!rule.expires_at);
+  const [expiresAt, setExpiresAt] = useState(() => {
+    if (!rule.expires_at) return defaultExpiresAtLocal();
+    const d = new Date(rule.expires_at);
+    const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+    return local.toISOString().slice(0, 16);
+  });
 
   const action = useMemo(
-    () => actions.find((a) => a.action_type === config.action_type) ?? null,
-    [actions, config.action_type],
+    () => actions.find((a) => a.action_type === rule.action_type) ?? null,
+    [actions, rule.action_type],
   );
 
   const schema = useMemo(
-    // Cast is safe: parameters_schema is typed as `{ [key: string]: unknown }` in
-    // the generated OpenAPI types, which is structurally identical to Record<string, unknown>.
     () =>
       parseParametersSchema(
         action?.parameters_schema as Record<string, unknown> | undefined,
@@ -99,41 +101,41 @@ export function EditActionConfigDialog({
       return;
     }
 
-    const emptyRequired = getEmptyRequiredParams(paramValues, schema?.required, schema?.properties);
+    const emptyRequired = getEmptyRequiredParams(
+      paramValues,
+      schema?.required,
+      schema?.properties,
+    );
     if (emptyRequired.length > 0) {
-      toast.error(`Required parameters need a value or wildcard: ${emptyRequired.join(", ")}`);
+      toast.error(
+        `Required parameters need a value or wildcard: ${emptyRequired.join(", ")}`,
+      );
       return;
     }
 
     try {
-      let parameters = buildParametersFromForm(
+      const constraints = buildParametersFromForm(
         paramValues,
         schema?.properties,
         paramModes,
       );
-      if (showAccountSelect) {
-        parameters = mergeConnectorInstanceIntoParameters(
-          parameters,
-          connectorInstance,
-        );
-      }
-      await updateActionConfig({
-        configId: config.id,
-        agentId,
-        body: {
-          name: name.trim(),
-          description: description.trim() || null,
-          status,
-          parameters,
-        },
+
+      await updateStandingApproval(rule.standing_approval_id, {
+        name: name.trim(),
+        description: description.trim() || null,
+        constraints,
+        expires_at: noExpiry ? null : new Date(expiresAt).toISOString(),
+        connector_instance_id:
+          standingApprovalConnectorInstanceIdForUpdate(connectorInstance),
       });
-      toast.success(`Configuration "${name.trim()}" updated`);
+      toast.success(`Standing approval "${name.trim()}" updated`);
       onOpenChange(false);
+      onUpdated?.();
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Failed to update action configuration",
+          : "Failed to update standing approval",
       );
     }
   }
@@ -143,50 +145,42 @@ export function EditActionConfigDialog({
       <DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>Edit Action Configuration</DialogTitle>
+            <DialogTitle>Edit Standing Approval</DialogTitle>
             <DialogDescription>
-              Update the configuration for{" "}
-              <strong>{action?.name ?? config.action_type}</strong>. The action
-              type and connector cannot be changed.
+              Update the standing approval for{" "}
+              <strong>{action?.name ?? rule.action_type}</strong>. The action
+              type cannot be changed.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
-            {/* Action (read-only) */}
             <div className="space-y-2">
               <Label>Action</Label>
               <p className="text-sm">
-                {action?.name ?? config.action_type}{" "}
+                {action?.name ?? rule.action_type}{" "}
                 <span className="text-muted-foreground font-mono text-xs">
-                  ({config.action_type})
+                  ({rule.action_type})
                 </span>
               </p>
             </div>
 
             <NameField
-              id="edit-config-name"
+              id="edit-standing-approval-name"
               value={name}
               onChange={setName}
               disabled={isPending}
             />
 
             <DescriptionField
-              id="edit-config-description"
+              id="edit-standing-approval-description"
               value={description}
               onChange={setDescription}
               disabled={isPending}
             />
 
-            <StatusSelect
-              id="edit-config-status"
-              value={status}
-              onChange={setStatus}
-              disabled={isPending}
-            />
-
             {showAccountSelect && (
               <ConnectorInstanceAccountSelect
-                id="edit-config-account"
+                id="edit-standing-approval-account"
                 value={connectorInstance}
                 onChange={setConnectorInstance}
                 instances={instances}
@@ -196,13 +190,15 @@ export function EditActionConfigDialog({
 
             {action ? (
               <div className="space-y-2">
-                <Label>Parameters</Label>
+                <Label>Constraints</Label>
                 <ActionConfigParameterFields
                   parametersSchema={schema}
                   values={paramValues}
                   onValueChange={handleParamChange}
                   modes={paramModes}
-                  onModeChange={(key, mode) => setParamModes((prev) => ({ ...prev, [key]: mode }))}
+                  onModeChange={(key, mode) =>
+                    setParamModes((prev) => ({ ...prev, [key]: mode }))
+                  }
                   disabled={isPending}
                   agentId={agentId}
                   connectorId={connectorId}
@@ -210,6 +206,12 @@ export function EditActionConfigDialog({
               </div>
             ) : null}
 
+            <StepLimits
+              expiresAt={expiresAt}
+              onExpiresAtChange={setExpiresAt}
+              noExpiry={noExpiry}
+              onNoExpiryChange={setNoExpiry}
+            />
           </div>
 
           <DialogFooter>
@@ -232,13 +234,19 @@ export function EditActionConfigDialog({
   );
 }
 
-/** Convert stored parameter values to a flat string map for form inputs.
- *  Unwraps `{"$pattern": "<glob>"}` objects into plain strings. */
+function defaultExpiresAtLocal(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 30);
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 16);
+}
+
 function toStringRecord(
-  params: Record<string, unknown>,
+  constraints: Record<string, unknown>,
 ): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(constraints)) {
+    if (key === "$meta" || key === "$data_window") continue;
     if (value === null || value === undefined) {
       result[key] = "";
     } else if (isPatternWrapper(value)) {
@@ -252,12 +260,12 @@ function toStringRecord(
   return result;
 }
 
-/** Infer ParamMode for each key from stored config parameters. */
-function inferModesFromConfig(
-  params: Record<string, unknown>,
+function inferModesFromConstraints(
+  constraints: Record<string, unknown>,
 ): Record<string, ParamMode> {
   const modes: Record<string, ParamMode> = {};
-  for (const [key, value] of Object.entries(params)) {
+  for (const [key, value] of Object.entries(constraints)) {
+    if (key === "$meta" || key === "$data_window") continue;
     if (value === "*") {
       modes[key] = "wildcard";
     } else if (isPatternWrapper(value)) {

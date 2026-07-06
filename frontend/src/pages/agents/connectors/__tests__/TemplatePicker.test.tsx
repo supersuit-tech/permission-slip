@@ -3,17 +3,17 @@ import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { renderWithProviders } from "../../../../test-helpers";
 import { TemplatePicker } from "../TemplatePicker";
-import type { ActionConfigTemplate } from "../../../../hooks/useActionConfigTemplates";
+import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
 
 
-const mockTemplates: ActionConfigTemplate[] = [
+const mockTemplates: StandingApprovalTemplate[] = [
   {
     id: "tpl_1",
     connector_id: "github",
     action_type: "github.create_issue",
     name: "Create issues (all fields open)",
     description: "Agent can create issues in any repo with any title and body.",
-    parameters: { repo: "*", title: "*", body: "*" },
+    constraints: { repo: "*", title: "*", body: "*" },
     created_at: "2026-02-28T10:00:00Z",
   },
   {
@@ -22,7 +22,7 @@ const mockTemplates: ActionConfigTemplate[] = [
     action_type: "github.merge_pr",
     name: "Merge PRs",
     description: "Agent can merge any PR",
-    parameters: { repo: "*", pull_number: "*" },
+    constraints: { repo: "*", pull_number: "*" },
     created_at: "2026-02-28T10:00:00Z",
   },
   {
@@ -31,7 +31,7 @@ const mockTemplates: ActionConfigTemplate[] = [
     action_type: "github.create_issue",
     name: "Create issues in org",
     description: null,
-    parameters: {
+    constraints: {
       repo: { $pattern: "myorg-*" },
       title: "*",
     },

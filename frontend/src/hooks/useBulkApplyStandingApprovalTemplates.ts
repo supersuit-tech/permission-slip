@@ -4,11 +4,10 @@ import client from "@/api/client";
 import { getApiErrorMessage } from "@/api/errors";
 import type { components } from "@/api/schema";
 
-export type BulkApplyResult = components["schemas"]["BulkApplyResult"];
-export type BulkApplyActionConfigTemplateResponse =
-  components["schemas"]["BulkApplyActionConfigTemplateResponse"];
+export type BulkApplyStandingApprovalTemplateResponse =
+  components["schemas"]["BulkApplyStandingApprovalTemplateResponse"];
 
-export function useBulkApplyActionConfigTemplates() {
+export function useBulkApplyStandingApprovalTemplates() {
   const { session } = useAuth();
   const queryClient = useQueryClient();
   const token = session?.access_token;
@@ -17,17 +16,15 @@ export function useBulkApplyActionConfigTemplates() {
     mutationFn: async (input: {
       templateIds: string[];
       agentId: number;
-      approvalModes?: Record<string, "auto_approve" | "requires_approval">;
-    }): Promise<BulkApplyActionConfigTemplateResponse> => {
+    }): Promise<BulkApplyStandingApprovalTemplateResponse> => {
       if (!token) throw new Error("Missing access token");
       const { data, error } = await client.POST(
-        "/v1/action-config-templates/bulk-apply",
+        "/v1/standing-approval-templates/bulk-apply",
         {
           headers: { Authorization: `Bearer ${token}` },
           body: {
             agent_id: input.agentId,
             template_ids: input.templateIds,
-            ...(input.approvalModes && { approval_modes: input.approvalModes }),
           },
         },
       );
@@ -40,7 +37,7 @@ export function useBulkApplyActionConfigTemplates() {
     },
     onSuccess: (_data, variables) => {
       void queryClient.invalidateQueries({
-        queryKey: ["action-configs", variables.agentId],
+        queryKey: ["standing-approvals", variables.agentId],
       });
       void queryClient.invalidateQueries({ queryKey: ["standing-approvals"] });
     },

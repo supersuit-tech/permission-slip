@@ -44,7 +44,6 @@ StandingApprovalListResponse:
         expires_at: "2026-02-21T00:00:00Z"
         created_at: "2026-02-14T10:30:00Z"
         revoked_at: null
-        source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
     has_more: false
 
 StandingApproval:
@@ -58,7 +57,6 @@ StandingApproval:
     - status
     - starts_at
     - created_at
-    - source_action_configuration_id
   properties:
     standing_approval_id:
       type: string
@@ -82,6 +80,22 @@ StandingApproval:
         User who created this standing approval.
       example: "alice"
 
+    name:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: |
+        Human-readable label for this standing approval rule.
+      example: "GitHub notifications"
+
+    description:
+      type: string
+      nullable: true
+      maxLength: 4096
+      description: |
+        Optional longer description of what this standing approval allows.
+      example: "Read emails from GitHub notification senders"
+
     action_type:
       type: string
       maxLength: 128
@@ -103,9 +117,9 @@ StandingApproval:
       type: object
       additionalProperties: true
       description: |
-        Constraint boundaries for this standing approval. Same schema as ACTION_CONFIG
-        constraints. Every execution is validated against these constraints — parameters
-        that fall outside the constraint bounds are rejected.
+        Constraint boundaries for this standing approval. Every execution is validated
+        against these constraints — parameters that fall outside the constraint bounds
+        are rejected.
 
         Examples for `email.read`:
         - `sender`: Sender filter pattern (e.g., `*@github.com`)
@@ -165,17 +179,6 @@ StandingApproval:
         `null` if not revoked.
       example: null
 
-    source_action_configuration_id:
-      type: string
-      minLength: 1
-      maxLength: 128
-      description: |
-        The action configuration this standing approval is tied to. Every standing
-        approval references a backing configuration row.
-        Expected format: `ac_` prefix followed by 32 hex characters, but the
-        backend does not enforce the pattern.
-      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
-
     connector_instance_id:
       type: string
       format: uuid
@@ -200,7 +203,6 @@ StandingApproval:
     expires_at: "2026-02-21T00:00:00Z"
     created_at: "2026-02-14T10:30:00Z"
     revoked_at: null
-    source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
 UserStandingApprovalListResponse:
   type: object
@@ -241,7 +243,6 @@ UserStandingApprovalListResponse:
         expires_at: "2026-02-21T00:00:00Z"
         created_at: "2026-02-14T10:30:00Z"
         revoked_at: null
-        source_action_configuration_id: null
     has_more: false
 
 CreateStandingApprovalRequest:
@@ -271,6 +272,19 @@ CreateStandingApprovalRequest:
       description: Action type version.
       example: "1"
 
+    name:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Human-readable label for this standing approval rule.
+      example: "Company email sends"
+
+    description:
+      type: string
+      nullable: true
+      maxLength: 4096
+      description: Optional longer description of what this standing approval allows.
+
     constraints:
       type: object
       additionalProperties: true
@@ -279,28 +293,11 @@ CreateStandingApprovalRequest:
         contain at least one non-wildcard parameter constraint; the backend rejects
         empty objects or constraints where every value is a wildcard (`"*"`).
 
-        When tied to an action configuration (always required for create), trusted flows
-        such as template customize may send `{}` to mean **match all** parameter values for
-        this action type (stored as empty constraints in the database).
+        Trusted flows such as template customize may send `{}` to mean **match all**
+        parameter values for this action type (stored as empty constraints in the database).
       example:
         recipient_pattern: "*@mycompany.com"
         max_recipients: 5
-
-    source_action_configuration_id:
-      type: string
-      minLength: 1
-      maxLength: 128
-      description: |
-        Action configuration this standing approval is created from. When omitted,
-        the backend auto-creates or reactivates a backing configuration for the
-        agent and action type.
-
-        When provided, the configuration must exist, belong to the same `agent_id`,
-        and have the same `action_type` as the request. Expected format: `ac_` prefix
-        followed by 32 hex characters (e.g.,
-        `ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d`), but the backend does not
-        enforce the pattern — only non-empty and max 128 characters.
-      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
 
     starts_at:
       type: string
@@ -323,14 +320,23 @@ CreateStandingApprovalRequest:
     action_version: "1"
     constraints:
       recipient_pattern: "*@mycompany.com"
-    source_action_configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
     expires_at: null
 
 UpdateStandingApprovalRequest:
   type: object
-  required:
-    - constraints
   properties:
+    name:
+      type: string
+      nullable: true
+      maxLength: 255
+      description: Updated human-readable label. Omit to preserve the current value.
+
+    description:
+      type: string
+      nullable: true
+      maxLength: 4096
+      description: Updated description. Omit to preserve the current value.
+
     constraints:
       type: object
       additionalProperties: true
@@ -445,27 +451,6 @@ StandingApprovalExecuteRequest:
         Unique request identifier for replay protection and idempotency. UUID v4 recommended.
       example: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
 
-    configuration_id:
-      type: string
-      pattern: '^ac_[a-f0-9]{32}$'
-      maxLength: 36
-      description: |
-        Optional reference to an action configuration. When provided, Permission Slip
-        validates that the configuration exists, is active, belongs to this agent,
-        and that the `action.parameters` comply with the configuration constraints
-        (fixed parameters must match exactly, wildcard parameters accept any value).
-
-        If the configuration reference is invalid, Permission Slip returns
-        `400 Bad Request` with error code `invalid_configuration`. If the
-        configuration is disabled, returns `403 Forbidden` with error code
-        `configuration_disabled`. If the configuration's `action_type` does not
-        match the request's `action.type`, returns `400 Bad Request` with error
-        code `configuration_action_type_mismatch`.
-
-        When omitted, the execution proceeds through the standard standing approval
-        matching flow without configuration-based validation.
-      example: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
-
     action:
       $ref: './shared.yaml#/Action'
 
@@ -491,7 +476,6 @@ StandingApprovalExecuteRequest:
 
   example:
     request_id: "f47ac10b-58cc-4372-a567-0e02b2c3d479"
-    configuration_id: "ac_1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d"
     action:
       type: "email.read"
       version: "1"

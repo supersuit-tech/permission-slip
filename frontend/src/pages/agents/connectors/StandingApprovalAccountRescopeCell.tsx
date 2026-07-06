@@ -8,40 +8,38 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useUpdateActionConfig } from "@/hooks/useUpdateActionConfig";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
+import { useUpdateStandingApproval } from "@/hooks/useUpdateStandingApproval";
+import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import type { AgentConnectorInstance } from "@/hooks/useAgentConnectorInstances";
 import {
-  connectorInstanceFromParameters,
+  connectorInstanceFromStandingApprovalId,
   instanceSelectLabel,
-  mergeConnectorInstanceIntoParameters,
-  parametersWithoutConnectorInstance,
-  resolveConnectorInstanceAccountLabel,
+  standingApprovalConnectorInstanceIdForUpdate,
 } from "./connectorInstanceAccount";
 
-interface ActionConfigAccountRescopeCellProps {
+interface StandingApprovalAccountRescopeCellProps {
   agentId: number;
-  config: ActionConfiguration;
+  rule: StandingApproval;
   instances: AgentConnectorInstance[];
   onSuccess?: () => void;
 }
 
-export function ActionConfigAccountRescopeCell({
-  agentId,
-  config,
+export function StandingApprovalAccountRescopeCell({
+  rule,
   instances,
   onSuccess,
-}: ActionConfigAccountRescopeCellProps) {
-  const { updateActionConfig, isPending } = useUpdateActionConfig();
+}: StandingApprovalAccountRescopeCellProps) {
+  const { updateStandingApproval, isPending } = useUpdateStandingApproval();
   const [open, setOpen] = useState(false);
 
-  const currentValue = connectorInstanceFromParameters(
-    config.parameters as Record<string, unknown>,
+  const currentValue = connectorInstanceFromStandingApprovalId(
+    rule.connector_instance_id,
   );
-  const accountLabel = resolveConnectorInstanceAccountLabel(
-    config.parameters.connector_instance,
-    instances,
-  );
+  const accountLabel =
+    currentValue === "*"
+      ? "All accounts"
+      : (instances.find((i) => i.connector_instance_id === currentValue)
+          ?.display?.trim() ?? currentValue);
 
   async function handleSelect(nextValue: string) {
     if (nextValue === currentValue) {
@@ -50,16 +48,9 @@ export function ActionConfigAccountRescopeCell({
     }
 
     try {
-      const parameters = mergeConnectorInstanceIntoParameters(
-        parametersWithoutConnectorInstance(
-          config.parameters as Record<string, unknown>,
-        ),
-        nextValue,
-      );
-      await updateActionConfig({
-        configId: config.id,
-        agentId,
-        body: { parameters },
+      await updateStandingApproval(rule.standing_approval_id, {
+        connector_instance_id:
+          standingApprovalConnectorInstanceIdForUpdate(nextValue),
       });
       toast.success("Account scope updated");
       onSuccess?.();
@@ -80,7 +71,7 @@ export function ActionConfigAccountRescopeCell({
           size="sm"
           className="h-auto gap-1 px-1 py-0.5 font-normal"
           disabled={isPending}
-          aria-label={`Change account scope for ${config.name}: ${accountLabel}`}
+          aria-label={`Change account scope for ${rule.name ?? rule.action_type}: ${accountLabel}`}
         >
           <span className="text-sm">{accountLabel}</span>
           {isPending ? (
@@ -97,7 +88,9 @@ export function ActionConfigAccountRescopeCell({
         {instances.map((instance) => (
           <DropdownMenuItem
             key={instance.connector_instance_id}
-            onClick={() => void handleSelect(instance.connector_instance_id)}
+            onClick={() =>
+              void handleSelect(instance.connector_instance_id)
+            }
           >
             {instanceSelectLabel(instance)}
           </DropdownMenuItem>

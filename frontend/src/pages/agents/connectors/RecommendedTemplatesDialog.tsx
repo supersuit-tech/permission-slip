@@ -10,24 +10,19 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useActionConfigTemplates } from "@/hooks/useActionConfigTemplates";
-import type { ActionConfigTemplate } from "@/hooks/useActionConfigTemplates";
-import type { ActionConfiguration } from "@/hooks/useActionConfigs";
+import { useStandingApprovalTemplates } from "@/hooks/useStandingApprovalTemplates";
+import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
+import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
-import { useApplyActionConfigTemplate } from "@/hooks/useApplyActionConfigTemplate";
-import { useBulkApplyActionConfigTemplates } from "@/hooks/useBulkApplyActionConfigTemplates";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { useApplyStandingApprovalTemplate } from "@/hooks/useApplyStandingApprovalTemplate";
+import { useBulkApplyStandingApprovalTemplates } from "@/hooks/useBulkApplyStandingApprovalTemplates";
 import { TemplateParamBadge } from "./TemplatePicker";
 import { QuickSetupPanel } from "./QuickSetupPanel";
-import {
-  approvalModeOptions,
-  type ApprovalMode,
-  type OperationTypeUI,
-} from "./recommendedTemplatesTypes";
+import { type OperationTypeUI } from "./recommendedTemplatesTypes";
 import { useRecommendedTemplateSelection } from "./useRecommendedTemplateSelection";
 import { templateIsApplied } from "./templateMatching";
 
-export type { ApprovalMode, OperationTypeUI };
+export type { OperationTypeUI };
 
 export interface RecommendedTemplatesDialogProps {
   open: boolean;
@@ -35,14 +30,8 @@ export interface RecommendedTemplatesDialogProps {
   agentId: number;
   connectorId: string;
   actions: ConnectorAction[];
-  /**
-   * Existing action configurations for this agent. Templates that are
-   * semantically equivalent to any of these (same action_type and
-   * deep-equal parameters) are hidden from the dialog to avoid
-   * encouraging duplicate adds.
-   */
-  existingConfigs?: ActionConfiguration[];
-  onCustomize: (template: ActionConfigTemplate, approvalMode: ApprovalMode) => void;
+  existingRules?: StandingApproval[];
+  onCustomize: (template: StandingApprovalTemplate) => void;
 }
 
 const operationSectionTitle: Record<OperationTypeUI, string> = {
@@ -58,13 +47,13 @@ export function RecommendedTemplatesDialog({
   agentId,
   connectorId,
   actions,
-  existingConfigs,
+  existingRules,
   onCustomize,
 }: RecommendedTemplatesDialogProps) {
   const { templates, isLoading, error } =
-    useActionConfigTemplates(connectorId);
-  const { applyTemplate, isPending } = useApplyActionConfigTemplate();
-  const { bulkApply, isBulkPending } = useBulkApplyActionConfigTemplates();
+    useStandingApprovalTemplates(connectorId);
+  const { applyTemplate, isPending } = useApplyStandingApprovalTemplate();
+  const { bulkApply, isBulkPending } = useBulkApplyStandingApprovalTemplates();
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(
     null,
   );
@@ -91,18 +80,18 @@ export function RecommendedTemplatesDialog({
   }, [actions]);
 
   const getOperationType = useCallback(
-    (template: ActionConfigTemplate): OperationTypeUI =>
+    (template: StandingApprovalTemplate): OperationTypeUI =>
       operationTypeByActionType.get(template.action_type) ?? "write",
     [operationTypeByActionType],
   );
 
   const liveTemplates = useMemo(() => {
-    const configs = existingConfigs ?? [];
+    const rules = existingRules ?? [];
     return templates.filter(
       (t) =>
-        actionTypeSet.has(t.action_type) && !templateIsApplied(t, configs),
+        actionTypeSet.has(t.action_type) && !templateIsApplied(t, rules),
     );
-  }, [templates, actionTypeSet, existingConfigs]);
+  }, [templates, actionTypeSet, existingRules]);
   const hasConnectorMatchingTemplates = useMemo(
     () => templates.some((t) => actionTypeSet.has(t.action_type)),
     [templates, actionTypeSet],
@@ -111,8 +100,6 @@ export function RecommendedTemplatesDialog({
   const {
     selectedIds,
     setSelectedIds,
-    getApprovalMode,
-    handleApprovalModeChange,
     allSelected,
     toggleSelectAll,
     toggleSelected,
@@ -144,12 +131,12 @@ export function RecommendedTemplatesDialog({
       subgroups: {
         actionType: string;
         actionName: string;
-        items: ActionConfigTemplate[];
+        items: StandingApprovalTemplate[];
       }[];
     }[] = [];
 
     for (const op of opOrder) {
-      const byAction = new Map<string, ActionConfigTemplate[]>();
+      const byAction = new Map<string, StandingApprovalTemplate[]>();
       for (const t of liveTemplates) {
         if (getOperationType(t) !== op) continue;
         const list = byAction.get(t.action_type) ?? [];
@@ -174,67 +161,56 @@ export function RecommendedTemplatesDialog({
     return out;
   }, [liveTemplates, actions, actionNameByType, getOperationType]);
 
-  async function handleUseTemplate(template: ActionConfigTemplate) {
-    const approvalMode = getApprovalMode(template);
+  async function handleUseTemplate(template: StandingApprovalTemplate) {
     setPendingTemplateId(template.id);
     try {
       const res = await applyTemplate({
         templateId: template.id,
         agentId,
-        approvalMode,
       });
       const sa = res.standing_approval;
       toast.success(
         sa
-          ? `Configuration "${template.name}" created with auto-approval`
-          : `Configuration "${template.name}" created`,
+          ? `Standing approval "${template.name}" created`
+          : `Template "${template.name}" applied`,
       );
       onOpenChange(false);
     } catch (err) {
       toast.error(
         err instanceof Error
           ? err.message
-          : "Failed to create action configuration",
+          : "Failed to create standing approval",
       );
     } finally {
       setPendingTemplateId(null);
     }
   }
 
-  function handleCustomize(template: ActionConfigTemplate) {
+  function handleCustomize(template: StandingApprovalTemplate) {
     onOpenChange(false);
-    onCustomize(template, getApprovalMode(template));
+    onCustomize(template);
   }
 
   async function handleBulkApply() {
     const ids = Array.from(selectedIds);
     if (ids.length === 0) return;
 
-    const modes: Record<string, ApprovalMode> = {};
-    for (const id of ids) {
-      const tpl = liveTemplates.find((t) => t.id === id);
-      if (tpl) {
-        modes[id] = getApprovalMode(tpl);
-      }
-    }
-
     try {
       const res = await bulkApply({
         templateIds: ids,
         agentId,
-        approvalModes: modes,
       });
       const succeeded = res.results.filter((r) => r.success);
       const failed = res.results.filter((r) => !r.success);
 
       if (failed.length === 0) {
         toast.success(
-          `${succeeded.length} configuration${succeeded.length === 1 ? "" : "s"} created`,
+          `${succeeded.length} standing approval${succeeded.length === 1 ? "" : "s"} created`,
         );
         setSelectedIds(new Set());
         onOpenChange(false);
       } else if (succeeded.length === 0) {
-        toast.error("Failed to create configurations");
+        toast.error("Failed to create standing approvals");
       } else {
         toast.warning(
           `${succeeded.length} of ${res.results.length} created. ${failed.length} failed.`,
@@ -244,9 +220,7 @@ export function RecommendedTemplatesDialog({
       }
     } catch (err) {
       toast.error(
-        err instanceof Error
-          ? err.message
-          : "Failed to apply templates",
+        err instanceof Error ? err.message : "Failed to apply templates",
       );
     }
   }
@@ -259,7 +233,7 @@ export function RecommendedTemplatesDialog({
         <DialogHeader>
           <DialogTitle>Recommended Templates</DialogTitle>
           <DialogDescription>
-            Start from a curated configuration for this connector. Use a
+            Start from a curated standing approval for this connector. Use a
             template as-is or customize it before saving.
           </DialogDescription>
         </DialogHeader>
@@ -346,10 +320,6 @@ export function RecommendedTemplatesDialog({
                                   onToggleSelected={() =>
                                     toggleSelected(template.id)
                                   }
-                                  approvalMode={getApprovalMode(template)}
-                                  onApprovalModeChange={(mode) =>
-                                    handleApprovalModeChange(template.id, mode)
-                                  }
                                   onUseTemplate={() =>
                                     void handleUseTemplate(template)
                                   }
@@ -397,24 +367,20 @@ function RecommendedTemplateCard({
   template,
   selected,
   onToggleSelected,
-  approvalMode,
-  onApprovalModeChange,
   onUseTemplate,
   onCustomize,
   disabled,
   usePending,
 }: {
-  template: ActionConfigTemplate;
+  template: StandingApprovalTemplate;
   selected: boolean;
   onToggleSelected: () => void;
-  approvalMode: ApprovalMode;
-  onApprovalModeChange: (mode: ApprovalMode) => void;
   onUseTemplate: () => void;
   onCustomize: () => void;
   disabled: boolean;
   usePending: boolean;
 }) {
-  const paramEntries = Object.entries(template.parameters);
+  const constraintEntries = Object.entries(template.constraints);
 
   return (
     <div className="rounded-lg border border-input p-3">
@@ -431,19 +397,13 @@ function RecommendedTemplateCard({
           {template.description && (
             <p className="text-muted-foreground text-sm">{template.description}</p>
           )}
-          {paramEntries.length > 0 && (
+          {constraintEntries.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {paramEntries.map(([key, value]) => (
+              {constraintEntries.map(([key, value]) => (
                 <TemplateParamBadge key={key} name={key} value={value} />
               ))}
             </div>
           )}
-          <SegmentedControl
-            options={approvalModeOptions}
-            value={approvalMode}
-            onChange={onApprovalModeChange}
-            ariaLabel="Approval mode"
-          />
           <div className="flex flex-wrap gap-2 pt-1">
             <Button
               type="button"
@@ -471,4 +431,3 @@ function RecommendedTemplateCard({
     </div>
   );
 }
-

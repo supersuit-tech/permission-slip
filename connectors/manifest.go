@@ -100,16 +100,47 @@ type ManifestStandingApproval struct {
 	DurationDays *int `json:"duration_days"`
 }
 
-// ManifestTemplate describes a predefined configuration preset for an action.
-// Templates pre-fill the name, description, and parameter constraints when a
-// user creates a new action configuration. ID must be globally unique.
+// ManifestTemplate describes a recommended standing approval preset for an action.
+// Templates pre-fill name, description, and constraint values when a user creates
+// a standing approval. Only templates with standing_approval (or duration_days) are
+// synced to the database — requires-approval-only legacy templates are ignored.
+// ID must be globally unique.
 type ManifestTemplate struct {
 	ID               string                    `json:"id"`
 	ActionType       string                    `json:"action_type"`
 	Name             string                    `json:"name"`
 	Description      string                    `json:"description,omitempty"`
-	Parameters       json.RawMessage           `json:"parameters"`
-	StandingApproval *ManifestStandingApproval `json:"standing_approval,omitempty"`
+	Constraints      json.RawMessage           `json:"constraints,omitempty"`
+	Parameters       json.RawMessage           `json:"parameters,omitempty"` // legacy alias for constraints
+	DurationDays     *int                      `json:"duration_days,omitempty"`
+	StandingApproval *ManifestStandingApproval `json:"standing_approval,omitempty"` // legacy; merged into DurationDays
+}
+
+// IsStandingApprovalPreset reports whether this template should be synced as a
+// standing approval preset. Legacy requires-approval-only templates (no standing
+// approval block) are skipped.
+func (t ManifestTemplate) IsStandingApprovalPreset() bool {
+	return t.StandingApproval != nil || t.DurationDays != nil
+}
+
+// EffectiveConstraints returns the constraint JSON for this template, preferring
+// the constraints field and falling back to legacy parameters.
+func (t ManifestTemplate) EffectiveConstraints() json.RawMessage {
+	if len(t.Constraints) > 0 {
+		return t.Constraints
+	}
+	return t.Parameters
+}
+
+// EffectiveDurationDays returns the template expiry duration in days.
+func (t ManifestTemplate) EffectiveDurationDays() *int {
+	if t.DurationDays != nil {
+		return t.DurationDays
+	}
+	if t.StandingApproval != nil {
+		return t.StandingApproval.DurationDays
+	}
+	return nil
 }
 
 // maxInstructionsURLLen is the maximum length for an instructions URL,
@@ -339,20 +370,23 @@ func (m *ConnectorManifest) Validate() error {
 		if tpl.Name == "" {
 			return fmt.Errorf("manifest validation: templates[%d].name is required", i)
 		}
-		if len(tpl.Parameters) == 0 {
-			return fmt.Errorf("manifest validation: templates[%d].parameters is required", i)
+		if !tpl.IsStandingApprovalPreset() {
+			continue // legacy requires-approval-only templates are ignored at sync time
 		}
-		// Verify parameters is a valid JSON object (not an array, string, etc.).
-		var params map[string]json.RawMessage
-		if err := json.Unmarshal(tpl.Parameters, &params); err != nil {
-			return fmt.Errorf("manifest validation: templates[%d].parameters must be a JSON object: %w", i, err)
+		constraints := tpl.EffectiveConstraints()
+		if len(constraints) == 0 {
+			return fmt.Errorf("manifest validation: templates[%d].constraints is required for standing approval presets", i)
+		}
+		var constraintObj map[string]json.RawMessage
+		if err := json.Unmarshal(constraints, &constraintObj); err != nil {
+			return fmt.Errorf("manifest validation: templates[%d].constraints must be a JSON object: %w", i, err)
 		}
 
-		if tpl.StandingApproval != nil {
-			sa := tpl.StandingApproval
-			if sa.DurationDays != nil && *sa.DurationDays <= 0 {
-				return fmt.Errorf("manifest validation: templates[%d].standing_approval.duration_days must be a positive integer or null", i)
-			}
+		if d := tpl.EffectiveDurationDays(); d != nil && *d <= 0 {
+			return fmt.Errorf("manifest validation: templates[%d].duration_days must be a positive integer or null", i)
+		}
+		if tpl.StandingApproval != nil && tpl.StandingApproval.DurationDays != nil && *tpl.StandingApproval.DurationDays <= 0 {
+			return fmt.Errorf("manifest validation: templates[%d].standing_approval.duration_days must be a positive integer or null", i)
 		}
 	}
 
@@ -757,22 +791,16 @@ func (m *ConnectorManifest) ToDBManifest() db.ExternalConnectorManifest {
 		})
 	}
 	for _, tpl := range m.Templates {
-		var standingSpec []byte
-		if tpl.StandingApproval != nil {
-			b, err := json.Marshal(tpl.StandingApproval)
-			if err != nil {
-				log.Printf("warning: failed to marshal standing_approval for template %s: %v", tpl.ID, err)
-			} else {
-				standingSpec = b
-			}
+		if !tpl.IsStandingApprovalPreset() {
+			continue
 		}
 		out.Templates = append(out.Templates, db.ExternalConnectorTemplate{
-			ID:                   tpl.ID,
-			ActionType:           tpl.ActionType,
-			Name:                 tpl.Name,
-			Description:          tpl.Description,
-			Parameters:           tpl.Parameters,
-			StandingApprovalSpec: standingSpec,
+			ID:           tpl.ID,
+			ActionType:   tpl.ActionType,
+			Name:         tpl.Name,
+			Description:  tpl.Description,
+			Constraints:  tpl.EffectiveConstraints(),
+			DurationDays: tpl.EffectiveDurationDays(),
 		})
 	}
 	return out
