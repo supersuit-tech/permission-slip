@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip/connectors"
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/shared"
 )
@@ -53,7 +54,7 @@ func handleApplyStandingApprovalTemplate(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		sa, err := applyStandingApprovalTemplateCore(r.Context(), deps.DB, profile, tpl, req.AgentID)
+		sa, err := applyStandingApprovalTemplateCore(r.Context(), deps.DB, deps.Connectors, profile, tpl, req.AgentID)
 		if err != nil {
 			if httpErr, ok := err.(*applyTemplateHTTPError); ok {
 				RespondError(w, r, httpErr.status, httpErr.resp)
@@ -81,6 +82,7 @@ func (e *applyTemplateHTTPError) Error() string { return e.resp.Error.Message }
 func applyStandingApprovalTemplateCore(
 	ctx context.Context,
 	pool db.DBTX,
+	registry *connectors.Registry,
 	profile *db.Profile,
 	tpl *db.StandingApprovalTemplate,
 	agentID int64,
@@ -104,7 +106,7 @@ func applyStandingApprovalTemplateCore(
 		return nil, &applyTemplateHTTPError{http.StatusBadRequest, BadRequest(ErrInvalidRequest, "invalid template action_type")}
 	}
 
-	standingBytes, err := buildStandingApprovalConstraintsFromTemplate(constraints)
+	standingBytes, err := buildStandingApprovalConstraintsFromTemplate(ctx, pool, registry, actionType, constraints)
 	if err != nil {
 		return nil, &applyTemplateHTTPError{http.StatusBadRequest, BadRequest(ErrInvalidRequest, err.Error())}
 	}
@@ -180,8 +182,14 @@ func applyStandingApprovalTemplateCore(
 
 // buildStandingApprovalConstraintsFromTemplate turns template constraint JSON into
 // standing-approval constraint JSON.
-func buildStandingApprovalConstraintsFromTemplate(templateConstraints []byte) ([]byte, error) {
-	validated, err := validateStandingApprovalConstraints(json.RawMessage(templateConstraints))
+func buildStandingApprovalConstraintsFromTemplate(
+	ctx context.Context,
+	pool db.DBTX,
+	registry *connectors.Registry,
+	actionType string,
+	templateConstraints []byte,
+) ([]byte, error) {
+	validated, err := validateStandingApprovalConstraintsForAction(ctx, pool, registry, actionType, json.RawMessage(templateConstraints))
 	if err == nil {
 		return validated, nil
 	}

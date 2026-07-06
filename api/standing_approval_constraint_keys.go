@@ -86,18 +86,47 @@ func validateStandingApprovalConstraintKeys(
 		}
 	}
 
-	for key := range obj {
+	for key, val := range obj {
 		if key == db.MetaNamespaceKey || key == db.DataWindowNamespaceKey {
 			continue
+		}
+		if key == "" {
+			return formatEmptyConstraintKeyError(obj[key], actionType, metaFields)
 		}
 		if schemaKeys != nil {
 			if _, ok := schemaKeys[key]; !ok {
 				return formatUnknownConstraintKeyError(key, actionType, metaFields)
 			}
+			continue
 		}
+		if metaFields != nil {
+			if _, ok := metaFields[key]; ok {
+				return formatUnknownConstraintKeyError(key, actionType, metaFields)
+			}
+		}
+		if isAllowedParameterConstraintValue(val) {
+			continue
+		}
+		return formatUnknownConstraintKeyError(key, actionType, metaFields)
 	}
 
 	return nil
+}
+
+func isAllowedParameterConstraintValue(val json.RawMessage) bool {
+	var s string
+	if json.Unmarshal(val, &s) == nil {
+		return true
+	}
+	var patternOnly map[string]json.RawMessage
+	if err := json.Unmarshal(val, &patternOnly); err != nil {
+		return false
+	}
+	if len(patternOnly) != 1 {
+		return false
+	}
+	_, ok := patternOnly[db.PatternKey]
+	return ok
 }
 
 func actionSchemaPropertyKeys(ctx context.Context, d db.DBTX, actionType string) (map[string]struct{}, error) {
@@ -189,6 +218,23 @@ func actionMetaConstraintFieldList(registry *connectors.Registry, actionType str
 	out := append([]string(nil), fields...)
 	sort.Strings(out)
 	return out, true
+}
+
+func formatEmptyConstraintKeyError(value json.RawMessage, actionType string, metaFields map[string]struct{}) error {
+	var innerObj map[string]json.RawMessage
+	if err := json.Unmarshal(value, &innerObj); err == nil {
+		for innerKey := range innerObj {
+			if metaFields != nil {
+				if _, ok := metaFields[innerKey]; ok {
+					return fmt.Errorf(
+						`constraint keys must not be empty; did you mean a verified metadata constraint? Use {"$meta":{%q:...}}`,
+						innerKey,
+					)
+				}
+			}
+		}
+	}
+	return fmt.Errorf("constraint keys must not be empty")
 }
 
 func formatUnknownConstraintKeyError(key, actionType string, metaFields map[string]struct{}) error {
