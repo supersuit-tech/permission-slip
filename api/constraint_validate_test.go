@@ -5,9 +5,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors/protonmail"
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
@@ -136,6 +138,105 @@ func TestRequestApproval_AutoApprove_SpoofedSenderParamIgnored(t *testing.T) {
 	}
 	if resp.Status == "approved" {
 		t.Fatal("spoofed sender param must not auto-approve when verified sender differs")
+	}
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 0)
+}
+
+func TestAgentCreateStandingApprovalRequest_RejectsEmptyKeyMetaConstraint(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"folder":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(protonmail.New())
+
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret, BaseURL: "https://app.example.com"}
+	router := NewRouter(deps)
+
+	reqBody := `{"action_type":"protonmail.read_email","constraints":{"":{"from":"automated@airbnb.com"}}}`
+	r := signedJSONRequest(t, http.MethodPost, "/standing-approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d: %s", w.Code, w.Body.String())
+	}
+	if !strings.Contains(w.Body.String(), `$meta`) {
+		t.Fatalf("expected $meta hint in response, got: %s", w.Body.String())
+	}
+}
+
+func TestRequestApproval_AutoApprove_ReadEmailMetaFromMismatch(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	testhelper.InsertConnector(t, tx, "protonmail")
+	testhelper.InsertConnectorAction(t, tx, "protonmail", "protonmail.read_email", "Read Email")
+
+	saID := testhelper.GenerateID(t, "sa_")
+	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:  "protonmail.read_email",
+		Constraints: []byte(`{"message_id":"*","folder":"*","$meta":{"from":"automated@airbnb.com"}}`),
+	})
+
+	action := &mockAction{result: &connectors.ActionResult{Data: json.RawMessage(`{"uid":42}`)}}
+	metaConn := &mockMetadataConnector{
+		mockConnector: mockConnector{
+			id:      "protonmail",
+			actions: map[string]connectors.Action{"protonmail.read_email": action},
+		},
+		metadata: map[string]any{
+			"messages": []map[string]any{{
+				"from": "other@example.com",
+				"to":   []string{"me@example.com"},
+				"cc":   []string{},
+				"bcc":  []string{},
+			}},
+			"senders": []string{"other@example.com"},
+			"sender":  "other@example.com",
+		},
+	}
+	registry := connectors.NewRegistry()
+	registry.Register(metaConn)
+
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	reqBody := `{"request_id":"read-email-meta-mismatch-001","action":{"type":"protonmail.read_email","parameters":{"message_id":42,"folder":"INBOX"}},"context":{"description":"read"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 pending, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "pending" {
+		t.Errorf("expected pending for non-matching sender, got %q", resp.Status)
 	}
 	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 0)
 }

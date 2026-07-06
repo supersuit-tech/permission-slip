@@ -1,6 +1,7 @@
 package api
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 	"time"
@@ -59,7 +60,7 @@ func TestToStandingApprovalResponse_PreservesConstraints(t *testing.T) {
 func TestBuildStandingApprovalConstraintsFromTemplate_AllWildcard(t *testing.T) {
 	t.Parallel()
 
-	got, err := buildStandingApprovalConstraintsFromTemplate([]byte(`{"to":"*","subject":"*","body":"*"}`))
+	got, err := buildStandingApprovalConstraintsFromTemplate(context.Background(), nil, nil, "email.send", []byte(`{"to":"*","subject":"*","body":"*"}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -71,7 +72,7 @@ func TestBuildStandingApprovalConstraintsFromTemplate_AllWildcard(t *testing.T) 
 func TestBuildStandingApprovalConstraintsFromTemplate_EmptyObject(t *testing.T) {
 	t.Parallel()
 
-	got, err := buildStandingApprovalConstraintsFromTemplate([]byte(`{}`))
+	got, err := buildStandingApprovalConstraintsFromTemplate(context.Background(), nil, nil, "email.send", []byte(`{}`))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

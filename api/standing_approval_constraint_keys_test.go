@@ -11,6 +11,60 @@ import (
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
 
+func TestValidateStandingApprovalConstraintKeys_RejectsEmptyKeyWithMetaHint(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"folder":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(protonmail.New())
+
+	constraints := []byte(`{"":{"from":"automated@airbnb.com"}}`)
+	err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "protonmail.read_email", constraints)
+	if err == nil {
+		t.Fatal("expected empty key rejection")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, `$meta`) || !strings.Contains(msg, "verified metadata constraint") {
+		t.Fatalf("expected $meta hint, got: %s", msg)
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_RejectsEmptyKeyWithoutSchema(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	testhelper.InsertConnectorAction(t, tx, "protonmail", "protonmail.read_email", "Read Email")
+
+	registry := connectors.NewRegistry()
+	registry.Register(protonmail.New())
+
+	constraints := []byte(`{"":{"from":"automated@airbnb.com"}}`)
+	err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "protonmail.read_email", constraints)
+	if err == nil {
+		t.Fatal("expected empty key rejection without parameters schema")
+	}
+	if !strings.Contains(err.Error(), `$meta`) {
+		t.Fatalf("expected $meta hint, got: %s", err.Error())
+	}
+}
+
+func TestValidateStandingApprovalConstraintsForAction_RejectsEmptyMetaKey(t *testing.T) {
+	t.Parallel()
+	raw := json.RawMessage(`{"message_id":"*","$meta":{"":"alice@example.com"}}`)
+	_, err := validateStandingApprovalConstraints(raw)
+	if err == nil {
+		t.Fatal("expected empty $meta key rejection")
+	}
+	if !strings.Contains(err.Error(), "$meta constraint keys must not be empty") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 func TestValidateStandingApprovalConstraintKeys_RejectsUnknownParam(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

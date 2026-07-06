@@ -163,7 +163,7 @@ func applyStandingApprovalTemplateInSavepoint(
 		return nil, fmt.Errorf("internal error")
 	}
 
-	sa, err := applyStandingApprovalTemplateCore(ctx, tx, profile, tpl, agentID)
+	sa, err := applyStandingApprovalTemplateCore(ctx, tx, nil, profile, tpl, agentID)
 	if err != nil {
 		tx.Exec(ctx, "ROLLBACK TO SAVEPOINT "+sp) //nolint:errcheck
 		return nil, err

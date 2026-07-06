@@ -689,6 +689,9 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 			}
 			metaMutated := false
 			for metaKey, metaVal := range metaObj {
+				if metaKey == "" {
+					return nil, errors.New("$meta constraint keys must not be empty")
+				}
 				if string(metaVal) == "null" {
 					return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
 				}
