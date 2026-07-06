@@ -180,7 +180,67 @@ describe("ConnectorInstancesSection", () => {
     expect(screen.getByText("Default")).toBeInTheDocument();
   });
 
-  it("enables a credential by creating an instance and assigning it", async () => {
+  it("enables the first credential from empty state by reusing the default instance", async () => {
+    mockStandardGets(false);
+    const emptyBinding = new Map<string, InstanceCredentialBinding | null>();
+    emptyBinding.set(defaultInstance.connector_instance_id, {
+      agent_id: 42,
+      connector_id: "slack",
+      credential_id: null,
+      oauth_connection_id: null,
+    });
+    mockUseConnectorInstanceCredentialBindings.mockReturnValue({
+      data: emptyBinding,
+      isLoading: false,
+      isPending: false,
+      isFetching: false,
+      status: "success" as const,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(
+      <ConnectorInstancesSection
+        agentId={42}
+        connectorId="slack"
+        requiredCredentials={[
+          {
+            service: "slack",
+            auth_type: "oauth2",
+            oauth_provider: "slack",
+          },
+        ]}
+      />,
+    );
+    await waitFor(() => {
+      expect(screen.getByText(/Slack OAuth — Acme/)).toBeInTheDocument();
+    });
+    const acmeCheckbox = screen.getByRole("checkbox", {
+      name: /Slack OAuth — Acme/i,
+    });
+    expect(acmeCheckbox).not.toBeChecked();
+    await user.click(acmeCheckbox);
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalled();
+    });
+    const createCalls = mockPost.mock.calls.filter(
+      (c) =>
+        c[0] === "/v1/agents/{agent_id}/connectors/{connector_id}/instances",
+    );
+    expect(createCalls.length).toBe(0);
+    const putCall = mockPut.mock.calls.find(
+      (c) =>
+        c[0] ===
+        "/v1/agents/{agent_id}/connectors/{connector_id}/instances/{instance_id}/credential",
+    );
+    expect(putCall?.[1]?.params?.path?.instance_id).toBe(
+      defaultInstance.connector_instance_id,
+    );
+    expect(putCall?.[1]?.body).toEqual({
+      credential_id: undefined,
+      oauth_connection_id: "oconn_1",
+    });
+  });
+
+  it("enables a second credential by creating a new non-default instance", async () => {
     mockStandardGets(false);
     mockUseConnectorInstanceCredentialBindings.mockReturnValue(
       bindingsQueryResult(false),
@@ -231,6 +291,10 @@ describe("ConnectorInstancesSection", () => {
       credential_id: undefined,
       oauth_connection_id: "oconn_2",
     });
+    expect(putCall?.[1]?.params?.path?.instance_id).toBe(
+      secondInstance.connector_instance_id,
+    );
+    expect(mockPatch).not.toHaveBeenCalled();
   });
 
   it("sets default instance via PATCH", async () => {
