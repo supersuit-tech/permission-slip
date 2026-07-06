@@ -255,23 +255,39 @@ export function ConnectorInstancesSection({
   }, [orphanInstanceIds, agentId, connectorId, deleteInstance]);
 
   async function enableRow(row: CredentialRow) {
-    const created = await create({ agentId, connectorId });
-    const newId = created?.connector_instance_id;
-    if (!newId) {
-      throw new Error("Server did not return a connector instance id");
+    let instanceId: string;
+    if (enabledInstanceCount === 0) {
+      const defaultInst = instances.find((i) => i.is_default);
+      if (defaultInst) {
+        instanceId = defaultInst.connector_instance_id;
+      } else {
+        const created = await create({ agentId, connectorId });
+        const newId = created?.connector_instance_id;
+        if (!newId) {
+          throw new Error("Server did not return a connector instance id");
+        }
+        instanceId = newId;
+      }
+    } else {
+      const created = await create({ agentId, connectorId });
+      const newId = created?.connector_instance_id;
+      if (!newId) {
+        throw new Error("Server did not return a connector instance id");
+      }
+      instanceId = newId;
     }
     if (row.kind === "oauth") {
       await assign({
         agentId,
         connectorId,
-        instanceId: newId,
+        instanceId,
         oauthConnectionId: row.connection.id,
       });
     } else {
       await assign({
         agentId,
         connectorId,
-        instanceId: newId,
+        instanceId,
         credentialId: row.credential.id,
       });
     }
