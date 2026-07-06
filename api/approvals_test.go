@@ -980,6 +980,17 @@ func TestDenyAllApprovals_SkipsBulkGroupItems(t *testing.T) {
 	groupID := testhelper.GenerateID(t, "grp_")
 	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
 	testhelper.InsertApproval(t, tx, standaloneID, agentID, uid)
+	_, err := db.InsertApprovalBulkGroup(context.Background(), tx, db.InsertApprovalBulkGroupParams{
+		BulkGroupID: groupID,
+		AgentID:     agentID,
+		ApproverID:  uid,
+		ActionType:  "test",
+		ItemCount:   1,
+		ExpiresAt:   time.Now().Add(time.Hour),
+	})
+	if err != nil {
+		t.Fatalf("insert bulk group: %v", err)
+	}
 	testhelper.MustExec(t, tx,
 		`INSERT INTO approvals (approval_id, agent_id, approver_id, bulk_group_id, action, context, status, expires_at)
 		 VALUES ($1, $2, $3, $4, '{"type":"test"}', '{"description":"test"}', 'pending', strftime('%Y-%m-%dT%H:%M:%fZ', 'now', '+1 hour'))`,
