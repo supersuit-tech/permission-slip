@@ -24,7 +24,6 @@ import {
   NameField,
   DescriptionField,
   buildParametersFromForm,
-  getEmptyRequiredParams,
   type ParamMode,
 } from "./StandingApprovalFormFields";
 import {
@@ -134,18 +133,6 @@ export function AddStandingApprovalDialog({
     }
     if (!name.trim()) {
       toast.error("Please enter a name for this standing approval");
-      return;
-    }
-
-    const emptyRequired = getEmptyRequiredParams(
-      paramValues,
-      schema?.required,
-      schema?.properties,
-    );
-    if (emptyRequired.length > 0) {
-      toast.error(
-        `Required parameters need a value or wildcard: ${emptyRequired.join(", ")}`,
-      );
       return;
     }
 

@@ -35,9 +35,22 @@ describe("buildParametersFromForm", () => {
     expect(result).toEqual({ query: { $pattern: "exact-match" } });
   });
 
-  it("skips empty values", () => {
-    const result = buildParametersFromForm({ name: "", email: "test@example.com" });
-    expect(result).toEqual({ email: "test@example.com" });
+  it("wildcardizes blank schema params instead of omitting them", () => {
+    const schema = { name: { type: "string" }, email: { type: "string" } };
+    const result = buildParametersFromForm({ name: "", email: "test@example.com" }, schema);
+    expect(result).toEqual({ name: "*", email: "test@example.com" });
+  });
+
+  it("defaults unset schema parameters to wildcard", () => {
+    const schema = { message_id: { type: "integer" }, folder: { type: "string" } };
+    const result = buildParametersFromForm({}, schema);
+    expect(result).toEqual({ message_id: "*", folder: "*" });
+  });
+
+  it("preserves explicit values while wildcarding unset params", () => {
+    const schema = { message_id: { type: "integer" }, folder: { type: "string" } };
+    const result = buildParametersFromForm({ folder: "INBOX" }, schema);
+    expect(result).toEqual({ message_id: "*", folder: "INBOX" });
   });
 
   it("coerces integer types", () => {
@@ -84,10 +97,10 @@ describe("buildParametersFromForm", () => {
     expect(result).toEqual({ tags: ["tag*", "billing"] });
   });
 
-  it("omits array key when all items are empty strings", () => {
+  it("wildcardizes array key when all items are empty strings", () => {
     const schema = { tags: { type: "array" } };
     const result = buildParametersFromForm({ tags: '["",""]' }, schema);
-    expect(result).toEqual({});
+    expect(result).toEqual({ tags: "*" });
   });
 
   it("falls through to string when array JSON is invalid", () => {

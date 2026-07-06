@@ -24,7 +24,6 @@ import {
   NameField,
   DescriptionField,
   buildParametersFromForm,
-  getEmptyRequiredParams,
   isPatternWrapper,
   type ParamMode,
 } from "./StandingApprovalFormFields";
@@ -121,18 +120,6 @@ export function EditStandingApprovalDialog({
 
     if (!name.trim()) {
       toast.error("Name is required");
-      return;
-    }
-
-    const emptyRequired = getEmptyRequiredParams(
-      paramValues,
-      schema?.required,
-      schema?.properties,
-    );
-    if (emptyRequired.length > 0) {
-      toast.error(
-        `Required parameters need a value or wildcard: ${emptyRequired.join(", ")}`,
-      );
       return;
     }
 

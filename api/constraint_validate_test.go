@@ -241,6 +241,118 @@ func TestRequestApproval_AutoApprove_ReadEmailMetaFromMismatch(t *testing.T) {
 	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 0)
 }
 
+func setupReadEmailMetaOnlyStandingApprovalTest(t *testing.T, constraints []byte, metadata map[string]any) (db.DBTX, http.Handler, int64, []byte, string) {
+	t.Helper()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"folder":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	saID := testhelper.GenerateID(t, "sa_")
+	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:  "protonmail.read_email",
+		Constraints: constraints,
+	})
+
+	action := &mockAction{result: &connectors.ActionResult{Data: json.RawMessage(`{"uid":42}`)}}
+	metaConn := &mockMetadataConnector{
+		mockConnector: mockConnector{
+			id:      "protonmail",
+			actions: map[string]connectors.Action{"protonmail.read_email": action},
+		},
+		metadata: metadata,
+	}
+	registry := connectors.NewRegistry()
+	registry.Register(metaConn)
+
+	deps := &Deps{DB: tx, Connectors: registry, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	return tx, router, agentID, privKey, saID
+}
+
+func TestRequestApproval_AutoApprove_ReadEmailMetaOnlyConstraintMatch(t *testing.T) {
+	t.Parallel()
+	tx, router, agentID, privKey, saID := setupReadEmailMetaOnlyStandingApprovalTest(t,
+		[]byte(`{"$meta":{"from":"automated@example.com"}}`),
+		map[string]any{
+			"messages": []map[string]any{{
+				"from": "automated@example.com",
+				"to":   []string{"me@example.com"},
+				"cc":   []string{},
+				"bcc":  []string{},
+			}},
+			"senders": []string{"automated@example.com"},
+			"sender":  "automated@example.com",
+		},
+	)
+
+	reqBody := `{"request_id":"read-email-meta-only-match-001","action":{"type":"protonmail.read_email","parameters":{"message_id":42,"folder":"INBOX"}},"context":{"description":"read"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "approved" {
+		t.Errorf("expected approved, got %q", resp.Status)
+	}
+	if resp.StandingApprovalID != saID {
+		t.Errorf("expected standing approval %q, got %q", saID, resp.StandingApprovalID)
+	}
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 1)
+}
+
+func TestRequestApproval_AutoApprove_ReadEmailMetaOnlyConstraintMismatch(t *testing.T) {
+	t.Parallel()
+	tx, router, agentID, privKey, saID := setupReadEmailMetaOnlyStandingApprovalTest(t,
+		[]byte(`{"$meta":{"from":"automated@example.com"}}`),
+		map[string]any{
+			"messages": []map[string]any{{
+				"from": "other@example.com",
+				"to":   []string{"me@example.com"},
+				"cc":   []string{},
+				"bcc":  []string{},
+			}},
+			"senders": []string{"other@example.com"},
+			"sender":  "other@example.com",
+		},
+	)
+
+	reqBody := `{"request_id":"read-email-meta-only-mismatch-001","action":{"type":"protonmail.read_email","parameters":{"message_id":42,"folder":"INBOX"}},"context":{"description":"read"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 pending, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "pending" {
+		t.Errorf("expected pending for non-matching sender, got %q", resp.Status)
+	}
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 0)
+}
+
 func TestRequestApproval_AutoApprove_ReadEmailMetaFromMatch(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)

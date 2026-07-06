@@ -94,33 +94,24 @@ export function ActionSelect({
 }
 
 /**
- * Returns the names of required parameters that have empty (non-wildcard) values.
- * Used to prevent submitting a form with required params accidentally omitted
- * (e.g. after toggling from wildcard to fixed without entering a value).
- *
- * Hidden fields (x-ui.hidden) are excluded — they are auto-wildcarded at
- * submission time and should never block the user.
+ * Blank parameter fields default to wildcard at submission time, so they never
+ * block save. Kept for call-site compatibility; always returns an empty list.
  */
 export function getEmptyRequiredParams(
-  paramValues: Record<string, string>,
-  requiredFields?: string[],
-  schemaProperties?: Record<string, { "x-ui"?: { hidden?: boolean } }>,
+  _paramValues: Record<string, string>,
+  _requiredFields?: string[],
+  _schemaProperties?: Record<string, { "x-ui"?: { hidden?: boolean } }>,
 ): string[] {
-  if (!requiredFields?.length) return [];
-  return requiredFields.filter((key) => {
-    if (schemaProperties?.[key]?.["x-ui"]?.hidden) return false;
-    const value = paramValues[key];
-    return value === undefined || value === "";
-  });
+  return [];
 }
 
 export type ParamMode = "fixed" | "pattern" | "wildcard";
 
 /**
  * Convert form parameter values (string map) into the API request format.
- * Filters out empty strings so only user-provided values are sent.
  * When schema properties are provided, coerces values back to their declared
  * types (integer, number, boolean) so the backend receives correct JSON types.
+ * Schema parameters left blank are stored as "*" (any value).
  *
  * Wildcard parameters (mode === "wildcard") are stored as "*".
  * Values containing "*" are auto-detected as patterns and wrapped as
@@ -191,6 +182,15 @@ export function buildParametersFromForm(
 
     parameters[key] = value;
   }
+
+  if (schemaProperties) {
+    for (const key of Object.keys(schemaProperties)) {
+      if (!(key in parameters)) {
+        parameters[key] = "*";
+      }
+    }
+  }
+
   return parameters;
 }
 

@@ -33,7 +33,16 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 			sa = candidate
 			break
 		}
-		if err := validateActionConstraints(r.Context(), deps, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID, candidate.Constraints, params); err != nil {
+		effectiveConstraints := candidate.Constraints
+		if filled, fillErr := fillMissingSchemaParameterWildcards(r.Context(), deps.DB, actionType, candidate.Constraints); fillErr != nil {
+			log.Printf("[%s] AutoApprove: fill schema wildcards for %s: %v",
+				TraceID(r.Context()), candidate.StandingApprovalID, fillErr)
+			CaptureError(r.Context(), fillErr)
+			continue
+		} else {
+			effectiveConstraints = filled
+		}
+		if err := validateActionConstraints(r.Context(), deps, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID, effectiveConstraints, params); err != nil {
 			configErr, unresolved := constraintMatchErr(err)
 			if unresolved {
 				metadataUnresolvedSkipped++
