@@ -1,10 +1,11 @@
 import {
   DATA_WINDOW_NAMESPACE_KEY,
-  META_NAMESPACE_KEY,
   isPatternWrapper,
-  metaConstraintLabel,
+  META_NAMESPACE_KEY,
+  formatStandingApprovalConstraints,
   type ConstraintMode,
-} from "@/lib/constraints";
+  type ParsedConstraintLine,
+} from "@permission-slip/constraints-format";
 import type { ParamMode } from "@/pages/agents/connectors/StandingApprovalFormFields";
 import type { DataWindowFormState } from "@/lib/dataWindow";
 import { buildDataWindowConstraint } from "@/lib/dataWindow";
@@ -341,58 +342,22 @@ export interface ParsedConstraintDisplay {
   scenarioIndex?: number;
 }
 
-function formatRowDisplay(
-  label: string,
-  row: ConstraintValueRow,
-): ParsedConstraintDisplay {
-  const decoded = decodeStoredValue(encodeRowValue(row));
-  return {
-    name: label,
-    mode: decoded.mode,
-    value: decoded.mode === "wildcard" ? "any" : decoded.value,
-    negated: row.operator === "does_not_match",
-  };
-}
-
 /** Human-readable constraint lines including negation and scenario grouping. */
 export function parseStructuredConstraintsForDisplay(
   constraints: Record<string, unknown> | null | undefined,
 ): ParsedConstraintDisplay[] {
   if (!constraints || typeof constraints !== "object") return [];
+  if (!isStructuredConstraints(constraints)) return [];
 
-  if (!isStructuredConstraints(constraints)) {
-    return [];
-  }
-
-  const form = parseStructuredDocument(constraints);
-  const lines: ParsedConstraintDisplay[] = [];
-
-  form.scenarios.forEach((scenario, scenarioIndex) => {
-    const prefix =
-      form.scenarios.length > 1 ? `Scenario ${scenarioIndex + 1}: ` : "";
-
-    for (const [field, rows] of Object.entries(scenario.paramRows)) {
-      for (const row of rows) {
-        if (row.value === "" && row.mode !== "wildcard") continue;
-        lines.push({
-          ...formatRowDisplay(`${prefix}${field}`, row),
-          scenarioIndex,
-        });
-      }
-    }
-    for (const [field, rows] of Object.entries(scenario.metaRows)) {
-      const label = metaConstraintLabel(field);
-      for (const row of rows) {
-        if (row.value === "" && row.mode !== "wildcard") continue;
-        lines.push({
-          ...formatRowDisplay(`${prefix}${label}`, row),
-          scenarioIndex,
-        });
-      }
-    }
-  });
-
-  return lines;
+  return formatStandingApprovalConstraints(constraints).map((line: ParsedConstraintLine) => ({
+    name: line.label,
+    mode: line.mode,
+    value: line.mode === "wildcard" ? "any" : line.value,
+    negated: line.negated,
+    scenarioIndex: /^Scenario (\d+): /.test(line.label)
+      ? Number.parseInt(/^Scenario (\d+): /.exec(line.label)?.[1] ?? "0", 10) - 1
+      : undefined,
+  }));
 }
 
 /** Plain-language summary for a field's rows within one scenario. */

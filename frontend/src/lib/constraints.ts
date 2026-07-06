@@ -1,41 +1,17 @@
-import { formatDataWindowConstraint } from "@/lib/dataWindow";
 import {
-  isStructuredConstraints,
-  parseStructuredConstraintsForDisplay,
-} from "@/lib/structuredConstraints";
+  formatStandingApprovalConstraints,
+  type ConstraintMode as SharedConstraintMode,
+} from "@permission-slip/constraints-format";
 
-/** Check if a stored parameter value is a $pattern wrapper object. */
-export function isPatternWrapper(value: unknown): value is { $pattern: string } {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    "$pattern" in value &&
-    typeof (value as Record<string, unknown>).$pattern === "string"
-  );
-}
+export {
+  DATA_WINDOW_NAMESPACE_KEY,
+  formatDataWindowConstraint,
+  isPatternWrapper,
+  metaConstraintLabel,
+  META_NAMESPACE_KEY,
+} from "@permission-slip/constraints-format";
 
-export const META_NAMESPACE_KEY = "$meta";
-export const DATA_WINDOW_NAMESPACE_KEY = "$data_window";
-
-/** Human-readable labels for verified $meta constraint fields. */
-export function metaConstraintLabel(key: string): string {
-  switch (key) {
-    case "from":
-    case "sender":
-    case "senders":
-      return "Verified sender";
-    case "to":
-      return "Verified To";
-    case "cc":
-      return "Verified Cc";
-    case "bcc":
-      return "Verified Bcc (sent mail only)";
-    default:
-      return `Verified ${key}`;
-  }
-}
-
-export type ConstraintMode = "fixed" | "pattern" | "wildcard";
+export type ConstraintMode = SharedConstraintMode;
 
 export interface ParsedConstraint {
   name: string;
@@ -45,76 +21,27 @@ export interface ParsedConstraint {
   scenarioIndex?: number;
 }
 
-function parseConstraintValue(
-  name: string,
-  raw: unknown,
-): ParsedConstraint {
-  if (raw === "*") {
-    return { name, mode: "wildcard", value: "*" };
-  }
-  if (isPatternWrapper(raw)) {
-    return { name, mode: "pattern", value: raw.$pattern };
-  }
-  return { name, mode: "fixed", value: String(raw) };
+function lineToParsedConstraint(line: {
+  label: string;
+  mode: ConstraintMode;
+  value: string;
+  negated?: boolean;
+}): ParsedConstraint {
+  const scenarioMatch = /^Scenario (\d+): /.exec(line.label);
+  return {
+    name: line.label,
+    mode: line.mode,
+    value: line.mode === "wildcard" ? "*" : line.value,
+    negated: line.negated,
+    scenarioIndex: scenarioMatch
+      ? Number.parseInt(scenarioMatch[1] ?? "0", 10) - 1
+      : undefined,
+  };
 }
 
 /** Flatten standing-approval constraints into display rows (params + $meta + $data_window). */
 export function parseStandingApprovalConstraints(
   constraints: Record<string, unknown> | null | undefined,
 ): ParsedConstraint[] {
-  if (!constraints || typeof constraints !== "object") return [];
-
-  if (isStructuredConstraints(constraints)) {
-    const structured = parseStructuredConstraintsForDisplay(constraints);
-    const dataWindow = constraints.groups;
-    // Append data window from first group if present
-    if (Array.isArray(dataWindow)) {
-      for (const group of dataWindow) {
-        const conditions = (group as { conditions?: unknown[] }).conditions;
-        if (!Array.isArray(conditions)) continue;
-        for (const cond of conditions) {
-          if (!cond || typeof cond !== "object") continue;
-          const c = cond as Record<string, unknown>;
-          if (c.field === DATA_WINDOW_NAMESPACE_KEY) {
-            const text = formatDataWindowConstraint(c.value);
-            if (text) {
-              structured.push({
-                name: "Data window",
-                mode: "fixed",
-                value: text,
-              });
-            }
-          }
-        }
-      }
-    }
-    return structured;
-  }
-
-  const parsed: ParsedConstraint[] = [];
-  for (const [key, raw] of Object.entries(constraints)) {
-    if (key === META_NAMESPACE_KEY) {
-      if (!raw || typeof raw !== "object") continue;
-      for (const [metaKey, metaVal] of Object.entries(
-        raw as Record<string, unknown>,
-      )) {
-        const label = metaConstraintLabel(metaKey);
-        parsed.push(parseConstraintValue(label, metaVal));
-      }
-      continue;
-    }
-    if (key === DATA_WINDOW_NAMESPACE_KEY) {
-      const text = formatDataWindowConstraint(raw);
-      if (text) {
-        parsed.push({
-          name: "Data window",
-          mode: "fixed",
-          value: text,
-        });
-      }
-      continue;
-    }
-    parsed.push(parseConstraintValue(key, raw));
-  }
-  return parsed;
+  return formatStandingApprovalConstraints(constraints).map(lineToParsedConstraint);
 }

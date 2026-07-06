@@ -95,4 +95,15 @@ Express `(repo = webapp AND title contains bug) OR (channel = #incidents)` as tw
 
 Existing flat constraints are adapted at evaluation time to a single v2 group with one `matches` condition per field. Behavior is unchanged for legacy rows.
 
+**No database migration is required.** Legacy flat JSON continues to match identically; the Go read adapter normalizes flat maps to v2 at evaluation time. New standing approvals created in the web UI are stored as v2 structured JSON. To inspect either format:
+
+- **CLI:** `permission-slip auto-approve format --constraints '<json>'` (add `--text` for plain output)
+- **Web / mobile:** constraint summaries on standing approval cards and review dialogs
+
+Optional future work: a one-time backfill migration to rewrite legacy rows as v2 for consistency in raw JSON exports. That is not required for correctness.
+
 See also [ADR-002](adr/002-standing-approvals.md) and `db/constraint_validate.go` for engine details.
+
+## Display formatting (shared)
+
+Human-readable constraint summaries use `@permission-slip/constraints-format` in `shared/constraints/`. The same formatter powers web (`ConstraintsSummary`), mobile (standing approval detail screens), and the CLI (`auto-approve format`). When changing display semantics, update `shared/constraints/format.ts` and its tests once.

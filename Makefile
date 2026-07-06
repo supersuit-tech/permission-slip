@@ -15,6 +15,7 @@
 
 # Install all dependencies (frontend + backend + mobile + cli)
 install:
+	cd shared/constraints && npm install
 	cd frontend && npm install
 	cd mobile && npm install
 	cd cli && npm install
@@ -23,7 +24,7 @@ install:
 # Minimal install for server production build (CI): frontend + Go only.
 # Uses npm ci --ignore-scripts to skip postinstall (openapi-typescript); run
 # make bundle && make generate-frontend-from-bundle before frontend build.
-install-build-deps:
+install-build-deps: shared-constraints-build
 	cd frontend && npm ci --ignore-scripts
 	go mod download
 
@@ -81,7 +82,7 @@ build: generate
 
 # CI / slim server build: expects bundle + generate-frontend-from-bundle already
 # (see install-build-deps). Does not install mobile or CLI npm dependencies.
-build-ci:
+build-ci: shared-constraints-build
 	cd frontend && VITE_GIT_COMMIT_HASH=$(GIT_COMMIT_HASH) VITE_GIT_COMMIT_TIMESTAMP=$(GIT_COMMIT_TIMESTAMP) VITE_WEB_VERSION=$(WEB_VERSION) npm run build
 	touch frontend/dist/.gitkeep
 	go build -ldflags "-X main.version=$(GIT_SHA)" -o bin/server .
@@ -121,7 +122,7 @@ redeploy:
 
 # ---------- Testing ----------
 
-test: test-backend test-frontend mobile-test cli-test
+test: test-backend test-frontend mobile-test shared-constraints-test cli-test
 
 test-backend:
 	go test ./...
@@ -133,7 +134,7 @@ test-backend:
 		echo "Supabase not detected — skipping integration-tagged tests (run 'supabase start' to include them)."; \
 	fi
 
-test-frontend:
+test-frontend: shared-constraints-build
 	cd frontend && npm test
 
 # Explicit integration test target — errors if Supabase is not running.
@@ -239,6 +240,7 @@ install-connectors:
 
 # Install CLI dependencies
 cli-install:
+	cd shared/constraints && npm install
 	cd cli && npm install
 
 # Build the CLI (TypeScript → dist/)
@@ -246,8 +248,17 @@ cli-build: cli-install
 	cd cli && npm run build
 
 # Run CLI tests
-cli-test: cli-install
+cli-test: cli-install shared-constraints-build
 	cd cli && npm test
+
+shared-constraints-install:
+	cd shared/constraints && npm install
+
+shared-constraints-build: shared-constraints-install
+	cd shared/constraints && npm run build
+
+shared-constraints-test: shared-constraints-build
+	cd shared/constraints && npm test
 
 # Shorthand: install + build + test
 cli: cli-build cli-test
