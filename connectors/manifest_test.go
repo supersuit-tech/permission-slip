@@ -499,18 +499,19 @@ func TestParseManifest_NoTemplates(t *testing.T) {
 
 func TestParseManifest_TemplateValidationErrors(t *testing.T) {
 	base := `{"id":"x","name":"X","actions":[{"action_type":"x.do","name":"Do"}],"templates":[%s]}`
+	preset := `"duration_days":30`
 
 	tests := []struct {
 		name     string
 		template string
 	}{
-		{"missing template id", `{"action_type":"x.do","name":"T","parameters":{"k":"v"}}`},
-		{"missing template action_type", `{"id":"tpl_x_1","name":"T","parameters":{"k":"v"}}`},
-		{"template action_type not in actions", `{"id":"tpl_x_1","action_type":"x.other","name":"T","parameters":{"k":"v"}}`},
-		{"missing template name", `{"id":"tpl_x_1","action_type":"x.do","parameters":{"k":"v"}}`},
-		{"missing template parameters", `{"id":"tpl_x_1","action_type":"x.do","name":"T"}`},
-		{"duplicate template id", `{"id":"tpl_x_1","action_type":"x.do","name":"A","parameters":{"k":"v"}},{"id":"tpl_x_1","action_type":"x.do","name":"B","parameters":{"k":"v"}}`},
-		{"template id missing connector id", `{"id":"tpl_other_1","action_type":"x.do","name":"T","parameters":{"k":"v"}}`},
+		{"missing template id", `{"action_type":"x.do","name":"T",` + preset + `,"constraints":{"k":"v"}}`},
+		{"missing template action_type", `{"id":"tpl_x_1","name":"T",` + preset + `,"constraints":{"k":"v"}}`},
+		{"template action_type not in actions", `{"id":"tpl_x_1","action_type":"x.other","name":"T",` + preset + `,"constraints":{"k":"v"}}`},
+		{"missing template name", `{"id":"tpl_x_1","action_type":"x.do",` + preset + `,"constraints":{"k":"v"}}`},
+		{"missing template constraints", `{"id":"tpl_x_1","action_type":"x.do","name":"T",` + preset + `}`},
+		{"duplicate template id", `{"id":"tpl_x_1","action_type":"x.do","name":"A",` + preset + `,"constraints":{"k":"v"}},{"id":"tpl_x_1","action_type":"x.do","name":"B",` + preset + `,"constraints":{"k":"v"}}`},
+		{"template id missing connector id", `{"id":"tpl_other_1","action_type":"x.do","name":"T",` + preset + `,"constraints":{"k":"v"}}`},
 	}
 
 	for _, tt := range tests {

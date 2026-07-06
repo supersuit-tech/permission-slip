@@ -34,6 +34,10 @@ const standingApprovalColumns = `standing_approval_id, agent_id, user_id, action
 	constraints, name, description, connector_instance_id, status,
 	starts_at, expires_at, created_at, revoked_at, expired_at`
 
+// WildcardActionType is the reserved action_type value that means
+// "all actions on this connector".
+const WildcardActionType = "*"
+
 // MaxStandingApprovalListSize is the maximum number of standing approvals returned per page.
 const MaxStandingApprovalListSize = 100
 

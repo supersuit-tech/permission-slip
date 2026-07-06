@@ -16,6 +16,11 @@ type bulkApplyStandingApprovalTemplateRequest struct {
 	TemplateIDs []string `json:"template_ids" validate:"required,min=1,max=50,dive,required,max=255"`
 }
 
+type bulkApplyResultError struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 type bulkApplyStandingApprovalResult struct {
 	TemplateID       string                    `json:"template_id"`
 	Success          bool                      `json:"success"`
@@ -108,7 +113,7 @@ func handleBulkApplyStandingApprovalTemplates(deps *Deps) http.HandlerFunc {
 				code := string(ErrInternalError)
 				msg := err.Error()
 				if httpErr, ok := err.(*applyTemplateHTTPError); ok {
-					code = httpErr.resp.Error.Code
+					code = string(httpErr.resp.Error.Code)
 					msg = httpErr.resp.Error.Message
 				}
 				results = append(results, bulkApplyStandingApprovalResult{
@@ -166,4 +171,19 @@ func applyStandingApprovalTemplateInSavepoint(
 		return nil, fmt.Errorf("internal error")
 	}
 	return sa, nil
+}
+
+// deduplicateStrings returns a new slice with duplicates removed, preserving
+// the first occurrence order.
+func deduplicateStrings(ss []string) []string {
+	seen := make(map[string]struct{}, len(ss))
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		if _, ok := seen[s]; ok {
+			continue
+		}
+		seen[s] = struct{}{}
+		out = append(out, s)
+	}
+	return out
 }
