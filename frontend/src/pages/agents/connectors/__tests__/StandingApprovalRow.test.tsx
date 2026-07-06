@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { describe, it, expect, vi } from "vitest";
 import {
   Table,
@@ -53,23 +53,44 @@ const baseRule: StandingApproval = {
 };
 
 describe("StandingApprovalRow", () => {
-  it("renders constraint pills for object constraints", () => {
+  it("renders constraint badges for object constraints", () => {
     renderRow(baseRule);
 
     expect(screen.getByText("Match all issues")).toBeInTheDocument();
-    expect(screen.getByText("repo:")).toBeInTheDocument();
+    expect(screen.getByText("repo")).toBeInTheDocument();
     expect(screen.getByText("myorg/*")).toBeInTheDocument();
   });
 
-  it("renders Match all when constraints is null", () => {
+  it("renders No constraints when constraints is null", () => {
     renderRow({ ...baseRule, constraints: null as unknown as Record<string, unknown> });
 
-    expect(screen.getByText("Match all")).toBeInTheDocument();
+    expect(screen.getByText("No constraints")).toBeInTheDocument();
   });
 
   it("renders Match all when constraints is an empty object", () => {
     renderRow({ ...baseRule, constraints: {} });
 
-    expect(screen.getByText("Match all")).toBeInTheDocument();
+    expect(screen.getByText("No constraints")).toBeInTheDocument();
+  });
+
+  it("renders verified sender constraints from $meta", () => {
+    renderRow({
+      ...baseRule,
+      name: "Read Email from automated@airbnb.com",
+      description:
+        "Created automatically when approving a standing auto-approve rule proposal",
+      constraints: {
+        message_id: "*",
+        folder: "*",
+        $meta: { from: "automated@airbnb.com" },
+      },
+    });
+
+    fireEvent.click(screen.getByText("+1 more"));
+    expect(screen.getByText("Verified sender")).toBeInTheDocument();
+    expect(screen.getByText("automated@airbnb.com")).toBeInTheDocument();
+    expect(
+      screen.queryByText(/Created automatically when approving/i),
+    ).not.toBeInTheDocument();
   });
 });

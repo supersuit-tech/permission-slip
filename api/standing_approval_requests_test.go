@@ -101,6 +101,62 @@ func TestApproveStandingApprovalRequest_HappyPath(t *testing.T) {
 	if resp.ResultingStandingApprovalID == "" {
 		t.Error("expected resulting_standing_approval_id")
 	}
+	if resp.StandingApproval == nil {
+		t.Fatal("expected standing_approval in response")
+	}
+	if !strings.Contains(resp.StandingApproval.Name, "email.send") &&
+		!strings.Contains(resp.StandingApproval.Name, "to:") {
+		t.Errorf("expected derived name to mention action or constraint, got %q", resp.StandingApproval.Name)
+	}
+	if resp.StandingApproval.Description == nil || *resp.StandingApproval.Description != standingApprovalAutoRuleDescription {
+		t.Errorf("description = %v, want %q", resp.StandingApproval.Description, standingApprovalAutoRuleDescription)
+	}
+}
+
+func TestApproveStandingApprovalRequest_DerivesNameFromMetaFrom(t *testing.T) {
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"folder":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	requestID := testhelper.GenerateID(t, "sar_")
+	constraints := []byte(`{"message_id":"*","folder":"*","$meta":{"from":"automated@airbnb.com"}}`)
+	_, err := tx.Exec(t.Context(),
+		`INSERT INTO standing_approval_requests
+		   (request_id, agent_id, user_id, action_type, action_version, constraints, status)
+		   VALUES ($1, $2, $3, 'protonmail.read_email', '1', $4, 'pending')`,
+		requestID, agentID, uid, constraints,
+	)
+	if err != nil {
+		t.Fatalf("insert request: %v", err)
+	}
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodPost, "/standing-approval-requests/"+requestID+"/approve", uid)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp approveStandingApprovalRequestResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.StandingApproval == nil {
+		t.Fatal("expected standing_approval in response")
+	}
+	want := "Read Email — from automated@airbnb.com"
+	if resp.StandingApproval.Name != want {
+		t.Errorf("name = %q, want %q", resp.StandingApproval.Name, want)
+	}
 }
 
 func TestApproveStandingApprovalRequest_UntilRevoked(t *testing.T) {

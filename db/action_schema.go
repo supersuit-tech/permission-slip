@@ -1,10 +1,9 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"errors"
-
 )
 
 // ActionSchema holds the connector ID and parameters schema for an action type.
@@ -29,4 +28,20 @@ func GetActionParametersSchema(ctx context.Context, db DBTX, actionType string) 
 		return nil, err
 	}
 	return &result, nil
+}
+
+// GetActionDisplayName returns the human-readable connector action name.
+func GetActionDisplayName(ctx context.Context, db DBTX, actionType string) (string, error) {
+	var name string
+	err := db.QueryRow(ctx,
+		`SELECT name FROM connector_actions WHERE action_type = $1`,
+		actionType,
+	).Scan(&name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return name, nil
 }

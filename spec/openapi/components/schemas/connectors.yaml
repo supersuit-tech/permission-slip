@@ -385,6 +385,17 @@ ConnectorAction:
           start: "start_time"
           end: "end_time"
 
+    meta_constraint_fields:
+      type: array
+      items:
+        type: string
+      description: |
+        Verified metadata fields that may appear under the `$meta` namespace in
+        standing approval constraints (e.g. `from`, `sender` for email reads).
+      example:
+        - from
+        - sender
+
   example:
     action_type: "github.create_issue"
     operation_type: "write"
