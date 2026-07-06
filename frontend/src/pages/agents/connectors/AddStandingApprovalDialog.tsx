@@ -17,9 +17,9 @@ import { useStandingApprovalTemplates } from "@/hooks/useStandingApprovalTemplat
 import type { StandingApprovalTemplate } from "@/hooks/useStandingApprovalTemplates";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import {
-  ActionConfigParameterFields,
+  ConstraintParameterFields,
   parseParametersSchema,
-} from "./ActionConfigParameterFields";
+} from "./ConstraintParameterFields";
 import {
   ActionSelect,
   NameField,
@@ -28,7 +28,7 @@ import {
   getEmptyRequiredParams,
   isPatternWrapper,
   type ParamMode,
-} from "./ActionConfigFormFields";
+} from "./StandingApprovalFormFields";
 import { TemplatePicker } from "./TemplatePicker";
 import {
   RiskBadge,
@@ -322,7 +322,7 @@ export function AddStandingApprovalDialog({
             {selectedAction && (
               <div className="space-y-2">
                 <Label>Constraints</Label>
-                <ActionConfigParameterFields
+                <ConstraintParameterFields
                   parametersSchema={schema}
                   values={paramValues}
                   onValueChange={handleParamChange}

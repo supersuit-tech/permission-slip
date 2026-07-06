@@ -154,7 +154,7 @@ function defaultExpiresAt(): string {
 }
 
 // ---------------------------------------------------------------------------
-// Inline constraint field — mirrors ActionConfigParameterFields for Storybook
+// Inline constraint field — mirrors ConstraintParameterFields for Storybook
 // ---------------------------------------------------------------------------
 
 type ParamMode = "fixed" | "pattern" | "wildcard";
@@ -540,7 +540,7 @@ export const Step1PickAgent: Story = {
   name: "Step 1 – Pick Agent",
 };
 
-/** Step 2: Pick Action — action configuration selection. */
+/** Step 2: Pick Action — connector action selection. */
 export const Step2PickAction: Story = {
   args: { initialStep: 2 },
   name: "Step 2 – Pick Action",

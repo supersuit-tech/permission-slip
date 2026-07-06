@@ -23,7 +23,7 @@ import {
   NameField,
   DescriptionField,
   type ParamMode,
-} from "@/pages/agents/connectors/ActionConfigFormFields";
+} from "@/pages/agents/connectors/StandingApprovalFormFields";
 import {
   buildDataWindowConstraint,
   dataWindowCountsAsConstraint,

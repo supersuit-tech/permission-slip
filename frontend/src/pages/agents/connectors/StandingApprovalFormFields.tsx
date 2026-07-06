@@ -1,15 +1,9 @@
-import { type KeyboardEvent, useRef } from "react";
-import { Ban, Check } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
 import validation from "@/lib/validation";
 
 const selectClassName =
   "border-input bg-background flex h-9 w-full rounded-md border px-3 py-1 text-sm";
-
-const segmentBase =
-  "flex flex-1 items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background disabled:pointer-events-none disabled:opacity-50";
 
 interface NameFieldProps {
   id: string;
@@ -53,106 +47,13 @@ export function DescriptionField({
       <Label htmlFor={id}>Description (optional)</Label>
       <Input
         id={id}
-        placeholder="Describe what this configuration permits"
+        placeholder="Describe what this standing approval authorizes"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         maxLength={validation.actionConfigDescription.maxLength}
         disabled={disabled}
       />
     </div>
-  );
-}
-
-interface StatusSelectProps {
-  id: string;
-  value: "active" | "disabled";
-  onChange: (value: "active" | "disabled") => void;
-  disabled?: boolean;
-}
-
-export function StatusSelect({
-  id,
-  value,
-  onChange,
-  disabled,
-}: StatusSelectProps) {
-  const activeRef = useRef<HTMLButtonElement>(null);
-  const disabledRef = useRef<HTMLButtonElement>(null);
-
-  const labelId = `${id}-label`;
-
-  // WAI-ARIA radio group: arrow keys cycle circularly between options.
-  function handleActiveKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
-    if (e.key === "ArrowRight" || e.key === "ArrowDown" ||
-        e.key === "ArrowLeft" || e.key === "ArrowUp") {
-      e.preventDefault();
-      onChange("disabled");
-      queueMicrotask(() => disabledRef.current?.focus());
-    }
-  }
-
-  function handleDisabledKeyDown(e: KeyboardEvent<HTMLButtonElement>) {
-    if (e.key === "ArrowLeft" || e.key === "ArrowUp" ||
-        e.key === "ArrowRight" || e.key === "ArrowDown") {
-      e.preventDefault();
-      onChange("active");
-      queueMicrotask(() => activeRef.current?.focus());
-    }
-  }
-
-  return (
-    <fieldset className="space-y-2" disabled={disabled}>
-      <Label id={labelId} className="text-sm font-medium">
-        Status
-      </Label>
-      <div
-        role="radiogroup"
-        aria-labelledby={labelId}
-        className="bg-muted/60 flex gap-1 rounded-lg border p-1"
-      >
-        <button
-          ref={activeRef}
-          type="button"
-          role="radio"
-          aria-checked={value === "active"}
-          tabIndex={value === "active" ? 0 : -1}
-          className={cn(
-            segmentBase,
-            value === "active"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-          onClick={() => onChange("active")}
-          onKeyDown={handleActiveKeyDown}
-        >
-          <Check className="size-3.5 shrink-0" aria-hidden />
-          Active
-        </button>
-        <button
-          ref={disabledRef}
-          type="button"
-          role="radio"
-          aria-checked={value === "disabled"}
-          tabIndex={value === "disabled" ? 0 : -1}
-          className={cn(
-            segmentBase,
-            value === "disabled"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-          onClick={() => onChange("disabled")}
-          onKeyDown={handleDisabledKeyDown}
-        >
-          <Ban className="size-3.5 shrink-0" aria-hidden />
-          Disabled
-        </button>
-      </div>
-      <p className="text-muted-foreground text-xs">
-        {value === "disabled"
-          ? "Disabled configurations stay in the list but do not allow new requests for this action."
-          : "Active configurations allow the agent to request this action (subject to approval)."}
-      </p>
-    </fieldset>
   );
 }
 
@@ -226,7 +127,7 @@ export type ParamMode = "fixed" | "pattern" | "wildcard";
  * {"$pattern": "<glob>"} for backend pattern matching.
  *
  * Hidden fields (x-ui.hidden) are automatically included as wildcards so the
- * backend config allows the agent to pass any value for those parameters.
+ * standing approval allows the agent to pass any value for those parameters.
  */
 export function buildParametersFromForm(
   paramValues: Record<string, string>,

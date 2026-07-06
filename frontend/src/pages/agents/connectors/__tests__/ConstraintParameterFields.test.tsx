@@ -2,9 +2,9 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, it, expect, vi } from "vitest";
 import { renderWithProviders } from "../../../../test-helpers";
-import { ActionConfigParameterFields } from "../ActionConfigParameterFields";
+import { ConstraintParameterFields } from "../ConstraintParameterFields";
 import type { ParametersSchema } from "@/lib/parameterSchema";
-import type { ParamMode } from "../ActionConfigFormFields";
+import type { ParamMode } from "../StandingApprovalFormFields";
 
 
 function renderFields(
@@ -23,7 +23,7 @@ function renderFields(
     onValueChange,
     onModeChange,
     ...renderWithProviders(
-      <ActionConfigParameterFields
+      <ConstraintParameterFields
         parametersSchema={schema}
         values={overrides?.values ?? {}}
         onValueChange={onValueChange}
@@ -44,7 +44,7 @@ const basicSchema: ParametersSchema = {
   },
 };
 
-describe("ActionConfigParameterFields", () => {
+describe("ConstraintParameterFields", () => {
   describe("backwards compatibility (no x-ui)", () => {
     it("renders fields when no x-ui hints are present", () => {
       renderFields(basicSchema);

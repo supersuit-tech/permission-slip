@@ -423,16 +423,17 @@ describe("RecommendedTemplatesDialog", () => {
 
     resolvePost!({
       data: {
-        action_configuration: {
-          id: "ac_new",
+        standing_approval: {
+          standing_approval_id: "sa_new",
           agent_id: 42,
-          connector_id: "github",
           action_type: "github.create_issue",
+          action_version: "1",
           constraints: {},
           status: "active",
           name: "All open",
+          description: null,
+          expires_at: null,
           created_at: "2026-02-25T10:00:00Z",
-          updated_at: "2026-02-25T10:00:00Z",
         },
       },
     });
@@ -467,16 +468,17 @@ describe("RecommendedTemplatesDialog", () => {
 
     resolvePost!({
       data: {
-        action_configuration: {
-          id: "ac_new",
+        standing_approval: {
+          standing_approval_id: "sa_new",
           agent_id: 42,
-          connector_id: "github",
           action_type: "github.create_issue",
+          action_version: "1",
           constraints: {},
           status: "active",
           name: "All open",
+          description: null,
+          expires_at: null,
           created_at: "2026-02-25T10:00:00Z",
-          updated_at: "2026-02-25T10:00:00Z",
         },
       },
     });

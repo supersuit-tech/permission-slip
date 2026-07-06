@@ -38,6 +38,8 @@ describe("buildCreateStandingApprovalFromApproval", () => {
     expect(request.agent_id).toBe(1);
     expect(request.action_type).toBe("protonmail.read_email");
     expect(request.action_version).toBe("1");
+    expect(request.name).toBe("read");
+    expect(request.description).toBe("read");
     expect(request.expires_at).toBeNull();
   });
 });

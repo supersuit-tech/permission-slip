@@ -6,8 +6,8 @@ import type { Agent } from "@/hooks/useAgents";
 import type { AgentActionOption } from "@/hooks/useAgentConnectorActions";
 import { getAgentDisplayName } from "@/lib/agents";
 import type { ParametersSchema } from "@/lib/parameterSchema";
-import { ActionConfigParameterFields } from "@/pages/agents/connectors/ActionConfigParameterFields";
-import type { ParamMode } from "@/pages/agents/connectors/ActionConfigFormFields";
+import { ConstraintParameterFields } from "@/pages/agents/connectors/ConstraintParameterFields";
+import type { ParamMode } from "@/pages/agents/connectors/StandingApprovalFormFields";
 import { DataWindowPicker } from "@/components/DataWindowPicker";
 import type { DataWindowFormState } from "@/lib/dataWindow";
 
@@ -159,7 +159,7 @@ export function StepConstraints({
       {configSchema?.properties ? (
         <div className="space-y-2">
           <Label>Constraints</Label>
-          <ActionConfigParameterFields
+          <ConstraintParameterFields
             parametersSchema={configSchema}
             values={paramValues}
             onValueChange={onParamValueChange}

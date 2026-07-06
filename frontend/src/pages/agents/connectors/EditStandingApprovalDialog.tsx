@@ -16,9 +16,9 @@ import { useAgentConnectorInstances } from "@/hooks/useAgentConnectorInstances";
 import type { StandingApproval } from "@/hooks/useStandingApprovals";
 import type { ConnectorAction } from "@/hooks/useConnectorDetail";
 import {
-  ActionConfigParameterFields,
+  ConstraintParameterFields,
   parseParametersSchema,
-} from "./ActionConfigParameterFields";
+} from "./ConstraintParameterFields";
 import {
   NameField,
   DescriptionField,
@@ -26,7 +26,7 @@ import {
   getEmptyRequiredParams,
   isPatternWrapper,
   type ParamMode,
-} from "./ActionConfigFormFields";
+} from "./StandingApprovalFormFields";
 import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
 import {
   connectorInstanceFromStandingApprovalId,
@@ -191,7 +191,7 @@ export function EditStandingApprovalDialog({
             {action ? (
               <div className="space-y-2">
                 <Label>Constraints</Label>
-                <ActionConfigParameterFields
+                <ConstraintParameterFields
                   parametersSchema={schema}
                   values={paramValues}
                   onValueChange={handleParamChange}

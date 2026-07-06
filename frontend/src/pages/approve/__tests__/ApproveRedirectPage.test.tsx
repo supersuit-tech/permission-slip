@@ -121,9 +121,6 @@ describe("ApproveRedirectPage", () => {
       if (url === "/v1/standing-approvals") {
         return Promise.resolve({ data: { data: [] } });
       }
-      if (url === "/v1/action-configurations") {
-        return Promise.resolve({ data: { data: [] } });
-      }
       return Promise.resolve({ data: { data: [] } });
     });
 
@@ -144,9 +141,6 @@ describe("ApproveRedirectPage", () => {
         return Promise.resolve({ data: { data: mockAgents } });
       }
       if (url === "/v1/standing-approvals") {
-        return Promise.resolve({ data: { data: [] } });
-      }
-      if (url === "/v1/action-configurations") {
         return Promise.resolve({ data: { data: [] } });
       }
       return Promise.resolve({ data: { data: [] } });

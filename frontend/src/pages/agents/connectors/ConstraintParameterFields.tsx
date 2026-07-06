@@ -3,7 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Asterisk, ChevronDown, ChevronRight } from "lucide-react";
-import type { ParamMode } from "./ActionConfigFormFields";
+import type { ParamMode } from "./StandingApprovalFormFields";
 import { ParameterFieldWidget } from "./ParameterFieldWidget";
 import type { ParametersSchema, SchemaProperty, FieldGroup } from "@/lib/parameterSchema";
 import {
@@ -15,7 +15,7 @@ import {
 } from "@/lib/parameterSchema";
 import { isConcreteDatetimeString } from "@/lib/datetime";
 
-interface ActionConfigParameterFieldsProps {
+interface ConstraintParameterFieldsProps {
   parametersSchema: ParametersSchema | null;
   values: Record<string, string>;
   onValueChange: (key: string, value: string) => void;
@@ -27,15 +27,15 @@ interface ActionConfigParameterFieldsProps {
 }
 
 /**
- * Renders parameter fields for action configuration, with an "Any value"
+ * Renders parameter fields for standing-approval constraints, with an "Any value"
  * checkbox per parameter. Wildcards in values (e.g. `*@company.com`) are
- * auto-detected and serialized as patterns. Used in both the Add and Edit
- * action configuration dialogs.
+ * auto-detected and serialized as patterns. Used in Add/Edit standing approval
+ * dialogs and the dashboard create-standing-approval wizard.
  *
  * Supports x-ui rendering hints: field ordering, labels, placeholders,
  * grouped collapsible sections, conditional visibility, and widget types.
  */
-export function ActionConfigParameterFields({
+export function ConstraintParameterFields({
   parametersSchema,
   values,
   onValueChange,
@@ -44,7 +44,7 @@ export function ActionConfigParameterFields({
   disabled,
   agentId,
   connectorId,
-}: ActionConfigParameterFieldsProps) {
+}: ConstraintParameterFieldsProps) {
   if (!parametersSchema?.properties) {
     return (
       <p className="text-muted-foreground text-sm">

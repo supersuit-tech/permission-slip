@@ -42,19 +42,8 @@ const mockAgents = [
   },
 ];
 
-const mockActionConfig = {
-  id: "ac_config1",
-  agent_id: 1,
-  connector_id: "email",
-  action_type: "email.send",
-  status: "active" as const,
-  name: "Send email",
-  parameters: {},
-};
-
 function setupMocks({
   standingApprovals = [] as Array<{ agent_id: number; action_type: string }>,
-  actionConfigs = [mockActionConfig],
 } = {}) {
   setupAuthMocks({ authenticated: true });
   mockGet.mockImplementation((url: string) => {
@@ -63,9 +52,6 @@ function setupMocks({
     }
     if (url === "/v1/standing-approvals") {
       return Promise.resolve({ data: { data: standingApprovals } });
-    }
-    if (url === "/v1/action-configurations") {
-      return Promise.resolve({ data: { data: actionConfigs } });
     }
     if (url.startsWith("/v1/connectors/")) {
       return Promise.resolve({ data: { id: "email", name: "Email", actions: [] } });
@@ -116,15 +102,7 @@ describe("ReviewApprovalDialog — auto-approve future requests", () => {
   });
 
   it("shows checkbox for parameterless actions", async () => {
-    setupMocks({
-      actionConfigs: [
-        {
-          ...mockActionConfig,
-          id: "ac_list",
-          action_type: "google.list_calendars",
-        },
-      ],
-    });
+    setupMocks();
     const approval = makeApproval({
       action: { type: "google.list_calendars", version: "1", parameters: {} },
     });
@@ -229,8 +207,8 @@ describe("ReviewApprovalDialog — auto-approve future requests", () => {
     ).toBeInTheDocument();
   });
 
-  it("creates standing approval without config id when no action configuration exists", async () => {
-    setupMocks({ actionConfigs: [] });
+  it("creates standing approval directly from the approval action", async () => {
+    setupMocks();
     mockApproveSuccess();
     mockPost.mockResolvedValueOnce({
       data: {
@@ -276,13 +254,14 @@ describe("ReviewApprovalDialog — auto-approve future requests", () => {
     expect(createCall?.[1]?.body).toMatchObject({
       agent_id: 1,
       action_type: "email.send",
+      name: "Send an email",
+      description: "Send an email",
       constraints: {
         recipient: "user@example.com",
         subject: "Hello",
       },
       expires_at: null,
     });
-    expect(createCall?.[1]?.body).not.toHaveProperty("source_action_configuration_id");
 
     expect(
       screen.getByText("Future matching requests will be auto-approved."),

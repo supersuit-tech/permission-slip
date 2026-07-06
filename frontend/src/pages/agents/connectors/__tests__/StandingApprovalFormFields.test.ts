@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildParametersFromForm, type ParamMode } from "../ActionConfigFormFields";
+import { buildParametersFromForm, type ParamMode } from "../StandingApprovalFormFields";
 
 describe("buildParametersFromForm", () => {
   it("auto-wraps value containing * as $pattern", () => {
