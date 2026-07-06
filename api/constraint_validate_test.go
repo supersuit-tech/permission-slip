@@ -307,7 +307,7 @@ func TestRequestApproval_Fallthrough_SurfacesMetadataUnavailableInContext(t *tes
 		t.Fatal("expected approval_id on pending response")
 	}
 
-	approval, err := db.GetApprovalByID(t.Context(), tx, resp.ApprovalID, uid)
+	approval, err := db.GetApprovalByID(t.Context(), tx, resp.ApprovalID)
 	if err != nil {
 		t.Fatalf("GetApprovalByID: %v", err)
 	}
