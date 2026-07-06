@@ -34,6 +34,7 @@ export function useActionSchema(actionType: string): {
   displayTemplate: string | null;
   preview: ActionPreviewConfig | null;
   dataWindow: DataWindowParams | null;
+  metaConstraintFields: string[];
   connectorName: string | null;
   connectorLogoSvg: string | null;
   isLoading: boolean;
@@ -49,6 +50,7 @@ export function useActionSchema(actionType: string): {
         displayTemplate: null,
         preview: null,
         dataWindow: null,
+        metaConstraintFields: [],
         connectorName: null,
         connectorLogoSvg: null,
       };
@@ -64,6 +66,7 @@ export function useActionSchema(actionType: string): {
         displayTemplate: null,
         preview: null,
         dataWindow: null,
+        metaConstraintFields: [],
         connectorName: connector.name ?? null,
         connectorLogoSvg: connector.logo_svg ?? null,
       };
@@ -102,6 +105,7 @@ export function useActionSchema(actionType: string): {
       displayTemplate: action.display_template ?? null,
       preview,
       dataWindow,
+      metaConstraintFields: action.meta_constraint_fields ?? [],
       connectorName: connector.name ?? null,
       connectorLogoSvg: connector.logo_svg ?? null,
     };

@@ -355,6 +355,9 @@ describe("CreateStandingApprovalDialog", () => {
           body: expect.objectContaining({
             agent_id: 1,
             action_type: "github.create_issue",
+            constraints: expect.objectContaining({
+              $version: 2,
+            }),
           }),
         }),
       );

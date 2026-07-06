@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildStructuredConstraintsFromForm,
+  constraintsObjectHasNonWildcard,
   constraintsToFormState,
   formStateHasNonWildcardConstraint,
   parseStructuredConstraintsForDisplay,
@@ -71,5 +72,26 @@ describe("structuredConstraints", () => {
     };
     const lines = parseStructuredConstraintsForDisplay(constraints);
     expect(lines[0]?.negated).toBe(true);
+  });
+
+  it("detects non-wildcard in flat and v2 objects", () => {
+    expect(
+      constraintsObjectHasNonWildcard({ repo: "foo", title: "*" }),
+    ).toBe(true);
+    expect(
+      constraintsObjectHasNonWildcard({
+        $version: 2,
+        match: "any",
+        groups: [
+          {
+            match: "all",
+            conditions: [
+              { field: "channel", op: "none_of", values: ["#secret"] },
+            ],
+          },
+        ],
+      }),
+    ).toBe(true);
+    expect(constraintsObjectHasNonWildcard({ title: "*" })).toBe(false);
   });
 });
