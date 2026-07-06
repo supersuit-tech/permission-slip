@@ -104,9 +104,13 @@ func TestApproveStandingApprovalRequest_HappyPath(t *testing.T) {
 	if resp.StandingApproval == nil {
 		t.Fatal("expected standing_approval in response")
 	}
-	if !strings.Contains(resp.StandingApproval.Name, "email.send") &&
-		!strings.Contains(resp.StandingApproval.Name, "to:") {
-		t.Errorf("expected derived name to mention action or constraint, got %q", resp.StandingApproval.Name)
+	if resp.StandingApproval.Name == nil {
+		t.Fatal("expected standing approval name")
+	}
+	name := *resp.StandingApproval.Name
+	if !strings.Contains(name, "email.send") &&
+		!strings.Contains(name, "to:") {
+		t.Errorf("expected derived name to mention action or constraint, got %q", name)
 	}
 	if resp.StandingApproval.Description == nil || *resp.StandingApproval.Description != standingApprovalAutoRuleDescription {
 		t.Errorf("description = %v, want %q", resp.StandingApproval.Description, standingApprovalAutoRuleDescription)
@@ -154,8 +158,11 @@ func TestApproveStandingApprovalRequest_DerivesNameFromMetaFrom(t *testing.T) {
 		t.Fatal("expected standing_approval in response")
 	}
 	want := "Read Email — from automated@airbnb.com"
-	if resp.StandingApproval.Name != want {
-		t.Errorf("name = %q, want %q", resp.StandingApproval.Name, want)
+	if resp.StandingApproval.Name == nil {
+		t.Fatal("expected standing approval name")
+	}
+	if *resp.StandingApproval.Name != want {
+		t.Errorf("name = %q, want %q", *resp.StandingApproval.Name, want)
 	}
 }
 
