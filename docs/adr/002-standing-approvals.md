@@ -41,6 +41,8 @@ From the web interface, the user configures:
 | **Agent** | Which agent this applies to | "My AI Assistant" |
 | **Action type** | Which action is pre-approved | `email.read` |
 | **Constraints** | Boundaries the agent must stay within | sender: `*@github.com`, max results: 10 |
+
+Constraint syntax supports legacy flat maps and **v2 structured rules** with negation, multi-row allow/deny per field, and OR-across-scenario groups. See [standing-approval-constraints.md](../standing-approval-constraints.md).
 | **Duration** | How long the standing approval is valid | Until revoked (default), or optional user-set expiry |
 
 #### Agent discovers its standing approvals

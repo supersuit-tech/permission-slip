@@ -1,0 +1,90 @@
+StandingApprovalConstraintsV2:
+  type: object
+  required:
+    - $version
+    - match
+    - groups
+  description: |
+    Version 2 structured constraints. Rules match if **any group** matches (OR).
+    Within a group, **all conditions** must match (AND). Per-field allow/deny uses
+    `matches` / `any_of` for positive rules and `does_not_match` / `none_of` for
+    negation. Legacy flat `{ field: value }` objects remain accepted on write and
+    are adapted at read/evaluation time.
+  properties:
+    $version:
+      type: integer
+      enum: [2]
+      example: 2
+    match:
+      type: string
+      enum: [any]
+      description: Top-level combinator — match any group.
+      example: any
+    groups:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/StandingApprovalConstraintGroup'
+  example:
+    $version: 2
+    match: any
+    groups:
+      - match: all
+        conditions:
+          - field: recipient
+            op: any_of
+            values:
+              - "*@acme.com"
+              - boss@partner.com
+          - field: recipient
+            op: none_of
+            values:
+              - ceo@acme.com
+          - field: $meta.sender
+            op: matches
+            value: boss@acme.com
+
+StandingApprovalConstraintGroup:
+  type: object
+  required:
+    - match
+    - conditions
+  properties:
+    match:
+      type: string
+      enum: [all]
+      description: Group combinator — all conditions must match.
+      example: all
+    conditions:
+      type: array
+      minItems: 1
+      items:
+        $ref: '#/StandingApprovalConstraintCondition'
+
+StandingApprovalConstraintCondition:
+  type: object
+  required:
+    - field
+    - op
+  properties:
+    field:
+      type: string
+      description: |
+        Parameter name, `$meta.<key>` for verified metadata, or `$data_window`.
+      example: recipient
+    op:
+      type: string
+      enum:
+        - matches
+        - does_not_match
+        - any_of
+        - none_of
+      description: |
+        - `matches` / `any_of` — positive (allow-list; OR within allow rows)
+        - `does_not_match` / `none_of` — negation (deny-list; AND within deny rows)
+    value:
+      description: Single constraint value (fixed, `"*"`, or `{"$pattern":"..."}`).
+    values:
+      type: array
+      description: Multiple values for `any_of` / `none_of`.
+      items: {}

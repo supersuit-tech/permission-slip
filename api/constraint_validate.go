@@ -53,6 +53,13 @@ func configHasMetaConstraints(configConstraints json.RawMessage) bool {
 	if len(configConstraints) == 0 || string(configConstraints) == "null" {
 		return false
 	}
+	if db.IsStructuredConstraintsV2(configConstraints) {
+		sc, err := db.ParseStructuredConstraints(configConstraints)
+		if err != nil {
+			return false
+		}
+		return db.StructuredConstraintsHasMeta(sc)
+	}
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(configConstraints, &obj); err != nil {
 		return false

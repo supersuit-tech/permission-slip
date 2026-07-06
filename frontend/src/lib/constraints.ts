@@ -1,4 +1,8 @@
 import { formatDataWindowConstraint } from "@/lib/dataWindow";
+import {
+  isStructuredConstraints,
+  parseStructuredConstraintsForDisplay,
+} from "@/lib/structuredConstraints";
 
 /** Check if a stored parameter value is a $pattern wrapper object. */
 export function isPatternWrapper(value: unknown): value is { $pattern: string } {
@@ -37,6 +41,8 @@ export interface ParsedConstraint {
   name: string;
   mode: ConstraintMode;
   value: string;
+  negated?: boolean;
+  scenarioIndex?: number;
 }
 
 function parseConstraintValue(
@@ -57,6 +63,33 @@ export function parseStandingApprovalConstraints(
   constraints: Record<string, unknown> | null | undefined,
 ): ParsedConstraint[] {
   if (!constraints || typeof constraints !== "object") return [];
+
+  if (isStructuredConstraints(constraints)) {
+    const structured = parseStructuredConstraintsForDisplay(constraints);
+    const dataWindow = constraints.groups;
+    // Append data window from first group if present
+    if (Array.isArray(dataWindow)) {
+      for (const group of dataWindow) {
+        const conditions = (group as { conditions?: unknown[] }).conditions;
+        if (!Array.isArray(conditions)) continue;
+        for (const cond of conditions) {
+          if (!cond || typeof cond !== "object") continue;
+          const c = cond as Record<string, unknown>;
+          if (c.field === DATA_WINDOW_NAMESPACE_KEY) {
+            const text = formatDataWindowConstraint(c.value);
+            if (text) {
+              structured.push({
+                name: "Data window",
+                mode: "fixed",
+                value: text,
+              });
+            }
+          }
+        }
+      }
+    }
+    return structured;
+  }
 
   const parsed: ParsedConstraint[] = [];
   for (const [key, raw] of Object.entries(constraints)) {

@@ -663,6 +663,10 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 		return nil, errors.New("constraints are required for standing approvals")
 	}
 
+	if db.IsStructuredConstraintsV2(raw) {
+		return validateStructuredStandingApprovalConstraints(raw)
+	}
+
 	var obj map[string]json.RawMessage
 	if err := json.Unmarshal(raw, &obj); err != nil {
 		return nil, errors.New("constraints must be a JSON object")
@@ -766,4 +770,47 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 	}
 
 	return raw, nil
+}
+
+func validateStructuredStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
+	if err := db.ValidateStructuredConstraintShape(raw); err != nil {
+		return nil, err
+	}
+	sc, err := db.ParseStructuredConstraints(raw)
+	if err != nil {
+		return nil, err
+	}
+	if !db.StructuredConstraintsHasNonWildcard(sc) {
+		return nil, errors.New("at least one constraint must be a non-wildcard value")
+	}
+	for gi, group := range sc.Groups {
+		for ci, cond := range group.Conditions {
+			if strings.HasPrefix(cond.Field, db.MetaNamespaceKey+".") {
+				metaKey := strings.TrimPrefix(cond.Field, db.MetaNamespaceKey+".")
+				if metaKey == "" {
+					return nil, errors.New("$meta constraint keys must not be empty")
+				}
+			}
+			for _, val := range dbConditionValues(cond) {
+				if string(val) == "null" {
+					return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
+				}
+			}
+			_ = gi
+			_ = ci
+		}
+	}
+	return db.NormalizeStructuredConstraints(raw)
+}
+
+func dbConditionValues(cond db.ConstraintCondition) []json.RawMessage {
+	switch cond.Op {
+	case db.OpAnyOf, db.OpNoneOf:
+		return cond.Values
+	case db.OpMatches, db.OpDoesNotMatch:
+		if len(cond.Value) > 0 {
+			return []json.RawMessage{cond.Value}
+		}
+	}
+	return nil
 }

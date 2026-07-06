@@ -114,20 +114,16 @@ StandingApproval:
       example: "1"
 
     constraints:
-      type: object
-      additionalProperties: true
+      oneOf:
+        - type: object
+          additionalProperties: true
+          description: Legacy flat constraint map (still supported).
+        - $ref: '../schemas/standing_approval_constraints.yaml#/StandingApprovalConstraintsV2'
       description: |
-        Constraint boundaries for this standing approval. Every execution is validated
-        against these constraints — parameters that fall outside the constraint bounds
-        are rejected.
-
-        Examples for `email.read`:
-        - `sender`: Sender filter pattern (e.g., `*@github.com`)
-        - `max_results`: Maximum number of results per execution
-
-        Examples for `email.send`:
-        - `recipient_pattern`: Allowed recipient pattern (e.g., `*@mycompany.com`)
-        - `max_recipients`: Maximum number of recipients per execution
+        Constraint boundaries for this standing approval. Supports legacy flat
+        `{ param: value }` maps and v2 structured rules with negation, multi-row
+        allow/deny per field, and cross-field OR groups (see
+        `StandingApprovalConstraintsV2`).
       example:
         sender: "*@github.com"
         max_results: 10
