@@ -112,8 +112,13 @@ func constraintDisplayValue(raw json.RawMessage) string {
 }
 
 func truncateStandingApprovalName(name string) string {
+	const ellipsis = "…"
 	if len(name) <= maxStandingApprovalNameLength {
 		return name
 	}
-	return name[:maxStandingApprovalNameLength-1] + "…"
+	prefixLen := maxStandingApprovalNameLength - len(ellipsis)
+	if prefixLen < 0 {
+		prefixLen = 0
+	}
+	return name[:prefixLen] + ellipsis
 }
