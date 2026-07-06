@@ -60,10 +60,10 @@ export function EditStandingApprovalDialog({
   const [name, setName] = useState(rule.name ?? "");
   const [description, setDescription] = useState(rule.description ?? "");
   const [paramValues, setParamValues] = useState<Record<string, string>>(() =>
-    toStringRecord(rule.constraints as Record<string, unknown>),
+    toStringRecord((rule.constraints ?? {}) as Record<string, unknown>),
   );
   const [paramModes, setParamModes] = useState<Record<string, ParamMode>>(() =>
-    inferModesFromConstraints(rule.constraints as Record<string, unknown>),
+    inferModesFromConstraints((rule.constraints ?? {}) as Record<string, unknown>),
   );
   const [connectorInstance, setConnectorInstance] = useState(() =>
     connectorInstanceFromStandingApprovalId(rule.connector_instance_id),
@@ -242,10 +242,10 @@ function defaultExpiresAtLocal(): string {
 }
 
 function toStringRecord(
-  constraints: Record<string, unknown>,
+  constraints: Record<string, unknown> | null | undefined,
 ): Record<string, string> {
   const result: Record<string, string> = {};
-  for (const [key, value] of Object.entries(constraints)) {
+  for (const [key, value] of Object.entries(constraints ?? {})) {
     if (key === "$meta" || key === "$data_window") continue;
     if (value === null || value === undefined) {
       result[key] = "";
@@ -261,10 +261,10 @@ function toStringRecord(
 }
 
 function inferModesFromConstraints(
-  constraints: Record<string, unknown>,
+  constraints: Record<string, unknown> | null | undefined,
 ): Record<string, ParamMode> {
   const modes: Record<string, ParamMode> = {};
-  for (const [key, value] of Object.entries(constraints)) {
+  for (const [key, value] of Object.entries(constraints ?? {})) {
     if (key === "$meta" || key === "$data_window") continue;
     if (value === "*") {
       modes[key] = "wildcard";

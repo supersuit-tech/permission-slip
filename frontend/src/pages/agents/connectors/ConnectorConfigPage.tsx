@@ -124,23 +124,23 @@ export function ConnectorConfigPage() {
         className="text-muted-foreground hover:text-foreground -mt-4 inline-flex items-center gap-1 text-sm transition-colors"
       >
         <ExternalLink className="size-3.5" />
-        View all {connector.actions.length} available actions
+        View all {(connector.actions ?? []).length} available actions
       </button>
       <ConnectorActionsDialog
         open={actionsDialogOpen}
         onOpenChange={setActionsDialogOpen}
-        actions={connector.actions}
+        actions={connector.actions ?? []}
       />
       <StandingApprovalsSection
         agentId={agentId}
         connectorId={connectorId}
         connectorName={connector.name}
-        actions={connector.actions}
+        actions={connector.actions ?? []}
       />
       <ConnectorInstancesSection
         agentId={agentId}
         connectorId={connectorId}
-        requiredCredentials={connector.required_credentials}
+        requiredCredentials={connector.required_credentials ?? []}
       />
       <DisableConnectorSection
         agentId={agentId}

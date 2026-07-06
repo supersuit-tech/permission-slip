@@ -235,6 +235,56 @@ func TestListStandingApprovals_ResponseShape(t *testing.T) {
 	}
 }
 
+func TestListStandingApprovals_NullConstraintsSerializedAsEmptyObject(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	saID := testhelper.GenerateID(t, "sa_")
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:  "test.action",
+		Constraints: nil,
+	})
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	r := authenticatedRequest(t, http.MethodGet, "/standing-approvals?status=all", uid)
+	w := httptest.NewRecorder()
+
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(w.Body.Bytes(), &raw); err != nil {
+		t.Fatalf("failed to unmarshal response: %v", err)
+	}
+	data, ok := raw["data"]
+	if !ok {
+		t.Fatal("expected data key in response")
+	}
+	var items []map[string]json.RawMessage
+	if err := json.Unmarshal(data, &items); err != nil {
+		t.Fatalf("failed to unmarshal data: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 standing approval, got %d", len(items))
+	}
+	constraints, ok := items[0]["constraints"]
+	if !ok {
+		t.Fatal("expected constraints key in standing approval")
+	}
+	if string(constraints) == "null" {
+		t.Fatal("expected null DB constraints to serialize as {}, got null")
+	}
+	if string(constraints) != "{}" {
+		t.Fatalf("expected constraints {}, got %s", string(constraints))
+	}
+}
+
 // ── Pagination ──────────────────────────────────────────────────────────────
 
 func TestListStandingApprovals_Pagination(t *testing.T) {
