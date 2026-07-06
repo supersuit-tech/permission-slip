@@ -486,7 +486,9 @@ func resolveResourceDetailsForBulk(ctx context.Context, deps *Deps, agent *db.Ag
 	resolveCtx, cancel := context.WithTimeout(ctx, resourceDetailsResolveTimeout)
 	defer cancel()
 	resolveCtx, resolveCreds := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
-	details, err := resolver.ResolveResourceDetails(resolveCtx, actionType, actionParams, resolveCreds)
+	details, err := retryResourceDetails(resolveCtx, func(callCtx context.Context) (map[string]any, error) {
+		return resolver.ResolveResourceDetails(callCtx, actionType, actionParams, resolveCreds)
+	})
 	if err != nil {
 		log.Printf("[%s] BulkRequest ResolveResourceDetails: %v", TraceID(ctx), err)
 		return nil

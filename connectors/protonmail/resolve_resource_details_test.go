@@ -3,6 +3,7 @@ package protonmail
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"reflect"
 	"testing"
 
@@ -85,19 +86,20 @@ func TestResolveResourceDetails_ReadEmail_PopulatesMetadata(t *testing.T) {
 	}
 }
 
-func TestResolveResourceDetails_ReadEmail_FailureFallsBack(t *testing.T) {
+func TestResolveResourceDetails_ReadEmail_TransientFailurePropagates(t *testing.T) {
 	orig := resolveMessageEnvelopes
 	t.Cleanup(func() { resolveMessageEnvelopes = orig })
 
+	wantErr := &connectors.ExternalError{Message: "proxy down"}
 	resolveMessageEnvelopes = func(context.Context, *ProtonMailConnector, connectors.Credentials, string, []uint32, connectors.MailboxUIDValidityStore) (map[uint32]emailEnvelopeMetadata, error) {
-		return nil, &connectors.ExternalError{Message: "proxy down"}
+		return nil, wantErr
 	}
 
 	conn := New()
 	params, _ := json.Marshal(map[string]any{"message_id": 10})
 	details, err := conn.ResolveResourceDetails(context.Background(), "protonmail.read_email", params, validCreds())
-	if err != nil {
-		t.Fatalf("expected nil error for best-effort fallback, got %v", err)
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected %v, got %v", wantErr, err)
 	}
 	if details != nil {
 		t.Fatalf("expected nil details on failure, got %v", details)
@@ -115,7 +117,7 @@ func TestResolveResourceDetails_ArchiveEmail_SingleUsesFlatFields(t *testing.T) 
 	}
 
 	conn := New()
-	params, _ := json.Marshal(map[string]any{"message_id": 42})
+	params, _ := json.Marshal(map[string]any{"message_id": 42, "include_thread": false})
 	details, err := conn.ResolveResourceDetails(context.Background(), "protonmail.archive_email", params, validCreds())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -188,7 +190,7 @@ func TestResolveResourceDetails_ArchiveEmail_BatchKeyedByHandle(t *testing.T) {
 	}
 
 	conn := New()
-	params, _ := json.Marshal(map[string]any{"message_ids": []int{10, 11}})
+	params, _ := json.Marshal(map[string]any{"message_ids": []int{10, 11}, "include_thread": false})
 	details, err := conn.ResolveResourceDetails(context.Background(), "protonmail.archive_email", params, validCreds())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)

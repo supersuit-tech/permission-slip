@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -39,7 +40,10 @@ func (c *IMessageConnector) resolveChatIDDetails(ctx context.Context, params jso
 	chatObj, err := lookupChatByID(ctx, c.client, creds, p.ChatID)
 	if err != nil {
 		log.Printf("imessage: resolve chat details: chat lookup: %v", err)
-		return nil, nil
+		if strings.Contains(err.Error(), "not found") {
+			return nil, nil
+		}
+		return nil, err
 	}
 
 	label := chatDisplayLabel(ctx, c.client, creds, chatObj)
@@ -67,6 +71,7 @@ func (c *IMessageConnector) resolveSendMessageDetails(ctx context.Context, param
 	chatObj, err := resolveChatForSend(ctx, c.client, creds, sendParams)
 	if err != nil {
 		log.Printf("imessage: resolve send_message details: chat lookup: %v", err)
+		return nil, err
 	}
 
 	service, disclosure := resolveDeliveryDisclosure(sendParams, chatObj)

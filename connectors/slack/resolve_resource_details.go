@@ -53,7 +53,7 @@ func (c *SlackConnector) ResolveResourceDetails(ctx context.Context, actionType 
 			"slack.archive_channel", "slack.invite_to_channel", "slack.remove_from_channel":
 			extra, xerr := c.resolveSlackApprovalContext(ctx, actionType, params, creds, &cache)
 			if xerr != nil {
-				return base, nil
+				return nil, xerr
 			}
 			return mergeResourceDetailMaps(base, extra), nil
 		default:
@@ -254,7 +254,7 @@ func (c *SlackConnector) resolveChannel(ctx context.Context, creds connectors.Cr
 		return nil, err
 	}
 	if !resp.OK {
-		return nil, fmt.Errorf("conversations.info: %s", resp.Error)
+		return nil, mapSlackError(resp.Error)
 	}
 
 	name := resp.Channel.Name
@@ -303,7 +303,7 @@ func (c *SlackConnector) resolveUser(ctx context.Context, creds connectors.Crede
 		return nil, err
 	}
 	if !resp.OK {
-		return nil, fmt.Errorf("users.info: %s", resp.Error)
+		return nil, mapSlackError(resp.Error)
 	}
 
 	// Prefer display_name > real_name (profile) > real_name (top-level) > username.

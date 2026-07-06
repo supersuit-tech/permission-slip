@@ -54,7 +54,7 @@ func (c *ProtonMailConnector) resolveReadEmailDetails(ctx context.Context, param
 	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, p.Folder, []uint32{p.MessageID}, connectors.MailboxUIDValidityFromContext(ctx))
 	if err != nil {
 		log.Printf("protonmail: resolve read_email details: envelope fetch (folder %q, uid %d): %v", p.Folder, p.MessageID, err)
-		return nil, nil
+		return nil, err
 	}
 	meta, ok := metaByUID[p.MessageID]
 	if !ok {
@@ -84,7 +84,7 @@ func (c *ProtonMailConnector) resolveReplyEmailDetails(ctx context.Context, para
 	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, p.Folder, []uint32{p.InReplyToMessageID}, connectors.MailboxUIDValidityFromContext(ctx))
 	if err != nil {
 		log.Printf("protonmail: resolve reply_email details: envelope fetch (folder %q, uid %d): %v", p.Folder, p.InReplyToMessageID, err)
-		return nil, nil
+		return nil, err
 	}
 	meta, ok := metaByUID[p.InReplyToMessageID]
 	if !ok {
@@ -123,7 +123,7 @@ func (c *ProtonMailConnector) resolveArchiveEmailDetails(ctx context.Context, pa
 		expanded, err := expandArchiveUIDsForApproval(ctx, c, creds, archiveParams.Folder, archiveParams.MessageIDs)
 		if err != nil {
 			log.Printf("protonmail: resolve archive_email details: thread expansion (folder %q, %d uids): %v", archiveParams.Folder, len(archiveParams.MessageIDs), err)
-			return c.resolveMessageDetailsForUIDs(ctx, creds, archiveParams.Folder, archiveParams.MessageIDs)
+			return nil, err
 		}
 		uids = expanded
 	}
@@ -147,7 +147,7 @@ func (c *ProtonMailConnector) resolveLabelMessageDetails(ctx context.Context, pa
 		expanded, err := expandArchiveUIDsForApproval(ctx, c, creds, labelParams.Folder, labelParams.MessageIDs)
 		if err != nil {
 			log.Printf("protonmail: resolve label message details: thread expansion (folder %q, %d uids): %v", labelParams.Folder, len(labelParams.MessageIDs), err)
-			return c.resolveMessageDetailsForUIDs(ctx, creds, labelParams.Folder, labelParams.MessageIDs)
+			return nil, err
 		}
 		uids = expanded
 	}
@@ -198,7 +198,7 @@ func (c *ProtonMailConnector) resolveMessageDetailsForUIDs(ctx context.Context, 
 	metaByUID, err := resolveMessageEnvelopes(ctx, c, creds, folder, messageIDs, connectors.MailboxUIDValidityFromContext(ctx))
 	if err != nil {
 		log.Printf("protonmail: resolve message details: envelope fetch (folder %q, %d uids): %v", folder, len(messageIDs), err)
-		return nil, nil
+		return nil, err
 	}
 	if len(metaByUID) == 0 {
 		log.Printf("protonmail: resolve message details: no envelopes returned (folder %q, %d uids)", folder, len(messageIDs))
