@@ -1,7 +1,7 @@
 /**
  * permission-slip capabilities [--server <url>]
  *
- * Lists the action configurations and standing approvals available to this agent.
+ * Lists connector actions, schemas, standing approvals, and credential readiness for this agent.
  */
 
 import type { Command } from "commander";
@@ -13,7 +13,7 @@ import { output, type OutputOptions } from "../output.js";
 export function capabilitiesCommand(program: Command): void {
   program
     .command("capabilities")
-    .description("List available action configurations and standing approvals")
+    .description("List connector actions, standing approvals, and credential readiness")
     .option(
       "--server <url>",
       "Permission Slip server URL — required unless PS_SERVER or config default_server is set",

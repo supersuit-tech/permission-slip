@@ -36,7 +36,6 @@ export function useCreateStandingApproval() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["standing-approvals"] });
-      queryClient.invalidateQueries({ queryKey: ["action-configs"] });
     },
   });
 
