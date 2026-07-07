@@ -422,6 +422,22 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
     return result;
   },
 
+  "imessage.list_chats": (params) => {
+    const limit =
+      typeof params.limit === "number" && Number.isFinite(params.limit)
+        ? params.limit
+        : 20;
+    let result = `List ${String(limit)} chats`;
+    if (params.unread_only === true) result += " (unread only)";
+    const filters: string[] = [];
+    const since = strVal(params.since);
+    if (since) filters.push(`since ${tryFormatDateTime(since) ?? since}`);
+    const before = strVal(params.before);
+    if (before) filters.push(`before ${tryFormatDateTime(before) ?? before}`);
+    if (filters.length > 0) result += ` with activity ${filters.join(", ")}`;
+    return result;
+  },
+
   "protonmail.read_inbox": (params) => {
     const folder = strVal(params.folder) ?? "INBOX";
     const limit =

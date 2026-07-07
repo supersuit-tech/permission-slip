@@ -38,9 +38,10 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 				ActionType:      "imessage.list_chats",
 				OperationType:   "read",
 				Name:            "List Chats",
-				Description:     "List recent iMessage and SMS conversations. Each chat includes unread_count when imsg supports it. Set unread_only to return only chats with unread messages.",
+				Description:     "List recent iMessage and SMS conversations. Each chat includes unread_count when imsg supports it. Set unread_only to return only chats with unread messages. Optional since/before filter by last_message_at (client-side; imsg chats.list has no native date filter).",
 				RiskLevel:       "low",
 				DisplayTemplate: "List {{limit:count}} chats",
+				DataWindow:      &connectors.DataWindowParams{StartParam: "since", EndParam: "before"},
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"properties": {
@@ -55,6 +56,32 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "boolean",
 							"default": false,
 							"description": "When true, return only chats with unread messages (unread_count > 0)"
+						},
+						"since": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Only chats with last activity on or after this ISO 8601 timestamp",
+							"x-ui": {
+								"widget": "datetime",
+								"label": "Activity after",
+								"hidden": true,
+								"help_text": "Managed via Data window in standing approvals",
+								"datetime_range_pair": "before",
+								"datetime_range_role": "lower"
+							}
+						},
+						"before": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Only chats with last activity before this ISO 8601 timestamp",
+							"x-ui": {
+								"widget": "datetime",
+								"label": "Activity before",
+								"hidden": true,
+								"help_text": "Managed via Data window in standing approvals",
+								"datetime_range_pair": "since",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),
@@ -263,6 +290,13 @@ func imessageTemplates() []connectors.ManifestTemplate {
 			Name:        "Read any chat history",
 			Description: "Agent can read message history from any chat.",
 			Parameters:  json.RawMessage(`{"chat_id":"*"}`),
+		},
+		{
+			ID:          "tpl_imessage_list_recent_chats",
+			ActionType:  "imessage.list_chats",
+			Name:        "List recent chats",
+			Description: "Agent can list chats with activity in the last 30 days.",
+			Parameters:  json.RawMessage(`{"limit":"*","unread_only":"*","$data_window":{"last_days":30}}`),
 		},
 		{
 			ID:          "tpl_imessage_search_any",

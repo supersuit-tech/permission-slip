@@ -252,6 +252,7 @@ function CreateStandingApprovalWizard({
               onManualConstraintsJsonChange={setManualConstraintsJson}
               dataWindowForm={dataWindowForm}
               onDataWindowFormChange={setDataWindowForm}
+              dataWindowSupported
               isPending={false}
             />
           )}

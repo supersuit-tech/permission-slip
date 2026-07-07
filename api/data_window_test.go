@@ -159,3 +159,77 @@ func TestValidateStandingApprovalConstraintsForAction_RejectsInvalidDataWindow(t
 		t.Fatal("expected invalid last_days rejection")
 	}
 }
+
+func TestRequestApproval_AutoApprove_ListChatsDataWindowInjectsSince(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	testhelper.InsertConnector(t, tx, "imessage")
+	schema := []byte(`{"type":"object","properties":{"limit":{"type":"integer"},"since":{"type":"string"},"before":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionWithDataWindow(t, tx, "imessage", "imessage.list_chats", "List Chats", schema,
+		`{"start_param":"since","end_param":"before"}`)
+
+	pubKeySSH, privKey, err := GenerateEd25519OpenSSHKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
+
+	saID := testhelper.GenerateID(t, "sa_")
+	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
+		ActionType:  "imessage.list_chats",
+		Constraints: []byte(`{"limit":"*","$data_window":{"last_days":30}}`),
+	})
+
+	router := NewRouter(testDepsForDB(t, tx))
+
+	reqBody := `{"request_id":"dw-list-chats-001","action":{"type":"imessage.list_chats","version":"1","parameters":{"limit":20}},"context":{"description":"test"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var params []byte
+	err = tx.QueryRow(context.Background(),
+		`SELECT parameters FROM standing_approval_executions WHERE standing_approval_id = $1 ORDER BY id DESC LIMIT 1`,
+		saID,
+	).Scan(&params)
+	if err != nil {
+		t.Fatalf("query execution params: %v", err)
+	}
+	var recorded map[string]any
+	if err := json.Unmarshal(params, &recorded); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	sinceStr, ok := recorded["since"].(string)
+	if !ok || sinceStr == "" {
+		t.Fatalf("expected injected since param, got %v", recorded["since"])
+	}
+	sinceAt, err := time.Parse(time.RFC3339, sinceStr)
+	if err != nil {
+		t.Fatalf("parse since: %v", err)
+	}
+	age := time.Now().UTC().Sub(sinceAt)
+	if age < 29*24*time.Hour || age > 31*24*time.Hour {
+		t.Fatalf("since %q is %v old, want ~30 days", sinceStr, age)
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_AllowsDataWindowOnListChats(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "imessage")
+	schema := []byte(`{"type":"object","properties":{"limit":{"type":"integer"},"since":{"type":"string"},"before":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionWithDataWindow(t, tx, "imessage", "imessage.list_chats", "List Chats", schema,
+		`{"start_param":"since","end_param":"before"}`)
+
+	constraints := []byte(`{"limit":"*","$data_window":{"last_days":30}}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, nil, "imessage.list_chats", constraints); err != nil {
+		t.Fatalf("expected valid constraints, got: %v", err)
+	}
+}

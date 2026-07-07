@@ -26,13 +26,20 @@ import {
   constraintsToFormState,
   type StructuredConstraintFormState,
 } from "@/lib/structuredConstraints";
-import { preservedNamespacesFromConstraints } from "@/lib/standingApprovalConstraints";
 import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
 import {
   connectorInstanceFromStandingApprovalId,
   standingApprovalConnectorInstanceIdForUpdate,
 } from "./connectorInstanceAccount";
 import { StepLimits } from "@/pages/dashboard/StandingApprovalSteps";
+import { DataWindowPicker } from "@/components/DataWindowPicker";
+import {
+  buildDataWindowConstraint,
+  parseDataWindowFormState,
+  supportsDataWindow,
+  type DataWindowFormState,
+  type DataWindowParams,
+} from "@/lib/dataWindow";
 
 interface EditStandingApprovalDialogProps {
   open: boolean;
@@ -63,12 +70,8 @@ export function EditStandingApprovalDialog({
     useState<StructuredConstraintFormState>(() =>
       constraintsToFormState((rule.constraints ?? {}) as Record<string, unknown>),
     );
-  const preservedNamespaces = useMemo(
-    () =>
-      preservedNamespacesFromConstraints(
-        (rule.constraints ?? {}) as Record<string, unknown>,
-      ),
-    [rule.constraints],
+  const [dataWindowForm, setDataWindowForm] = useState<DataWindowFormState>(() =>
+    parseDataWindowFormState((rule.constraints ?? {}) as Record<string, unknown>),
   );
   const [connectorInstance, setConnectorInstance] = useState(() =>
     connectorInstanceFromStandingApprovalId(rule.connector_instance_id),
@@ -96,6 +99,10 @@ export function EditStandingApprovalDialog({
 
   const metaFields = action?.meta_constraint_fields ?? [];
 
+  const dataWindowSupported = supportsDataWindow(
+    action?.data_window as DataWindowParams | null | undefined,
+  );
+
   const paramKeys = useMemo(
     () => (schema?.properties ? Object.keys(schema.properties) : []),
     [schema],
@@ -115,9 +122,10 @@ export function EditStandingApprovalDialog({
     }
 
     try {
+      const dataWindow = buildDataWindowConstraint(dataWindowForm);
       const constraints = buildStructuredConstraintsFromForm(
         preparedConstraintForm,
-        preservedNamespaces.data_window,
+        dataWindow ?? undefined,
       );
 
       await updateStandingApproval(rule.standing_approval_id, {
@@ -201,6 +209,14 @@ export function EditStandingApprovalDialog({
                   connectorId={connectorId}
                 />
               </div>
+            ) : null}
+
+            {action && dataWindowSupported ? (
+              <DataWindowPicker
+                value={dataWindowForm}
+                onChange={setDataWindowForm}
+                disabled={isPending}
+              />
             ) : null}
 
             <StepLimits

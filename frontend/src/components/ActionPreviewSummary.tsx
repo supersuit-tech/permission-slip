@@ -399,6 +399,30 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     return parts;
   },
 
+  "imessage.list_chats": (params) => {
+    const limit =
+      typeof params.limit === "number" && Number.isFinite(params.limit)
+        ? params.limit
+        : 20;
+    const parts: SummaryPart[] = [
+      text("List "),
+      val(String(limit)),
+      text(" chats"),
+    ];
+    if (params.unread_only === true) {
+      parts.push(text(" (unread only)"));
+    }
+    const filters: string[] = [];
+    const since = strVal(params.since);
+    if (since) filters.push(`since ${formatDateTime(since) ?? since}`);
+    const before = strVal(params.before);
+    if (before) filters.push(`before ${formatDateTime(before) ?? before}`);
+    if (filters.length > 0) {
+      parts.push(text(" with activity "), val(filters.join(", ")));
+    }
+    return parts;
+  },
+
   "protonmail.read_inbox": (params) => {
     const folder = strVal(params.folder) ?? "INBOX";
     const limit =
