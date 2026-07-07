@@ -73,13 +73,13 @@ func TestValidateParametersAgainstStructuredConfig_ComparisonOps(t *testing.T) {
 		{
 			name:   "datetime lte",
 			config: baseConfig("lte", "2026-07-07T00:00:00Z"),
-			exec:   `{"since":"2026-06-01T00:00:00Z"}`,
+			exec:   `{"limit":"2026-06-01T00:00:00Z"}`,
 			wantOK: true,
 		},
 		{
 			name:   "datetime gt rejects equal",
 			config: baseConfig("gt", "2026-07-07T00:00:00Z"),
-			exec:   `{"since":"2026-07-07T00:00:00Z"}`,
+			exec:   `{"limit":"2026-07-07T00:00:00Z"}`,
 			wantOK: false,
 		},
 		{
