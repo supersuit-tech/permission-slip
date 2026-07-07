@@ -70,10 +70,9 @@ func TestExecValueWithinRelativeDateBound_Lower(t *testing.T) {
 	t.Parallel()
 	loc := time.UTC
 	now := time.Date(2026, 7, 7, 12, 0, 0, 0, loc)
-	tokenRaw, _ := jsonMarshalString("@today")
 
 	if err := ExecValueWithinRelativeDateBound(
-		"since", "@today", tokenRaw, RelativeDateBoundLower, now, loc,
+		"since", "@today", nil, RelativeDateBoundLower, now, loc,
 	); err != nil {
 		t.Fatalf("empty value should pass: %v", err)
 	}
