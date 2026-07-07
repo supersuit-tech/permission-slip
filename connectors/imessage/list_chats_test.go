@@ -72,6 +72,106 @@ func TestListChatsParams_ValidateRejectsBeforeBeforeSince(t *testing.T) {
 	}
 }
 
+func TestListChatsParams_ValidateDefaultsOrderAndSort(t *testing.T) {
+	t.Parallel()
+	p := listChatsParams{}
+	if err := p.validate(); err != nil {
+		t.Fatalf("validate: %v", err)
+	}
+	if p.OrderBy != "last_activity" {
+		t.Fatalf("order_by = %q, want last_activity", p.OrderBy)
+	}
+	if p.Sort != "desc" {
+		t.Fatalf("sort = %q, want desc", p.Sort)
+	}
+}
+
+func TestListChatsParams_ValidateRejectsInvalidOrderBy(t *testing.T) {
+	t.Parallel()
+	p := listChatsParams{OrderBy: "created_at"}
+	if err := p.validate(); err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
+func TestListChatsParams_ValidateRejectsInvalidSort(t *testing.T) {
+	t.Parallel()
+	p := listChatsParams{Sort: "newest"}
+	if err := p.validate(); err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
+func TestSortChats_LastActivityDesc(t *testing.T) {
+	t.Parallel()
+	chats := []chat{
+		{ID: 1, LastMessageAt: "2026-06-01T12:00:00Z"},
+		{ID: 2, LastMessageAt: "2026-07-05T12:00:00Z"},
+		{ID: 3, LastMessageAt: "2026-07-01T12:00:00Z"},
+		{ID: 4},
+	}
+	sortChats(chats, "last_activity", "desc")
+	if chats[0].ID != 2 || chats[1].ID != 3 || chats[2].ID != 1 || chats[3].ID != 4 {
+		t.Fatalf("got = %#v", chats)
+	}
+}
+
+func TestSortChats_LastActivityAsc(t *testing.T) {
+	t.Parallel()
+	chats := []chat{
+		{ID: 1, LastMessageAt: "2026-07-05T12:00:00Z"},
+		{ID: 2, LastMessageAt: "2026-06-01T12:00:00Z"},
+		{ID: 3},
+	}
+	sortChats(chats, "last_activity", "asc")
+	if chats[0].ID != 3 || chats[1].ID != 2 || chats[2].ID != 1 {
+		t.Fatalf("got = %#v", chats)
+	}
+}
+
+func TestSortChats_ContactNameAsc(t *testing.T) {
+	t.Parallel()
+	chats := []chat{
+		{ID: 1, ContactName: "Zoe"},
+		{ID: 2, ContactName: "Alice"},
+		{ID: 3, DisplayName: "Bob"},
+	}
+	sortChats(chats, "contact_name", "asc")
+	if chats[0].ID != 2 || chats[1].ID != 3 || chats[2].ID != 1 {
+		t.Fatalf("got = %#v", chats)
+	}
+}
+
+func TestListChatsAction_SortsByLastActivityDesc(t *testing.T) {
+	mock := newMockIMsgWithChatsList(t, `{"chats":[{"id":1,"name":"Old","last_message_at":"2026-06-01T10:00:00Z"},{"id":2,"name":"Newest","last_message_at":"2026-07-07T10:00:00Z"},{"id":3,"name":"Middle","last_message_at":"2026-07-03T10:00:00Z"}]}`)
+	defer mock.Close()
+
+	c := New()
+	c.client = mock.client
+	creds := connectors.NewCredentials(map[string]string{credKeyCLIPath: mock.path})
+
+	result, err := c.Actions()["imessage.list_chats"].Execute(context.Background(), connectors.ActionRequest{
+		ActionType:  "imessage.list_chats",
+		Parameters:  json.RawMessage(`{"limit":2,"order_by":"last_activity","sort":"desc"}`),
+		Credentials: creds,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	var payload struct {
+		Chats []chat `json:"chats"`
+	}
+	if err := json.Unmarshal(result.Data, &payload); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(payload.Chats) != 2 {
+		t.Fatalf("chats = %#v", payload.Chats)
+	}
+	if payload.Chats[0].ID != 2 || payload.Chats[1].ID != 3 {
+		t.Fatalf("chats = %#v", payload.Chats)
+	}
+}
+
 func TestListChatsAction_SinceFilters(t *testing.T) {
 	mock := newMockIMsgWithChatsList(t, `{"chats":[{"id":1,"name":"Recent","last_message_at":"2026-07-07T10:00:00Z"},{"id":2,"name":"Old","last_message_at":"2026-06-01T10:00:00Z"},{"id":3,"name":"AlsoRecent","last_message_at":"2026-07-06T10:00:00Z"}]}`)
 	defer mock.Close()

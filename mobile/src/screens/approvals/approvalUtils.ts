@@ -429,6 +429,17 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
         : 20;
     let result = `List ${String(limit)} chats`;
     if (params.unread_only === true) result += " (unread only)";
+    const orderBy = strVal(params.order_by);
+    const sort = strVal(params.sort);
+    if (
+      (orderBy && orderBy !== "last_activity") ||
+      (sort && sort !== "desc")
+    ) {
+      const orderLabel =
+        orderBy === "contact_name" ? "contact name" : "last activity";
+      const sortLabel = sort === "asc" ? "oldest first" : "most recent first";
+      result += ` (${orderLabel}, ${sortLabel})`;
+    }
     const filters: string[] = [];
     const since = strVal(params.since);
     if (since) filters.push(`since ${tryFormatDateTime(since) ?? since}`);
