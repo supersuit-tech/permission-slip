@@ -94,4 +94,22 @@ describe("structuredConstraints", () => {
     ).toBe(true);
     expect(constraintsObjectHasNonWildcard({ title: "*" })).toBe(false);
   });
+
+  it("round-trips comparison operators", () => {
+    const constraints = {
+      $version: 2,
+      match: "any",
+      groups: [
+        {
+          match: "all",
+          conditions: [{ field: "limit", op: "lte", value: 20 }],
+        },
+      ],
+    };
+    const form = constraintsToFormState(constraints);
+    expect(form.scenarios[0]?.paramRows.limit?.[0]?.operator).toBe("lte");
+    expect(form.scenarios[0]?.paramRows.limit?.[0]?.value).toBe("20");
+    const rebuilt = buildStructuredConstraintsFromForm(form);
+    expect(rebuilt).toEqual(constraints);
+  });
 });

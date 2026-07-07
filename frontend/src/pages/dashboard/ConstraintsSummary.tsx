@@ -26,8 +26,9 @@ function truncate(value: string, max: number): string {
 
 function ConstraintBadge({ constraint }: { constraint: ParsedConstraint }) {
   const isVerified = constraint.name.startsWith("Verified ");
-  const displayValue =
-    constraint.mode === "wildcard"
+  const displayValue = constraint.comparisonOp
+    ? `${comparisonOpLabel(constraint.comparisonOp)} ${truncate(constraint.value, VALUE_TRUNCATE_LENGTH)}`
+    : constraint.mode === "wildcard"
       ? "any"
       : constraint.negated
         ? `not ${truncate(constraint.value, VALUE_TRUNCATE_LENGTH)}`

@@ -21,6 +21,10 @@ const (
 	OpNoneOf       = "none_of"
 	OpMatches      = "matches"
 	OpDoesNotMatch = "does_not_match"
+	OpLte          = "lte"
+	OpGte          = "gte"
+	OpLt           = "lt"
+	OpGt           = "gt"
 	GroupMatchAll  = "all"
 	GroupMatchAny  = "any"
 )
@@ -180,6 +184,16 @@ func validateStructuredCondition(gi, ci int, cond ConstraintCondition) error {
 		if err := validateConstraintValueEncoding(cond.Field, cond.Value); err != nil {
 			return fmt.Errorf("%s: %w", param, err)
 		}
+	case OpLte, OpGte, OpLt, OpGt:
+		if len(cond.Value) == 0 || string(cond.Value) == "null" {
+			return fmt.Errorf("%s: %s requires a threshold value", param, cond.Op)
+		}
+		if len(cond.Values) > 0 {
+			return fmt.Errorf("%s: %s must use value, not values", param, cond.Op)
+		}
+		if err := validateComparisonThreshold(cond.Field, cond.Value); err != nil {
+			return fmt.Errorf("%s: %w", param, err)
+		}
 	default:
 		return fmt.Errorf("%s: unsupported op %q", param, cond.Op)
 	}
@@ -219,7 +233,7 @@ func conditionValues(cond ConstraintCondition) []json.RawMessage {
 	switch cond.Op {
 	case OpAnyOf, OpNoneOf:
 		return cond.Values
-	case OpMatches, OpDoesNotMatch:
+	case OpMatches, OpDoesNotMatch, OpLte, OpGte, OpLt, OpGt:
 		if len(cond.Value) > 0 {
 			return []json.RawMessage{cond.Value}
 		}
@@ -328,8 +342,20 @@ func groupConditionsByField(conditions []ConstraintCondition) map[string][]Const
 }
 
 func evaluateExecFieldConditions(field string, conds []ConstraintCondition, exec map[string]json.RawMessage) error {
-	allow, deny := splitAllowDenyValues(conds)
+	allow, deny, comparisons := splitFieldConditions(conds)
 	sourceValue, present := exec[field]
+
+	for _, comp := range comparisons {
+		if !present {
+			return &ConfigValidationError{
+				Parameter: field,
+				Reason:    "required parameter is missing",
+			}
+		}
+		if err := evaluateComparisonConstraint(field, comp.Op, comp.Value, sourceValue); err != nil {
+			return err
+		}
+	}
 
 	if len(allow) == 0 && len(deny) == 0 {
 		return nil
@@ -362,7 +388,25 @@ func evaluateExecFieldConditions(field string, conds []ConstraintCondition, exec
 }
 
 func evaluateFieldConditions(param, metaKey string, conds []ConstraintCondition, meta map[string]json.RawMessage, isMeta bool) error {
-	allow, deny := splitAllowDenyValues(conds)
+	allow, deny, comparisons := splitFieldConditions(conds)
+
+	evalMetaComparisons := func(sourceValue json.RawMessage) error {
+		if len(comparisons) == 0 {
+			return nil
+		}
+		if len(sourceValue) == 0 {
+			return &ConfigValidationError{
+				Parameter: param,
+				Reason:    "required metadata field is missing",
+			}
+		}
+		for _, comp := range comparisons {
+			if err := evaluateComparisonConstraint(param, comp.Op, comp.Value, sourceValue); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
 
 	if messagesRaw, ok := meta["messages"]; ok && len(messagesRaw) > 0 && string(messagesRaw) != "null" {
 		var messages []map[string]json.RawMessage
@@ -374,6 +418,9 @@ func evaluateFieldConditions(param, metaKey string, conds []ConstraintCondition,
 		}
 		for _, msg := range messages {
 			sourceValue := perMessageMetaSourceValue(metaKey, msg)
+			if err := evalMetaComparisons(sourceValue); err != nil {
+				return err
+			}
 			if err := evaluateMetaSource(param, metaKey, allow, deny, sourceValue, isMeta); err != nil {
 				return err
 			}
@@ -382,6 +429,9 @@ func evaluateFieldConditions(param, metaKey string, conds []ConstraintCondition,
 	}
 
 	sourceValue := flatMetaSourceValue(metaKey, meta)
+	if err := evalMetaComparisons(sourceValue); err != nil {
+		return err
+	}
 	return evaluateMetaSource(param, metaKey, allow, deny, sourceValue, isMeta)
 }
 
@@ -404,6 +454,9 @@ func evaluateMetaSource(param, metaKey string, allow, deny []json.RawMessage, so
 
 func splitAllowDenyValues(conds []ConstraintCondition) (allow, deny []json.RawMessage) {
 	for _, cond := range conds {
+		if isComparisonOp(cond.Op) {
+			continue
+		}
 		vals := conditionValues(cond)
 		if isAllowOp(cond.Op) {
 			allow = append(allow, vals...)
@@ -412,6 +465,22 @@ func splitAllowDenyValues(conds []ConstraintCondition) (allow, deny []json.RawMe
 		}
 	}
 	return allow, deny
+}
+
+func splitFieldConditions(conds []ConstraintCondition) (allow, deny []json.RawMessage, comparisons []ConstraintCondition) {
+	for _, cond := range conds {
+		if isComparisonOp(cond.Op) {
+			comparisons = append(comparisons, cond)
+			continue
+		}
+		vals := conditionValues(cond)
+		if isAllowOp(cond.Op) {
+			allow = append(allow, vals...)
+		} else if isDenyOp(cond.Op) {
+			deny = append(deny, vals...)
+		}
+	}
+	return allow, deny, comparisons
 }
 
 func hasWildcardAllow(allow []json.RawMessage) bool {
@@ -500,7 +569,7 @@ func NormalizeStructuredConstraints(raw json.RawMessage) ([]byte, error) {
 						mutated = true
 					}
 				}
-			case OpMatches, OpDoesNotMatch:
+			case OpMatches, OpDoesNotMatch, OpLte, OpGte, OpLt, OpGt:
 				normalized, changed, err := normalizeConstraintValue(cond.Value)
 				if err != nil {
 					return nil, err

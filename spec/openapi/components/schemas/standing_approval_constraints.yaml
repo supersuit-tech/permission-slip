@@ -79,9 +79,14 @@ StandingApprovalConstraintCondition:
         - does_not_match
         - any_of
         - none_of
+        - lte
+        - gte
+        - lt
+        - gt
       description: |
         - `matches` / `any_of` — positive (allow-list; OR within allow rows)
         - `does_not_match` / `none_of` — negation (deny-list; AND within deny rows)
+        - `lte` / `gte` / `lt` / `gt` — numeric or RFC3339 datetime thresholds
     value:
       description: Single constraint value (fixed, `"*"`, or `{"$pattern":"..."}`).
     values:

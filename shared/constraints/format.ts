@@ -1,11 +1,14 @@
 export type ConstraintMode = "fixed" | "pattern" | "wildcard";
 
+export type ComparisonOp = "lte" | "gte" | "lt" | "gt";
+
 export interface ParsedConstraintLine {
   label: string;
   value: string;
   mode: ConstraintMode;
   verified: boolean;
   negated?: boolean;
+  comparisonOp?: ComparisonOp;
 }
 
 export const META_NAMESPACE_KEY = "$meta";
@@ -57,6 +60,26 @@ export function formatDataWindowConstraint(raw: unknown): string | null {
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
+/** Human-readable phrasing for comparison operators. */
+export function comparisonOpLabel(op: string): string {
+  switch (op) {
+    case "lte":
+      return "at most";
+    case "gte":
+      return "at least";
+    case "lt":
+      return "less than";
+    case "gt":
+      return "greater than";
+    default:
+      return op;
+  }
+}
+
+function isComparisonOp(op: string): op is ComparisonOp {
+  return op === "lte" || op === "gte" || op === "lt" || op === "gt";
+}
+
 function decodeDisplayValue(raw: unknown): { mode: ConstraintMode; value: string } {
   if (raw === "*") {
     return { mode: "wildcard", value: "any" };
@@ -103,6 +126,18 @@ function parseStructuredConstraints(
       const label = isMeta
         ? metaConstraintLabel(field.slice(`${META_NAMESPACE_KEY}.`.length))
         : field;
+
+      if (isComparisonOp(op)) {
+        const decoded = decodeDisplayValue(c.value);
+        lines.push({
+          label: `${prefix}${label}`,
+          mode: decoded.mode,
+          value: decoded.value,
+          verified: isMeta,
+          comparisonOp: op,
+        });
+        continue;
+      }
 
       const values: unknown[] =
         op === "any_of" || op === "none_of"
@@ -180,6 +215,9 @@ export function formatStandingApprovalConstraintsText(
   if (lines.length === 0) return "No constraints";
   return lines
     .map((line) => {
+      if (line.comparisonOp) {
+        return `${line.label}: ${comparisonOpLabel(line.comparisonOp)} ${line.value}`;
+      }
       const prefix = line.negated ? "not " : "";
       const value =
         line.mode === "wildcard" ? "any value" : `${prefix}${line.value}`;

@@ -3,6 +3,7 @@ import {
   isPatternWrapper,
   META_NAMESPACE_KEY,
   formatStandingApprovalConstraints,
+  comparisonOpLabel,
   type ConstraintMode,
   type ParsedConstraintLine,
 } from "@permission-slip/constraints-format";
@@ -12,7 +13,13 @@ import { buildDataWindowConstraint } from "@/lib/dataWindow";
 
 export const CONSTRAINT_VERSION = 2;
 
-export type RowOperator = "matches" | "does_not_match";
+export type RowOperator =
+  | "matches"
+  | "does_not_match"
+  | "lte"
+  | "gte"
+  | "lt"
+  | "gt";
 
 export interface ConstraintValueRow {
   id: string;
@@ -56,7 +63,20 @@ export function emptyScenario(): ConstraintScenario {
   return { id: newScenarioId(), paramRows: {}, metaRows: {} };
 }
 
+function isComparisonOperator(op: string): op is Exclude<RowOperator, "matches" | "does_not_match"> {
+  return op === "lte" || op === "gte" || op === "lt" || op === "gt";
+}
+
 function encodeRowValue(row: ConstraintValueRow): unknown {
+  if (isComparisonOperator(row.operator)) {
+    const trimmed = row.value.trim();
+    if (trimmed === "") return "";
+    const asNumber = Number(trimmed);
+    if (trimmed !== "" && !Number.isNaN(asNumber)) {
+      return asNumber;
+    }
+    return trimmed;
+  }
   if (row.mode === "wildcard" || row.value === "*") {
     return "*";
   }
@@ -113,6 +133,12 @@ function appendConditionRows(
       op === "does_not_match" ? "does_not_match" : "matches";
     if (value !== undefined) {
       target[key].push(...rowsFromCondition(operator, [value]));
+    }
+    return;
+  }
+  if (isComparisonOperator(op)) {
+    if (value !== undefined) {
+      target[key].push(...rowsFromCondition(op, [value]));
     }
     return;
   }
@@ -216,14 +242,26 @@ function buildFieldConditions(
     const effectiveField = metaPrefix ? `${META_NAMESPACE_KEY}.${field}` : field;
     const allow: unknown[] = [];
     const deny: unknown[] = [];
+    const comparisons: Array<{ op: RowOperator; value: unknown }> = [];
     for (const row of rows) {
       if (row.value === "" && row.mode !== "wildcard") continue;
       const encoded = encodeRowValue(row);
+      if (isComparisonOperator(row.operator)) {
+        comparisons.push({ op: row.operator, value: encoded });
+        continue;
+      }
       if (row.operator === "does_not_match") {
         deny.push(encoded);
       } else {
         allow.push(encoded);
       }
+    }
+    for (const comp of comparisons) {
+      conditions.push({
+        field: effectiveField,
+        op: comp.op,
+        value: comp.value,
+      });
     }
     if (allow.length === 1 && deny.length === 0) {
       conditions.push({
@@ -325,6 +363,9 @@ export function formStateHasNonWildcardConstraint(
         if (row.mode !== "wildcard" && row.value !== "" && row.value !== "*") {
           return true;
         }
+        if (isComparisonOperator(row.operator) && row.value !== "") {
+          return true;
+        }
         if (row.operator === "does_not_match" && row.value !== "") {
           return true;
         }
@@ -365,9 +406,18 @@ export function summarizeFieldRows(
   fieldLabel: string,
   rows: ConstraintValueRow[],
 ): string | null {
+  const comparisons = rows.filter((r) => isComparisonOperator(r.operator));
   const allow = rows.filter((r) => r.operator === "matches");
   const deny = rows.filter((r) => r.operator === "does_not_match");
   const parts: string[] = [];
+
+  for (const row of comparisons) {
+    const decoded = decodeStoredValue(encodeRowValue(row));
+    if (decoded.value === "") continue;
+    parts.push(
+      `${fieldLabel} is ${comparisonOpLabel(row.operator)} ${decoded.value}`,
+    );
+  }
 
   if (allow.length > 0) {
     const allowText = allow

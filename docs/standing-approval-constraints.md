@@ -57,6 +57,28 @@ Version 2 adds **negation**, **multiple allow/deny rows per field**, and **OR ac
 - **Per-field allow/deny**: `matches` / `any_of` rows form an allow-list (OR). `does_not_match` / `none_of` rows form a deny-list (AND). A field passes when the value is allowed *and* not denied.
 - **Empty allow-list** means no positive restriction (deny-list still applies).
 - **Wildcard (`"*"`)** in an allow-list short-circuits that field to “any value allowed.”
+- **Comparison thresholds** (`lte`, `gte`, `lt`, `gt`) apply to numeric parameters and RFC3339 datetime strings. Example: `{ "field": "limit", "op": "lte", "value": 20 }` auto-approves any request where `limit` is 20 or less.
+
+## Comparison operators
+
+Use structured v2 conditions — not MongoDB-style wrappers like `{"$lte": 20}` in flat maps:
+
+```json
+{
+  "$version": 2,
+  "match": "any",
+  "groups": [
+    {
+      "match": "all",
+      "conditions": [
+        { "field": "limit", "op": "lte", "value": 20 }
+      ]
+    }
+  ]
+}
+```
+
+Supported ops: `lte` (≤), `gte` (≥), `lt` (<), `gt` (>). The web UI exposes these as “is at most”, “is at least”, etc. on number and datetime fields.
 
 ## Multi-valued fields
 
