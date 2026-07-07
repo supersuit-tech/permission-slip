@@ -79,6 +79,17 @@ func tryStandingApprovalAutoApprove(w http.ResponseWriter, r *http.Request, deps
 		}
 		params = effectiveParams
 
+		effectiveParams, rdErr := applyStandingApprovalRelativeDates(
+			r.Context(), deps.DB, actionType, candidate.Constraints, params, time.Now(),
+		)
+		if rdErr != nil {
+			log.Printf("[%s] AutoApprove: relative date constraints for %s: %v",
+				TraceID(r.Context()), candidate.StandingApprovalID, rdErr)
+			CaptureError(r.Context(), rdErr)
+			continue
+		}
+		params = effectiveParams
+
 		sa = candidate
 		break
 	}

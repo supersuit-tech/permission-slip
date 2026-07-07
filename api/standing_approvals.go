@@ -730,6 +730,13 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 			allWildcard = false
 			continue
 		}
+		if token, ok := db.ExtractRelativeDateToken(v); ok {
+			if err := db.ValidateRelativeDateToken(token); err != nil {
+				return nil, err
+			}
+			allWildcard = false
+			continue
+		}
 		if string(v) == "null" {
 			return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
 		}
@@ -794,6 +801,11 @@ func validateStructuredStandingApprovalConstraints(raw json.RawMessage) ([]byte,
 			for _, val := range dbConditionValues(cond) {
 				if string(val) == "null" {
 					return nil, errors.New("constraint values must not be null; use \"*\" for a wildcard or omit the key entirely")
+				}
+				if token, ok := db.ExtractRelativeDateToken(val); ok {
+					if err := db.ValidateRelativeDateToken(token); err != nil {
+						return nil, err
+					}
 				}
 			}
 			_ = gi

@@ -150,6 +150,12 @@ func ValidateConfigParameters(params json.RawMessage) error {
 			}
 			continue
 		}
+		if token, ok := ExtractRelativeDateToken(raw); ok {
+			if err := ValidateRelativeDateToken(token); err != nil {
+				return err
+			}
+			continue
+		}
 		if pattern, ok := extractPattern(raw); ok {
 			if !strings.Contains(pattern, "*") {
 				return &ConfigValidationError{
@@ -248,6 +254,13 @@ func validateFlatParametersAgainstConfig(configParams, execParams, resolvedMeta 
 	for key, configValue := range config {
 		if IsWildcard(configValue) {
 			// Bare wildcard: any value (or missing) is acceptable.
+			continue
+		}
+
+		if token, ok := ExtractRelativeDateToken(configValue); ok {
+			_ = token
+			// Relative date bounds are enforced when params are injected/clamped
+			// after a standing approval match (see ApplyRelativeDateConstraintsToParams).
 			continue
 		}
 

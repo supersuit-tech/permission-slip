@@ -159,4 +159,29 @@ describe("formatStandingApprovalConstraints", () => {
       }),
     ).toBe("limit: at most 20");
   });
+
+  it("formats relative date tokens", () => {
+    const lines = formatStandingApprovalConstraints({
+      limit: "*",
+      since: "@today",
+    });
+    expect(lines).toContainEqual({
+      label: "since",
+      mode: "fixed",
+      value: "start of today",
+      verified: false,
+    });
+  });
+
+  it("formats rolling relative date tokens", () => {
+    const lines = formatStandingApprovalConstraints({
+      since: "-7d",
+    });
+    expect(lines).toContainEqual({
+      label: "since",
+      mode: "fixed",
+      value: "last 7 days",
+      verified: false,
+    });
+  });
 });

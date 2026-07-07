@@ -545,6 +545,17 @@ func attemptStandingApprovalForBulk(ctx context.Context, deps *Deps, agent *db.A
 		}
 		item.actionParams = effectiveParams
 
+		effectiveParams, rdErr := applyStandingApprovalRelativeDates(
+			ctx, deps.DB, item.actionType, candidate.Constraints, item.actionParams, time.Now(),
+		)
+		if rdErr != nil {
+			log.Printf("[%s] BulkRequest relative date constraints for %s: %v",
+				TraceID(ctx), candidate.StandingApprovalID, rdErr)
+			CaptureError(ctx, rdErr)
+			continue
+		}
+		item.actionParams = effectiveParams
+
 		sa = candidate
 		break
 	}
