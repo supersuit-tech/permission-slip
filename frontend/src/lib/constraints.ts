@@ -1,10 +1,10 @@
 import {
   formatStandingApprovalConstraints,
-  comparisonOpLabel,
   type ConstraintMode as SharedConstraintMode,
 } from "@permission-slip/constraints-format";
 
 export {
+  comparisonOpLabel,
   DATA_WINDOW_NAMESPACE_KEY,
   formatDataWindowConstraint,
   isPatternWrapper,

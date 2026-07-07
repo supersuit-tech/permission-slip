@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Asterisk, Lock, Regex, ShieldCheck } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import {
+  comparisonOpLabel,
   type ConstraintMode,
   type ParsedConstraint,
   parseStandingApprovalConstraints,

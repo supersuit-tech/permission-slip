@@ -25,7 +25,7 @@ func validateComparisonThreshold(field string, val json.RawMessage) error {
 	if _, ok := extractPattern(val); ok {
 		return fmt.Errorf("comparison threshold cannot be a pattern")
 	}
-	if _, _, err := parseComparableValue(val); err != nil {
+	if _, _, _, _, err := parseComparableValue(val); err != nil {
 		return fmt.Errorf("comparison threshold must be a number or RFC3339 datetime: %w", err)
 	}
 	return nil
