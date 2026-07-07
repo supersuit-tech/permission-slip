@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildDataWindowConstraint,
+  extractDataWindowConstraint,
   formatDataWindowConstraint,
   parseDataWindowFormState,
 } from "@/lib/dataWindow";
@@ -29,6 +30,43 @@ describe("parseDataWindowFormState", () => {
     expect(form.enabled).toBe(true);
     expect(form.mode).toBe("last_days");
     expect(form.lastDays).toBe("14");
+  });
+
+  it("reads last_days from v2 structured constraints", () => {
+    const form = parseDataWindowFormState({
+      $version: 2,
+      match: "any",
+      groups: [
+        {
+          match: "all",
+          conditions: [
+            { field: "limit", op: "matches", value: "*" },
+            { field: "$data_window", op: "matches", value: { last_days: 30 } },
+          ],
+        },
+      ],
+    });
+    expect(form.enabled).toBe(true);
+    expect(form.lastDays).toBe("30");
+  });
+});
+
+describe("extractDataWindowConstraint", () => {
+  it("reads from v2 structured constraints", () => {
+    expect(
+      extractDataWindowConstraint({
+        $version: 2,
+        match: "any",
+        groups: [
+          {
+            match: "all",
+            conditions: [
+              { field: "$data_window", op: "matches", value: { last_days: 7 } },
+            ],
+          },
+        ],
+      }),
+    ).toEqual({ last_days: 7 });
   });
 });
 

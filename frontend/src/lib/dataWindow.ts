@@ -31,13 +31,42 @@ export function supportsDataWindow(
   );
 }
 
+/** Read `$data_window` from legacy flat or v2 structured standing-approval constraints. */
+export function extractDataWindowConstraint(
+  constraints: Record<string, unknown> | null | undefined,
+): unknown | undefined {
+  if (!constraints || typeof constraints !== "object") {
+    return undefined;
+  }
+  const topLevel = constraints[DATA_WINDOW_NAMESPACE_KEY];
+  if (topLevel !== undefined) {
+    return topLevel;
+  }
+  if (constraints.$version !== 2 || !Array.isArray(constraints.groups)) {
+    return undefined;
+  }
+  for (const group of constraints.groups) {
+    if (!group || typeof group !== "object") continue;
+    const conditions = (group as { conditions?: unknown[] }).conditions;
+    if (!Array.isArray(conditions)) continue;
+    for (const cond of conditions) {
+      if (!cond || typeof cond !== "object") continue;
+      const c = cond as Record<string, unknown>;
+      if (c.field === DATA_WINDOW_NAMESPACE_KEY && c.op === "matches") {
+        return c.value;
+      }
+    }
+  }
+  return undefined;
+}
+
 export function parseDataWindowFormState(
   constraints: Record<string, unknown> | null | undefined,
 ): DataWindowFormState {
   if (!constraints || typeof constraints !== "object") {
     return { ...DEFAULT_DATA_WINDOW_FORM };
   }
-  const raw = constraints[DATA_WINDOW_NAMESPACE_KEY];
+  const raw = extractDataWindowConstraint(constraints);
   if (!raw || typeof raw !== "object") {
     return { ...DEFAULT_DATA_WINDOW_FORM };
   }

@@ -60,12 +60,28 @@ func (c *IMessageConnector) Manifest() *connectors.ConnectorManifest {
 						"since": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Only chats with last activity on or after this ISO 8601 timestamp"
+							"description": "Only chats with last activity on or after this ISO 8601 timestamp",
+							"x-ui": {
+								"widget": "datetime",
+								"label": "Activity after",
+								"hidden": true,
+								"help_text": "Managed via Data window in standing approvals",
+								"datetime_range_pair": "before",
+								"datetime_range_role": "lower"
+							}
 						},
 						"before": {
 							"type": "string",
 							"format": "date-time",
-							"description": "Only chats with last activity before this ISO 8601 timestamp"
+							"description": "Only chats with last activity before this ISO 8601 timestamp",
+							"x-ui": {
+								"widget": "datetime",
+								"label": "Activity before",
+								"hidden": true,
+								"help_text": "Managed via Data window in standing approvals",
+								"datetime_range_pair": "since",
+								"datetime_range_role": "upper"
+							}
 						}
 					}
 				}`)),

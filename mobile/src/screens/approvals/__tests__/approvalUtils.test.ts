@@ -261,6 +261,15 @@ describe("buildActionSummary", () => {
   });
 
   describe("imessage chat name resolution", () => {
+    it("summarizes imessage.list_chats with since filter", () => {
+      const result = buildActionSummary("imessage.list_chats", {
+        limit: 20,
+        since: "2026-07-07T00:00:00Z",
+      });
+      expect(result).toContain("List 20 chats");
+      expect(result).toContain("since");
+    });
+
     it("uses chat_name from resourceDetails for imessage.read_history", () => {
       const result = buildActionSummary(
         "imessage.read_history",

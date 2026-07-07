@@ -40,6 +40,14 @@ import {
   mergeConnectorInstanceIntoParameters,
 } from "./connectorInstanceAccount";
 import { StepLimits } from "@/pages/dashboard/StandingApprovalSteps";
+import { DataWindowPicker } from "@/components/DataWindowPicker";
+import {
+  buildDataWindowConstraint,
+  parseDataWindowFormState,
+  supportsDataWindow,
+  type DataWindowFormState,
+} from "@/lib/dataWindow";
+import { formStateHasNonWildcardConstraint } from "@/lib/structuredConstraints";
 
 interface AddStandingApprovalDialogProps {
   open: boolean;
@@ -70,6 +78,9 @@ export function AddStandingApprovalDialog({
       constraintsToFormState(null),
     );
   const [connectorInstance, setConnectorInstance] = useState("*");
+  const [dataWindowForm, setDataWindowForm] = useState<DataWindowFormState>(() =>
+    parseDataWindowFormState(null),
+  );
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(() => defaultExpiresAtLocal());
 
@@ -92,6 +103,10 @@ export function AddStandingApprovalDialog({
 
   const metaFields = selectedAction?.meta_constraint_fields ?? [];
 
+  const dataWindowSupported = supportsDataWindow(
+    selectedAction?.data_window as { start_param?: string; end_param?: string } | undefined,
+  );
+
   const paramKeys = useMemo(
     () => (schema?.properties ? Object.keys(schema.properties) : []),
     [schema],
@@ -107,6 +122,7 @@ export function AddStandingApprovalDialog({
     setName("");
     setDescription("");
     setConstraintForm(constraintsToFormState(null));
+    setDataWindowForm(parseDataWindowFormState(null));
     setConnectorInstance("*");
     setNoExpiry(true);
     setExpiresAt(defaultExpiresAtLocal());
@@ -120,6 +136,7 @@ export function AddStandingApprovalDialog({
   function handleActionChange(actionType: string) {
     setSelectedActionType(actionType);
     setConstraintForm(constraintsToFormState(null));
+    setDataWindowForm(parseDataWindowFormState(null));
     setConnectorInstance("*");
   }
 
@@ -134,10 +151,16 @@ export function AddStandingApprovalDialog({
       toast.error("Please enter a name for this standing approval");
       return;
     }
+    if (!formStateHasNonWildcardConstraint(preparedConstraintForm, dataWindowForm)) {
+      toast.error("At least one parameter constraint must be non-wildcard");
+      return;
+    }
 
     try {
+      const dataWindow = buildDataWindowConstraint(dataWindowForm);
       let builtConstraints = buildStructuredConstraintsFromForm(
         preparedConstraintForm,
+        dataWindow ?? undefined,
       ) as Record<string, unknown>;
       if (showAccountSelect) {
         builtConstraints = mergeConnectorInstanceIntoParameters(
@@ -245,6 +268,14 @@ export function AddStandingApprovalDialog({
                 />
               </div>
             )}
+
+            {selectedAction && dataWindowSupported ? (
+              <DataWindowPicker
+                value={dataWindowForm}
+                onChange={setDataWindowForm}
+                disabled={isPending}
+              />
+            ) : null}
 
             <StepLimits
               expiresAt={expiresAt}

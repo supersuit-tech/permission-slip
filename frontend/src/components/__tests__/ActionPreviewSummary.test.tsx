@@ -741,8 +741,19 @@ describe("buildSummary", () => {
       );
     });
 
-    describe("imessage chat name resolution", () => {
-      it("uses chat_name from resourceDetails for imessage.read_history", () => {
+  describe("imessage chat name resolution", () => {
+    it("summarizes imessage.list_chats with since filter", () => {
+      const result = buildSummary("imessage.list_chats", {
+        limit: 20,
+        since: "2026-07-07T00:00:00Z",
+      });
+      expect(result).toContain("List");
+      expect(result).toContain("20");
+      expect(result).toContain("chats");
+      expect(result).toContain("since");
+    });
+
+    it("uses chat_name from resourceDetails for imessage.read_history", () => {
         const result = buildSummary(
           "imessage.read_history",
           { chat_id: 30 },

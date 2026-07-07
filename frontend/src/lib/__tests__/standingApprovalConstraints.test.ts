@@ -14,6 +14,24 @@ describe("standingApprovalConstraints", () => {
     ).toEqual({ data_window: { last_days: 7 } });
   });
 
+  it("preserves $data_window from v2 structured constraints", () => {
+    expect(
+      preservedNamespacesFromConstraints({
+        $version: 2,
+        match: "any",
+        groups: [
+          {
+            match: "all",
+            conditions: [
+              { field: "limit", op: "matches", value: "*" },
+              { field: "$data_window", op: "matches", value: { last_days: 30 } },
+            ],
+          },
+        ],
+      }),
+    ).toEqual({ data_window: { last_days: 30 } });
+  });
+
   it("returns empty object when no data window is present", () => {
     expect(
       preservedNamespacesFromConstraints({ message_id: "*" }),

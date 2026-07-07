@@ -1,12 +1,9 @@
-import { DATA_WINDOW_NAMESPACE_KEY } from "@/lib/constraints";
+import { extractDataWindowConstraint } from "@/lib/dataWindow";
 
 export function preservedNamespacesFromConstraints(
   constraints: Record<string, unknown> | null | undefined,
 ): { data_window?: unknown } {
-  if (!constraints || typeof constraints !== "object") {
-    return {};
-  }
-  const dataWindow = constraints[DATA_WINDOW_NAMESPACE_KEY];
+  const dataWindow = extractDataWindowConstraint(constraints);
   if (dataWindow === undefined) {
     return {};
   }
