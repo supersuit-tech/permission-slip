@@ -743,10 +743,15 @@ describe("buildSummary", () => {
 
   describe("imessage chat name resolution", () => {
     it("summarizes imessage.list_chats with since filter", () => {
-      const result = buildSummary("imessage.list_chats", {
-        limit: 20,
-        since: "2026-07-07T00:00:00Z",
-      });
+      const result = buildSummary(
+        "imessage.list_chats",
+        {
+          limit: 20,
+          since: "2026-07-07T00:00:00Z",
+        },
+        null,
+        "List Chats",
+      );
       expect(result).toContain("List");
       expect(result).toContain("20");
       expect(result).toContain("chats");

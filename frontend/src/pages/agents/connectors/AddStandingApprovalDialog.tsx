@@ -46,6 +46,7 @@ import {
   parseDataWindowFormState,
   supportsDataWindow,
   type DataWindowFormState,
+  type DataWindowParams,
 } from "@/lib/dataWindow";
 import { formStateHasNonWildcardConstraint } from "@/lib/structuredConstraints";
 
@@ -104,7 +105,7 @@ export function AddStandingApprovalDialog({
   const metaFields = selectedAction?.meta_constraint_fields ?? [];
 
   const dataWindowSupported = supportsDataWindow(
-    selectedAction?.data_window as { start_param?: string; end_param?: string } | undefined,
+    selectedAction?.data_window as DataWindowParams | null | undefined,
   );
 
   const paramKeys = useMemo(

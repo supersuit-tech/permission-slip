@@ -38,6 +38,7 @@ import {
   parseDataWindowFormState,
   supportsDataWindow,
   type DataWindowFormState,
+  type DataWindowParams,
 } from "@/lib/dataWindow";
 
 interface EditStandingApprovalDialogProps {
@@ -99,7 +100,7 @@ export function EditStandingApprovalDialog({
   const metaFields = action?.meta_constraint_fields ?? [];
 
   const dataWindowSupported = supportsDataWindow(
-    action?.data_window as { start_param?: string; end_param?: string } | undefined,
+    action?.data_window as DataWindowParams | null | undefined,
   );
 
   const paramKeys = useMemo(
