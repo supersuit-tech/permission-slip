@@ -23,7 +23,7 @@ SMS relay routes through Apple's push servers (APNs), not the local Wi‑Fi netw
 
 | Action | Approval | Description |
 |--------|----------|-------------|
-| `imessage.list_chats` | No | Recent conversations with optional `unread_only` filter and per-chat `unread_count` (when imsg supports it) |
+| `imessage.list_chats` | No | Recent conversations with optional `unread_only`, `since`/`before` (filters on `last_message_at` client-side), and per-chat `unread_count` (when imsg supports it). Standing approvals can constrain `$data_window` to auto-approve recent chats only. |
 | `imessage.get_chat` | No | Single chat + participants |
 | `imessage.read_history` | No | Messages in a chat (supports `since_guid` / `since_rowid`; per-message `is_read` / `date_read` when imsg supports it) |
 | `imessage.search` | No | Search local history |

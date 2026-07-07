@@ -10,6 +10,98 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
+func TestFilterChatsByActivity_Since(t *testing.T) {
+	t.Parallel()
+	chats := []chat{
+		{ID: 1, LastMessageAt: "2026-07-01T12:00:00Z"},
+		{ID: 2, LastMessageAt: "2026-06-01T12:00:00Z"},
+		{ID: 3, LastMessageAt: "2026-07-05T12:00:00Z"},
+		{ID: 4}, // missing timestamp excluded
+	}
+	got := filterChatsByActivity(chats, "2026-07-01T00:00:00Z", "", 10)
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2: %#v", len(got), got)
+	}
+	if got[0].ID != 1 || got[1].ID != 3 {
+		t.Fatalf("got = %#v", got)
+	}
+}
+
+func TestFilterChatsByActivity_Before(t *testing.T) {
+	t.Parallel()
+	chats := []chat{
+		{ID: 1, LastMessageAt: "2026-07-01T12:00:00Z"},
+		{ID: 2, LastMessageAt: "2026-06-01T12:00:00Z"},
+		{ID: 3, LastMessageAt: "2026-07-05T12:00:00Z"},
+	}
+	got := filterChatsByActivity(chats, "", "2026-07-01T12:00:00Z", 10)
+	if len(got) != 1 || got[0].ID != 2 {
+		t.Fatalf("got = %#v", got)
+	}
+}
+
+func TestFilterChatsByActivity_RespectsLimit(t *testing.T) {
+	t.Parallel()
+	chats := []chat{
+		{ID: 1, LastMessageAt: "2026-07-03T12:00:00Z"},
+		{ID: 2, LastMessageAt: "2026-07-02T12:00:00Z"},
+		{ID: 3, LastMessageAt: "2026-07-01T12:00:00Z"},
+	}
+	got := filterChatsByActivity(chats, "2026-07-01T00:00:00Z", "", 2)
+	if len(got) != 2 {
+		t.Fatalf("len = %d, want 2", len(got))
+	}
+}
+
+func TestListChatsParams_ValidateRejectsInvalidSince(t *testing.T) {
+	t.Parallel()
+	p := listChatsParams{Since: "not-a-date"}
+	if err := p.validate(); err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
+func TestListChatsParams_ValidateRejectsBeforeBeforeSince(t *testing.T) {
+	t.Parallel()
+	p := listChatsParams{
+		Since:  "2026-07-07T00:00:00Z",
+		Before: "2026-07-01T00:00:00Z",
+	}
+	if err := p.validate(); err == nil {
+		t.Fatal("expected validation error")
+	}
+}
+
+func TestListChatsAction_SinceFilters(t *testing.T) {
+	mock := newMockIMsgWithChatsList(t, `{"chats":[{"id":1,"name":"Recent","last_message_at":"2026-07-07T10:00:00Z"},{"id":2,"name":"Old","last_message_at":"2026-06-01T10:00:00Z"},{"id":3,"name":"AlsoRecent","last_message_at":"2026-07-06T10:00:00Z"}]}`)
+	defer mock.Close()
+
+	c := New()
+	c.client = mock.client
+	creds := connectors.NewCredentials(map[string]string{credKeyCLIPath: mock.path})
+
+	result, err := c.Actions()["imessage.list_chats"].Execute(context.Background(), connectors.ActionRequest{
+		ActionType:  "imessage.list_chats",
+		Parameters:  json.RawMessage(`{"limit":10,"since":"2026-07-06T00:00:00Z"}`),
+		Credentials: creds,
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	var payload struct {
+		Chats []chat `json:"chats"`
+	}
+	if err := json.Unmarshal(result.Data, &payload); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(payload.Chats) != 2 {
+		t.Fatalf("chats = %#v", payload.Chats)
+	}
+	if payload.Chats[0].ID != 1 || payload.Chats[1].ID != 3 {
+		t.Fatalf("chats = %#v", payload.Chats)
+	}
+}
+
 func TestFilterUnreadChats(t *testing.T) {
 	t.Parallel()
 	chats := []chat{
