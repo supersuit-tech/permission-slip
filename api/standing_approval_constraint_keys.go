@@ -163,10 +163,11 @@ func validateStandingApprovalConstraintKeys(
 				if _, ok := schemaKeys[key]; !ok {
 					return formatUnknownConstraintKeyError(key, actionType, metaFields)
 				}
-				if dtFields != nil {
-					if _, ok := dtFields[key]; !ok {
-						return fmt.Errorf("relative date token %q is only valid on date or date-time parameters; %q is not a temporal field on action %q", token, key, actionType)
-					}
+				if dtFields == nil {
+					return fmt.Errorf("relative date token %q is only valid on date or date-time parameters; action %q has no temporal fields", token, actionType)
+				}
+				if _, ok := dtFields[key]; !ok {
+					return fmt.Errorf("relative date token %q is only valid on date or date-time parameters; %q is not a temporal field on action %q", token, key, actionType)
 				}
 			}
 			continue
