@@ -126,7 +126,7 @@ If not yet at `MAX_ROUNDS`, go to step 2. The trigger script always starts **new
 When `fix-ci-trigger.sh` exits 0:
 
 1. Print the **CI run URL** and **audit run URL** from script output (`CI_RUN_URL=`, `AUDIT_RUN_URL=`).
-2. **Pull request:** If there is no PR for the current branch, create one (same conventions as `/yolo` Step 5 — ready for review, link context in body). If a PR already exists, note its URL.
+2. **Pull request:** If there is no PR for the current branch, create one (ready for review, with summary and test plan in the body per `CLAUDE.md`). If a PR already exists, note its URL.
 
 ```bash
 PR_URL=$(GH_HOST=github.com GH_REPO=supersuit-tech/permission-slip gh pr view --json url --jq '.url' 2>/dev/null || echo "")
