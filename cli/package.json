@@ -16,21 +16,20 @@
     "CHANGELOG.md"
   ],
   "scripts": {
-    "build": "tsc",
-    "dev": "tsc --watch",
-    "postinstall": "npm run build --prefix ../shared/constraints",
-    "prebuild": "npm run build --prefix ../shared/constraints",
+    "build": "node scripts/build.mjs",
+    "dev": "node scripts/build.mjs --watch",
+    "pretest": "npm run build --prefix ../shared/constraints",
     "test": "node --experimental-vm-modules node_modules/.bin/jest --passWithNoTests",
     "test:watch": "node --experimental-vm-modules node_modules/.bin/jest --watch",
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@permission-slip/constraints-format": "file:../shared/constraints",
     "commander": "^14.0.3"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
     "@types/node": "^25.6.0",
+    "esbuild": "^0.25.0",
     "jest": "^30.3.0",
     "ts-jest": "^29.3.0",
     "typescript": "^6.0.3"

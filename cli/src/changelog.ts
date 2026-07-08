@@ -14,12 +14,12 @@ export interface ChangelogEntry {
 }
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const CHANGELOG_PATH = path.join(__dirname, "..", "..", "CHANGELOG.md");
+const CHANGELOG_PATH = path.join(__dirname, "..", "CHANGELOG.md");
 
 /** Current CLI version from package.json (bundled at build). */
 export function currentCliVersion(): string {
   try {
-    const pkgPath = path.join(__dirname, "..", "..", "package.json");
+    const pkgPath = path.join(__dirname, "..", "package.json");
     const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf-8")) as { version?: string };
     return pkg.version ?? "0.0.0";
   } catch {
