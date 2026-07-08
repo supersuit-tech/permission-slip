@@ -272,6 +272,12 @@ export function inferWidgetFromProperty(property: SchemaProperty): WidgetType {
   return "text";
 }
 
+/** Whether a parameter supports numeric/datetime comparison constraints. */
+export function isComparableField(property: SchemaProperty): boolean {
+  const widget = property["x-ui"]?.widget ?? inferWidgetFromProperty(property);
+  return widget === "number" || widget === "date" || widget === "datetime";
+}
+
 /**
  * Auto-map JSON Schema type/format to a widget when no explicit widget is set.
  * Explicit x-ui.widget always takes precedence. Uses inferWidgetFromProperty

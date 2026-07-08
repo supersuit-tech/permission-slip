@@ -4,6 +4,7 @@ import {
 } from "@permission-slip/constraints-format";
 
 export {
+  comparisonOpLabel,
   DATA_WINDOW_NAMESPACE_KEY,
   formatDataWindowConstraint,
   isPatternWrapper,
@@ -18,6 +19,7 @@ export interface ParsedConstraint {
   mode: ConstraintMode;
   value: string;
   negated?: boolean;
+  comparisonOp?: "lte" | "gte" | "lt" | "gt";
   scenarioIndex?: number;
 }
 
@@ -26,6 +28,7 @@ function lineToParsedConstraint(line: {
   mode: ConstraintMode;
   value: string;
   negated?: boolean;
+  comparisonOp?: "lte" | "gte" | "lt" | "gt";
 }): ParsedConstraint {
   const scenarioMatch = /^Scenario (\d+): /.exec(line.label);
   return {
@@ -33,6 +36,7 @@ function lineToParsedConstraint(line: {
     mode: line.mode,
     value: line.mode === "wildcard" ? "*" : line.value,
     negated: line.negated,
+    comparisonOp: line.comparisonOp,
     scenarioIndex: scenarioMatch
       ? Number.parseInt(scenarioMatch[1] ?? "0", 10) - 1
       : undefined,

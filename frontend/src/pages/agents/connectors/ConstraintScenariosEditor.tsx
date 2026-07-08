@@ -14,6 +14,7 @@ import type { ParametersSchema, SchemaProperty } from "@/lib/parameterSchema";
 import {
   getFieldLabel,
   getOrderedFieldKeys,
+  isComparableField,
   isFieldHidden,
   isFieldVisible,
 } from "@/lib/parameterSchema";
@@ -22,6 +23,7 @@ import { ParameterFieldWidget } from "./ParameterFieldWidget";
 import {
   type ConstraintScenario,
   type ConstraintValueRow,
+  type RowOperator,
   type StructuredConstraintFormState,
   emptyConstraintRow,
   emptyScenario,
@@ -386,23 +388,59 @@ function ConstraintValueRowEditor({
   onChange: (patch: Partial<ConstraintValueRow>) => void;
   onRemove: () => void;
 }) {
-  const isWildcard = row.mode === "wildcard";
+  const comparable = isComparableField(property);
+  const isComparison =
+    row.operator === "lte" ||
+    row.operator === "gte" ||
+    row.operator === "lt" ||
+    row.operator === "gt";
+  const isWildcard = row.mode === "wildcard" && !isComparison;
+
+  const operatorOptions: Array<{ value: RowOperator; label: string }> = comparable
+    ? [
+        { value: "matches", label: "is exactly" },
+        { value: "does_not_match", label: "is not" },
+        { value: "lte", label: "is at most" },
+        { value: "gte", label: "is at least" },
+        { value: "lt", label: "is less than" },
+        { value: "gt", label: "is greater than" },
+      ]
+    : [
+        { value: "matches", label: "matches" },
+        { value: "does_not_match", label: "does not match" },
+      ];
 
   return (
     <div className="flex flex-wrap items-start gap-2">
       <Select
         value={row.operator}
-        onValueChange={(v) =>
-          onChange({ operator: v as "matches" | "does_not_match" })
-        }
+        onValueChange={(v) => {
+          const nextOp = v as RowOperator;
+          const patch: Partial<ConstraintValueRow> = { operator: nextOp };
+          if (
+            nextOp === "lte" ||
+            nextOp === "gte" ||
+            nextOp === "lt" ||
+            nextOp === "gt"
+          ) {
+            patch.mode = "fixed";
+            if (row.mode === "wildcard") {
+              patch.value = "";
+            }
+          }
+          onChange(patch);
+        }}
         disabled={disabled}
       >
-        <SelectTrigger className="h-9 w-[140px] shrink-0">
+        <SelectTrigger className="h-9 w-[160px] shrink-0">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
-          <SelectItem value="matches">matches</SelectItem>
-          <SelectItem value="does_not_match">does not match</SelectItem>
+          {operatorOptions.map((opt) => (
+            <SelectItem key={opt.value} value={opt.value}>
+              {opt.label}
+            </SelectItem>
+          ))}
         </SelectContent>
       </Select>
 
@@ -428,20 +466,22 @@ function ConstraintValueRowEditor({
         />
       </div>
 
-      <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
-        <Checkbox
-          checked={isWildcard}
-          disabled={disabled || row.operator === "does_not_match"}
-          onCheckedChange={(checked) => {
-            if (checked === true) {
-              onChange({ mode: "wildcard", value: "*" });
-            } else {
-              onChange({ mode: "fixed", value: "" });
-            }
-          }}
-        />
-        Any value
-      </label>
+      {!isComparison && (
+        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
+          <Checkbox
+            checked={isWildcard}
+            disabled={disabled || row.operator === "does_not_match"}
+            onCheckedChange={(checked) => {
+              if (checked === true) {
+                onChange({ mode: "wildcard", value: "*" });
+              } else {
+                onChange({ mode: "fixed", value: "" });
+              }
+            }}
+          />
+          Any value
+        </label>
+      )}
 
       {canRemove && (
         <Button

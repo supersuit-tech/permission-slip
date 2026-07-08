@@ -125,4 +125,38 @@ describe("formatStandingApprovalConstraints", () => {
       verified: false,
     });
   });
+
+  it("formats comparison operators", () => {
+    const lines = formatStandingApprovalConstraints({
+      $version: 2,
+      match: "any",
+      groups: [
+        {
+          match: "all",
+          conditions: [{ field: "limit", op: "lte", value: 20 }],
+        },
+      ],
+    });
+    expect(lines).toEqual([
+      {
+        label: "limit",
+        mode: "fixed",
+        value: "20",
+        verified: false,
+        comparisonOp: "lte",
+      },
+    ]);
+    expect(
+      formatStandingApprovalConstraintsText({
+        $version: 2,
+        match: "any",
+        groups: [
+          {
+            match: "all",
+            conditions: [{ field: "limit", op: "lte", value: 20 }],
+          },
+        ],
+      }),
+    ).toBe("limit: at most 20");
+  });
 });
