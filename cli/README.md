@@ -78,4 +78,4 @@ Run `permission-slip --help` for the full command list.
 cd cli && npm install && npm test && npm run build
 ```
 
-The CLI depends on `@permission-slip/constraints-format` in `shared/constraints/` (built automatically on `postinstall`).
+The CLI bundles `@permission-slip/constraints-format` from `shared/constraints/` at build time via esbuild, so the published npm tarball has no monorepo-only dependencies.
