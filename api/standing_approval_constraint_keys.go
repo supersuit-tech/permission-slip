@@ -331,6 +331,14 @@ func isAllowedParameterConstraintValue(val json.RawMessage) bool {
 	if json.Unmarshal(val, &s) == nil {
 		return true
 	}
+	var n json.Number
+	if json.Unmarshal(val, &n) == nil {
+		return true
+	}
+	var b bool
+	if json.Unmarshal(val, &b) == nil {
+		return true
+	}
 	var patternOnly map[string]json.RawMessage
 	if err := json.Unmarshal(val, &patternOnly); err != nil {
 		return false

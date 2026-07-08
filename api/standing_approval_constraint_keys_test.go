@@ -269,6 +269,21 @@ func TestValidateStandingApprovalConstraintKeys_RejectsObjectValueOnSchemaParam(
 	}
 }
 
+func TestValidateStandingApprovalConstraintKeys_AllowsIntegerValueOnSchemaParam(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"limit":{"type":"integer"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	constraints := []byte(`{"message_id":"*","limit":20}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, nil, "protonmail.read_email", constraints); err != nil {
+		t.Fatalf("expected integer limit constraint, got: %v", err)
+	}
+}
+
 func TestValidateStandingApprovalConstraintKeys_RejectsObjectValueInStructuredConstraints(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
