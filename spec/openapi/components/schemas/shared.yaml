@@ -202,6 +202,17 @@ ActionContext:
         - **medium**: Moderate impact, some consequences (e.g., update database, post to social media)
         - **high**: Significant impact, hard to reverse (e.g., delete data, make payment, deploy to production)
       example: "low"
+
+    session_key:
+      type: string
+      maxLength: 256
+      description: |
+        Optional OpenClaw session key for push wake targeting. When present, Permission Slip
+        POSTs resolution wakes to the gateway's `/hooks/agent` endpoint with this key so the
+        active chat session resumes instead of the gateway main session. Agents typically set
+        this via `permission-slip request --session-key <key>`. Requires OpenClaw gateway
+        `hooks.allowRequestSessionKey: true`.
+      example: "agent:main:telegram:direct:8935627010"
     
     details:
       type: object
