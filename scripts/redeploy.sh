@@ -143,11 +143,22 @@ if [ "$(uname -s)" = "Darwin" ] && [ -n "${PS_CODESIGN_IDENTITY:-}" ] && [ -f "$
     : # keychain already unlocked — no prompt needed
   elif [ -t 0 ]; then
     echo "==> Login keychain is locked — unlocking for codesign"
-    if ! security unlock-keychain "$LOGIN_KEYCHAIN"; then
-      echo "    WARNING: keychain unlock failed — codesign may fail with errSecInternalComponent." >&2
-    fi
+    MAX_UNLOCK_ATTEMPTS=3
+    UNLOCK_ATTEMPT=1
+    while ! security unlock-keychain "$LOGIN_KEYCHAIN"; do
+      if [ "$UNLOCK_ATTEMPT" -ge "$MAX_UNLOCK_ATTEMPTS" ]; then
+        echo "ERROR: Failed to unlock login keychain after ${MAX_UNLOCK_ATTEMPTS} attempts — aborting before build." >&2
+        echo "       Re-run make redeploy and enter your macOS login password, or unlock manually:" >&2
+        echo "       security unlock-keychain ~/Library/Keychains/login.keychain-db" >&2
+        exit 1
+      fi
+      UNLOCK_ATTEMPT=$((UNLOCK_ATTEMPT + 1))
+      echo "    Attempt ${UNLOCK_ATTEMPT}/${MAX_UNLOCK_ATTEMPTS}: keychain unlock failed — retrying." >&2
+    done
   else
-    echo "    WARNING: login keychain is locked and there's no TTY to prompt — codesign may fail with errSecInternalComponent. Unlock it first: security unlock-keychain ~/Library/Keychains/login.keychain-db" >&2
+    echo "ERROR: login keychain is locked and there's no TTY to prompt — aborting before build." >&2
+    echo "       Unlock it first: security unlock-keychain ~/Library/Keychains/login.keychain-db" >&2
+    exit 1
   fi
 fi
 
