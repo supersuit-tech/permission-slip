@@ -77,6 +77,18 @@ describe("ParameterFieldWidget", () => {
       "x-ui": { widget: "select" },
     };
 
+    it("auto-renders select for enum properties without explicit widget", () => {
+      renderWidget({
+        type: "string",
+        enum: ["desc", "asc"],
+      });
+
+      const select = screen.getByTestId("select-param-test_field");
+      expect(select.tagName).toBe("SELECT");
+      expect(screen.getByText("desc")).toBeInTheDocument();
+      expect(screen.getByText("asc")).toBeInTheDocument();
+    });
+
     it("renders a select element with enum options", () => {
       renderWidget(selectProp);
 

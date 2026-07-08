@@ -14,7 +14,9 @@ import type { ParametersSchema, SchemaProperty } from "@/lib/parameterSchema";
 import {
   getFieldLabel,
   getOrderedFieldKeys,
+  isBooleanField,
   isComparableField,
+  isEnumField,
   isFieldHidden,
   isFieldVisible,
 } from "@/lib/parameterSchema";
@@ -389,6 +391,9 @@ function ConstraintValueRowEditor({
   onRemove: () => void;
 }) {
   const comparable = isComparableField(property);
+  const enumField = isEnumField(property);
+  const booleanField = isBooleanField(property);
+  const discreteField = enumField || booleanField;
   const isComparison =
     row.operator === "lte" ||
     row.operator === "gte" ||
@@ -406,8 +411,8 @@ function ConstraintValueRowEditor({
         { value: "gt", label: "is greater than" },
       ]
     : [
-        { value: "matches", label: "matches" },
-        { value: "does_not_match", label: "does not match" },
+        { value: "matches", label: "is" },
+        { value: "does_not_match", label: "is not" },
       ];
 
   return (
@@ -445,28 +450,43 @@ function ConstraintValueRowEditor({
       </Select>
 
       <div className="min-w-[160px] flex-1">
-        <ParameterFieldWidget
-          paramKey={fieldKey}
-          property={property}
-          value={isWildcard ? "" : row.value}
-          onChange={(v) => {
-            const mode: ParamMode =
-              v === "*"
-                ? "wildcard"
-                : v.includes("*")
-                  ? "pattern"
-                  : "fixed";
-            onChange({ value: v, mode });
-          }}
-          disabled={disabled || isWildcard}
-          className={isWildcard ? "bg-muted" : ""}
-          placeholder={isWildcard ? "Any value" : undefined}
-          agentId={agentId}
-          connectorId={connectorId}
-        />
+        {booleanField ? (
+          <BooleanConstraintSelect
+            row={row}
+            disabled={disabled || row.operator === "does_not_match"}
+            onChange={onChange}
+          />
+        ) : enumField ? (
+          <EnumConstraintSelect
+            property={property}
+            row={row}
+            disabled={disabled || row.operator === "does_not_match"}
+            onChange={onChange}
+          />
+        ) : (
+          <ParameterFieldWidget
+            paramKey={fieldKey}
+            property={property}
+            value={isWildcard ? "" : row.value}
+            onChange={(v) => {
+              const mode: ParamMode =
+                v === "*"
+                  ? "wildcard"
+                  : v.includes("*")
+                    ? "pattern"
+                    : "fixed";
+              onChange({ value: v, mode });
+            }}
+            disabled={disabled || isWildcard}
+            className={isWildcard ? "bg-muted" : ""}
+            placeholder={isWildcard ? "Any value" : undefined}
+            agentId={agentId}
+            connectorId={connectorId}
+          />
+        )}
       </div>
 
-      {!isComparison && (
+      {!isComparison && !discreteField && (
         <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs">
           <Checkbox
             checked={isWildcard}
@@ -496,6 +516,90 @@ function ConstraintValueRowEditor({
         </Button>
       )}
     </div>
+  );
+}
+
+function EnumConstraintSelect({
+  property,
+  row,
+  disabled,
+  onChange,
+}: {
+  property: SchemaProperty;
+  row: ConstraintValueRow;
+  disabled?: boolean;
+  onChange: (patch: Partial<ConstraintValueRow>) => void;
+}) {
+  const isWildcard = row.mode === "wildcard" || row.value === "*";
+  const selectValue = isWildcard ? "*" : row.value;
+
+  return (
+    <Select
+      value={selectValue}
+      onValueChange={(v) => {
+        if (v === "*") {
+          onChange({ mode: "wildcard", value: "*" });
+        } else {
+          onChange({ mode: "fixed", value: v });
+        }
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger className="h-9 w-full">
+        <SelectValue placeholder="Select…" />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="*">Any value</SelectItem>
+        {(property.enum ?? []).map((opt) => (
+          <SelectItem key={opt} value={opt}>
+            {opt}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
+function BooleanConstraintSelect({
+  row,
+  disabled,
+  onChange,
+}: {
+  row: ConstraintValueRow;
+  disabled?: boolean;
+  onChange: (patch: Partial<ConstraintValueRow>) => void;
+}) {
+  const isWildcard = row.mode === "wildcard" || row.value === "*";
+  let selectValue = "any";
+  if (!isWildcard) {
+    if (row.value === "true") {
+      selectValue = "true";
+    } else if (row.value === "false") {
+      selectValue = "false";
+    }
+  }
+
+  return (
+    <Select
+      value={selectValue}
+      onValueChange={(v) => {
+        if (v === "any") {
+          onChange({ mode: "wildcard", value: "*" });
+        } else {
+          onChange({ mode: "fixed", value: v });
+        }
+      }}
+      disabled={disabled}
+    >
+      <SelectTrigger className="h-9 w-full">
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="any">Any value</SelectItem>
+        <SelectItem value="true">Yes</SelectItem>
+        <SelectItem value="false">No</SelectItem>
+      </SelectContent>
+    </Select>
   );
 }
 

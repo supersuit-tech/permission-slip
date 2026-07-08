@@ -73,7 +73,8 @@ describe("parseParametersSchema", () => {
       description: "Merge strategy",
       enum: ["merge", "squash", "rebase"],
       default: "merge",
-      "x-ui": undefined,
+      items: undefined,
+      "x-ui": { widget: "select" },
     });
   });
 
@@ -652,6 +653,13 @@ describe("parseParametersSchema", () => {
         description: "Some RFC 3339 thing",
       })).toBe("number");
     });
+
+    it("infers select for string fields with enum values", () => {
+      expect(inferWidgetFromProperty({
+        type: "string",
+        enum: ["desc", "asc"],
+      })).toBe("select");
+    });
   });
 
   describe("auto-mapping heuristics in parseParametersSchema", () => {
@@ -681,6 +689,20 @@ describe("parseParametersSchema", () => {
       });
 
       expect(result?.properties?.body?.["x-ui"]?.widget).toBe("textarea");
+    });
+
+    it("auto-maps enum string fields to select widget", () => {
+      const result = parseParametersSchema({
+        type: "object",
+        properties: {
+          sort: {
+            type: "string",
+            enum: ["desc", "asc"],
+          },
+        },
+      });
+
+      expect(result?.properties?.sort?.["x-ui"]?.widget).toBe("select");
     });
   });
 
