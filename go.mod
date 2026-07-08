@@ -28,7 +28,7 @@ require (
 	github.com/snowflakedb/gosnowflake v1.13.3
 	github.com/stripe/stripe-go/v82 v82.5.1
 	go.mongodb.org/mongo-driver/v2 v2.5.0
-	golang.org/x/crypto v0.51.0
+	golang.org/x/crypto v0.52.0
 	golang.org/x/oauth2 v0.36.0
 	google.golang.org/api v0.274.0
 	google.golang.org/grpc v1.80.0
