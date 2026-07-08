@@ -48,7 +48,9 @@ sequenceDiagram
 ## Setup
 
 1. Install and register the CLI per [agents.md](../agents.md).
-2. **Push wakes (recommended):** enable OpenClaw gateway hooks, then:
+2. **Push wakes (recommended):** enable OpenClaw gateway hooks, then register the hooks URL and token from either:
+   - **Dashboard:** open the agent's settings page → **Push Wake Webhook** → configure URL + token and use **Test wake**
+   - **CLI:**
    ```bash
    permission-slip webhook set --url http://<tailnet-host>:18789/hooks --token <hooks-token>
    permission-slip webhook status --test
@@ -61,12 +63,16 @@ sequenceDiagram
 
 ### Webhook registration
 
+Configure from the agent settings page (**Push Wake Webhook** section) or via CLI:
+
 ```bash
 permission-slip webhook set --url http://100.x.x.x:18789/hooks --token <token>
 permission-slip webhook status          # show config
 permission-slip webhook status --test   # fire test wake
 permission-slip webhook clear           # remove config
 ```
+
+In the dashboard, **Test wake** on the agent settings page fires the same test delivery as `webhook status --test` and shows success/failure plus latency.
 
 The hooks URL must resolve to a **private** address (RFC1918, Tailscale `100.64.0.0/10`, or loopback). Public URLs are rejected at registration.
 
@@ -107,10 +113,10 @@ Use when no webhook is configured, or as an extra safety net. See [permission-sl
 
 | Symptom | Likely cause | Recovery |
 |--------|--------------|----------|
-| Agent never wakes after approve | Webhook not registered, gateway down, or bad token | `permission-slip webhook status --test`; check gateway logs |
+| Agent never wakes after approve | Webhook not registered, gateway down, or bad token | Agent settings → **Test wake**, or `permission-slip webhook status --test`; check gateway logs |
 | Push missed but heartbeat works | Transient network blip | Expected — sweep picks it up; verify heartbeat runs `pending` |
 | `invalid_webhook_url` at registration | Public URL or DNS to public IP | Use tailnet / LAN address only |
-| `webhook status --test` fails | Gateway unreachable from server host | `curl` hooks URL from server over tailnet |
+| `webhook status --test` fails | Gateway unreachable from server host | Agent settings → **Test wake**, or `curl` hooks URL from server over tailnet |
 | No webhook configured | Normal — watcher path unchanged | Run `wait_command` or register webhook |
 
 ## Related

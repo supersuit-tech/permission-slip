@@ -149,6 +149,9 @@ paths:
   /v1/agents/{agent_id}/payment-method:
     $ref: './components/paths/agent_payment_methods.yaml#/agentPaymentMethod'
 
+  /v1/agents/{agent_id}/webhook:
+    $ref: './components/paths/agent_user_webhook.yaml#/agentUserWebhook'
+
   /v1/agents/{agent_id}/connectors:
     $ref: './components/paths/agent_connectors.yaml#/agentConnectors'
 

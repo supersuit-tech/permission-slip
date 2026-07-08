@@ -513,7 +513,7 @@ Expect `200`. Non-2xx means fix tailnet routing, gateway listen address, or toke
 
 ### 3. Register the webhook from the agent machine
 
-On the machine where the agent runs (with CLI registered):
+On the machine where the agent runs (with CLI registered), or from the dashboard on the agent settings page (**Push Wake Webhook**):
 
 ```bash
 permission-slip webhook set \
@@ -524,6 +524,8 @@ permission-slip webhook set \
 Registration rejects public URLs — only private/tailnet addresses are allowed.
 
 ### 4. Verify end-to-end
+
+From the agent settings page, click **Test wake**, or run:
 
 ```bash
 permission-slip webhook status --test
