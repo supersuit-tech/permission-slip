@@ -184,4 +184,22 @@ describe("formatStandingApprovalConstraints", () => {
       verified: false,
     });
   });
+
+  it("formats object constraint values as JSON instead of [object Object]", () => {
+    const objectValue = { threshold: 20 };
+    const lines = formatStandingApprovalConstraints({
+      limit: objectValue,
+    });
+    expect(lines).toEqual([
+      {
+        label: "limit",
+        mode: "fixed",
+        value: JSON.stringify(objectValue),
+        verified: false,
+      },
+    ]);
+    expect(
+      formatStandingApprovalConstraintsText({ limit: objectValue }),
+    ).toBe(`limit: ${JSON.stringify(objectValue)}`);
+  });
 });

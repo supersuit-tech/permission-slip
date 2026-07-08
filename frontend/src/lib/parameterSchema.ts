@@ -123,7 +123,10 @@ export function parseParametersSchema(
       const parsedUI = parsePropertyUI(prop["x-ui"]);
       const items = parseItems(prop.items);
       // Auto-map types to widgets when no explicit widget is set
-      const ui = autoMapWidget(propType, format, items, description, parsedUI);
+      const enumValues = Array.isArray(prop.enum)
+        ? prop.enum.filter((e): e is string => typeof e === "string")
+        : undefined;
+      const ui = autoMapWidget(propType, format, items, description, parsedUI, enumValues);
       properties[key] = {
         type: propType,
         format,
@@ -256,6 +259,7 @@ export function inferWidgetFromProperty(property: SchemaProperty): WidgetType {
   if (property.type === "boolean") return "toggle";
   if (property.type === "integer" || property.type === "number") return "number";
   if (property.type === "array" && (!property.items || property.items?.type === "string")) return "list";
+  if (property.enum && property.enum.length > 0) return "select";
 
   // Heuristic: detect datetime fields by description mentioning RFC 3339 or ISO 8601
   if (property.type === "string" && property.description) {
@@ -278,6 +282,18 @@ export function isComparableField(property: SchemaProperty): boolean {
   return widget === "number" || widget === "date" || widget === "datetime";
 }
 
+/** Whether a parameter has a fixed set of enum values (renders as select). */
+export function isEnumField(property: SchemaProperty): boolean {
+  const widget = property["x-ui"]?.widget ?? inferWidgetFromProperty(property);
+  return widget === "select" && (property.enum?.length ?? 0) > 0;
+}
+
+/** Whether a parameter is a boolean toggle. */
+export function isBooleanField(property: SchemaProperty): boolean {
+  const widget = property["x-ui"]?.widget ?? inferWidgetFromProperty(property);
+  return widget === "toggle" || property.type === "boolean";
+}
+
 /**
  * Auto-map JSON Schema type/format to a widget when no explicit widget is set.
  * Explicit x-ui.widget always takes precedence. Uses inferWidgetFromProperty
@@ -289,10 +305,17 @@ function autoMapWidget(
   items: { type?: string } | undefined,
   description: string | undefined,
   parsedUI: SchemaPropertyUI | undefined,
+  enumValues?: string[],
 ): SchemaPropertyUI | undefined {
   if (parsedUI?.widget) return parsedUI;
 
-  const inferred = inferWidgetFromProperty({ type, format, items, description });
+  const inferred = inferWidgetFromProperty({
+    type,
+    format,
+    items,
+    description,
+    enum: enumValues,
+  });
   if (inferred !== "text") {
     return { ...parsedUI, widget: inferred };
   }

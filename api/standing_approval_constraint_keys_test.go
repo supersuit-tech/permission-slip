@@ -249,3 +249,63 @@ func TestValidateStandingApprovalConstraintsForAction_PartialSchemaWildcards(t *
 		t.Fatalf("expected folder INBOX, got %#v", obj["folder"])
 	}
 }
+
+func TestValidateStandingApprovalConstraintKeys_RejectsObjectValueOnSchemaParam(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"limit":{"type":"integer"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	constraints := []byte(`{"message_id":"*","limit":{"threshold":20}}`)
+	err := validateStandingApprovalConstraintKeys(context.Background(), tx, nil, "protonmail.read_email", constraints)
+	if err == nil {
+		t.Fatal("expected object value rejection on scalar param")
+	}
+	if !strings.Contains(err.Error(), "constraint value for \"limit\"") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_AllowsIntegerValueOnSchemaParam(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"message_id":{"type":"integer"},"limit":{"type":"integer"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	constraints := []byte(`{"message_id":"*","limit":20}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, nil, "protonmail.read_email", constraints); err != nil {
+		t.Fatalf("expected integer limit constraint, got: %v", err)
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_RejectsObjectValueInStructuredConstraints(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "protonmail")
+	schema := []byte(`{"type":"object","properties":{"limit":{"type":"integer"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "protonmail", "protonmail.read_email", "Read Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	constraints := []byte(`{
+		"$version": 2,
+		"match": "any",
+		"groups": [{
+			"match": "all",
+			"conditions": [{"field": "limit", "op": "matches", "value": {"threshold": 20}}]
+		}]
+	}`)
+	err := validateStandingApprovalConstraintKeys(context.Background(), tx, nil, "protonmail.read_email", constraints)
+	if err == nil {
+		t.Fatal("expected object value rejection in structured constraints")
+	}
+	if !strings.Contains(err.Error(), "constraint value for \"limit\"") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

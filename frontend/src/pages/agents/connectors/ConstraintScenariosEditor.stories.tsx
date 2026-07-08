@@ -93,3 +93,50 @@ export const MultiScenario: Story = {
   args: { initialMultiScenario: true },
   name: "Multiple scenarios",
 };
+
+const IMESSAGE_SCHEMA: ParametersSchema = {
+  type: "object",
+  properties: {
+    sort: { type: "string", enum: ["desc", "asc"] },
+    order_by: {
+      type: "string",
+      enum: ["last_activity", "contact_name"],
+    },
+    unread_only: { type: "boolean" },
+  },
+};
+
+function IMessageConstraintsDemo() {
+  const [form, setForm] = useState(() => {
+    const base = constraintsToFormState(null);
+    const scenario = base.scenarios[0];
+    if (scenario) {
+      scenario.paramRows.sort = [
+        { ...emptyConstraintRow(), mode: "wildcard", value: "*" },
+      ];
+      scenario.paramRows.order_by = [
+        { ...emptyConstraintRow(), value: "last_activity", mode: "fixed" },
+      ];
+      scenario.paramRows.unread_only = [
+        { ...emptyConstraintRow(), value: "true", mode: "fixed" },
+      ];
+    }
+    return base;
+  });
+
+  return (
+    <div className="max-w-lg rounded-lg border bg-background p-4">
+      <ConstraintScenariosEditor
+        form={form}
+        onChange={setForm}
+        parametersSchema={IMESSAGE_SCHEMA}
+        metaFields={[]}
+      />
+    </div>
+  );
+}
+
+export const EnumAndBooleanFields: StoryObj<typeof IMessageConstraintsDemo> = {
+  render: () => <IMessageConstraintsDemo />,
+  name: "Enum and boolean fields",
+};

@@ -107,6 +107,9 @@ function decodeDisplayValue(raw: unknown): { mode: ConstraintMode; value: string
   if (isPatternWrapper(raw)) {
     return { mode: "pattern", value: raw.$pattern };
   }
+  if (raw != null && typeof raw === "object") {
+    return { mode: "fixed", value: JSON.stringify(raw) };
+  }
   const relative = formatRelativeDateToken(String(raw));
   if (relative) {
     return { mode: "fixed", value: relative };

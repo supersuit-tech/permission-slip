@@ -179,6 +179,12 @@ func validateStandingApprovalConstraintKeys(
 			if _, ok := schemaKeys[key]; !ok {
 				return formatUnknownConstraintKeyError(key, actionType, metaFields)
 			}
+			if !isAllowedParameterConstraintValue(val) {
+				return fmt.Errorf(
+					"constraint value for %q must be a string, number, boolean, wildcard, or $pattern object",
+					key,
+				)
+			}
 			continue
 		}
 		if metaFields != nil {
@@ -279,6 +285,13 @@ func validateStructuredStandingApprovalConstraintKeys(
 						if _, ok := dtFields[field]; !ok {
 							return fmt.Errorf("relative date token %q is only valid on date or date-time parameters; %q is not a temporal field on action %q", token, field, actionType)
 						}
+						continue
+					}
+					if !isAllowedParameterConstraintValue(val) {
+						return fmt.Errorf(
+							"constraint value for %q must be a string, number, boolean, wildcard, or $pattern object",
+							field,
+						)
 					}
 				}
 				continue
@@ -316,6 +329,14 @@ func isAllowedParameterConstraintValue(val json.RawMessage) bool {
 	}
 	var s string
 	if json.Unmarshal(val, &s) == nil {
+		return true
+	}
+	var n json.Number
+	if json.Unmarshal(val, &n) == nil {
+		return true
+	}
+	var b bool
+	if json.Unmarshal(val, &b) == nil {
 		return true
 	}
 	var patternOnly map[string]json.RawMessage
