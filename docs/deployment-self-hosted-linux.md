@@ -416,10 +416,12 @@ For reliable non-blocking approvals, register the OpenClaw gateway **hooks** end
     token: "<your-hooks-token>",
     path: "/hooks",
     allowRequestSessionKey: true,
-    allowedSessionKeyPrefixes: ["agent:", "hook:"],
+    allowedSessionKeyPrefixes: ["hook:", "agent:main:"],
   },
 }
 ```
+
+Include **`"hook:"`** in `allowedSessionKeyPrefixes`, not just your agent session prefix — OpenClaw's default session key (commonly `"hook:ingress"`) must pass the prefix check too. **No custom `hooks.mappings` needed** — Permission Slip POSTs directly to built-in `/hooks/agent` and `/hooks/wake`.
 
 Restart the gateway after changing config.
 

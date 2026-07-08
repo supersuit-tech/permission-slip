@@ -488,10 +488,14 @@ In your OpenClaw config (on the agent machine), enable hooks with a long random 
     token: "<your-hooks-token>",
     path: "/hooks",
     allowRequestSessionKey: true,
-    allowedSessionKeyPrefixes: ["agent:", "hook:"],
+    allowedSessionKeyPrefixes: ["hook:", "agent:main:"],
   },
 }
 ```
+
+Include **`"hook:"`** in `allowedSessionKeyPrefixes`, not just your agent session prefix. OpenClaw's default session key (commonly `"hook:ingress"`) must pass the prefix check — without `"hook:"`, the gateway rejects all hook payloads with `"sessionKey is disabled for externally supplied hook payload values"`, even when `allowRequestSessionKey: true` is set. Use your actual agent prefix (e.g. `"agent:main:"`) or a broader prefix like `"agent:"` if you target multiple sessions.
+
+**No custom `hooks.mappings` needed.** Permission Slip POSTs directly to OpenClaw's built-in `/hooks/agent` and `/hooks/wake` endpoints.
 
 Restart the gateway after changing config.
 
@@ -548,6 +552,17 @@ permission-slip request --action email.send --params '{...}' \
 
 This stores `session_key` in approval context. On resolution the server POSTs to `/hooks/agent` with `{ "message", "wakeMode": "next-heartbeat", "sessionKey" }` instead of `/hooks/wake`. Without it, wakes hit the gateway **main** session and may reach the wrong agent.
 
+Ensure the gateway config from step 1 includes both `allowRequestSessionKey: true` and `allowedSessionKeyPrefixes` with **`"hook:"`** plus your agent prefix:
+
+```json
+{
+  "hooks": {
+    "allowRequestSessionKey": true,
+    "allowedSessionKeyPrefixes": ["hook:", "agent:main:"]
+  }
+}
+```
+
 See [OpenClaw integration — push payloads and session targeting](../integrations/openclaw.md#push-wake-payloads-what-permission-slip-posts) for the exact JSON bodies and troubleshooting.
 
 See [OpenClaw integration](../integrations/openclaw.md) for the full three-layer flow (push → sweep → watcher fallback).
@@ -557,10 +572,11 @@ See [OpenClaw integration](../integrations/openclaw.md) for the full three-layer
 | Symptom | Likely cause | Fix |
 |--------|--------------|-----|
 | Wake reaches wrong agent on shared gateway | `session_key` not in approval context | Add `--session-key` to `request`; confirm stored context includes it |
-| Approval resolves but active chat never resumes | Server used `/hooks/wake` fallback, or OpenClaw ignored session key | Pass `--session-key` on `request`; set `hooks.allowRequestSessionKey: true` and restart gateway |
+| Approval resolves but active chat never resumes | Server used `/hooks/wake` fallback, or OpenClaw ignored session key | Pass `--session-key` on `request`; set `hooks.allowRequestSessionKey: true` and include your agent prefix in `allowedSessionKeyPrefixes`; restart gateway |
+| Gateway rejects hook with `sessionKey is disabled for externally supplied hook payload values` | `allowedSessionKeyPrefixes` missing `"hook:"` or your agent prefix | Add both `"hook:"` and your agent prefix (e.g. `"agent:main:"`) to `allowedSessionKeyPrefixes`; restart gateway |
 | `webhook status --test` returns 401 or fails silently | Wrong hooks token or hooks disabled | Match token in OpenClaw config and `webhook set`; verify `hooks.enabled: true` |
 | Test wake OK but real approvals don't wake | Tailnet routing from server to gateway | Re-run step 2 curl from the **Permission Slip server host**, not the agent machine |
-| POST succeeds, user sees nothing | OpenClaw hook mapping / transform / `deliver` config | Configure on the OpenClaw gateway — Permission Slip does not control mapping behavior |
+| POST succeeds, user sees nothing | OpenClaw transform / `deliver` config, or unnecessary custom `hooks.mappings` | `/hooks/agent` and `/hooks/wake` are built-in — no custom mapping needed; fix transform/token config on the OpenClaw side |
 
 ---
 
