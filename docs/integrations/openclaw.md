@@ -91,22 +91,37 @@ The human-readable `message` / `text` is always of the form `Permission Slip <ap
 
 **Why `wakeMode: next-heartbeat` vs `mode: now`?** OpenClaw treats `/hooks/agent` with `wakeMode: next-heartbeat` as an immediate resume of the identified session's conversation. The `/hooks/wake` fallback uses `mode: now`, which wakes the gateway's **main** session — fine for a dedicated single-agent gateway, but wrong on a shared gateway or when the approval was opened from a specific Telegram/iMessage chat.
 
-**OpenClaw-side config is out of scope here.** Hook mappings, transform modules, `deliver: true/false`, and gateway routing rules live in the [OpenClaw](https://github.com/openclaw/openclaw) repo. Permission Slip only documents what it POSTs; configure your gateway separately (including `hooks.allowRequestSessionKey: true` when using session targeting — see [Self-hosted deployment](../deployment-self-hosted.md#openclaw-push-wakes)).
+**OpenClaw-side config is out of scope here.** Transform modules, `deliver: true/false`, and other gateway routing rules live in the [OpenClaw](https://github.com/openclaw/openclaw) repo. Permission Slip only documents what it POSTs; configure your gateway separately (see [Self-hosted deployment](../deployment-self-hosted.md#openclaw-push-wakes)).
+
+**`/hooks/agent` and `/hooks/wake` are built-in OpenClaw endpoints.** Permission Slip POSTs to them directly — you do **not** need custom entries in `hooks.mappings` for push wake delivery.
 
 ### Session targeting (`session_key` in context)
 
 To wake the **active chat** that opened the approval (not the gateway main session):
 
-1. Pass your OpenClaw session key when requesting approval:
+1. Enable session keys on the OpenClaw gateway. Both settings are required:
+
+   ```json
+   {
+     "hooks": {
+       "allowRequestSessionKey": true,
+       "allowedSessionKeyPrefixes": ["hook:", "agent:main:"]
+     }
+   }
+   ```
+
+   Include **`"hook:"`** in `allowedSessionKeyPrefixes`, not just your agent session prefix. OpenClaw's default session key (commonly `"hook:ingress"`) must pass the prefix check too — without `"hook:"`, the gateway rejects all hook payloads (including session-targeted ones) with `"sessionKey is disabled for externally supplied hook payload values"`. Use your actual agent prefix (e.g. `"agent:main:"`) or a broader prefix like `"agent:"` if you target multiple sessions.
+
+2. Pass your OpenClaw session key when requesting approval:
    ```bash
    permission-slip request --action email.send --params '{...}' \
      --session-key 'agent:main:telegram:direct:8935627010'
    ```
    The CLI stores `session_key` in approval context (`POST /approvals/request`). The same field is accepted on direct API calls and on `request-bulk --session-key …`.
 
-2. On resolution, the server reads `session_key` from stored context and POSTs to `/hooks/agent` with `wakeMode: next-heartbeat`.
+3. On resolution, the server reads `session_key` from stored context and POSTs to `/hooks/agent` with `wakeMode: next-heartbeat`.
 
-3. Use the **same key** on `watch` as a local fallback:
+4. Use the **same key** on `watch` as a local fallback:
    ```bash
    permission-slip watch appr_x --session-key 'agent:main:telegram:direct:8935627010'
    ```
@@ -163,8 +178,9 @@ Use the same `--session-key` value you passed to `request`. Use when no webhook 
 | `webhook status --test` fails | Gateway unreachable from server host | Agent settings → **Test wake**, or `curl` hooks URL from server over tailnet |
 | No webhook configured | Normal — watcher path unchanged | Run `wait_command` or register webhook |
 | Wake reaches wrong agent (shared gateway) | `session_key` missing from approval context | Pass `--session-key` on `request` (same key as your active chat); see [Session targeting](#session-targeting-session_key-in-context) |
-| Approval resolves but active chat doesn't resume | Push used `/hooks/wake` fallback (`mode: now`) instead of `/hooks/agent` | Ensure `session_key` is in context via `--session-key`; verify OpenClaw `hooks.allowRequestSessionKey: true` |
-| Webhook POST succeeds but nothing happens | OpenClaw gateway config (mappings, transforms, token) | Fix on the OpenClaw side — Permission Slip only POSTs to `/hooks/wake` or `/hooks/agent`; see OpenClaw docs |
+| Approval resolves but active chat doesn't resume | Push used `/hooks/wake` fallback (`mode: now`) instead of `/hooks/agent` | Ensure `session_key` is in context via `--session-key`; verify OpenClaw `hooks.allowRequestSessionKey: true` and `allowedSessionKeyPrefixes` includes your agent prefix |
+| Gateway rejects hook with `sessionKey is disabled for externally supplied hook payload values` | `allowedSessionKeyPrefixes` missing `"hook:"` or your agent prefix | Add both `"hook:"` and your agent prefix (e.g. `"agent:main:"`) to `allowedSessionKeyPrefixes`; restart gateway — see [Session targeting](#session-targeting-session_key-in-context) |
+| Webhook POST succeeds but nothing happens | OpenClaw gateway config (transforms, token) or unnecessary custom `hooks.mappings` | `/hooks/agent` and `/hooks/wake` are built-in — no custom mapping needed for Permission Slip wakes; fix token/transform config on the OpenClaw side |
 
 ## Related
 
