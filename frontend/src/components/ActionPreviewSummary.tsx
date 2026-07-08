@@ -412,6 +412,17 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     if (params.unread_only === true) {
       parts.push(text(" (unread only)"));
     }
+    const orderBy = strVal(params.order_by);
+    const sort = strVal(params.sort);
+    if (
+      (orderBy && orderBy !== "last_activity") ||
+      (sort && sort !== "desc")
+    ) {
+      const orderLabel =
+        orderBy === "contact_name" ? "contact name" : "last activity";
+      const sortLabel = sort === "asc" ? "oldest first" : "most recent first";
+      parts.push(text(` (${orderLabel}, ${sortLabel})`));
+    }
     const filters: string[] = [];
     const since = strVal(params.since);
     if (since) filters.push(`since ${formatDateTime(since) ?? since}`);
