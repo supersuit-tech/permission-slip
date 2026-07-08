@@ -437,10 +437,14 @@ Expect `200` from the server host over tailnet.
 
 ### 3. Register and test
 
+From the agent settings page (**Push Wake Webhook**) or via CLI:
+
 ```bash
 permission-slip webhook set --url http://100.x.x.x:18789/hooks --token <your-hooks-token>
 permission-slip webhook status --test
 ```
+
+The dashboard **Test wake** button runs the same check as `webhook status --test`.
 
 ### 4. Heartbeat backstop
 
