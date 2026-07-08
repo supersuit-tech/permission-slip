@@ -537,7 +537,30 @@ Success means the server reached your gateway and the test wake was accepted. If
 
 Ensure OpenClaw heartbeat is enabled. The agent should run `permission-slip pending` each beat as a backstop if a push is missed.
 
+### 6. Session-targeted wakes (recommended for shared gateways)
+
+When multiple agents share one gateway, or approvals are opened from a specific chat (Telegram, iMessage, etc.), pass your OpenClaw session key on every approval request:
+
+```bash
+permission-slip request --action email.send --params '{...}' \
+  --session-key 'agent:main:telegram:direct:8935627010'
+```
+
+This stores `session_key` in approval context. On resolution the server POSTs to `/hooks/agent` with `{ "message", "wakeMode": "next-heartbeat", "sessionKey" }` instead of `/hooks/wake`. Without it, wakes hit the gateway **main** session and may reach the wrong agent.
+
+See [OpenClaw integration — push payloads and session targeting](../integrations/openclaw.md#push-wake-payloads-what-permission-slip-posts) for the exact JSON bodies and troubleshooting.
+
 See [OpenClaw integration](../integrations/openclaw.md) for the full three-layer flow (push → sweep → watcher fallback).
+
+### Troubleshooting webhook push issues
+
+| Symptom | Likely cause | Fix |
+|--------|--------------|-----|
+| Wake reaches wrong agent on shared gateway | `session_key` not in approval context | Add `--session-key` to `request`; confirm stored context includes it |
+| Approval resolves but active chat never resumes | Server used `/hooks/wake` fallback, or OpenClaw ignored session key | Pass `--session-key` on `request`; set `hooks.allowRequestSessionKey: true` and restart gateway |
+| `webhook status --test` returns 401 or fails silently | Wrong hooks token or hooks disabled | Match token in OpenClaw config and `webhook set`; verify `hooks.enabled: true` |
+| Test wake OK but real approvals don't wake | Tailnet routing from server to gateway | Re-run step 2 curl from the **Permission Slip server host**, not the agent machine |
+| POST succeeds, user sees nothing | OpenClaw hook mapping / transform / `deliver` config | Configure on the OpenClaw gateway — Permission Slip does not control mapping behavior |
 
 ---
 

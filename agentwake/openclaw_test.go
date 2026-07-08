@@ -69,6 +69,35 @@ func TestSessionKeyFromApprovalContext(t *testing.T) {
 	}
 }
 
+func TestWakeDeliveryFromStoredApprovalContext(t *testing.T) {
+	ctxJSON := []byte(`{"description":"Send email","session_key":"agent:main:telegram:direct:8935627010"}`)
+	sk := SessionKeyFromApprovalContext(ctxJSON)
+	if sk != "agent:main:telegram:direct:8935627010" {
+		t.Fatalf("session key = %q", sk)
+	}
+	d, err := BuildOpenClawDelivery("http://127.0.0.1:18789/hooks", "secret", WakeRequest{
+		ApprovalID: "appr_ctx",
+		Status:     "approved",
+		SessionKey: sk,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.URL != "http://127.0.0.1:18789/hooks/agent" {
+		t.Fatalf("URL = %q", d.URL)
+	}
+	var body map[string]string
+	if err := json.Unmarshal(d.Body, &body); err != nil {
+		t.Fatal(err)
+	}
+	if body["sessionKey"] != "agent:main:telegram:direct:8935627010" {
+		t.Fatalf("sessionKey = %q", body["sessionKey"])
+	}
+	if body["wakeMode"] != "next-heartbeat" {
+		t.Fatalf("wakeMode = %q", body["wakeMode"])
+	}
+}
+
 func TestWakeMessage_Expired(t *testing.T) {
 	msg := WakeMessage("appr_1", "expired")
 	if !strings.Contains(msg, "expired unanswered") {

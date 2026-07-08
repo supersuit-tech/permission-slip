@@ -253,7 +253,7 @@ export class ApiClient {
   async requestApproval(
     actionId: string,
     params: unknown,
-    context?: { description?: string; risk_level?: string },
+    context?: { description?: string; risk_level?: string; session_key?: string },
     payment?: { paymentMethodId?: string; amountCents?: number },
     requestId?: string,
   ) {

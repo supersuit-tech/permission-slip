@@ -18,6 +18,7 @@ import {
   parseAvailableInstances,
 } from "../util/connectorInstance.js";
 import { promptConnectorInstanceChoice } from "../util/promptConnectorInstance.js";
+import { buildApprovalContext } from "../approvals/approvalContext.js";
 import { isPendingApprovalStatus, pendingWaitFields } from "../approvals/waitHint.js";
 
 const REQUEST_HELP =
@@ -39,6 +40,10 @@ export function requestCommand(program: Command): void {
     .option("--description <text>", "Human-readable description of the action")
     .option("--risk-level <level>", "Risk level: low, medium, high")
     .option(
+      "--session-key <key>",
+      "OpenClaw session key for this approval; stored in context so server push wakes target the active chat",
+    )
+    .option(
       "--server <url>",
       "Permission Slip server URL — required unless PS_SERVER or config default_server is set",
     )
@@ -53,6 +58,7 @@ export function requestCommand(program: Command): void {
       params: string;
       description?: string;
       riskLevel?: string;
+      sessionKey?: string;
       server?: string;
       agentId?: string;
       requestId?: string;
@@ -81,13 +87,11 @@ export function requestCommand(program: Command): void {
         const agentId = resolveAgentId(server, opts.agentId);
         const client = new ApiClient({ serverUrl: server, agentId });
 
-        const context =
-          opts.description || opts.riskLevel
-            ? {
-                description: opts.description,
-                risk_level: opts.riskLevel,
-              }
-            : undefined;
+        const context = buildApprovalContext({
+          description: opts.description,
+          riskLevel: opts.riskLevel,
+          sessionKey: opts.sessionKey,
+        });
 
         const send = async (p: unknown) =>
           client.requestApproval(
@@ -148,6 +152,7 @@ export function requestCommand(program: Command): void {
                 Boolean(
                   (result as { push_wake_configured?: boolean }).push_wake_configured,
                 ),
+                opts.sessionKey,
               ),
             },
             outputOpts,

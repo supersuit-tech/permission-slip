@@ -8,6 +8,7 @@ import type { Command } from "commander";
 import { ApiClient } from "../api/client.js";
 import { resolveAgentId } from "./status.js";
 import { requireServerUrl } from "../config/serverUrl.js";
+import { buildApprovalContext } from "../approvals/approvalContext.js";
 import { output, type OutputOptions } from "../output.js";
 import { shellQuote } from "../util/shell.js";
 
@@ -34,12 +35,17 @@ export function requestBulkCommand(program: Command): void {
       "Permission Slip server URL — required unless PS_SERVER or config default_server is set",
     )
     .option("--agent-id <id>", "Agent ID (auto-detected from saved registration)")
+    .option(
+      "--session-key <key>",
+      "OpenClaw session key merged into each item's context for server push wake targeting",
+    )
     .option("--pretty", "Pretty-printed JSON (default is compact JSON)")
     .action(async (opts: {
       action: string;
       actions: string;
       server?: string;
       agentId?: string;
+      sessionKey?: string;
       pretty?: boolean;
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
@@ -58,16 +64,19 @@ export function requestBulkCommand(program: Command): void {
         const agentId = resolveAgentId(server, opts.agentId);
         const client = new ApiClient({ serverUrl: server, agentId });
 
+        const sharedSessionKey = opts.sessionKey?.trim();
+
         const bodyItems = items.map((item) => ({
           request_id: item.request_id,
           action: {
             type: opts.action,
             parameters: item.parameters ?? {},
           },
-          context: {
-            ...(item.description ? { description: item.description } : {}),
-            ...(item.risk_level ? { risk_level: item.risk_level } : {}),
-          },
+          context: buildApprovalContext({
+            description: item.description,
+            riskLevel: item.risk_level,
+            sessionKey: sharedSessionKey,
+          }) ?? {},
         }));
 
         const result = await client.requestBulkApproval(bodyItems);
