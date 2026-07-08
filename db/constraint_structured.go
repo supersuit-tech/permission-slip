@@ -204,6 +204,9 @@ func validateConstraintValueEncoding(field string, val json.RawMessage) error {
 	if field == DataWindowNamespaceKey {
 		return ValidateDataWindowConstraintShape(val)
 	}
+	if _, ok := ExtractRelativeDateToken(val); ok {
+		return nil
+	}
 	if pattern, ok := extractPattern(val); ok {
 		if !strings.Contains(pattern, "*") {
 			return fmt.Errorf("$pattern value %q must contain at least one '*' wildcard; use a plain string for fixed values", pattern)
@@ -366,7 +369,7 @@ func evaluateExecFieldConditions(field string, conds []ConstraintCondition, exec
 	}
 
 	if !present {
-		if len(allow) > 0 {
+		if len(allow) > 0 && !hasRelativeDateAllow(allow) {
 			return &ConfigValidationError{
 				Parameter: field,
 				Reason:    "required parameter is missing",
@@ -492,6 +495,15 @@ func hasWildcardAllow(allow []json.RawMessage) bool {
 	return false
 }
 
+func hasRelativeDateAllow(allow []json.RawMessage) bool {
+	for _, val := range allow {
+		if _, ok := ExtractRelativeDateToken(val); ok {
+			return true
+		}
+	}
+	return false
+}
+
 func evaluateDenyOnly(param string, deny []json.RawMessage, sourceValue json.RawMessage, present, recipientMulti bool) error {
 	if len(deny) == 0 {
 		return nil
@@ -505,6 +517,9 @@ func evaluateDenyOnly(param string, deny []json.RawMessage, sourceValue json.Raw
 func valueMatchesAnyAllow(param string, allow []json.RawMessage, sourceValue json.RawMessage, recipientMulti bool) bool {
 	for _, allowVal := range allow {
 		if IsWildcard(allowVal) {
+			return true
+		}
+		if _, ok := ExtractRelativeDateToken(allowVal); ok {
 			return true
 		}
 		if recipientMulti {

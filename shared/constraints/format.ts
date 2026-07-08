@@ -15,6 +15,26 @@ export const META_NAMESPACE_KEY = "$meta";
 export const DATA_WINDOW_NAMESPACE_KEY = "$data_window";
 export const CONSTRAINT_VERSION = 2;
 
+const RELATIVE_DATE_TOKENS: Record<string, string> = {
+  "@today": "start of today",
+  "@yesterday": "start of yesterday",
+  "@now": "now",
+};
+
+/** Human-readable label for a relative date constraint token. */
+export function formatRelativeDateToken(token: string): string | null {
+  const trimmed = token.trim();
+  if (RELATIVE_DATE_TOKENS[trimmed]) {
+    return RELATIVE_DATE_TOKENS[trimmed];
+  }
+  const rolling = /^-(\d+)d$/.exec(trimmed);
+  if (rolling) {
+    const days = rolling[1];
+    return `last ${days} day${days === "1" ? "" : "s"}`;
+  }
+  return null;
+}
+
 /** Check if a stored parameter value is a `$pattern` wrapper object. */
 export function isPatternWrapper(value: unknown): value is { $pattern: string } {
   return (
@@ -86,6 +106,10 @@ function decodeDisplayValue(raw: unknown): { mode: ConstraintMode; value: string
   }
   if (isPatternWrapper(raw)) {
     return { mode: "pattern", value: raw.$pattern };
+  }
+  const relative = formatRelativeDateToken(String(raw));
+  if (relative) {
+    return { mode: "fixed", value: relative };
   }
   return { mode: "fixed", value: String(raw) };
 }

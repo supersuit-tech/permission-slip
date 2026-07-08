@@ -137,8 +137,39 @@ func validateStandingApprovalConstraintKeys(
 		}
 	}
 
+	var dtFields map[string]db.DateTimeFieldInfo
+	if schemaKeys != nil {
+		schema, schemaErr := db.GetActionParametersSchema(ctx, d, actionType)
+		if schemaErr != nil {
+			return fmt.Errorf("lookup action schema: %w", schemaErr)
+		}
+		if schema != nil {
+			dtFields, schemaErr = db.ParseActionSchemaDateTimeFields(schema.Schema)
+			if schemaErr != nil {
+				return schemaErr
+			}
+		}
+	}
+
 	for key, val := range obj {
 		if key == db.MetaNamespaceKey || key == db.DataWindowNamespaceKey {
+			continue
+		}
+		if token, ok := db.ExtractRelativeDateToken(val); ok {
+			if err := db.ValidateRelativeDateToken(token); err != nil {
+				return err
+			}
+			if schemaKeys != nil {
+				if _, ok := schemaKeys[key]; !ok {
+					return formatUnknownConstraintKeyError(key, actionType, metaFields)
+				}
+				if dtFields == nil {
+					return fmt.Errorf("relative date token %q is only valid on date or date-time parameters; action %q has no temporal fields", token, actionType)
+				}
+				if _, ok := dtFields[key]; !ok {
+					return fmt.Errorf("relative date token %q is only valid on date or date-time parameters; %q is not a temporal field on action %q", token, key, actionType)
+				}
+			}
 			continue
 		}
 		if key == "" {
@@ -187,6 +218,20 @@ func validateStructuredStandingApprovalConstraintKeys(
 		metaFields, metaSupported = connectorMetaConstraintFields(registry, actionType)
 	}
 
+	var dtFields map[string]db.DateTimeFieldInfo
+	if schemaKeys != nil {
+		schema, schemaErr := db.GetActionParametersSchema(ctx, d, actionType)
+		if schemaErr != nil {
+			return fmt.Errorf("lookup action schema: %w", schemaErr)
+		}
+		if schema != nil {
+			dtFields, schemaErr = db.ParseActionSchemaDateTimeFields(schema.Schema)
+			if schemaErr != nil {
+				return schemaErr
+			}
+		}
+	}
+
 	for gi, group := range sc.Groups {
 		for ci, cond := range group.Conditions {
 			field := cond.Field
@@ -223,6 +268,19 @@ func validateStructuredStandingApprovalConstraintKeys(
 				if _, ok := schemaKeys[field]; !ok {
 					return formatUnknownConstraintKeyError(field, actionType, metaFields)
 				}
+				for _, val := range conditionValuesForValidation(cond) {
+					if token, ok := db.ExtractRelativeDateToken(val); ok {
+						if err := db.ValidateRelativeDateToken(token); err != nil {
+							return err
+						}
+						if dtFields == nil {
+							return fmt.Errorf("relative date token %q is only valid on date or date-time parameters; action %q has no temporal fields", token, actionType)
+						}
+						if _, ok := dtFields[field]; !ok {
+							return fmt.Errorf("relative date token %q is only valid on date or date-time parameters; %q is not a temporal field on action %q", token, field, actionType)
+						}
+					}
+				}
 				continue
 			}
 			if metaFields != nil {
@@ -253,6 +311,9 @@ func conditionValuesForValidation(cond db.ConstraintCondition) []json.RawMessage
 }
 
 func isAllowedParameterConstraintValue(val json.RawMessage) bool {
+	if _, ok := db.ExtractRelativeDateToken(val); ok {
+		return true
+	}
 	var s string
 	if json.Unmarshal(val, &s) == nil {
 		return true
