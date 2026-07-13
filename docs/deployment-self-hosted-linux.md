@@ -160,6 +160,25 @@ sed -i "s|INVITE_HMAC_KEY=replace-me|INVITE_HMAC_KEY=$(openssl rand -hex 32)|" ~
 
 That's it — `BASE_URL` is your tailnet HTTPS hostname, and `ALLOWED_ORIGINS` doesn't need to be set (the server allows the origin the browser used).
 
+### Rate limiting (optional)
+
+In production (any `MODE` other than `development`), the server enforces per-IP and per-agent rate limits on API traffic. Rate limiting is disabled entirely when `MODE=development`.
+
+When running behind a reverse proxy, set `TRUSTED_PROXY_HEADER` (default: `X-Forwarded-For`) so the per-IP limiter keys on the real client IP rather than the proxy's.
+
+To tune limits without a code change, set these optional env vars in `.env` (invalid values log a warning and fall back to the default):
+
+| Env var | Default | Description |
+|---|---|---|
+| `RATE_LIMIT_IP_RATE` | `50` | Per-IP sustained requests/second |
+| `RATE_LIMIT_IP_BURST` | `100` | Per-IP burst capacity |
+| `RATE_LIMIT_IP_GLOBAL_RATE` | `200` | Global sustained requests/second (all IPs) |
+| `RATE_LIMIT_IP_GLOBAL_BURST` | `400` | Global burst capacity |
+| `RATE_LIMIT_AGENT_RATE` | `20` | Per-agent sustained requests/second (post-auth) |
+| `RATE_LIMIT_AGENT_BURST` | `40` | Per-agent burst capacity |
+
+Values are read once at startup; restart the service after changing them.
+
 ---
 
 ## Step 4: Run on Boot (systemd)

@@ -1,13 +1,108 @@
 package api
 
 import (
+	"bytes"
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestDefaultRateLimiterConfig_DefaultsWhenUnset(t *testing.T) {
+	t.Setenv("RATE_LIMIT_IP_RATE", "")
+	t.Setenv("RATE_LIMIT_IP_BURST", "")
+	t.Setenv("RATE_LIMIT_IP_GLOBAL_RATE", "")
+	t.Setenv("RATE_LIMIT_IP_GLOBAL_BURST", "")
+
+	cfg := DefaultRateLimiterConfig()
+	if cfg.PerKeyRate != 50 || cfg.PerKeyBurst != 100 || cfg.GlobalRate != 200 || cfg.GlobalBurst != 400 {
+		t.Fatalf("unexpected defaults: %+v", cfg)
+	}
+}
+
+func TestDefaultRateLimiterConfig_OverridesFromEnv(t *testing.T) {
+	t.Setenv("RATE_LIMIT_IP_RATE", "75.5")
+	t.Setenv("RATE_LIMIT_IP_BURST", "150")
+	t.Setenv("RATE_LIMIT_IP_GLOBAL_RATE", "300")
+	t.Setenv("RATE_LIMIT_IP_GLOBAL_BURST", "600")
+
+	cfg := DefaultRateLimiterConfig()
+	if cfg.PerKeyRate != 75.5 || cfg.PerKeyBurst != 150 || cfg.GlobalRate != 300 || cfg.GlobalBurst != 600 {
+		t.Fatalf("unexpected overrides: %+v", cfg)
+	}
+}
+
+func TestDefaultRateLimiterConfig_InvalidEnvFallsBackWithWarning(t *testing.T) {
+	var buf bytes.Buffer
+	orig := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(orig) })
+
+	t.Setenv("RATE_LIMIT_IP_RATE", "not-a-float")
+	t.Setenv("RATE_LIMIT_IP_BURST", "not-an-int")
+	t.Setenv("RATE_LIMIT_IP_GLOBAL_RATE", "")
+	t.Setenv("RATE_LIMIT_IP_GLOBAL_BURST", "")
+
+	cfg := DefaultRateLimiterConfig()
+	if cfg.PerKeyRate != 50 || cfg.PerKeyBurst != 100 {
+		t.Fatalf("expected fallback defaults, got %+v", cfg)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "warning: invalid RATE_LIMIT_IP_RATE") {
+		t.Fatalf("expected warning for invalid rate, got log: %q", out)
+	}
+	if !strings.Contains(out, "warning: invalid RATE_LIMIT_IP_BURST") {
+		t.Fatalf("expected warning for invalid burst, got log: %q", out)
+	}
+}
+
+func TestDefaultAgentRateLimiterConfig_DefaultsWhenUnset(t *testing.T) {
+	t.Setenv("RATE_LIMIT_AGENT_RATE", "")
+	t.Setenv("RATE_LIMIT_AGENT_BURST", "")
+
+	cfg := DefaultAgentRateLimiterConfig()
+	if cfg.PerKeyRate != 20 || cfg.PerKeyBurst != 40 || cfg.GlobalRate != 10000 || cfg.GlobalBurst != 10000 {
+		t.Fatalf("unexpected defaults: %+v", cfg)
+	}
+}
+
+func TestDefaultAgentRateLimiterConfig_OverridesFromEnv(t *testing.T) {
+	t.Setenv("RATE_LIMIT_AGENT_RATE", "30")
+	t.Setenv("RATE_LIMIT_AGENT_BURST", "60")
+
+	cfg := DefaultAgentRateLimiterConfig()
+	if cfg.PerKeyRate != 30 || cfg.PerKeyBurst != 60 {
+		t.Fatalf("unexpected overrides: %+v", cfg)
+	}
+}
+
+func TestDefaultAgentRateLimiterConfig_InvalidEnvFallsBackWithWarning(t *testing.T) {
+	var buf bytes.Buffer
+	orig := log.Writer()
+	log.SetOutput(&buf)
+	t.Cleanup(func() { log.SetOutput(orig) })
+
+	t.Setenv("RATE_LIMIT_AGENT_RATE", "bad")
+	t.Setenv("RATE_LIMIT_AGENT_BURST", "worse")
+
+	cfg := DefaultAgentRateLimiterConfig()
+	if cfg.PerKeyRate != 20 || cfg.PerKeyBurst != 40 {
+		t.Fatalf("expected fallback defaults, got %+v", cfg)
+	}
+
+	out := buf.String()
+	if !strings.Contains(out, "warning: invalid RATE_LIMIT_AGENT_RATE") {
+		t.Fatalf("expected warning for invalid agent rate, got log: %q", out)
+	}
+	if !strings.Contains(out, "warning: invalid RATE_LIMIT_AGENT_BURST") {
+		t.Fatalf("expected warning for invalid agent burst, got log: %q", out)
+	}
+}
 
 func TestRateLimitMiddleware_AllowsNormalTraffic(t *testing.T) {
 	t.Parallel()

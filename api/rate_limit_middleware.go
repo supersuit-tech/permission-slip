@@ -5,9 +5,36 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 )
+
+func envFloat64(key string, defaultVal float64) float64 {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return defaultVal
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil {
+		log.Printf("warning: invalid %s %q, using default %v", key, v, defaultVal)
+		return defaultVal
+	}
+	return f
+}
+
+func envInt(key string, defaultVal int) int {
+	v := strings.TrimSpace(os.Getenv(key))
+	if v == "" {
+		return defaultVal
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil {
+		log.Printf("warning: invalid %s %q, using default %d", key, v, defaultVal)
+		return defaultVal
+	}
+	return n
+}
 
 // AuthRateLimiterConfig returns conservative per-IP limits for unauthenticated
 // /api/auth/signup and /api/auth/login traffic (credential stuffing defense).
@@ -28,10 +55,10 @@ func AuthRateLimiterConfig() RateLimiterConfig {
 // Global: 200 req/s sustained, burst of 400.
 func DefaultRateLimiterConfig() RateLimiterConfig {
 	return RateLimiterConfig{
-		PerKeyRate:  50,
-		PerKeyBurst: 100,
-		GlobalRate:  200,
-		GlobalBurst: 400,
+		PerKeyRate:  envFloat64("RATE_LIMIT_IP_RATE", 50),
+		PerKeyBurst: envInt("RATE_LIMIT_IP_BURST", 100),
+		GlobalRate:  envFloat64("RATE_LIMIT_IP_GLOBAL_RATE", 200),
+		GlobalBurst: envInt("RATE_LIMIT_IP_GLOBAL_BURST", 400),
 	}
 }
 
@@ -43,8 +70,8 @@ func DefaultRateLimiterConfig() RateLimiterConfig {
 // Per-agent: 20 req/s sustained, burst of 40.
 func DefaultAgentRateLimiterConfig() RateLimiterConfig {
 	return RateLimiterConfig{
-		PerKeyRate:  20,
-		PerKeyBurst: 40,
+		PerKeyRate:  envFloat64("RATE_LIMIT_AGENT_RATE", 20),
+		PerKeyBurst: envInt("RATE_LIMIT_AGENT_BURST", 40),
 		GlobalRate:  10000,
 		GlobalBurst: 10000,
 	}
