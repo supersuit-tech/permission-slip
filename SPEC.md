@@ -75,7 +75,7 @@ The middle-man architecture eliminates all of that:
 
 - **Credentials are user-scoped** — the user stores their Gmail API key once; any of their agents that has Gmail enabled can trigger actions that use it
 - **Connector enablement is per-agent** — Agent A might have Gmail enabled but not Stripe; Agent B might have both
-- **Users manage credentials** through the dashboard (Supabase session JWT auth), never through agents
+- **Users manage credentials** through the dashboard (self-hosted session JWT auth), never through agents
 - **Agents never see credentials** — credentials are only decrypted at the moment of action execution by Permission Slip's server
 
 > **Why user-initiated?** If agents could register by simply naming an approver username, any agent could spam any user with registration notifications. The invite code ensures the user explicitly chose to add this agent. See [ADR-005](docs/adr/005-user-initiated-registration.md).
@@ -205,10 +205,10 @@ Permission Slip's security is layered:
 1. **Action validation** — agents can only submit pre-defined action types with schema-validated parameters
 2. **Transport layer (TLS)** — all communication is encrypted in transit
 3. **Agent authentication (Ed25519 signatures)** — every agent-facing request is cryptographically signed
-4. **User authentication (Supabase session JWTs)** — all user-facing endpoints (credentials, agent config, standing approvals) use session tokens
+4. **User authentication (self-hosted session JWTs)** — all user-facing endpoints (credentials, agent config, standing approvals) authenticate with self-hosted HS256 session JWTs issued after email + password login (Argon2id password hashing, opaque refresh tokens)
 5. **Connector gating** — agents can only request actions from connectors explicitly enabled by the user (per-agent `agent_connectors` allowlist)
 6. **Human approval** — no action executes without user consent (per-request approval or pre-authorized standing approval)
-7. **Single-use tokens** (one-off) — approved one-off actions get a one-time-use token with a short TTL
+7. **Server-side execution** (one-off) — once the user approves, Permission Slip executes the action itself using the user's stored credentials and returns the result to the agent (which polls approval status). The agent never receives an execution token and never touches the credential; the confirmation code shown to the approver is a human-readable receipt, not a redemption token
 8. **Standing approvals** (pre-authorized) — user-defined, constraint-scoped grants that allow repeated execution without per-request approval; revocable instantly
 9. **Credential isolation** — agent never sees credentials; credentials are user-scoped and only decrypted at the moment of action execution by Permission Slip's server
 10. **Audit trail** — every action request, approval, and execution is logged (including all standing approval executions)
