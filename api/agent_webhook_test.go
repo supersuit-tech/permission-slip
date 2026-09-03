@@ -88,6 +88,9 @@ func TestPutAgentWebhook_SuccessWithTestDelivery(t *testing.T) {
 	if !resp.Configured || resp.Test == nil || !resp.Test.Success {
 		t.Fatalf("unexpected resp: %+v", resp)
 	}
+	if resp.Provider != "openclaw" {
+		t.Fatalf("provider = %q, want openclaw default", resp.Provider)
+	}
 }
 
 func TestNotifyAgentWake_DispatchesToHooks(t *testing.T) {
@@ -117,7 +120,7 @@ func TestNotifyAgentWake_DispatchesToHooks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(context.Background(), tx, agentID, hookSrv.URL+"/hooks", vaultID); err != nil {
+	if err := db.SetAgentWebhook(context.Background(), tx, agentID, hookSrv.URL+"/hooks", vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -169,7 +172,7 @@ func TestAgentWebhook_SharedURLWarning(t *testing.T) {
 		t.Fatal(err)
 	}
 	sharedURL := hookSrv.URL + "/hooks"
-	if err := db.SetAgentWebhook(context.Background(), tx, agent1, sharedURL, vaultID); err != nil {
+	if err := db.SetAgentWebhook(context.Background(), tx, agent1, sharedURL, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,7 +235,7 @@ func TestAgentWebhook_UniqueURLNoWarning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(context.Background(), tx, agent1, hookSrv.URL+"/hooks-a", vaultID); err != nil {
+	if err := db.SetAgentWebhook(context.Background(), tx, agent1, hookSrv.URL+"/hooks-a", vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 

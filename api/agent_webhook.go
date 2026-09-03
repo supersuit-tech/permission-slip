@@ -9,20 +9,24 @@ import (
 	"strings"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip/agentwake"
 	"github.com/supersuit-tech/permission-slip/connectors"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
 type setAgentWebhookRequest struct {
-	URL   string `json:"url" validate:"required"`
-	Token string `json:"token" validate:"required"`
+	URL      string `json:"url" validate:"required"`
+	Token    string `json:"token" validate:"required"`
+	Provider string `json:"provider,omitempty"`
 }
 
 const agentWebhookSharedURLWarning = "Another of your agents is registered with this same webhook URL. Wakes without a session_key are delivered to the gateway's main session and may reach the wrong agent. Include session_key in approval context, or give each agent its own gateway."
+const agentWebhookSharedGrokBotWarning = "Another of your agents is registered with this same webhook URL. Both will receive the same wake payloads."
 
 type agentWebhookStatusResponse struct {
 	Configured bool                    `json:"configured"`
 	WebhookURL string                  `json:"webhook_url,omitempty"`
+	Provider   string                  `json:"provider,omitempty"`
 	Warning    string                  `json:"warning,omitempty"`
 	Test       *agentWebhookTestResult `json:"test,omitempty"`
 }
@@ -70,7 +74,7 @@ func handlePutAgentWebhook(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		resp, opErr := setAgentWebhookCore(r.Context(), deps, agent.AgentID, req.URL, req.Token)
+		resp, opErr := setAgentWebhookCore(r.Context(), deps, agent.AgentID, req.URL, req.Token, req.Provider)
 		if opErr != nil {
 			RespondError(w, r, opErr.Status, opErr.Body)
 			return
@@ -104,7 +108,7 @@ func handleDeleteAgentWebhook(deps *Deps) http.HandlerFunc {
 	}
 }
 
-func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL, rawToken string) (*agentWebhookStatusResponse, *agentWebhookOpError) {
+func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL, rawToken, rawProvider string) (*agentWebhookStatusResponse, *agentWebhookOpError) {
 	if deps.Vault == nil {
 		return nil, &agentWebhookOpError{
 			Status: http.StatusServiceUnavailable,
@@ -120,7 +124,14 @@ func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL,
 			Body:   BadRequest(ErrInvalidRequest, "token is required"),
 		}
 	}
-	if err := connectors.ValidatePrivateNetworkURL(url, "url"); err != nil {
+	provider, err := agentwake.NormalizeProvider(rawProvider)
+	if err != nil {
+		return nil, &agentWebhookOpError{
+			Status: http.StatusBadRequest,
+			Body:   BadRequest(ErrInvalidRequest, err.Error()),
+		}
+	}
+	if err := validateWakeWebhookURL(provider, url); err != nil {
 		var valErr *connectors.ValidationError
 		if errors.As(err, &valErr) {
 			return nil, &agentWebhookOpError{
@@ -155,7 +166,7 @@ func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL,
 		}
 	}
 
-	if err := db.SetAgentWebhook(ctx, deps.DB, agentID, url, vaultID); err != nil {
+	if err := db.SetAgentWebhook(ctx, deps.DB, agentID, url, vaultID, provider); err != nil {
 		_ = deps.Vault.DeleteSecret(ctx, deps.DB, vaultID)
 		log.Printf("[%s] setAgentWebhookCore: update agent: %v", TraceID(ctx), err)
 		CaptureError(ctx, err)
@@ -181,9 +192,10 @@ func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL,
 	resp := agentWebhookStatusResponse{
 		Configured: true,
 		WebhookURL: url,
+		Provider:   provider,
 		Test:       testResult,
 	}
-	populateWebhookSharedURLWarning(ctx, deps, &resp, agentID, url)
+	populateWebhookSharedURLWarning(ctx, deps, &resp, agentID, url, provider)
 	return &resp, nil
 }
 
@@ -202,7 +214,11 @@ func getAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, runTest
 	if cfg != nil && cfg.WebhookURL != nil && *cfg.WebhookURL != "" {
 		resp.Configured = true
 		resp.WebhookURL = *cfg.WebhookURL
-		populateWebhookSharedURLWarning(ctx, deps, &resp, agentID, *cfg.WebhookURL)
+		resp.Provider = cfg.WebhookProvider
+		if resp.Provider == "" {
+			resp.Provider = agentwake.ProviderOpenClaw
+		}
+		populateWebhookSharedURLWarning(ctx, deps, &resp, agentID, *cfg.WebhookURL, resp.Provider)
 	}
 
 	if runTest {
@@ -241,13 +257,25 @@ func deleteAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64) *age
 	return nil
 }
 
-func populateWebhookSharedURLWarning(ctx context.Context, deps *Deps, resp *agentWebhookStatusResponse, agentID int64, webhookURL string) {
+func populateWebhookSharedURLWarning(ctx context.Context, deps *Deps, resp *agentWebhookStatusResponse, agentID int64, webhookURL, provider string) {
 	shared, err := db.WebhookURLSharedByOtherAgent(ctx, deps.DB, agentID, webhookURL)
 	if err != nil {
 		log.Printf("[%s] webhook shared URL check: %v", TraceID(ctx), err)
 		return
 	}
-	if shared {
-		resp.Warning = agentWebhookSharedURLWarning
+	if !shared {
+		return
 	}
+	if provider == agentwake.ProviderGrokBot {
+		resp.Warning = agentWebhookSharedGrokBotWarning
+		return
+	}
+	resp.Warning = agentWebhookSharedURLWarning
+}
+
+func validateWakeWebhookURL(provider, rawURL string) error {
+	if provider == agentwake.ProviderGrokBot {
+		return agentwake.ValidateGrokBotWebhookURL(rawURL)
+	}
+	return connectors.ValidatePrivateNetworkURL(rawURL, "url")
 }

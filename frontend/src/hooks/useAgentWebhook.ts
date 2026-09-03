@@ -52,10 +52,12 @@ export function useSetAgentWebhook() {
       agentId,
       url,
       token,
+      provider,
     }: {
       agentId: number;
       url: string;
       token: string;
+      provider?: "openclaw" | "grokbot";
     }) => {
       if (!accessToken) throw new Error("Missing access token");
       const { data, error } = await client.PUT(
@@ -63,7 +65,7 @@ export function useSetAgentWebhook() {
         {
           headers: { Authorization: `Bearer ${accessToken}` },
           params: { path: { agent_id: agentId } },
-          body: { url, token },
+          body: { url, token, provider: provider ?? "openclaw" },
         },
       );
       if (error) {

@@ -5,6 +5,12 @@ AgentWebhookConfig:
       type: boolean
     webhook_url:
       type: string
+    provider:
+      type: string
+      enum:
+        - openclaw
+        - grokbot
+      description: Wake delivery adapter. Omitted when no webhook is configured. Defaults to openclaw for legacy rows.
     warning:
       type: string
       description: Advisory when another agent for the same approver shares this webhook URL
@@ -19,11 +25,20 @@ SetAgentWebhookRequest:
   properties:
     url:
       type: string
-      description: OpenClaw gateway hooks base URL (private network only)
+      description: |
+        OpenClaw gateway hooks base URL (private network only), or Grok Bot
+        Cursor automation webhook URL (`https://api2.cursor.sh/automations/webhook/…`).
       example: "http://100.64.0.5:18789/hooks"
     token:
       type: string
-      description: Hooks bearer token from OpenClaw configuration
+      description: OpenClaw hooks bearer token, or Grok Bot Authorization header value
+    provider:
+      type: string
+      enum:
+        - openclaw
+        - grokbot
+      default: openclaw
+      description: Wake delivery adapter. Defaults to openclaw.
 
 AgentWebhookTestResult:
   type: object

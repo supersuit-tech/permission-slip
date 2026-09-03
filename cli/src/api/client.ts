@@ -381,11 +381,12 @@ export class ApiClient {
     });
   }
 
-  /** PUT /agent/webhook — register OpenClaw gateway hooks URL and token */
-  async setAgentWebhook(url: string, token: string) {
+  /** PUT /agent/webhook — register wake webhook URL, token, and provider */
+  async setAgentWebhook(url: string, token: string, provider = "openclaw") {
     return this.request<{
       configured: boolean;
       webhook_url?: string;
+      provider?: string;
       warning?: string;
       test?: {
         configured: boolean;
@@ -396,7 +397,7 @@ export class ApiClient {
     }>({
       method: "PUT",
       routerPath: "/agent/webhook",
-      body: { url, token },
+      body: { url, token, provider },
     });
   }
 
@@ -405,6 +406,7 @@ export class ApiClient {
     return this.request<{
       configured: boolean;
       webhook_url?: string;
+      provider?: string;
       warning?: string;
       test?: {
         configured: boolean;

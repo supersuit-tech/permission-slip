@@ -1037,9 +1037,11 @@ paths:
       operationId: setAgentWebhook
       summary: Register Agent Wake Webhook
       description: |
-        Register the OpenClaw gateway hooks URL and token for server-push approval wakes.
-        The URL must resolve to a private network address (RFC1918, Tailscale/CGNAT, or loopback).
-        Performs a test delivery before saving.
+        Register the wake webhook URL and token for server-push approval wakes.
+        `provider` selects the delivery adapter (`openclaw` default, or `grokbot`).
+        OpenClaw URLs must resolve to a private network address. Grok Bot URLs must
+        be `https://api2.cursor.sh/automations/webhook/…`. Performs a test delivery
+        after saving.
       tags:
         - Agents
       security:
@@ -1067,7 +1069,7 @@ paths:
       operationId: getAgentWebhook
       summary: Get Agent Wake Webhook
       description: |
-        Returns the configured hooks URL. Pass `?test=true` to fire a test wake.
+        Returns the configured webhook URL and provider. Pass `?test=true` to fire a test wake.
       tags:
         - Agents
       security:
@@ -1438,8 +1440,8 @@ paths:
       operationId: getAgentWebhookForUser
       summary: Get agent wake webhook (user session)
       description: |
-        Returns the configured hooks URL for the agent. Pass `?test=true` to fire a test wake.
-        The token is never returned — only `configured`, `webhook_url`, and optional warning.
+        Returns the configured webhook URL and provider for the agent. Pass `?test=true` to fire a test wake.
+        The token is never returned — only `configured`, `webhook_url`, `provider`, and optional warning.
       tags:
         - Agents
       security:
@@ -1466,8 +1468,11 @@ paths:
       operationId: setAgentWebhookForUser
       summary: Register agent wake webhook (user session)
       description: |
-        Register the OpenClaw gateway hooks URL and token for server-push approval wakes.
-        The URL must resolve to a private network address. Performs a test delivery after saving.
+        Register the wake webhook URL and token for server-push approval wakes.
+        `provider` selects the delivery adapter (`openclaw` default, or `grokbot`).
+        OpenClaw URLs must resolve to a private network address. Grok Bot URLs must
+        be `https://api2.cursor.sh/automations/webhook/…`. Performs a test delivery
+        after saving.
       tags:
         - Agents
       security:
@@ -10725,6 +10730,12 @@ components:
           type: boolean
         webhook_url:
           type: string
+        provider:
+          type: string
+          enum:
+            - openclaw
+            - grokbot
+          description: Wake delivery adapter. Omitted when no webhook is configured. Defaults to openclaw for legacy rows.
         warning:
           type: string
           description: Advisory when another agent for the same approver shares this webhook URL
@@ -10738,11 +10749,20 @@ components:
       properties:
         url:
           type: string
-          description: OpenClaw gateway hooks base URL (private network only)
+          description: |
+            OpenClaw gateway hooks base URL (private network only), or Grok Bot
+            Cursor automation webhook URL (`https://api2.cursor.sh/automations/webhook/…`).
           example: http://100.64.0.5:18789/hooks
         token:
           type: string
-          description: Hooks bearer token from OpenClaw configuration
+          description: OpenClaw hooks bearer token, or Grok Bot Authorization header value
+        provider:
+          type: string
+          enum:
+            - openclaw
+            - grokbot
+          default: openclaw
+          description: Wake delivery adapter. Defaults to openclaw.
     AgentApprovalSweepItem:
       type: object
       required:

@@ -7,14 +7,15 @@ import (
 	"strings"
 )
 
-// WakeRequest describes an approval resolution wake to deliver to OpenClaw.
+// WakeRequest describes an approval resolution wake to deliver to a provider.
 type WakeRequest struct {
 	ApprovalID string
 	Status     string
-	SessionKey string // optional; when set, targets /hooks/agent with wakeMode next-heartbeat
+	SessionKey string // optional; OpenClaw uses this to target /hooks/agent
+	AgentID    int64  // Grok Bot JSON includes agent_id
 }
 
-// Delivery describes a single HTTP POST to the OpenClaw gateway hooks API.
+// Delivery describes a single HTTP POST to a wake webhook.
 type Delivery struct {
 	URL     string
 	Headers map[string]string
@@ -76,14 +77,6 @@ func BuildOpenClawDelivery(webhookBaseURL, token string, req WakeRequest) (*Deli
 		Headers: headers,
 		Body:    body,
 	}, nil
-}
-
-// BuildTestDelivery returns a test wake delivery (no session key).
-func BuildTestDelivery(webhookBaseURL, token string) (*Delivery, error) {
-	return BuildOpenClawDelivery(webhookBaseURL, token, WakeRequest{
-		ApprovalID: "test_wake",
-		Status:     "test",
-	})
 }
 
 // SessionKeyFromApprovalContext extracts an optional session_key from approval context JSON.
