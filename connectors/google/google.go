@@ -2,9 +2,9 @@
 // connector execution layer. It uses Google REST APIs (Gmail, Calendar, Slides, Sheets, Docs, Chat, Drive)
 // with plain net/http and OAuth 2.0 access tokens provided by the platform.
 //
-// The connector exposes 31 actions covering email (send, reply, read, list, archive), calendar (create,
-// list, list calendars, update, delete, meetings), Slides, Sheets, Docs, Chat, and Drive (list, get,
-// upload, delete, search, create folder).
+// The connector exposes 32 actions covering email (send, reply, read, list, archive, download attachment),
+// calendar (create, list, list calendars, update, delete, meetings), Slides, Sheets, Docs, Chat, and
+// Drive (list, get, upload including binary, delete, search, create folder).
 package google
 
 import (
@@ -167,6 +167,7 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.create_drive_folder":   &createDriveFolderAction{conn: c},
 		"google.send_email_reply":      &sendEmailReplyAction{conn: c},
 		"google.read_email":            &readEmailAction{conn: c},
+		"google.download_attachment":   &downloadAttachmentAction{conn: c},
 		"google.archive_email":         &archiveEmailAction{conn: c},
 		"google.list_calendars":        &listCalendarsAction{conn: c},
 	}
@@ -188,9 +189,18 @@ func (c *GoogleConnector) ValidateCredentials(_ context.Context, creds connector
 // bearer auth, handles rate limiting and timeouts, and unmarshals the
 // response into respBody.
 func (c *GoogleConnector) doJSON(ctx context.Context, creds connectors.Credentials, method, url string, reqBody, respBody any) error {
+	return c.doJSONLimit(ctx, creds, method, url, reqBody, respBody, maxResponseBytes)
+}
+
+// doJSONLimit is doJSON with a caller-specified response body cap. Used for
+// Gmail attachment downloads whose JSON (base64) can exceed maxResponseBytes.
+func (c *GoogleConnector) doJSONLimit(ctx context.Context, creds connectors.Credentials, method, url string, reqBody, respBody any, maxBytes int64) error {
 	token, ok := creds.Get(credKeyAccessToken)
 	if !ok || token == "" {
 		return &connectors.ValidationError{Message: "access_token credential is missing or empty"}
+	}
+	if maxBytes <= 0 {
+		maxBytes = maxResponseBytes
 	}
 
 	var body io.Reader
@@ -217,7 +227,7 @@ func (c *GoogleConnector) doJSON(ctx context.Context, creds connectors.Credentia
 	}
 	defer resp.Body.Close()
 
-	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes))
+	respBytes, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes))
 	if err != nil {
 		return &connectors.ExternalError{Message: fmt.Sprintf("reading response body: %v", err)}
 	}

@@ -45,7 +45,7 @@ func (c *GoogleConnector) ResolveResourceDetails(ctx context.Context, actionType
 		return c.resolvePresentation(ctx, creds, params)
 
 	// Gmail
-	case "google.read_email", "google.archive_email":
+	case "google.read_email", "google.archive_email", "google.download_attachment":
 		return c.resolveEmail(ctx, creds, params)
 	case "google.send_email_reply":
 		return c.resolveEmailReply(ctx, creds, params)

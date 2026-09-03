@@ -1,6 +1,8 @@
 package google
 
 import (
+	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"io"
 	"mime"
@@ -190,7 +192,7 @@ func TestUploadDriveFile_ContentTooLarge(t *testing.T) {
 	conn := New()
 	action := &uploadDriveFileAction{conn: conn}
 
-	// Create content larger than maxUploadBytes (4 MB).
+	// Create content larger than maxUploadBytes (10 MB).
 	largeContent := strings.Repeat("x", maxUploadBytes+1)
 	params, _ := json.Marshal(uploadDriveFileParams{
 		Name:    "large.txt",
@@ -315,5 +317,216 @@ func TestUploadDriveFile_InvalidJSON(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUploadDriveFile_BinaryBase64(t *testing.T) {
+	t.Parallel()
+
+	pdfBytes := []byte("%PDF-1.4 binary receipt")
+	var gotContent []byte
+	var gotContentType string
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		contentType := r.Header.Get("Content-Type")
+		mediaType, params, err := mime.ParseMediaType(contentType)
+		if err != nil {
+			t.Fatalf("failed to parse Content-Type: %v", err)
+		}
+		if !strings.HasPrefix(mediaType, "multipart/") {
+			t.Fatalf("expected multipart content type, got %s", mediaType)
+		}
+
+		reader := multipart.NewReader(r.Body, params["boundary"])
+		if _, err := reader.NextPart(); err != nil {
+			t.Fatalf("failed to read metadata part: %v", err)
+		}
+		part, err := reader.NextPart()
+		if err != nil {
+			t.Fatalf("failed to read content part: %v", err)
+		}
+		gotContentType = part.Header.Get("Content-Type")
+		gotContent, err = io.ReadAll(part)
+		if err != nil {
+			t.Fatalf("failed to read content: %v", err)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(driveUploadResponse{
+			ID:          "pdf-file-1",
+			Name:        "receipt.pdf",
+			WebViewLink: "https://drive.google.com/file/d/pdf-file-1/view",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newDriveForTest(srv.Client(), srv.URL)
+	action := &uploadDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(uploadDriveFileParams{
+		Name:          "receipt.pdf",
+		ContentBase64: base64.StdEncoding.EncodeToString(pdfBytes),
+		MimeType:      "application/pdf",
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.upload_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if gotContentType != "application/pdf" {
+		t.Errorf("expected content part Content-Type application/pdf, got %q", gotContentType)
+	}
+	if !bytes.Equal(gotContent, pdfBytes) {
+		t.Errorf("expected uploaded bytes %q, got %q", pdfBytes, gotContent)
+	}
+
+	var data map[string]string
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["id"] != "pdf-file-1" {
+		t.Errorf("expected id pdf-file-1, got %q", data["id"])
+	}
+	if data["web_view_link"] == "" {
+		t.Error("expected web_view_link in result")
+	}
+}
+
+func TestUploadDriveFile_BinaryInfersMimeFromName(t *testing.T) {
+	t.Parallel()
+
+	var gotContentType string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_, params, _ := mime.ParseMediaType(r.Header.Get("Content-Type"))
+		reader := multipart.NewReader(r.Body, params["boundary"])
+		_, _ = reader.NextPart()
+		part, _ := reader.NextPart()
+		gotContentType = part.Header.Get("Content-Type")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(driveUploadResponse{ID: "img-1", Name: "scan.png"})
+	}))
+	defer srv.Close()
+
+	conn := newDriveForTest(srv.Client(), srv.URL)
+	action := &uploadDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(uploadDriveFileParams{
+		Name:          "scan.png",
+		ContentBase64: base64.StdEncoding.EncodeToString([]byte("\x89PNG")),
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.upload_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotContentType != "image/png" {
+		t.Errorf("expected inferred mime image/png, got %q", gotContentType)
+	}
+}
+
+func TestUploadDriveFile_MutuallyExclusiveContent(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &uploadDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(uploadDriveFileParams{
+		Name:          "both.txt",
+		Content:       "hello",
+		ContentBase64: base64.StdEncoding.EncodeToString([]byte("hello")),
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.upload_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error when both content and content_base64 are set")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+	if !strings.Contains(err.Error(), "mutually exclusive") {
+		t.Errorf("expected mutually exclusive message, got: %v", err)
+	}
+}
+
+func TestUploadDriveFile_InvalidBase64(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &uploadDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(uploadDriveFileParams{
+		Name:          "file.bin",
+		ContentBase64: "not valid base64!!!",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.upload_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid base64")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUploadDriveFile_MimeTypeNewlineRejected(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &uploadDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(uploadDriveFileParams{
+		Name:     "file.txt",
+		Content:  "hello",
+		MimeType: "text/plain\r\nX-Injected: yes",
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.upload_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for mime_type with newlines")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestMimeTypeFromFilename(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"receipt.pdf", "application/pdf"},
+		{"photo.jpg", "image/jpeg"},
+		{"photo.jpeg", "image/jpeg"},
+		{"scan.png", "image/png"},
+		{"notes.txt", "text/plain"},
+		{"noext", "application/octet-stream"},
+	}
+	for _, tt := range tests {
+		if got := mimeTypeFromFilename(tt.name); got != tt.want {
+			t.Errorf("mimeTypeFromFilename(%q) = %q, want %q", tt.name, got, tt.want)
+		}
 	}
 }

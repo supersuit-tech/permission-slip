@@ -671,28 +671,36 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "google.upload_drive_file",
 				Name:            "Upload Drive File",
-				Description:     "Create and upload a text file to Google Drive",
+				Description:     "Create and upload a file to Google Drive. Accepts UTF-8 text via content, or binary bytes (PDF, images, etc.) via content_base64. Maximum 10 MB decoded.",
 				RiskLevel:       "medium",
 				DisplayTemplate: "Upload {{name}} to Drive",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
-					"required": ["name", "content"],
+					"required": ["name"],
+					"anyOf": [
+						{"required": ["content"]},
+						{"required": ["content_base64"]}
+					],
 					"properties": {
 						"name": {
 							"type": "string",
 							"description": "File name",
-							"x-ui": {"label": "File name", "placeholder": "report.txt"}
+							"x-ui": {"label": "File name", "placeholder": "receipt.pdf"}
 						},
 						"content": {
 							"type": "string",
-							"description": "File content (text)",
-							"x-ui": {"label": "Content", "widget": "textarea"}
+							"description": "UTF-8 text file content. Mutually exclusive with content_base64. Maximum 10 MB.",
+							"x-ui": {"label": "Content", "widget": "textarea", "help_text": "Use content_base64 instead for PDFs, images, and other binary files"}
+						},
+						"content_base64": {
+							"type": "string",
+							"description": "Base64-encoded binary file content (PDF, JPEG, PNG, etc.). Mutually exclusive with content. Maximum 10 MB decoded.",
+							"x-ui": {"label": "File content (Base64)", "help_text": "Base64-encoded bytes — max 10 MB decoded. Mutually exclusive with content."}
 						},
 						"mime_type": {
 							"type": "string",
-							"default": "text/plain",
-							"description": "MIME type of the file (default: text/plain)",
-							"x-ui": {"label": "MIME type", "placeholder": "text/plain"}
+							"description": "MIME type of the file. Defaults to text/plain for content, or inferred from the file name for content_base64 (e.g. application/pdf, image/jpeg, image/png).",
+							"x-ui": {"label": "MIME type", "placeholder": "application/pdf"}
 						},
 						"folder_id": {
 							"type": "string",
@@ -902,6 +910,30 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"default": "full",
 							"description": "Controls how much of the message is returned. 'full' (default) returns headers, body, and attachment metadata. 'metadata' returns headers only (no body). 'minimal' returns only ID, labels, and snippet.",
 							"x-ui": {"widget": "select", "label": "Format"}
+						}
+					}
+				}`)),
+			},
+			{
+				ActionType:      "google.download_attachment",
+				Name:            "Download Attachment",
+				Description:     "Download a single Gmail attachment by message ID and attachment ID (from read_email attachment metadata). Returns filename, MIME type, and base64-encoded bytes. Maximum 10 MB.",
+				RiskLevel:       "low",
+				DisplayTemplate: "Download attachment from email {{message_id}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["message_id", "attachment_id"],
+					"properties": {
+						"message_id": {
+							"type": "string",
+							"description": "The Gmail message ID containing the attachment (from list_emails or read_email)",
+							"x-ui": {"label": "Message ID", "help_text": "Gmail message ID — from google.list_emails or google.read_email"}
+						},
+						"attachment_id": {
+							"type": "string",
+							"minLength": 1,
+							"description": "Attachment ID or MIME part_id from read_email attachments[] (attachments[].attachment_id or attachments[].part_id)",
+							"x-ui": {"label": "Attachment ID", "help_text": "From google.read_email attachments[].attachment_id (or part_id)"}
 						}
 					}
 				}`)),

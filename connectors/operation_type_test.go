@@ -20,6 +20,7 @@ func TestInferOperationType(t *testing.T) {
 		{"github.close_issue", OperationDelete},
 		{"expedia.price_check", OperationRead},
 		{"google.read_email", OperationRead},
+		{"google.download_attachment", OperationRead},
 		{"google.archive_email", OperationDelete},
 		{"docusign.void_envelope", OperationDelete},
 		{"no_dot", OperationWrite},
