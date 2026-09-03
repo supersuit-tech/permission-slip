@@ -161,7 +161,7 @@ func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connecto
 		if defaultRootName == "" {
 			return nil, nil
 		}
-		return driveFolderDetails(defaultRootName)
+		return driveFolderDetails(defaultRootName), nil
 	}
 	if !isValidDriveID(id) {
 		return nil, fmt.Errorf("invalid folder_id")
