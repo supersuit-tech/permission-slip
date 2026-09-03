@@ -253,8 +253,7 @@ describe("AgentWebhookSection", () => {
     });
 
     await user.click(screen.getByRole("button", { name: /Configure webhook/i }));
-    await user.click(screen.getByRole("combobox", { name: /Provider/i }));
-    await user.click(await screen.findByRole("option", { name: /Grok Bot/i }));
+    await user.selectOptions(screen.getByLabelText(/Provider/i), "grokbot");
     await user.type(
       screen.getByLabelText(/Webhook URL/i),
       "https://api2.cursor.sh/automations/webhook/wh_abc",

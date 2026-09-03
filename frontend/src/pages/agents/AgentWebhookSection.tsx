@@ -26,13 +26,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   useAgentWebhook,
   useClearAgentWebhook,
   useSetAgentWebhook,
@@ -301,22 +294,20 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
           <div className="space-y-4 py-2">
             <div className="space-y-2">
               <Label htmlFor="webhook-provider">Provider</Label>
-              <Select
+              <select
+                id="webhook-provider"
+                aria-label="Provider"
+                className="border-input bg-background h-9 w-full rounded-md border px-2 text-sm shadow-xs outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px]"
                 value={provider}
-                onValueChange={(value) => {
-                  if (isWakeProvider(value)) {
-                    setProvider(value);
+                onChange={(e) => {
+                  if (isWakeProvider(e.target.value)) {
+                    setProvider(e.target.value);
                   }
                 }}
               >
-                <SelectTrigger id="webhook-provider" aria-label="Provider">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="openclaw">OpenClaw</SelectItem>
-                  <SelectItem value="grokbot">Grok Bot</SelectItem>
-                </SelectContent>
-              </Select>
+                <option value="openclaw">OpenClaw</option>
+                <option value="grokbot">Grok Bot</option>
+              </select>
             </div>
             <div className="space-y-2">
               <Label htmlFor="webhook-url">
