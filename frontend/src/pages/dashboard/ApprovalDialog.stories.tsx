@@ -275,7 +275,12 @@ function ApprovalDialogStory({
           {/* Parameters */}
           {hasParams && (
             <ApprovalSection label="Parameters">
-              <SchemaParameterDetails parameters={parameters} schema={schema} />
+              <SchemaParameterDetails
+                parameters={parameters}
+                schema={schema}
+                actionType={actionType}
+                resourceDetails={resourceDetails}
+              />
             </ApprovalSection>
           )}
 
@@ -861,19 +866,26 @@ export const GoogleUploadDriveFile: Story = {
     actionType: "google.upload_drive_file",
     agentName: "Chiedobot",
     riskLevel: "medium",
-    displayTemplate: "Upload {{name}} to Drive",
+    displayTemplate: "Upload {{name}} to {{folder_name}}",
     preview: null,
-    parameters: { name: "meeting-notes-2026-03-16.md", content: "# Meeting Notes\n\n...", mime_type: "text/markdown" },
+    parameters: {
+      name: "ps-agentmail-drive-test.pdf",
+      content_base64: "JVBERi0xLjQKJeLjz9MKMSAwIG9iaiA8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PiBlbmRvYmoKeHJlZgowIDIKMDAwMDAwMDAwMCA2NTUzNSBmIAp0cmFpbGVyIDw8L1NpemUgMj4+CnN0YXJ0eHJlZgoxNQo=",
+      mime_type: "application/pdf",
+      folder_id: "0AKbIIKZ8knmBUk9PVA",
+    },
     schema: {
       type: "object",
       required: ["name"],
       properties: {
-        name: { type: "string", description: "File name" },
+        name: { type: "string", description: "File name", "x-ui": { label: "File name" } },
         content: { type: "string", description: "UTF-8 text file content" },
-        content_base64: { type: "string", description: "Base64-encoded binary file content" },
+        content_base64: { type: "string", description: "Base64-encoded binary file content", "x-ui": { label: "File" } },
         mime_type: { type: "string", description: "MIME type" },
+        folder_id: { type: "string", description: "Parent folder ID", "x-ui": { label: "Folder" } },
       },
     },
+    resourceDetails: { folder_name: "Finance Shared Drive" },
   },
 };
 

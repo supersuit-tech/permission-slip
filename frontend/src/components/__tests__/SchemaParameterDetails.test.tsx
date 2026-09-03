@@ -225,4 +225,49 @@ describe("SchemaParameterDetails", () => {
 
     expect(screen.getByText("#general (C0123)")).toBeInTheDocument();
   });
+
+  it("shows resolved Drive folder name with raw ID", () => {
+    const driveSchema: ParametersSchema = {
+      type: "object",
+      required: ["name"],
+      properties: {
+        name: { type: "string", description: "File name" },
+        folder_id: { type: "string", description: "Folder ID", "x-ui": { label: "Folder" } },
+      },
+    };
+    render(
+      <SchemaParameterDetails
+        parameters={{ name: "notes.pdf", folder_id: "0AKbIIKZ8knmBUk9PVA" }}
+        schema={driveSchema}
+        resourceDetails={{ folder_name: "Finance Shared Drive" }}
+      />,
+    );
+
+    expect(screen.getByText("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)")).toBeInTheDocument();
+  });
+
+  it("summarizes content_base64 instead of dumping encoded bytes", () => {
+    const driveSchema: ParametersSchema = {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        content_base64: { type: "string", "x-ui": { label: "File" } },
+        mime_type: { type: "string" },
+      },
+    };
+    const pdf = "JVBERi0xLjQK";
+    render(
+      <SchemaParameterDetails
+        parameters={{
+          name: "receipt.pdf",
+          content_base64: pdf,
+          mime_type: "application/pdf",
+        }}
+        schema={driveSchema}
+      />,
+    );
+
+    expect(screen.getByText(/PDF\s\u00b7/)).toBeInTheDocument();
+    expect(screen.queryByText(pdf)).not.toBeInTheDocument();
+  });
 });

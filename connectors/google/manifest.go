@@ -678,7 +678,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Upload Drive File",
 				Description:     "Create and upload a file to Google Drive. Accepts UTF-8 text via content, or binary bytes (PDF, images, etc.) via content_base64. Maximum 10 MB decoded.",
 				RiskLevel:       "medium",
-				DisplayTemplate: "Upload {{name}} to Drive",
+				DisplayTemplate: "Upload {{name}} to {{folder_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["name"],
@@ -700,7 +700,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						"content_base64": {
 							"type": "string",
 							"description": "Base64-encoded binary file content (PDF, JPEG, PNG, etc.). Mutually exclusive with content. Maximum 10 MB decoded.",
-							"x-ui": {"label": "File content (Base64)", "help_text": "Base64-encoded bytes — max 10 MB decoded. Mutually exclusive with content."}
+							"x-ui": {"label": "File", "help_text": "Binary file (PDF, image, etc.) — max 10 MB. Mutually exclusive with content."}
 						},
 						"mime_type": {
 							"type": "string",
@@ -881,7 +881,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Create Drive Folder",
 				Description:     "Create a new folder in Google Drive",
 				RiskLevel:       "medium",
-				DisplayTemplate: "Create folder {{name}} in Drive",
+				DisplayTemplate: "Create folder {{name}} in {{folder_name}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["name"],

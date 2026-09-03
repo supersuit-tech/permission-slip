@@ -336,6 +336,30 @@ describe("buildActionSummary", () => {
       expect(result).toContain("October");
     });
   });
+
+  describe("google.upload_drive_file", () => {
+    it("uses folder_name from resourceDetails", () => {
+      const result = buildActionSummary(
+        "google.upload_drive_file",
+        { name: "receipt.pdf", folder_id: "0AKbIIKZ8knmBUk9PVA" },
+        "Upload {{name}} to {{folder_name}}",
+        { folder_name: "Finance Shared Drive" },
+      );
+      expect(result).toContain("receipt.pdf");
+      expect(result).toContain("Finance Shared Drive");
+      expect(result).not.toContain("0AKbIIKZ8knmBUk9PVA");
+    });
+
+    it("falls back to Drive when folder_name is missing", () => {
+      const result = buildActionSummary(
+        "google.upload_drive_file",
+        { name: "receipt.pdf" },
+        "Upload {{name}} to Drive",
+      );
+      expect(result).toContain("receipt.pdf");
+      expect(result).toContain("to Drive");
+    });
+  });
 });
 
 describe("formatRelativeTime", () => {

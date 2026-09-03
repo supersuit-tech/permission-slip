@@ -890,6 +890,8 @@ Creates and uploads a file to Google Drive. Text can be sent as `content`; PDFs,
 
 Uses multipart upload with JSON metadata in the first part and file content in the second. Decoded content is capped at 10 MB. Sends `supportsAllDrives=true` so a Shared Drive folder or drive ID in `folder_id` is accepted as the parent.
 
+Approval UIs resolve `folder_id` to a human-readable folder (or Shared Drive) name via the Drive API, the same way `calendar_id` is resolved to `calendar_name`. Binary `content_base64` is shown as a type/size summary rather than raw encoded bytes.
+
 ---
 
 ### `google.update_calendar_event`

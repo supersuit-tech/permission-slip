@@ -3,13 +3,14 @@
  * approval parameters, context details, and timeline entries. Handles both
  * short (inline) and long (stacked) values automatically.
  */
-import { StyleSheet, Text, View } from "react-native";
+import { Image, StyleSheet, Text, View } from "react-native";
 import { colors } from "../../theme/colors";
 import { formatParamValue } from "./approvalUtils";
 
 export interface KeyValueEntry {
   label: string;
   value: unknown;
+  thumbnailUri?: string;
 }
 
 interface KeyValueListProps {
@@ -19,10 +20,11 @@ interface KeyValueListProps {
 export function KeyValueList({ entries }: KeyValueListProps) {
   return (
     <>
-      {entries.map(({ label, value }, index) => {
+      {entries.map(({ label, value, thumbnailUri }, index) => {
         const formatted =
           typeof value === "string" ? value : formatParamValue(value);
-        const isLong = formatted.length > 40 || formatted.includes("\n");
+        const isLong =
+          formatted.length > 40 || formatted.includes("\n") || Boolean(thumbnailUri);
         const isLast = index === entries.length - 1;
         return (
           <View
@@ -33,6 +35,14 @@ export function KeyValueList({ entries }: KeyValueListProps) {
             ]}
           >
             <Text style={styles.key}>{label}</Text>
+            {thumbnailUri && (
+              <Image
+                source={{ uri: thumbnailUri }}
+                style={styles.thumbnail}
+                resizeMode="contain"
+                accessibilityIgnoresInvertColors
+              />
+            )}
             <Text
               style={isLong ? styles.valueFull : styles.value}
               selectable
@@ -80,5 +90,12 @@ const styles = StyleSheet.create({
     color: colors.gray900,
     marginTop: 4,
     lineHeight: 19,
+  },
+  thumbnail: {
+    marginTop: 8,
+    height: 96,
+    width: "100%",
+    borderRadius: 8,
+    backgroundColor: colors.gray100,
   },
 });

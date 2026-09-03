@@ -299,6 +299,22 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     return [text("Get file "), val(name)];
   },
 
+  "google.upload_drive_file": (params, rd) => {
+    const name = strVal(params.name);
+    if (!name) return null;
+    const folder = strVal(rd?.folder_name);
+    if (folder) return [text("Upload "), val(name), text(" to "), val(folder)];
+    return [text("Upload "), val(name), text(" to Drive")];
+  },
+
+  "google.create_drive_folder": (params, rd) => {
+    const name = strVal(params.name);
+    if (!name) return null;
+    const folder = strVal(rd?.folder_name);
+    if (folder) return [text("Create folder "), val(name), text(" in "), val(folder)];
+    return [text("Create folder "), val(name), text(" in Drive")];
+  },
+
   // ── Google Docs ─────────────────────────────────────────────────
 
   "google.get_document": (_params, rd) => {

@@ -525,6 +525,22 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
   "protonmail.list_labels": () => "List Proton labels",
 
   "protonmail.delete": (_params, rd) => protonmailUIDActionSummary("Delete email", rd),
+
+  "google.upload_drive_file": (params, rd) => {
+    const name = strVal(params.name);
+    if (!name) return null;
+    const folder = strVal(rd?.folder_name);
+    if (folder) return `Upload \u201C${name}\u201D to ${folder}`;
+    return `Upload \u201C${name}\u201D to Drive`;
+  },
+
+  "google.create_drive_folder": (params, rd) => {
+    const name = strVal(params.name);
+    if (!name) return null;
+    const folder = strVal(rd?.folder_name);
+    if (folder) return `Create folder \u201C${name}\u201D in ${folder}`;
+    return `Create folder \u201C${name}\u201D in Drive`;
+  },
 };
 
 /**

@@ -330,6 +330,30 @@ describe("buildSummary", () => {
     });
   });
 
+  describe("google.upload_drive_file", () => {
+    it("shows folder name from resource details", () => {
+      const result = buildSummary(
+        "google.upload_drive_file",
+        { name: "receipt.pdf", folder_id: "0AKbIIKZ8knmBUk9PVA" },
+        null,
+        null,
+        undefined,
+        { folder_name: "Finance Shared Drive" },
+      );
+      expect(result).toBe(`Upload ${q("receipt.pdf")} to ${q("Finance Shared Drive")}`);
+    });
+
+    it("falls back to Drive when folder name is missing", () => {
+      const result = buildSummary(
+        "google.upload_drive_file",
+        { name: "receipt.pdf" },
+        null,
+        null,
+      );
+      expect(result).toBe(`Upload ${q("receipt.pdf")} to Drive`);
+    });
+  });
+
   // ── Google Docs ─────────────────────────────────────────────────
 
   describe("google.get_document", () => {

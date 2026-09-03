@@ -178,6 +178,29 @@ describe("ApprovalDetailScreen", () => {
     expect(json).toContain("Welcome");
   });
 
+  it("shows Drive folder name instead of the raw folder_id", async () => {
+    const approval = makeApproval({
+      action: {
+        type: "google.upload_drive_file",
+        version: "1",
+        parameters: {
+          name: "ps-agentmail-drive-test.pdf",
+          folder_id: "0AKbIIKZ8knmBUk9PVA",
+          mime_type: "application/pdf",
+          content_base64: "JVBERi0xLjQK",
+        },
+      },
+      resource_details: { folder_name: "Finance Shared Drive" },
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    const json = JSON.stringify(renderer.toJSON());
+    expect(json).toContain("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)");
+    expect(json).toMatch(/PDF/);
+    expect(json).not.toContain("JVBERi0xLjQK");
+  });
+
   it("shows proton in-reply-to card for protonmail.reply_email", async () => {
     const approval = makeApproval({
       action: {
