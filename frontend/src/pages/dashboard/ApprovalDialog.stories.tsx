@@ -885,7 +885,7 @@ export const GoogleUploadDriveFile: Story = {
         folder_id: { type: "string", description: "Parent folder ID", "x-ui": { label: "Folder" } },
       },
     },
-    resourceDetails: { folder_name: "Finance Shared Drive" },
+    resourceDetails: { folder_name: "Chiedo's assistant drive in the / directory" },
   },
 };
 

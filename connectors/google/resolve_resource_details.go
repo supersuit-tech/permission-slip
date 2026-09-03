@@ -141,8 +141,9 @@ func (c *GoogleConnector) resolveDriveFile(ctx context.Context, creds connectors
 // "all files", so defaultRootName is left empty and no details are returned.
 //
 // folder_id may be a My Drive folder, a Shared Drive folder, or a Shared Drive
-// ID (the drive root). files.get 404s for Shared Drive IDs, so we fall back to
-// drives.get.
+// ID (the drive root). files.get often succeeds for Shared Drive IDs but
+// returns the generic name "Drive"; drives.get supplies the real title.
+// A 404 from files.get still falls back to drives.get.
 func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connectors.Credentials, params json.RawMessage, defaultRootName string) (map[string]any, error) {
 	var p struct {
 		FolderID string `json:"folder_id"`
@@ -160,10 +161,7 @@ func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connecto
 		if defaultRootName == "" {
 			return nil, nil
 		}
-		return map[string]any{
-			"folder_name": defaultRootName,
-			"parent_name": defaultRootName,
-		}, nil
+		return driveFolderDetails(defaultRootName)
 	}
 	if !isValidDriveID(id) {
 		return nil, fmt.Errorf("invalid folder_id")
@@ -173,29 +171,70 @@ func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connecto
 	if err != nil {
 		return nil, err
 	}
+	return driveFolderDetails(name), nil
+}
+
+// genericSharedDriveRootName is what files.get returns for a Shared Drive's
+// root folder. The real drive title only comes from drives.get.
+const genericSharedDriveRootName = "Drive"
+
+func driveFolderDetails(name string) map[string]any {
 	return map[string]any{
 		"folder_name": name,
 		"parent_name": name,
-	}, nil
+	}
+}
+
+func driveRootDisplayName(name string) string {
+	return name + " in the / directory"
 }
 
 func (c *GoogleConnector) lookupDriveFolderName(ctx context.Context, creds connectors.Credentials, id string) (string, error) {
 	var fileResp struct {
-		Name string `json:"name"`
+		Name    string   `json:"name"`
+		DriveID string   `json:"driveId"`
+		Parents []string `json:"parents"`
 	}
 	q := url.Values{}
-	q.Set("fields", "name")
+	q.Set("fields", "name,driveId,parents")
 	applySupportsAllDrives(q)
 	fileURL := c.driveBaseURL + "/drive/v3/files/" + url.PathEscape(id) + "?" + q.Encode()
-	if err := c.doJSON(ctx, creds, http.MethodGet, fileURL, nil, &fileResp); err == nil {
-		if fileResp.Name == "" {
-			return "", fmt.Errorf("folder %q has no name", id)
+	fileErr := c.doJSON(ctx, creds, http.MethodGet, fileURL, nil, &fileResp)
+	if fileErr != nil {
+		if !isGoogleNotFound(fileErr) {
+			return "", fileErr
 		}
-		return fileResp.Name, nil
-	} else if !isGoogleNotFound(err) {
-		return "", err
+		driveName, driveErr := c.lookupSharedDriveName(ctx, creds, id)
+		if driveErr != nil {
+			return "", driveErr
+		}
+		return driveRootDisplayName(driveName), nil
 	}
 
+	name := fileResp.Name
+	isDriveRoot := (fileResp.DriveID != "" && fileResp.DriveID == id) ||
+		(name == genericSharedDriveRootName && len(fileResp.Parents) == 0)
+	// files.get succeeds for Shared Drive IDs (with supportsAllDrives) but
+	// names the root folder "Drive". Fall through to drives.get for the title.
+	if isDriveRoot {
+		driveID := fileResp.DriveID
+		if driveID == "" {
+			driveID = id
+		}
+		if driveName, err := c.lookupSharedDriveName(ctx, creds, driveID); err == nil && driveName != "" {
+			name = driveName
+		}
+	}
+	if name == "" {
+		return "", fmt.Errorf("folder %q has no name", id)
+	}
+	if isDriveRoot {
+		return driveRootDisplayName(name), nil
+	}
+	return name, nil
+}
+
+func (c *GoogleConnector) lookupSharedDriveName(ctx context.Context, creds connectors.Credentials, id string) (string, error) {
 	var driveResp struct {
 		Name string `json:"name"`
 	}

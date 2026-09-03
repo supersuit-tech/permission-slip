@@ -9,6 +9,14 @@ describe("resolvedResourceDisplayValue", () => {
     ).toBe("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)");
   });
 
+  it("overlays a Shared Drive root path label", () => {
+    expect(
+      resolvedResourceDisplayValue("folder_id", "0AKbllKZ8knmBUk9PVA", {
+        folder_name: "Chiedo's assistant drive in the / directory",
+      }),
+    ).toBe("Chiedo's assistant drive in the / directory (0AKbllKZ8knmBUk9PVA)");
+  });
+
   it("overlays calendar_id with calendar_name", () => {
     expect(
       resolvedResourceDisplayValue("calendar_id", "primary", {
