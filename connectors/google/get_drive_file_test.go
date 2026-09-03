@@ -19,6 +19,7 @@ func TestGetDriveFile_MetadataOnly(t *testing.T) {
 		if r.URL.Path != "/drive/v3/files/file-abc" {
 			t.Errorf("expected path /drive/v3/files/file-abc, got %s", r.URL.Path)
 		}
+		assertSupportsAllDrives(t, r.URL.Query())
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(driveFileEntry{
@@ -68,6 +69,7 @@ func TestGetDriveFile_WithGoogleDocsContent(t *testing.T) {
 		switch r.URL.Path {
 		case "/drive/v3/files/doc-123":
 			// Metadata request.
+			assertSupportsAllDrives(t, r.URL.Query())
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(driveFileEntry{
 				ID:       "doc-123",
@@ -76,6 +78,7 @@ func TestGetDriveFile_WithGoogleDocsContent(t *testing.T) {
 			})
 		case "/drive/v3/files/doc-123/export":
 			// Export request.
+			assertSupportsAllDrives(t, r.URL.Query())
 			mimeType := r.URL.Query().Get("mimeType")
 			if mimeType != "text/plain" {
 				t.Errorf("expected export mimeType text/plain, got %q", mimeType)
@@ -119,10 +122,12 @@ func TestGetDriveFile_WithTextFileContent(t *testing.T) {
 		switch {
 		case r.URL.Path == "/drive/v3/files/txt-456" && r.URL.Query().Get("alt") == "media":
 			// Download request.
+			assertSupportsAllDrives(t, r.URL.Query())
 			w.Header().Set("Content-Type", "text/plain")
 			w.Write([]byte("Plain text file content."))
 		case r.URL.Path == "/drive/v3/files/txt-456":
 			// Metadata request.
+			assertSupportsAllDrives(t, r.URL.Query())
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(driveFileEntry{
 				ID:       "txt-456",
@@ -233,10 +238,10 @@ func TestGetDriveFile_InvalidFileID(t *testing.T) {
 	action := &getDriveFileAction{conn: conn}
 
 	invalidIDs := []string{
-		"../../etc/passwd",               // path traversal
-		"file id with spaces",            // spaces
-		"file'--injection",               // quote injection
-		"<script>alert('xss')</script>",  // special characters
+		"../../etc/passwd",              // path traversal
+		"file id with spaces",           // spaces
+		"file'--injection",              // quote injection
+		"<script>alert('xss')</script>", // special characters
 	}
 	for _, id := range invalidIDs {
 		params, _ := json.Marshal(getDriveFileParams{FileID: id})

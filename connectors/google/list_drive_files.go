@@ -24,6 +24,7 @@ type listDriveFilesParams struct {
 	Query      string `json:"query"`
 	MaxResults int    `json:"max_results"`
 	FolderID   string `json:"folder_id"`
+	DriveID    string `json:"drive_id"`
 	OrderBy    string `json:"order_by"`
 }
 
@@ -47,6 +48,9 @@ var validOrderByValues = map[string]bool{
 func (p *listDriveFilesParams) validate() error {
 	if p.FolderID != "" && !isValidDriveID(p.FolderID) {
 		return &connectors.ValidationError{Message: "folder_id contains invalid characters; expected alphanumeric ID"}
+	}
+	if p.DriveID != "" && !isValidDriveID(p.DriveID) {
+		return &connectors.ValidationError{Message: "drive_id contains invalid characters; expected alphanumeric ID"}
 	}
 	if !validOrderByValues[p.OrderBy] {
 		return &connectors.ValidationError{Message: "invalid order_by value; valid options: modifiedTime, modifiedTime desc, name, name desc, createdTime, createdTime desc, folder, recency, viewedByMeTime, viewedByMeTime desc, sharedWithMeTime, sharedWithMeTime desc"}
@@ -128,6 +132,7 @@ func (a *listDriveFilesAction) Execute(ctx context.Context, req connectors.Actio
 	// Exclude trashed files by default.
 	queryParts = append(queryParts, "trashed = false")
 	q.Set("q", strings.Join(queryParts, " and "))
+	applyDriveListScope(q, params.DriveID)
 
 	var listResp driveListResponse
 	listURL := a.conn.driveBaseURL + "/drive/v3/files?" + q.Encode()

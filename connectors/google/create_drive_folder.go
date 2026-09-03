@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
@@ -74,7 +75,10 @@ func (a *createDriveFolderAction) Execute(ctx context.Context, req connectors.Ac
 	}
 
 	var resp driveFolderResponse
-	createURL := a.conn.driveBaseURL + "/drive/v3/files?fields=id,name,mimeType,webViewLink"
+	q := url.Values{}
+	q.Set("fields", "id,name,mimeType,webViewLink")
+	applySupportsAllDrives(q)
+	createURL := a.conn.driveBaseURL + "/drive/v3/files?" + q.Encode()
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, createURL, body, &resp); err != nil {
 		return nil, err
 	}

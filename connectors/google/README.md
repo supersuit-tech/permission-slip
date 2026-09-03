@@ -655,6 +655,8 @@ Searches and lists Google Docs from Drive, filtered by the Google Docs MIME type
 
 **Drive API:** `GET /drive/v3/files` ([docs](https://developers.google.com/drive/api/v3/reference/files/list))
 
+Shared Drive documents are included (`supportsAllDrives=true`, `includeItemsFromAllDrives=true`, `corpora=allDrives`).
+
 **Security notes:**
 - The `query` parameter is escaped (single quotes and backslashes) before being inserted into the Drive query string to prevent query injection.
 - Results are ordered by `modifiedTime desc` and capped at 100 items.
@@ -777,7 +779,8 @@ Lists or searches files in Google Drive.
 |------|------|----------|---------|-------------|
 | `query` | string | No | — | Google Drive search query (e.g., `name contains 'report'`) |
 | `max_results` | integer | No | `10` | Maximum number of files to return (1-100) |
-| `folder_id` | string | No | — | Folder ID to filter by (lists files within that folder) |
+| `folder_id` | string | No | — | Folder ID to filter by. Accepts a My Drive folder, a Shared Drive folder, or a Shared Drive ID (the drive root). |
+| `drive_id` | string | No | — | Shared Drive ID (the `0A…` id). When set, results are limited to that Shared Drive (`corpora=drive`). |
 | `order_by` | string | No | relevance | Sort order (e.g., `modifiedTime desc`, `name`) |
 
 **Response:**
@@ -802,6 +805,8 @@ Lists or searches files in Google Drive.
 
 Trashed files are automatically excluded. Google Workspace files (Docs, Sheets, Slides) have no `size` — they report an empty string.
 
+Shared Drive items are included by default (`supportsAllDrives=true`, `includeItemsFromAllDrives=true`, `corpora=allDrives`). Set `drive_id` to search a single Shared Drive.
+
 ---
 
 ### `google.get_drive_file`
@@ -814,7 +819,7 @@ Gets file metadata and optionally downloads content from Google Drive.
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `file_id` | string | Yes | — | The ID of the file to retrieve |
+| `file_id` | string | Yes | — | The ID of the file to retrieve (My Drive or Shared Drive) |
 | `include_content` | boolean | No | `false` | Whether to include file content |
 
 **Response (metadata only):**
@@ -842,6 +847,8 @@ Gets file metadata and optionally downloads content from Google Drive.
 
 **Drive API:** `GET /drive/v3/files/{id}` for metadata, `GET /drive/v3/files/{id}/export` for Workspace content, `GET /drive/v3/files/{id}?alt=media` for regular files ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/get))
 
+All requests send `supportsAllDrives=true` so Shared Drive file IDs resolve instead of 404ing.
+
 **Content export behavior:**
 - **Google Docs** → exported as `text/plain`
 - **Google Sheets** → exported as `text/csv`
@@ -865,7 +872,7 @@ Creates and uploads a file to Google Drive. Text can be sent as `content`; PDFs,
 | `content` | string | One of `content` or `content_base64` | — | UTF-8 text content (max 10 MB) |
 | `content_base64` | string | One of `content` or `content_base64` | — | Base64-encoded binary content (max 10 MB decoded) |
 | `mime_type` | string | No | `text/plain` for text; inferred from `name` for binary | MIME type (`application/pdf`, `image/jpeg`, `image/png`, …) |
-| `folder_id` | string | No | — | Parent folder ID |
+| `folder_id` | string | No | — | Parent folder ID. Accepts a My Drive folder, a Shared Drive folder, or a Shared Drive ID to upload to that drive's root. |
 
 `content` and `content_base64` are mutually exclusive.
 
@@ -881,7 +888,7 @@ Creates and uploads a file to Google Drive. Text can be sent as `content`; PDFs,
 
 **Drive API:** `POST /upload/drive/v3/files?uploadType=multipart` ([docs](https://developers.google.com/drive/api/guides/manage-uploads#multipart))
 
-Uses multipart upload with JSON metadata in the first part and file content in the second. Decoded content is capped at 10 MB.
+Uses multipart upload with JSON metadata in the first part and file content in the second. Decoded content is capped at 10 MB. Sends `supportsAllDrives=true` so a Shared Drive folder or drive ID in `folder_id` is accepted as the parent.
 
 ---
 
@@ -969,10 +976,11 @@ Searches Google Drive files by name, full-text content, file type, or folder sco
 |------|------|----------|---------|-------------|
 | `query` | string | No | — | Search text (matched against file name and full-text content) |
 | `file_type` | string | No | — | Filter by file type: `document`, `spreadsheet`, `presentation`, `pdf`, `folder`, `image`, `video`, `audio` |
-| `folder_id` | string | No | — | Limit results to files within this folder (alphanumeric Drive ID) |
+| `folder_id` | string | No | — | Limit results to files within this folder. Accepts a My Drive folder, a Shared Drive folder, or a Shared Drive ID. |
+| `drive_id` | string | No | — | Shared Drive ID (the `0A…` id). When set, search is limited to that Shared Drive (`corpora=drive`). |
 | `max_results` | integer | No | `10` | Maximum number of results (1-100) |
 
-At least one of `query`, `file_type`, or `folder_id` must be provided. Trashed files are excluded automatically.
+At least one of `query`, `file_type`, `folder_id`, or `drive_id` must be provided. Trashed files are excluded automatically. Shared Drive items are included by default (`supportsAllDrives=true`, `includeItemsFromAllDrives=true`, `corpora=allDrives`).
 
 **Response:**
 
@@ -1013,7 +1021,7 @@ Creates a folder in Google Drive.
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `name` | string | Yes | — | Folder name (max 255 characters) |
-| `parent_id` | string | No | — | Parent folder ID (alphanumeric Drive ID). Omit to create in the root of My Drive. |
+| `parent_id` | string | No | — | Parent folder ID. Accepts a My Drive folder, a Shared Drive folder, or a Shared Drive ID to create in that drive's root. Omit to create in My Drive root. |
 
 **Response:**
 
@@ -1026,6 +1034,8 @@ Creates a folder in Google Drive.
 ```
 
 **Drive API:** `POST /drive/v3/files` with `mimeType: application/vnd.google-apps.folder` ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/create))
+
+Sends `supportsAllDrives=true` so a Shared Drive folder or drive ID in `parent_id` is accepted.
 
 **Validation:**
 - `name` is required and may not exceed 255 characters (Google Drive allows up to 32,767, but a practical limit prevents oversized API requests).
@@ -1091,6 +1101,8 @@ Moves a file to trash in Google Drive (soft delete — not permanent).
 ```
 
 **Drive API:** `PATCH /drive/v3/files/{id}` with `{trashed: true}` ([docs](https://developers.google.com/drive/api/reference/rest/v3/files/update))
+
+Sends `supportsAllDrives=true` so Shared Drive file IDs can be trashed.
 
 **Security notes:**
 - This is a **soft delete only** — files are moved to the Google Drive trash and can be recovered by the user. The permanent delete endpoint is intentionally not exposed.
@@ -1172,7 +1184,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | List chat spaces | `list_chat_spaces` | Nothing — agent controls page size and filter |
 | Create meetings with Meet link | `create_meeting` | Nothing — agent controls all parameters |
 | Create personal meetings | `create_meeting` | `calendar_id` locked to `primary`, no attendees |
-| Browse Drive files | `list_drive_files` | Nothing — agent controls query, folder, and sort |
+| Browse Drive files | `list_drive_files` | Nothing — agent controls query, folder, Shared Drive, and sort |
 | Read Drive files | `get_drive_file` | Nothing — agent can read metadata and content |
 | View Drive file metadata | `get_drive_file` | `include_content` locked to `false` (metadata only) |
 | Upload files to Drive | `upload_drive_file` | Nothing — agent controls name, text or base64 content, MIME type, and destination |
@@ -1181,7 +1193,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Update calendar events | `update_calendar_event` | Nothing — agent can update summary, time, attendees, location |
 | Reschedule calendar events | `update_calendar_event` | `summary`, `description`, `attendees`, `location` omitted — time changes only |
 | Delete calendar events | `delete_calendar_event` | Nothing — agent can delete events from any calendar |
-| Search Drive files | `search_drive` | Nothing — agent controls query, type, folder |
+| Search Drive files | `search_drive` | Nothing — agent controls query, type, folder, Shared Drive |
 | Search Drive within folder | `search_drive` | `folder_id` locked to a specific folder |
 | Create Drive folders | `create_drive_folder` | Nothing — agent controls name and parent |
 | Read any email | `read_email` | Nothing — agent controls message ID |
@@ -1244,6 +1256,7 @@ connectors/google/
 ├── delete_drive_file.go            # google.delete_drive_file action (soft delete via trash)
 ├── search_drive.go                 # google.search_drive action (name/fullText/type/folder search)
 ├── create_drive_folder.go          # google.create_drive_folder action
+├── drive_helpers.go                # Shared Drive query flags (supportsAllDrives, corpora)
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
@@ -1277,6 +1290,7 @@ connectors/google/
 ├── delete_drive_file_test.go       # Delete tests (soft delete, ID validation, rate limiting)
 ├── search_drive_test.go            # Search Drive tests (query escaping, type filter, deterministic errors)
 ├── create_drive_folder_test.go     # Create folder tests (name validation, parent ID)
+├── drive_helpers_test.go           # Shared Drive query-flag helper tests
 └── README.md                       # This file
 ```
 

@@ -633,8 +633,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"folder_id": {
 							"type": "string",
-							"description": "Folder ID to list files from (defaults to all accessible files)",
-							"x-ui": {"label": "Folder", "help_text": "Google Drive folder ID — from the folder URL"}
+							"description": "Folder ID to list files from. Accepts a My Drive folder, a Shared Drive folder, or a Shared Drive ID (the drive root).",
+							"x-ui": {"label": "Folder", "help_text": "Google Drive folder or Shared Drive ID — from the folder URL"}
+						},
+						"drive_id": {
+							"type": "string",
+							"description": "Shared Drive ID (the 0A… id). When set, results are limited to that Shared Drive.",
+							"x-ui": {"label": "Shared Drive", "help_text": "Shared Drive ID — omit to search My Drive and all Shared Drives"}
 						},
 						"order_by": {
 							"type": "string",
@@ -704,8 +709,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"folder_id": {
 							"type": "string",
-							"description": "Parent folder ID (optional)",
-							"x-ui": {"label": "Folder", "help_text": "Google Drive folder ID — omit to upload to root"}
+							"description": "Parent folder ID (optional). Accepts a My Drive folder, a Shared Drive folder, or a Shared Drive ID to upload to that drive's root.",
+							"x-ui": {"label": "Folder", "help_text": "Google Drive folder or Shared Drive ID — omit to upload to My Drive root"}
 						}
 					}
 				}`)),
@@ -852,8 +857,13 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"folder_id": {
 							"type": "string",
-							"description": "Limit search to files within this folder ID",
-							"x-ui": {"label": "Folder", "help_text": "Google Drive folder ID — omit to search all files"}
+							"description": "Limit search to files within this folder ID. Accepts a My Drive folder, a Shared Drive folder, or a Shared Drive ID.",
+							"x-ui": {"label": "Folder", "help_text": "Google Drive folder or Shared Drive ID — omit to search all files"}
+						},
+						"drive_id": {
+							"type": "string",
+							"description": "Shared Drive ID (the 0A… id). When set, search is limited to that Shared Drive.",
+							"x-ui": {"label": "Shared Drive", "help_text": "Shared Drive ID — omit to search My Drive and all Shared Drives"}
 						},
 						"max_results": {
 							"type": "integer",
@@ -883,8 +893,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 						},
 						"parent_id": {
 							"type": "string",
-							"description": "Parent folder ID (optional, defaults to Drive root)",
-							"x-ui": {"label": "Parent folder", "help_text": "Google Drive folder ID — omit to create in root"}
+							"description": "Parent folder ID (optional). Accepts a My Drive folder, a Shared Drive folder, or a Shared Drive ID to create in that drive's root. Defaults to My Drive root.",
+							"x-ui": {"label": "Parent folder", "help_text": "Google Drive folder or Shared Drive ID — omit to create in My Drive root"}
 						}
 					}
 				}`)),

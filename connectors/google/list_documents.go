@@ -73,6 +73,7 @@ func (a *listDocumentsAction) Execute(ctx context.Context, req connectors.Action
 	queryParams.Set("pageSize", strconv.Itoa(params.MaxResults))
 	queryParams.Set("fields", "files(id,name,createdTime,modifiedTime,webViewLink)")
 	queryParams.Set("orderBy", "modifiedTime desc")
+	applyDriveListScope(queryParams, "")
 
 	var resp docsListResponse
 	listURL := a.conn.driveBaseURL + "/drive/v3/files?" + queryParams.Encode()

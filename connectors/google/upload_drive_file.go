@@ -10,6 +10,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
+	"net/url"
 	"path/filepath"
 	"strings"
 
@@ -166,8 +167,13 @@ func (a *uploadDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 		return nil, fmt.Errorf("closing multipart writer: %w", err)
 	}
 
-	// Send the multipart upload request.
-	uploadURL := a.conn.driveBaseURL + "/upload/drive/v3/files?uploadType=multipart&fields=id,name,webViewLink"
+	// Send the multipart upload request. supportsAllDrives is required so a
+	// Shared Drive folder (or the Shared Drive root ID) in folder_id is accepted.
+	q := url.Values{}
+	q.Set("uploadType", "multipart")
+	q.Set("fields", "id,name,webViewLink")
+	applySupportsAllDrives(q)
+	uploadURL := a.conn.driveBaseURL + "/upload/drive/v3/files?" + q.Encode()
 	httpReq, err := http.NewRequestWithContext(ctx, http.MethodPost, uploadURL, &buf)
 	if err != nil {
 		return nil, fmt.Errorf("creating request: %w", err)

@@ -19,6 +19,7 @@ func TestCreateDriveFolder_Success(t *testing.T) {
 		if r.URL.Path != "/drive/v3/files" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
+		assertSupportsAllDrives(t, r.URL.Query())
 
 		var body driveFolderCreateRequest
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -162,6 +163,38 @@ func TestCreateDriveFolder_AuthFailure(t *testing.T) {
 	}
 	if !connectors.IsAuthError(err) {
 		t.Errorf("expected AuthError, got: %T", err)
+	}
+}
+
+func TestCreateDriveFolder_SharedDriveParent(t *testing.T) {
+	t.Parallel()
+
+	var capturedBody driveFolderCreateRequest
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertSupportsAllDrives(t, r.URL.Query())
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(driveFolderResponse{
+			ID:   "folder-sd",
+			Name: "Receipts",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newDriveForTest(srv.Client(), srv.URL)
+	action := &createDriveFolderAction{conn: conn}
+
+	params, _ := json.Marshal(createDriveFolderParams{Name: "Receipts", ParentID: sharedDriveID})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_drive_folder",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(capturedBody.Parents) != 1 || capturedBody.Parents[0] != sharedDriveID {
+		t.Errorf("expected parents [%s], got %v", sharedDriveID, capturedBody.Parents)
 	}
 }
 

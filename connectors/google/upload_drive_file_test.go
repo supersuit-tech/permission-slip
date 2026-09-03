@@ -25,6 +25,7 @@ func TestUploadDriveFile_Success(t *testing.T) {
 		if r.URL.Path != "/upload/drive/v3/files" {
 			t.Errorf("expected path /upload/drive/v3/files, got %s", r.URL.Path)
 		}
+		assertSupportsAllDrives(t, r.URL.Query())
 		if got := r.Header.Get("Authorization"); got != "Bearer ya29.test-access-token-123" {
 			t.Errorf("expected Bearer token, got %q", got)
 		}
@@ -119,6 +120,7 @@ func TestUploadDriveFile_WithFolder(t *testing.T) {
 		if len(meta.Parents) != 1 || meta.Parents[0] != "folder-abc" {
 			t.Errorf("expected parent folder-abc, got %v", meta.Parents)
 		}
+		assertSupportsAllDrives(t, r.URL.Query())
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(driveUploadResponse{ID: "file-1", Name: "doc.txt"})
@@ -507,6 +509,53 @@ func TestUploadDriveFile_MimeTypeNewlineRejected(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestUploadDriveFile_SharedDriveFolder(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertSupportsAllDrives(t, r.URL.Query())
+
+		contentType := r.Header.Get("Content-Type")
+		_, params, _ := mime.ParseMediaType(contentType)
+		reader := multipart.NewReader(r.Body, params["boundary"])
+		part, _ := reader.NextPart()
+		var meta driveUploadMetadata
+		json.NewDecoder(part).Decode(&meta)
+		if len(meta.Parents) != 1 || meta.Parents[0] != sharedDriveID {
+			t.Errorf("expected parent %s, got %v", sharedDriveID, meta.Parents)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(driveUploadResponse{ID: "file-sd", Name: "receipt.pdf"})
+	}))
+	defer srv.Close()
+
+	conn := newDriveForTest(srv.Client(), srv.URL)
+	action := &uploadDriveFileAction{conn: conn}
+
+	params, _ := json.Marshal(uploadDriveFileParams{
+		Name:     "receipt.pdf",
+		Content:  "receipt bytes",
+		FolderID: sharedDriveID,
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.upload_drive_file",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var data map[string]string
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["id"] != "file-sd" {
+		t.Errorf("expected id file-sd, got %q", data["id"])
 	}
 }
 

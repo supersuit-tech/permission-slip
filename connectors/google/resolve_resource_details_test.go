@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 )
 
@@ -98,6 +99,34 @@ func TestResolveResourceDetails_DriveFile(t *testing.T) {
 			t.Errorf("%s: expected mime_type", actionType)
 		}
 	}
+}
+
+func TestResolveResourceDetails_DriveFile_SupportsAllDrives(t *testing.T) {
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"name":"Shared receipt.pdf","mimeType":"application/pdf"}`))
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{
+		client:       srv.Client(),
+		driveBaseURL: srv.URL,
+	}
+	params, _ := json.Marshal(map[string]string{"file_id": sharedDriveID})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.get_drive_file", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["file_name"] != "Shared receipt.pdf" {
+		t.Errorf("expected file_name, got %v", details["file_name"])
+	}
+	q, err := url.ParseQuery(gotQuery)
+	if err != nil {
+		t.Fatalf("parse query: %v", err)
+	}
+	assertSupportsAllDrives(t, q)
 }
 
 func TestResolveResourceDetails_Document(t *testing.T) {
