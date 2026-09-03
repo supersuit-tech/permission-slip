@@ -96,7 +96,10 @@ export function StandingApprovalRow({
         </div>
       </TableCell>
       <TableCell>
-        <ConstraintsSummary constraints={constraints} />
+        <ConstraintsSummary
+          constraints={constraints}
+          unrestricted={rule.unrestricted}
+        />
       </TableCell>
       {showAccountColumn && (
         <TableCell>

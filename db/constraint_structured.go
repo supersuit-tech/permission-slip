@@ -215,21 +215,59 @@ func validateConstraintValueEncoding(field string, val json.RawMessage) error {
 	return nil
 }
 
-// StructuredConstraintsHasNonWildcard reports whether any condition is not a bare wildcard.
+// StructuredConstraintsHasNonWildcard reports whether any condition actually
+// restricts matching. Bare "*" and all-star $pattern globs are wildcards;
+// data-window conditions, comparison operators, and deny operators always count
+// as constraints.
 func StructuredConstraintsHasNonWildcard(sc StructuredConstraints) bool {
 	for _, group := range sc.Groups {
 		for _, cond := range group.Conditions {
 			if cond.Field == DataWindowNamespaceKey {
 				return true
 			}
+			if isComparisonOp(cond.Op) {
+				return true
+			}
+			if isDenyOp(cond.Op) && len(conditionValues(cond)) > 0 {
+				return true
+			}
 			for _, val := range conditionValues(cond) {
-				if !IsWildcard(val) {
+				if !IsSemanticWildcard(val) {
 					return true
 				}
 			}
 		}
 	}
 	return false
+}
+
+// StructuredConstraintGroupsAreEmpty reports whether a parsed v2 document has
+// no groups, or every group has zero conditions.
+func StructuredConstraintGroupsAreEmpty(sc StructuredConstraints) bool {
+	if len(sc.Groups) == 0 {
+		return true
+	}
+	for _, group := range sc.Groups {
+		if len(group.Conditions) > 0 {
+			return false
+		}
+	}
+	return true
+}
+
+// ConstraintsAreUnrestricted reports whether the constraint document matches
+// every possible parameter value (empty object, all semantic wildcards, or
+// unparseable-as-empty). Callers that persist standing approvals should store
+// this as the unrestricted flag rather than re-deriving it at read time.
+func ConstraintsAreUnrestricted(raw json.RawMessage) bool {
+	if len(raw) == 0 || string(raw) == "null" || string(raw) == "{}" {
+		return true
+	}
+	sc, err := ParseStructuredConstraints(raw)
+	if err != nil {
+		return false
+	}
+	return !StructuredConstraintsHasNonWildcard(sc)
 }
 
 func conditionValues(cond ConstraintCondition) []json.RawMessage {

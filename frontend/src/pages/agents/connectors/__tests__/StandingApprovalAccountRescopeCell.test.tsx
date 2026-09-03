@@ -43,6 +43,7 @@ const baseRule: StandingApproval = {
   expires_at: null,
   constraints: {},
   connector_instance_id: null,
+  unrestricted: false,
 };
 
 describe("StandingApprovalAccountRescopeCell", () => {

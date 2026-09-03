@@ -570,13 +570,13 @@ function BooleanConstraintSelect({
   onChange: (patch: Partial<ConstraintValueRow>) => void;
 }) {
   const isWildcard = row.mode === "wildcard" || row.value === "*";
-  let selectValue = "any";
-  if (!isWildcard) {
-    if (row.value === "true") {
-      selectValue = "true";
-    } else if (row.value === "false") {
-      selectValue = "false";
-    }
+  let selectValue: string | undefined;
+  if (isWildcard) {
+    selectValue = "any";
+  } else if (row.value === "true") {
+    selectValue = "true";
+  } else if (row.value === "false") {
+    selectValue = "false";
   }
 
   return (
@@ -592,7 +592,7 @@ function BooleanConstraintSelect({
       disabled={disabled}
     >
       <SelectTrigger className="h-9 w-full">
-        <SelectValue />
+        <SelectValue placeholder="Select…" />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="any">Any value</SelectItem>

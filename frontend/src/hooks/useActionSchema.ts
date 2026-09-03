@@ -37,6 +37,7 @@ export function useActionSchema(actionType: string): {
   metaConstraintFields: string[];
   connectorName: string | null;
   connectorLogoSvg: string | null;
+  riskLevel: string | null;
   isLoading: boolean;
 } {
   const connectorId = connectorIdFromActionType(actionType);
@@ -53,6 +54,7 @@ export function useActionSchema(actionType: string): {
         metaConstraintFields: [],
         connectorName: null,
         connectorLogoSvg: null,
+        riskLevel: null,
       };
     }
 
@@ -69,6 +71,7 @@ export function useActionSchema(actionType: string): {
         metaConstraintFields: [],
         connectorName: connector.name ?? null,
         connectorLogoSvg: connector.logo_svg ?? null,
+        riskLevel: null,
       };
     }
 
@@ -108,6 +111,7 @@ export function useActionSchema(actionType: string): {
       metaConstraintFields: action.meta_constraint_fields ?? [],
       connectorName: connector.name ?? null,
       connectorLogoSvg: connector.logo_svg ?? null,
+      riskLevel: action.risk_level ?? null,
     };
   }, [connector, actionType]);
 

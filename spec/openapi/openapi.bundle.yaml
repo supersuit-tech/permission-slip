@@ -4665,6 +4665,7 @@ paths:
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
                     revoked_at: null
+                    unrestricted: false
                   - standing_approval_id: sa_def456
                     agent_id: 42
                     user_id: alice
@@ -4678,6 +4679,7 @@ paths:
                     expires_at: '2026-05-15T00:00:00Z'
                     created_at: '2026-02-14T10:35:00Z'
                     revoked_at: null
+                    unrestricted: false
                 has_more: true
                 next_cursor: 2026-02-14T10:30:00.000000000Z,sa_abc123
         '400':
@@ -4788,6 +4790,7 @@ paths:
                     expires_at: '2026-02-21T00:00:00Z'
                     created_at: '2026-02-14T10:30:00Z'
                     revoked_at: null
+                    unrestricted: false
                 has_more: false
         '400':
           description: Invalid query parameters
@@ -4830,9 +4833,12 @@ paths:
         the authenticated user. The standing approval becomes active immediately
         (or at `starts_at` if specified).
 
-        **Constraints are required.** The `constraints` object must be non-empty and
-        contain at least one non-wildcard (`"*"`) value. This prevents "blank check"
-        standing approvals that auto-approve any parameters.
+        Constraints are required. When every parameter is a semantic wildcard
+        (`"*"` or a `$pattern` glob of only `*` characters), the standing approval
+        is stored as `unrestricted` and auto-approves any parameters for this
+        action with no further prompts. That shape requires
+        `confirm_unrestricted: true` so unrestricted grants cannot be created
+        accidentally.
       tags:
         - Standing Approvals
       security:
@@ -4860,8 +4866,8 @@ paths:
         '400':
           description: |
             Invalid request. Common causes:
-            - Missing or empty `constraints` (`invalid_constraints`)
-            - All constraint values are wildcards (`invalid_constraints`)
+            - Missing `constraints` (`invalid_constraints`)
+            - Unrestricted constraints without `confirm_unrestricted: true` (`invalid_constraints`)
             - Invalid field values (`invalid_request`)
           content:
             application/json:
@@ -4875,8 +4881,16 @@ paths:
                       code: invalid_constraints
                       message: constraints are required for standing approvals
                       retryable: false
+                      trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
+                unrestricted_unconfirmed:
+                  summary: Unrestricted approval needs confirmation
+                  value:
+                    error:
+                      code: invalid_constraints
+                      message: this standing approval has no parameter constraints and will auto-approve any parameters for this action; set confirm_unrestricted to true to proceed
+                      retryable: false
                       details:
-                        hint: 'Provide a JSON object with at least one non-wildcard constraint, e.g. {"repo": "my-org/my-repo", "title": "*"}'
+                        hint: Set confirm_unrestricted to true to create an unrestricted standing approval that auto-approves any parameters for this action.
                       trace_id: trace_a1b2c3d4e5f6a1b2c3d4e5f6a1b2c3d4
         '401':
           $ref: '#/components/responses/Unauthorized'
@@ -7955,6 +7969,7 @@ components:
         - status
         - starts_at
         - created_at
+        - unrestricted
       properties:
         standing_approval_id:
           type: string
@@ -8069,6 +8084,15 @@ components:
             applies to all connected accounts for the connector; a UUID limits the
             rule to that specific account.
           example: null
+        unrestricted:
+          type: boolean
+          description: |
+            Whether this standing approval matches any parameters for the action.
+            Set when every stored constraint is a semantic wildcard (`"*"` or a
+            `$pattern` glob of only `*` characters) or the document is empty.
+            Downstream consumers should read this flag rather than re-deriving it
+            from `constraints`.
+          example: false
       example:
         standing_approval_id: sa_abc123
         agent_id: 42
@@ -8083,6 +8107,7 @@ components:
         expires_at: '2026-02-21T00:00:00Z'
         created_at: '2026-02-14T10:30:00Z'
         revoked_at: null
+        unrestricted: false
     StandingApprovalExecuteRequest:
       type: object
       required:
@@ -8197,6 +8222,7 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
+            unrestricted: false
         has_more: false
     UserStandingApprovalListResponse:
       type: object
@@ -8236,6 +8262,7 @@ components:
             expires_at: '2026-02-21T00:00:00Z'
             created_at: '2026-02-14T10:30:00Z'
             revoked_at: null
+            unrestricted: false
         has_more: false
     CreateStandingApprovalRequest:
       type: object
@@ -8276,12 +8303,11 @@ components:
           type: object
           additionalProperties: true
           description: |
-            Constraint boundaries for this standing approval. Normally required and must
-            contain at least one non-wildcard parameter constraint; the backend rejects
-            empty objects or constraints where every value is a wildcard (`"*"`).
-
-            Trusted flows such as template customize may send `{}` to mean **match all**
-            parameter values for this action type (stored as empty constraints in the database).
+            Constraint boundaries for this standing approval. Required; omit or `null`
+            is rejected. An empty object `{}` is allowed and means any parameters for
+            this action. Semantic wildcards (`"*"` or a `$pattern` glob of only `*`
+            characters) are allowed for every parameter; that combination (or `{}`)
+            persists `unrestricted: true` and requires `confirm_unrestricted: true`.
           example:
             recipient_pattern: '*@mycompany.com'
             max_recipients: 5
@@ -8298,6 +8324,13 @@ components:
             When this standing approval expires. Omit or set to null for no expiry
             (the approval remains active until revoked).
           example: null
+        confirm_unrestricted:
+          type: boolean
+          description: |
+            Required when every constraint is a semantic wildcard, or when
+            `constraints` is `{}`. Confirms that this standing approval should
+            auto-approve any parameters for the action with no further prompts.
+          example: true
       example:
         agent_id: 42
         action_type: email.send
@@ -8341,7 +8374,9 @@ components:
           type: object
           additionalProperties: true
           description: |
-            Updated constraint boundaries. Must be non-empty with at least one non-wildcard value.
+            Updated constraint boundaries. An empty object `{}` or all-semantic-wildcard
+            documents are allowed and persist `unrestricted: true`; that shape requires
+            `confirm_unrestricted: true`.
           example:
             recipient_pattern: '*@mycompany.com'
         expires_at:
@@ -8361,6 +8396,13 @@ components:
             Updated account scope. Null means all connected accounts for the connector.
             Omitting the field preserves the current scope.
           example: null
+        confirm_unrestricted:
+          type: boolean
+          description: |
+            Required when the updated constraints are semantically unrestricted.
+            Confirms that this standing approval should auto-approve any parameters
+            for the action with no further prompts.
+          example: true
       example:
         constraints:
           recipient_pattern: '*@mycompany.com'

@@ -163,4 +163,31 @@ describe("ReviewStandingApprovalRequestDialog", () => {
       );
     });
   });
+
+  it("requires confirmation before approving an unrestricted rule", async () => {
+    render(
+      <ReviewStandingApprovalRequestDialog
+        open
+        onOpenChange={() => {}}
+        agentDisplayName="Test Agent"
+        request={{
+          request_id: "sar_unrestricted",
+          agent_id: 1,
+          user_id: "user-1",
+          action_type: "gmail.list_messages",
+          action_version: "1",
+          constraints: { query: "*", max_results: "*" },
+          status: "pending",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        }}
+      />,
+    );
+
+    expect(screen.getByText("Unrestricted")).toBeInTheDocument();
+    const approve = screen.getByRole("button", { name: /Approve rule/i });
+    expect(approve).toBeDisabled();
+    fireEvent.click(screen.getByLabelText(/I understand this approves any parameters/i));
+    expect(approve).not.toBeDisabled();
+  });
 });

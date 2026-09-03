@@ -163,9 +163,8 @@ export function StepConstraints({
       <div className="bg-muted/50 flex items-start gap-2 rounded-md p-3">
         <Info className="text-muted-foreground mt-0.5 size-4 shrink-0" />
         <p className="text-muted-foreground text-sm">
-          Standing approvals require parameter constraints. At least one
-          constraint must be fixed, a pattern, or a &quot;does not match&quot;
-          rule — not all wildcards.
+          Standing approvals can constrain parameters, or you can confirm an
+          unrestricted rule that auto-approves any parameters for this action.
         </p>
       </div>
 

@@ -19,6 +19,7 @@ import {
   useStandingApprovals,
   type StandingApproval,
 } from "@/hooks/useStandingApprovals";
+import { UnrestrictedBadge } from "@/pages/agents/connectors/UnrestrictedBadge";
 
 function formatExpiresIn(expiresAt: string | null | undefined): string {
   if (expiresAt === null) return "Never";
@@ -56,6 +57,11 @@ function StandingApprovalSummaryRow({ sa }: { sa: StandingApproval }) {
           <p className="text-muted-foreground truncate font-mono text-xs">
             {sa.action_type}
           </p>
+          {sa.unrestricted ? (
+            <div className="mt-1">
+              <UnrestrictedBadge />
+            </div>
+          ) : null}
         </div>
       </TableCell>
       <TableCell className="text-sm">{connectorId}</TableCell>

@@ -7,6 +7,7 @@ import {
   type ParsedConstraint,
   parseStandingApprovalConstraints,
 } from "@/lib/constraints";
+import { UnrestrictedBadge } from "@/pages/agents/connectors/UnrestrictedBadge";
 
 /** Maximum number of constraints shown before collapsing with "+N more". */
 const VISIBLE_LIMIT = 2;
@@ -50,10 +51,17 @@ function ConstraintBadge({ constraint }: { constraint: ParsedConstraint }) {
 
 interface ConstraintsSummaryProps {
   constraints: Record<string, unknown> | null | undefined;
+  unrestricted?: boolean;
 }
 
-export function ConstraintsSummary({ constraints }: ConstraintsSummaryProps) {
+export function ConstraintsSummary({
+  constraints,
+  unrestricted,
+}: ConstraintsSummaryProps) {
   const [expanded, setExpanded] = useState(false);
+  if (unrestricted) {
+    return <UnrestrictedBadge />;
+  }
   const parsed = parseStandingApprovalConstraints(constraints);
 
   if (parsed.length === 0) {

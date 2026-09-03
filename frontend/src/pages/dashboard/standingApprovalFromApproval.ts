@@ -2,6 +2,7 @@ import type { components } from "@/api/schema";
 import type { ApprovalSummary } from "@/hooks/useApprovals";
 import { META_NAMESPACE_KEY } from "@/lib/constraints";
 import { resourceDetailsToConstraintMeta } from "@/lib/approvalConstraintMeta";
+import { constraintsObjectHasNonWildcard } from "@/lib/structuredConstraints";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -97,13 +98,18 @@ export function buildCreateStandingApprovalFromApproval(
       ? approval.context.description.trim()
       : null;
 
+  const constraints = deriveStandingApprovalConstraints(approval);
+
   return {
     agent_id: approval.agent_id,
     action_type: approval.action.type,
     action_version: version,
     name: description ?? approval.action.type,
     description,
-    constraints: deriveStandingApprovalConstraints(approval),
+    constraints,
     expires_at: null,
+    ...(!constraintsObjectHasNonWildcard(constraints)
+      ? { confirm_unrestricted: true }
+      : {}),
   };
 }

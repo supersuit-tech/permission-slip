@@ -1,5 +1,6 @@
 import type { components } from "../../api/schema";
 import type { ApprovalSummary } from "../../hooks/useApprovals";
+import { constraintsAreUnrestricted } from "./unrestrictedConstraints";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -100,11 +101,16 @@ export function buildCreateStandingApprovalFromApproval(
       ? approval.action.version
       : "1";
 
+  const constraints = deriveStandingApprovalConstraints(approval);
+
   return {
     agent_id: approval.agent_id,
     action_type: approval.action.type,
     action_version: version,
-    constraints: deriveStandingApprovalConstraints(approval),
+    constraints,
     expires_at: null,
+    ...(constraintsAreUnrestricted(constraints)
+      ? { confirm_unrestricted: true }
+      : {}),
   };
 }

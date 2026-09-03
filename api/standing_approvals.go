@@ -32,6 +32,7 @@ type standingApprovalResponse struct {
 	ExpiresAt           *time.Time `json:"expires_at"`
 	CreatedAt           time.Time  `json:"created_at"`
 	RevokedAt           *time.Time `json:"revoked_at,omitempty"`
+	Unrestricted        bool       `json:"unrestricted"`
 }
 
 type standingApprovalListResponse struct {
@@ -47,14 +48,15 @@ type revokeStandingApprovalResponse struct {
 }
 
 type createStandingApprovalRequest struct {
-	AgentID       int64           `json:"agent_id" validate:"gt=0"`
-	ActionType    string          `json:"action_type" validate:"required"`
-	ActionVersion string          `json:"action_version"`
-	Constraints   json.RawMessage `json:"constraints"`
-	Name          *string         `json:"name,omitempty"`
-	Description   *string         `json:"description,omitempty"`
-	StartsAt      *time.Time      `json:"starts_at"`
-	ExpiresAt     *time.Time      `json:"expires_at"`
+	AgentID             int64           `json:"agent_id" validate:"gt=0"`
+	ActionType          string          `json:"action_type" validate:"required"`
+	ActionVersion       string          `json:"action_version"`
+	Constraints         json.RawMessage `json:"constraints"`
+	Name                *string         `json:"name,omitempty"`
+	Description         *string         `json:"description,omitempty"`
+	StartsAt            *time.Time      `json:"starts_at"`
+	ExpiresAt           *time.Time      `json:"expires_at"`
+	ConfirmUnrestricted bool            `json:"confirm_unrestricted"`
 }
 
 type updateStandingApprovalRequest struct {
@@ -75,6 +77,7 @@ type updateStandingApprovalRequest struct {
 	// ConnectorInstanceIDSet is true when the JSON payload explicitly included
 	// the "connector_instance_id" key (even if the value was null).
 	ConnectorInstanceIDSet bool `json:"-"`
+	ConfirmUnrestricted    bool `json:"confirm_unrestricted"`
 }
 
 func (r *updateStandingApprovalRequest) UnmarshalJSON(data []byte) error {
@@ -115,6 +118,25 @@ var actionVersionPattern = regexp.MustCompile(`^\d+$`)
 
 // maxStandingApprovalNameLength is the maximum length for standing approval names.
 const maxStandingApprovalNameLength = 255
+
+var errUnrestrictedConfirmationRequired = errors.New("this standing approval has no parameter constraints and will auto-approve any parameters for this action; set confirm_unrestricted to true to proceed")
+
+func requireUnrestrictedConfirmation(constraints []byte, confirmed bool) error {
+	if db.ConstraintsAreUnrestricted(constraints) && !confirmed {
+		return errUnrestrictedConfirmationRequired
+	}
+	return nil
+}
+
+func invalidConstraintsResponse(err error) ErrorResponse {
+	resp := BadRequest(ErrInvalidConstraints, err.Error())
+	if errors.Is(err, errUnrestrictedConfirmationRequired) {
+		resp.Error.Details = map[string]any{
+			"hint": "Set confirm_unrestricted to true to create an unrestricted standing approval that auto-approves any parameters for this action.",
+		}
+	}
+	return resp
+}
 
 func init() {
 	RegisterRouteGroup(RegisterStandingApprovalRoutes)
@@ -244,11 +266,11 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			var cErr error
 			constraintsBytes, cErr = validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, req.ActionType, req.Constraints)
 			if cErr != nil {
-				resp := BadRequest(ErrInvalidConstraints, cErr.Error())
-				resp.Error.Details = map[string]any{
-					"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
-				}
-				RespondError(w, r, http.StatusBadRequest, resp)
+				RespondError(w, r, http.StatusBadRequest, invalidConstraintsResponse(cErr))
+				return
+			}
+			if cErr := requireUnrestrictedConfirmation(constraintsBytes, req.ConfirmUnrestricted); cErr != nil {
+				RespondError(w, r, http.StatusBadRequest, invalidConstraintsResponse(cErr))
 				return
 			}
 		} else {
@@ -291,6 +313,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			Description:        req.Description,
 			StartsAt:           startsAt,
 			ExpiresAt:          req.ExpiresAt,
+			Unrestricted:       db.ConstraintsAreUnrestricted(constraintsBytes),
 		})
 		if err != nil {
 			var saErr *db.StandingApprovalError
@@ -516,11 +539,11 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 
 		constraintsBytes, err := validateStandingApprovalConstraintsForAction(r.Context(), deps.DB, deps.Connectors, existing.ActionType, req.Constraints)
 		if err != nil {
-			resp := BadRequest(ErrInvalidConstraints, err.Error())
-			resp.Error.Details = map[string]any{
-				"hint": "Provide a JSON object with at least one non-wildcard constraint, e.g. {\"repo\": \"my-org/my-repo\", \"title\": \"*\"}",
-			}
-			RespondError(w, r, http.StatusBadRequest, resp)
+			RespondError(w, r, http.StatusBadRequest, invalidConstraintsResponse(err))
+			return
+		}
+		if err := requireUnrestrictedConfirmation(constraintsBytes, req.ConfirmUnrestricted); err != nil {
+			RespondError(w, r, http.StatusBadRequest, invalidConstraintsResponse(err))
 			return
 		}
 
@@ -560,6 +583,7 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			ExpiresAt:              req.ExpiresAt,
 			ConnectorInstanceID:    connectorInstanceID,
 			ConnectorInstanceIDSet: req.ConnectorInstanceIDSet,
+			Unrestricted:           db.ConstraintsAreUnrestricted(constraintsBytes),
 		})
 		if err != nil {
 			if handleStandingApprovalError(w, r, err) {
@@ -630,6 +654,7 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 		ExpiresAt:           sa.ExpiresAt,
 		CreatedAt:           sa.CreatedAt,
 		RevokedAt:           sa.RevokedAt,
+		Unrestricted:        sa.Unrestricted,
 	}
 
 	if len(sa.Constraints) > 0 {
@@ -653,8 +678,10 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 //
 // Rules:
 //   - non-object JSON (array, string, number) → rejected
-//   - null, empty, or {} → rejected (constraints are required)
-//   - all values are "*" → rejected (at least one must be Fixed or Pattern)
+//   - null or absent → rejected (constraints are required)
+//   - {} or v2 with empty groups → allowed; callers persist unrestricted=true
+//     and require confirm_unrestricted on user-facing create/update
+//   - all-semantic-wildcard documents are allowed the same way
 //   - bare strings containing "*" (except the wildcard "*") → auto-wrapped as {"$pattern": "<value>"}
 //   - valid otherwise → returns the normalized bytes
 func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
@@ -664,6 +691,13 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 	}
 
 	if db.IsStructuredConstraintsV2(raw) {
+		sc, err := db.ParseStructuredConstraints(raw)
+		if err != nil {
+			return nil, err
+		}
+		if db.StructuredConstraintGroupsAreEmpty(sc) {
+			return []byte("{}"), nil
+		}
 		return validateStructuredStandingApprovalConstraints(raw)
 	}
 
@@ -673,13 +707,11 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 	}
 
 	if len(obj) == 0 {
-		return nil, errors.New("constraints are required for standing approvals")
+		return []byte("{}"), nil
 	}
 
-	// Check that at least one constraint value is not a wildcard ("*").
 	// Null values are rejected outright — use "*" for a wildcard or omit the key.
 	// Bare strings containing "*" (except the wildcard "*") are auto-wrapped as patterns.
-	allWildcard := true
 	mutated := false
 	for key, v := range obj {
 		if key == db.MetaNamespaceKey {
@@ -700,7 +732,6 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 					if s == "*" {
 						continue
 					}
-					allWildcard = false
 					if strings.Contains(s, "*") {
 						wrapped, err := json.Marshal(map[string]string{db.PatternKey: s})
 						if err != nil {
@@ -709,8 +740,6 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 						metaObj[metaKey] = wrapped
 						metaMutated = true
 					}
-				} else {
-					allWildcard = false
 				}
 			}
 			if metaMutated {
@@ -727,14 +756,12 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 			if err := db.ValidateDataWindowConstraintShape(v); err != nil {
 				return nil, err
 			}
-			allWildcard = false
 			continue
 		}
 		if token, ok := db.ExtractRelativeDateToken(v); ok {
 			if err := db.ValidateRelativeDateToken(token); err != nil {
 				return nil, err
 			}
-			allWildcard = false
 			continue
 		}
 		if string(v) == "null" {
@@ -745,7 +772,6 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 			if s == "*" {
 				continue // bare wildcard — stays as-is
 			}
-			allWildcard = false
 			// Auto-wrap bare strings containing "*" as $pattern.
 			// Only plain strings are wrapped; objects (e.g. already-wrapped
 			// {"$pattern": "..."}) are left unchanged since json.Unmarshal
@@ -760,12 +786,7 @@ func validateStandingApprovalConstraints(raw json.RawMessage) ([]byte, error) {
 				obj[key] = wrapped
 				mutated = true
 			}
-		} else {
-			allWildcard = false
 		}
-	}
-	if allWildcard {
-		return nil, errors.New("at least one constraint must be a non-wildcard value")
 	}
 
 	if mutated {
@@ -786,9 +807,6 @@ func validateStructuredStandingApprovalConstraints(raw json.RawMessage) ([]byte,
 	sc, err := db.ParseStructuredConstraints(raw)
 	if err != nil {
 		return nil, err
-	}
-	if !db.StructuredConstraintsHasNonWildcard(sc) {
-		return nil, errors.New("at least one constraint must be a non-wildcard value")
 	}
 	for gi, group := range sc.Groups {
 		for ci, cond := range group.Conditions {

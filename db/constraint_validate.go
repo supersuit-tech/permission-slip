@@ -41,6 +41,33 @@ func IsWildcard(raw json.RawMessage) bool {
 	return s == WildcardValue
 }
 
+// IsSemanticWildcard reports whether a JSON-encoded parameter value matches every
+// possible string: the bare wildcard "*" or a $pattern glob made entirely of
+// "*" characters ("*", "**", "***", …). Patterns with any non-star character
+// (e.g. "a*" or "*@example.com") are not semantic wildcards.
+func IsSemanticWildcard(raw json.RawMessage) bool {
+	if IsWildcard(raw) {
+		return true
+	}
+	pattern, ok := extractPattern(raw)
+	if !ok {
+		return false
+	}
+	return isAllStarGlob(pattern)
+}
+
+func isAllStarGlob(pattern string) bool {
+	if pattern == "" {
+		return false
+	}
+	for _, r := range pattern {
+		if r != '*' {
+			return false
+		}
+	}
+	return true
+}
+
 // PatternKey is the JSON object key that marks a parameter value as a glob
 // pattern. Pattern values are stored as {"$pattern": "<glob>"} in the
 // parameters JSONB column — never as bare strings containing "*". This avoids

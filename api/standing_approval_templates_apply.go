@@ -163,6 +163,7 @@ func applyStandingApprovalTemplateCore(
 		Description:        tpl.Description,
 		StartsAt:           startsAt,
 		ExpiresAt:          expiresAt,
+		Unrestricted:       db.ConstraintsAreUnrestricted(standingBytes),
 	})
 	if err != nil {
 		var saErr *db.StandingApprovalError

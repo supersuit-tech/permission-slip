@@ -23,7 +23,10 @@ import { parseParametersSchema } from "@/lib/parameterSchema";
 import { NameField, DescriptionField } from "./StandingApprovalFormFields";
 import {
   buildStructuredConstraintsFromForm,
+  collapseEmptyStructuredConstraints,
   constraintsToFormState,
+  fillEmptyRowsAsWildcards,
+  formStateHasNonWildcardConstraint,
   type StructuredConstraintFormState,
 } from "@/lib/structuredConstraints";
 import { ConnectorInstanceAccountSelect } from "./ConnectorInstanceAccountSelect";
@@ -40,6 +43,7 @@ import {
   type DataWindowFormState,
   type DataWindowParams,
 } from "@/lib/dataWindow";
+import { UnrestrictedApprovalConfirm } from "./UnrestrictedApprovalConfirm";
 
 interface EditStandingApprovalDialogProps {
   open: boolean;
@@ -83,6 +87,7 @@ export function EditStandingApprovalDialog({
     const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
     return local.toISOString().slice(0, 16);
   });
+  const [confirmUnrestricted, setConfirmUnrestricted] = useState(false);
 
   const action = useMemo(
     () => actions.find((a) => a.action_type === rule.action_type) ?? null,
@@ -113,6 +118,11 @@ export function EditStandingApprovalDialog({
     [constraintForm, paramKeys, metaFields],
   );
 
+  const isUnrestricted = !formStateHasNonWildcardConstraint(
+    preparedConstraintForm,
+    dataWindowForm,
+  );
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
@@ -120,12 +130,23 @@ export function EditStandingApprovalDialog({
       toast.error("Name is required");
       return;
     }
+    if (isUnrestricted && !confirmUnrestricted) {
+      toast.error(
+        "Confirm that this standing approval may run with any parameters",
+      );
+      return;
+    }
 
     try {
       const dataWindow = buildDataWindowConstraint(dataWindowForm);
-      const constraints = buildStructuredConstraintsFromForm(
-        preparedConstraintForm,
-        dataWindow ?? undefined,
+      const formForBuild = isUnrestricted
+        ? fillEmptyRowsAsWildcards(preparedConstraintForm, paramKeys)
+        : preparedConstraintForm;
+      const constraints = collapseEmptyStructuredConstraints(
+        buildStructuredConstraintsFromForm(
+          formForBuild,
+          dataWindow ?? undefined,
+        ),
       );
 
       await updateStandingApproval(rule.standing_approval_id, {
@@ -135,6 +156,7 @@ export function EditStandingApprovalDialog({
         expires_at: noExpiry ? null : new Date(expiresAt).toISOString(),
         connector_instance_id:
           standingApprovalConnectorInstanceIdForUpdate(connectorInstance),
+        ...(isUnrestricted ? { confirm_unrestricted: true } : {}),
       });
       toast.success(`Standing approval "${name.trim()}" updated`);
       onOpenChange(false);
@@ -219,6 +241,16 @@ export function EditStandingApprovalDialog({
               />
             ) : null}
 
+            {isUnrestricted && (
+              <UnrestrictedApprovalConfirm
+                checked={confirmUnrestricted}
+                onCheckedChange={setConfirmUnrestricted}
+                riskLevel={action?.risk_level}
+                disabled={isPending}
+                id="edit-confirm-unrestricted"
+              />
+            )}
+
             <StepLimits
               expiresAt={expiresAt}
               onExpiresAtChange={setExpiresAt}
@@ -236,7 +268,7 @@ export function EditStandingApprovalDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending}>
+            <Button type="submit" disabled={isPending || (isUnrestricted && !confirmUnrestricted)}>
               {isPending && <Loader2 className="animate-spin" />}
               Save Changes
             </Button>

@@ -262,6 +262,7 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			ConnectorInstanceID: sar.ConnectorInstanceID,
 			StartsAt:            startsAt,
 			ExpiresAt:           nil,
+			Unrestricted:        db.ConstraintsAreUnrestricted(sar.Constraints),
 		})
 		if err != nil {
 			if handleStandingApprovalError(w, r, err) {

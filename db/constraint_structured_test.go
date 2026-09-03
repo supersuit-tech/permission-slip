@@ -184,25 +184,135 @@ func TestValidateParametersAgainstStructuredConfig_RecipientNoneOf(t *testing.T)
 
 func TestStructuredConstraintsHasNonWildcard(t *testing.T) {
 	t.Parallel()
-	allWild := StructuredConstraints{
-		Groups: []ConstraintGroup{{
-			Conditions: []ConstraintCondition{
-				{Field: "x", Op: OpMatches, Value: mustJSON(`"*"`)},
-			},
-		}},
+
+	cases := []struct {
+		name string
+		sc   StructuredConstraints
+		want bool
+	}{
+		{
+			name: "bare star",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: "x", Op: OpMatches, Value: mustJSON(`"*"`)},
+				},
+			}}},
+			want: false,
+		},
+		{
+			name: "pattern star",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: "x", Op: OpMatches, Value: mustJSON(`{"$pattern":"*"}`)},
+				},
+			}}},
+			want: false,
+		},
+		{
+			name: "pattern double star",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: "x", Op: OpMatches, Value: mustJSON(`{"$pattern":"**"}`)},
+				},
+			}}},
+			want: false,
+		},
+		{
+			name: "pattern prefix is a real constraint",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: "x", Op: OpMatches, Value: mustJSON(`{"$pattern":"a*"}`)},
+				},
+			}}},
+			want: true,
+		},
+		{
+			name: "mixed wildcard and fixed",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: "x", Op: OpMatches, Value: mustJSON(`"*"`)},
+					{Field: "y", Op: OpMatches, Value: mustJSON(`"fixed"`)},
+				},
+			}}},
+			want: true,
+		},
+		{
+			name: "fixed value",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: "x", Op: OpMatches, Value: mustJSON(`"foo"`)},
+				},
+			}}},
+			want: true,
+		},
+		{
+			name: "comparison is a constraint",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: "limit", Op: OpLte, Value: mustJSON(`20`)},
+				},
+			}}},
+			want: true,
+		},
+		{
+			name: "deny is a constraint even with star",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: "channel", Op: OpDoesNotMatch, Value: mustJSON(`"*"`)},
+				},
+			}}},
+			want: true,
+		},
+		{
+			name: "data window is a constraint",
+			sc: StructuredConstraints{Groups: []ConstraintGroup{{
+				Conditions: []ConstraintCondition{
+					{Field: DataWindowNamespaceKey, Op: OpMatches, Value: mustJSON(`{"last_days":30}`)},
+				},
+			}}},
+			want: true,
+		},
 	}
-	if StructuredConstraintsHasNonWildcard(allWild) {
-		t.Fatal("expected all wildcard")
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := StructuredConstraintsHasNonWildcard(tc.sc)
+			if got != tc.want {
+				t.Fatalf("StructuredConstraintsHasNonWildcard() = %v, want %v", got, tc.want)
+			}
+		})
 	}
-	fixed := StructuredConstraints{
-		Groups: []ConstraintGroup{{
-			Conditions: []ConstraintCondition{
-				{Field: "x", Op: OpMatches, Value: mustJSON(`"foo"`)},
-			},
-		}},
+}
+
+func TestConstraintsAreUnrestricted(t *testing.T) {
+	t.Parallel()
+
+	if !ConstraintsAreUnrestricted(nil) {
+		t.Fatal("nil constraints should be unrestricted")
 	}
-	if !StructuredConstraintsHasNonWildcard(fixed) {
-		t.Fatal("expected non-wildcard")
+	if !ConstraintsAreUnrestricted(mustJSON(`{}`)) {
+		t.Fatal("empty object should be unrestricted")
+	}
+	if !ConstraintsAreUnrestricted(mustJSON(`{"title":"*"}`)) {
+		t.Fatal("all-wildcard flat map should be unrestricted")
+	}
+	if !ConstraintsAreUnrestricted(mustJSON(`{"title":{"$pattern":"**"}}`)) {
+		t.Fatal("all-star pattern should be unrestricted")
+	}
+	if ConstraintsAreUnrestricted(mustJSON(`{"title":"hello"}`)) {
+		t.Fatal("fixed value should not be unrestricted")
+	}
+	if ConstraintsAreUnrestricted(mustJSON(`{"title":{"$pattern":"a*"}}`)) {
+		t.Fatal("partial pattern should not be unrestricted")
+	}
+	emptyV2 := mustJSON(`{"$version":2,"match":"any","groups":[{"match":"all","conditions":[]}]}`)
+	sc, err := ParseStructuredConstraints(emptyV2)
+	if err != nil {
+		t.Fatalf("parse empty v2: %v", err)
+	}
+	if !StructuredConstraintGroupsAreEmpty(sc) {
+		t.Fatal("empty v2 groups should be vacuous")
 	}
 }
 

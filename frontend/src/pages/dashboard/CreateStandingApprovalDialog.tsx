@@ -25,12 +25,15 @@ import {
 } from "@/lib/dataWindow";
 import {
   buildStructuredConstraintsFromForm,
+  collapseEmptyStructuredConstraints,
   constraintsObjectHasNonWildcard,
   constraintsToFormState,
+  fillEmptyRowsAsWildcards,
   formStateHasNonWildcardConstraint,
   isStructuredConstraints,
   type StructuredConstraintFormState,
 } from "@/lib/structuredConstraints";
+import { UnrestrictedApprovalConfirm } from "@/pages/agents/connectors/UnrestrictedApprovalConfirm";
 import {
   StepPickAgent,
   StepPickAction,
@@ -108,7 +111,7 @@ export function CreateStandingApprovalDialog({
   const [manualConstraintsJson, setManualConstraintsJson] = useState(
     hasInitialContext && ctxConstraints
       ? JSON.stringify(ctxConstraints, null, 2)
-      : "",
+      : "{}",
   );
   const [dataWindowForm, setDataWindowForm] = useState<DataWindowFormState>(() =>
     parseDataWindowFormState(ctxConstraints),
@@ -122,6 +125,8 @@ export function CreateStandingApprovalDialog({
     }
     return defaultExpiresAt();
   });
+  const [confirmUnrestricted, setConfirmUnrestricted] = useState(false);
+  const [expiryTouched, setExpiryTouched] = useState(isEditMode);
 
   const activeAgents = agents.filter((a) => a.status !== "deactivated");
 
@@ -139,6 +144,7 @@ export function CreateStandingApprovalDialog({
     connectorLogoSvg,
     dataWindow,
     metaConstraintFields,
+    riskLevel,
   } = useActionSchema(effectiveActionType);
 
   const configSchema = fetchedSchema;
@@ -153,10 +159,12 @@ export function CreateStandingApprovalDialog({
     setManualConstraintsJson(
       hasInitialContext && ctxConstraints
         ? JSON.stringify(ctxConstraints, null, 2)
-        : "",
+        : "{}",
     );
     setDataWindowForm(parseDataWindowFormState(ctxConstraints));
     setNoExpiry(isEditMode ? !editTarget.expires_at : true);
+    setConfirmUnrestricted(false);
+    setExpiryTouched(isEditMode);
     if (isEditMode && editTarget.expires_at) {
       const d = new Date(editTarget.expires_at);
       const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
@@ -164,6 +172,26 @@ export function CreateStandingApprovalDialog({
     } else {
       setExpiresAt(defaultExpiresAt());
     }
+  }
+
+  function isCurrentFormUnrestricted(): boolean {
+    const useManualJson = !configSchema?.properties;
+    if (useManualJson) {
+      try {
+        const parsed = JSON.parse(manualConstraintsJson) as Record<string, unknown>;
+        if (
+          parsed === null ||
+          typeof parsed !== "object" ||
+          Array.isArray(parsed)
+        ) {
+          return false;
+        }
+        return !constraintsObjectHasNonWildcard(parsed, dataWindowForm);
+      } catch {
+        return false;
+      }
+    }
+    return !formStateHasNonWildcardConstraint(constraintForm, dataWindowForm);
   }
 
   function validateConstraintsStep(): boolean {
@@ -179,24 +207,11 @@ export function CreateStandingApprovalDialog({
           toast.error("Constraints must be a JSON object");
           return false;
         }
-        if (
-          !constraintsObjectHasNonWildcard(parsed, dataWindowForm)
-        ) {
-          toast.error(
-            "At least one parameter constraint must be non-wildcard",
-          );
-          return false;
-        }
       } catch {
         toast.error("Constraints must be valid JSON");
         return false;
       }
       return true;
-    }
-
-    if (!formStateHasNonWildcardConstraint(constraintForm, dataWindowForm)) {
-      toast.error("At least one parameter constraint must be non-wildcard");
-      return false;
     }
     return true;
   }
@@ -217,7 +232,7 @@ export function CreateStandingApprovalDialog({
         toast.error("Please select an action");
         return;
       }
-      setManualConstraintsJson("");
+      setManualConstraintsJson("{}");
       setConstraintForm(constraintsToFormState(null));
       setStep(3);
     } else if (step === 3) {
@@ -227,6 +242,9 @@ export function CreateStandingApprovalDialog({
       }
       if (!validateConstraintsStep()) {
         return;
+      }
+      if (isCurrentFormUnrestricted() && !expiryTouched) {
+        setNoExpiry(false);
       }
       setStep(4);
     }
@@ -269,15 +287,19 @@ export function CreateStandingApprovalDialog({
           }
         }
       }
-      if (!constraintsObjectHasNonWildcard(constraints, dataWindowForm)) {
-        toast.error("At least one parameter constraint must be non-wildcard");
-        return null;
-      }
     } else {
       const dw = buildDataWindowConstraint(dataWindowForm);
-      constraints = buildStructuredConstraintsFromForm(
-        constraintForm,
-        dw ?? undefined,
+      const formForBuild = isCurrentFormUnrestricted()
+        ? fillEmptyRowsAsWildcards(
+            constraintForm,
+            configSchema?.properties ? Object.keys(configSchema.properties) : [],
+          )
+        : constraintForm;
+      constraints = collapseEmptyStructuredConstraints(
+        buildStructuredConstraintsFromForm(
+          formForBuild,
+          dw ?? undefined,
+        ),
       );
     }
 
@@ -315,6 +337,14 @@ export function CreateStandingApprovalDialog({
     const constraints = buildConstraintsPayload();
     if (!constraints) return;
 
+    const unrestricted = isCurrentFormUnrestricted();
+    if (unrestricted && !confirmUnrestricted) {
+      toast.error(
+        "Confirm that this standing approval may run with any parameters",
+      );
+      return;
+    }
+
     try {
       if (isEditMode) {
         await updateStandingApproval(editTarget.standing_approval_id, {
@@ -322,6 +352,7 @@ export function CreateStandingApprovalDialog({
           description: ruleDescription.trim() || null,
           constraints,
           expires_at: noExpiry ? null : new Date(expiresAt).toISOString(),
+          ...(unrestricted ? { confirm_unrestricted: true } : {}),
         });
         toast.success("Standing approval updated");
         resetForm();
@@ -336,6 +367,7 @@ export function CreateStandingApprovalDialog({
           description: ruleDescription.trim() || null,
           constraints,
           ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
+          ...(unrestricted ? { confirm_unrestricted: true } : {}),
         });
         toast.success("Standing approval created");
         resetForm();
@@ -353,7 +385,13 @@ export function CreateStandingApprovalDialog({
     }
   }
 
-  const canCreate = !isPending && !!agentId && !!effectiveActionType && (noExpiry || !!expiresAt);
+  const unrestricted = isCurrentFormUnrestricted();
+  const canCreate =
+    !isPending &&
+    !!agentId &&
+    !!effectiveActionType &&
+    (noExpiry || !!expiresAt) &&
+    (!unrestricted || confirmUnrestricted);
 
   return (
     <Dialog
@@ -471,12 +509,28 @@ export function CreateStandingApprovalDialog({
           )}
 
           {step === 4 && (
-            <StepLimits
-              expiresAt={expiresAt}
-              onExpiresAtChange={setExpiresAt}
-              noExpiry={noExpiry}
-              onNoExpiryChange={setNoExpiry}
-            />
+            <>
+              {unrestricted && (
+                <UnrestrictedApprovalConfirm
+                  checked={confirmUnrestricted}
+                  onCheckedChange={setConfirmUnrestricted}
+                  riskLevel={riskLevel}
+                  disabled={isPending}
+                />
+              )}
+              <StepLimits
+                expiresAt={expiresAt}
+                onExpiresAtChange={(value) => {
+                  setExpiryTouched(true);
+                  setExpiresAt(value);
+                }}
+                noExpiry={noExpiry}
+                onNoExpiryChange={(value) => {
+                  setExpiryTouched(true);
+                  setNoExpiry(value);
+                }}
+              />
+            </>
           )}
 
           <DialogFooter className="gap-2 sm:gap-0">
