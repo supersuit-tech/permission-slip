@@ -4,7 +4,12 @@ import { Badge } from "@/components/ui/badge";
 import type { ParametersSchema, SchemaProperty } from "@/lib/parameterSchema";
 import { friendlyTypeLabel } from "@/lib/parameterSchema";
 import { formatParameterValue, humanizeKey } from "@/lib/formatValues";
-import { slackResolvedDisplayValue } from "@/lib/slackParameterDisplay";
+import { resolvedResourceDisplayValue } from "@/lib/resourceParameterDisplay";
+import {
+  isBase64ParamKey,
+  formatBinaryParamSummary,
+  binaryThumbnailSrc,
+} from "@/lib/binaryParamDisplay";
 import { KeyValueList, type KeyValueEntry } from "@/components/KeyValueList";
 
 export type { ParametersSchema } from "@/lib/parameterSchema";
@@ -15,7 +20,7 @@ interface SchemaParameterDetailsProps {
   parameters: Record<string, unknown>;
   /** JSON Schema describing the parameters (from connector action). */
   schema: ParametersSchema | null;
-  /** e.g. "slack.send_message" — used with resourceDetails for Slack ID resolution. */
+  /** Accepted for caller compatibility; resource names come from resourceDetails. */
   actionType?: string;
   /** Resolved names from the backend (channel_name, user_name, …). */
   resourceDetails?: Record<string, unknown> | null;
@@ -29,13 +34,13 @@ function parameterDisplayLabel(key: string, prop?: SchemaProperty): string {
 function resolveDisplayValue(
   key: string,
   value: unknown,
-  actionType?: string,
+  parameters: Record<string, unknown>,
   resourceDetails?: Record<string, unknown> | null,
 ): string {
-  const resolved =
-    actionType != null
-      ? slackResolvedDisplayValue(actionType, key, value, resourceDetails)
-      : null;
+  if (isBase64ParamKey(key) && typeof value === "string" && value.length > 0) {
+    return formatBinaryParamSummary(value, parameters);
+  }
+  const resolved = resolvedResourceDisplayValue(key, value, resourceDetails);
   return resolved ?? formatParameterValue(value);
 }
 
@@ -103,7 +108,6 @@ function collectParameterRows(
 export function SchemaParameterDetails({
   parameters,
   schema,
-  actionType,
   resourceDetails,
 }: SchemaParameterDetailsProps) {
   const [developerOpen, setDeveloperOpen] = useState(false);
@@ -113,7 +117,8 @@ export function SchemaParameterDetails({
     .filter((row) => row.isProvided)
     .map((row) => ({
       label: row.label,
-      value: resolveDisplayValue(row.key, row.value, actionType, resourceDetails),
+      value: resolveDisplayValue(row.key, row.value, parameters, resourceDetails),
+      thumbnailSrc: binaryThumbnailSrc(row.key, row.value, parameters),
     }));
 
   const hasDeveloperDetails = schema?.properties != null;
@@ -154,7 +159,7 @@ export function SchemaParameterDetails({
                   defaultValue={row.prop?.default}
                   isRequired={row.isRequired}
                   isProvided={row.isProvided}
-                  actionType={actionType}
+                  parameters={parameters}
                   resourceDetails={resourceDetails}
                 />
               ))}
@@ -176,7 +181,7 @@ function DeveloperParameterRow({
   defaultValue,
   isRequired,
   isProvided,
-  actionType,
+  parameters,
   resourceDetails,
 }: {
   name: string;
@@ -188,13 +193,15 @@ function DeveloperParameterRow({
   defaultValue?: unknown;
   isRequired?: boolean;
   isProvided: boolean;
-  actionType?: string;
+  parameters: Record<string, unknown>;
   resourceDetails?: Record<string, unknown> | null;
 }) {
-  const displayValue = resolveDisplayValue(name, value, actionType, resourceDetails);
+  const displayValue = resolveDisplayValue(name, value, parameters, resourceDetails);
+  const thumbnailSrc = binaryThumbnailSrc(name, value, parameters);
   const isDefault =
     defaultValue !== undefined && String(value) === String(defaultValue);
-  const isMultiline = typeof value === "string" && value.includes("\n");
+  const isBinary = isBase64ParamKey(name);
+  const isMultiline = !isBinary && typeof value === "string" && value.includes("\n");
   const typeLabel = friendlyTypeLabel(type);
 
   return (
@@ -224,22 +231,31 @@ function DeveloperParameterRow({
       )}
 
       {isProvided ? (
-        isMultiline ? (
-          <pre className="bg-muted/60 border-border text-foreground rounded-md border px-3 py-2 font-sans text-xs leading-relaxed break-words whitespace-pre-wrap">
-            {displayValue}
-          </pre>
-        ) : (
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="bg-muted/60 border-border text-foreground inline-block rounded-md border px-2.5 py-1 text-sm font-medium break-all">
+        <div className="space-y-2">
+          {thumbnailSrc && (
+            <img
+              src={thumbnailSrc}
+              alt=""
+              className="border-border max-h-24 rounded-md border object-contain"
+            />
+          )}
+          {isMultiline ? (
+            <pre className="bg-muted/60 border-border text-foreground rounded-md border px-3 py-2 font-sans text-xs leading-relaxed break-words whitespace-pre-wrap">
               {displayValue}
-            </span>
-            {enumValues && enumValues.length > 0 && (
-              <span className="text-muted-foreground text-[10px]">
-                one of: {enumValues.join(", ")}
+            </pre>
+          ) : (
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-muted/60 border-border text-foreground inline-block rounded-md border px-2.5 py-1 text-sm font-medium break-all">
+                {displayValue}
               </span>
-            )}
-          </div>
-        )
+              {enumValues && enumValues.length > 0 && (
+                <span className="text-muted-foreground text-[10px]">
+                  one of: {enumValues.join(", ")}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
       ) : (
         <span className="text-muted-foreground text-sm italic">not provided</span>
       )}

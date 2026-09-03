@@ -1,0 +1,29 @@
+import { resolvedResourceDisplayValue, formatBinaryParamSummary } from "../paramDisplay";
+
+describe("resolvedResourceDisplayValue", () => {
+  it("overlays folder_id with folder_name", () => {
+    expect(
+      resolvedResourceDisplayValue("folder_id", "0AKbIIKZ8knmBUk9PVA", {
+        folder_name: "Finance Shared Drive",
+      }),
+    ).toBe("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)");
+  });
+
+  it("overlays calendar_id with calendar_name", () => {
+    expect(
+      resolvedResourceDisplayValue("calendar_id", "primary", {
+        calendar_name: "Work Calendar",
+      }),
+    ).toBe("Work Calendar (primary)");
+  });
+});
+
+describe("formatBinaryParamSummary", () => {
+  it("summarizes a PDF instead of dumping base64", () => {
+    const summary = formatBinaryParamSummary("JVBERi0xLjQK", {
+      mime_type: "application/pdf",
+    });
+    expect(summary).toMatch(/^PDF /);
+    expect(summary).not.toContain("JVBERi");
+  });
+});

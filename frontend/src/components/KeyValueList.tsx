@@ -5,6 +5,7 @@
 export interface KeyValueEntry {
   label: string;
   value: string;
+  thumbnailSrc?: string;
 }
 
 interface KeyValueListProps {
@@ -18,8 +19,8 @@ function isLongValue(value: string): boolean {
 export function KeyValueList({ entries }: KeyValueListProps) {
   return (
     <div>
-      {entries.map(({ label, value }, index) => {
-        const isLong = isLongValue(value);
+      {entries.map(({ label, value, thumbnailSrc }, index) => {
+        const isLong = isLongValue(value) || Boolean(thumbnailSrc);
         const isLast = index === entries.length - 1;
 
         return (
@@ -34,15 +35,30 @@ export function KeyValueList({ entries }: KeyValueListProps) {
             <span className="text-muted-foreground shrink-0 text-sm font-medium">
               {label}
             </span>
-            <span
+            <div
               className={
                 isLong
-                  ? "text-foreground block text-sm leading-relaxed break-words whitespace-pre-wrap"
-                  : "text-foreground min-w-0 text-right text-sm break-all"
+                  ? "space-y-2"
+                  : "min-w-0 text-right"
               }
             >
-              {value}
-            </span>
+              {thumbnailSrc && (
+                <img
+                  src={thumbnailSrc}
+                  alt=""
+                  className="border-border max-h-24 rounded-md border object-contain"
+                />
+              )}
+              <span
+                className={
+                  isLong
+                    ? "text-foreground block text-sm leading-relaxed break-words whitespace-pre-wrap"
+                    : "text-foreground text-sm break-all"
+                }
+              >
+                {value}
+              </span>
+            </div>
           </div>
         );
       })}

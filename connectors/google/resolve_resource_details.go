@@ -30,6 +30,10 @@ func (c *GoogleConnector) ResolveResourceDetails(ctx context.Context, actionType
 	// Drive
 	case "google.delete_drive_file", "google.get_drive_file":
 		return c.resolveDriveFile(ctx, creds, params)
+	case "google.upload_drive_file", "google.create_drive_folder":
+		return c.resolveDriveFolder(ctx, creds, params, "My Drive")
+	case "google.list_drive_files", "google.search_drive":
+		return c.resolveDriveFolder(ctx, creds, params, "")
 
 	// Docs
 	case "google.get_document", "google.update_document":
@@ -129,6 +133,85 @@ func (c *GoogleConnector) resolveDriveFile(ctx context.Context, creds connectors
 		"file_name": resp.Name,
 		"mime_type": resp.MimeType,
 	}, nil
+}
+
+// resolveDriveFolder fetches the human-readable name for a Drive folder_id or
+// parent_id. When the ID is omitted and defaultRootName is set (upload / create
+// folder), the destination is My Drive root. List/search omit the ID to mean
+// "all files", so defaultRootName is left empty and no details are returned.
+//
+// folder_id may be a My Drive folder, a Shared Drive folder, or a Shared Drive
+// ID (the drive root). files.get 404s for Shared Drive IDs, so we fall back to
+// drives.get.
+func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connectors.Credentials, params json.RawMessage, defaultRootName string) (map[string]any, error) {
+	var p struct {
+		FolderID string `json:"folder_id"`
+		ParentID string `json:"parent_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, fmt.Errorf("invalid drive folder params: %w", err)
+	}
+
+	id := p.FolderID
+	if id == "" {
+		id = p.ParentID
+	}
+	if id == "" {
+		if defaultRootName == "" {
+			return nil, nil
+		}
+		return map[string]any{
+			"folder_name": defaultRootName,
+			"parent_name": defaultRootName,
+		}, nil
+	}
+	if !isValidDriveID(id) {
+		return nil, fmt.Errorf("invalid folder_id")
+	}
+
+	name, err := c.lookupDriveFolderName(ctx, creds, id)
+	if err != nil {
+		return nil, err
+	}
+	return map[string]any{
+		"folder_name": name,
+		"parent_name": name,
+	}, nil
+}
+
+func (c *GoogleConnector) lookupDriveFolderName(ctx context.Context, creds connectors.Credentials, id string) (string, error) {
+	var fileResp struct {
+		Name string `json:"name"`
+	}
+	q := url.Values{}
+	q.Set("fields", "name")
+	applySupportsAllDrives(q)
+	fileURL := c.driveBaseURL + "/drive/v3/files/" + url.PathEscape(id) + "?" + q.Encode()
+	if err := c.doJSON(ctx, creds, http.MethodGet, fileURL, nil, &fileResp); err == nil {
+		if fileResp.Name == "" {
+			return "", fmt.Errorf("folder %q has no name", id)
+		}
+		return fileResp.Name, nil
+	} else if !isGoogleNotFound(err) {
+		return "", err
+	}
+
+	var driveResp struct {
+		Name string `json:"name"`
+	}
+	driveURL := c.driveBaseURL + "/drive/v3/drives/" + url.PathEscape(id) + "?fields=name"
+	if err := c.doJSON(ctx, creds, http.MethodGet, driveURL, nil, &driveResp); err != nil {
+		return "", err
+	}
+	if driveResp.Name == "" {
+		return "", fmt.Errorf("shared drive %q has no name", id)
+	}
+	return driveResp.Name, nil
+}
+
+func isGoogleNotFound(err error) bool {
+	var ext *connectors.ExternalError
+	return errors.As(err, &ext) && ext.StatusCode == http.StatusNotFound
 }
 
 // ── Docs ────────────────────────────────────────────────────────────────────

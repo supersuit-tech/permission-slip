@@ -69,6 +69,10 @@ import {
   formatImessageParticipants,
   parseImessageParticipants,
 } from "./imessageParticipantsUtils";
+import {
+  formatApprovalParamValue,
+  binaryThumbnailUri,
+} from "./paramDisplay";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -131,9 +135,22 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   );
 
   const parameters = safeParams(approval.action.parameters);
+  const resourceDetails = approval.resource_details as
+    | Record<string, unknown>
+    | undefined;
   const paramEntries: KeyValueEntry[] = useMemo(
-    () => Object.entries(parameters).map(([label, value]) => ({ label, value })),
-    [parameters],
+    () =>
+      Object.entries(parameters).map(([label, value]) => ({
+        label,
+        value: formatApprovalParamValue(
+          label,
+          value,
+          parameters,
+          resourceDetails,
+        ),
+        thumbnailUri: binaryThumbnailUri(label, value, parameters),
+      })),
+    [parameters, resourceDetails],
   );
   const slackContext = useMemo(() => {
     const details = approval.context.details as { slack_context?: components["schemas"]["SlackContext"] } | undefined;

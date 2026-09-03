@@ -316,6 +316,151 @@ func TestResolveResourceDetails_EmailReply(t *testing.T) {
 	}
 }
 
+func TestResolveResourceDetails_DriveFolder(t *testing.T) {
+	srv, conn := testResolveServer(t, map[string]string{
+		"/drive/v3/files/": `{"name":"Receipts"}`,
+	})
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{"folder_id": "1folderAbc"})
+	for _, actionType := range []string{"google.upload_drive_file", "google.list_drive_files", "google.search_drive"} {
+		details, err := conn.ResolveResourceDetails(context.Background(), actionType, params, validCreds())
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", actionType, err)
+		}
+		if details["folder_name"] != "Receipts" {
+			t.Errorf("%s: expected folder_name 'Receipts', got %v", actionType, details["folder_name"])
+		}
+	}
+}
+
+func TestResolveResourceDetails_DriveFolder_DefaultMyDrive(t *testing.T) {
+	conn := New()
+	params, _ := json.Marshal(map[string]string{"name": "notes.md"})
+
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.upload_drive_file", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["folder_name"] != "My Drive" {
+		t.Errorf("expected folder_name 'My Drive', got %v", details["folder_name"])
+	}
+
+	details, err = conn.ResolveResourceDetails(context.Background(), "google.create_drive_folder", params, validCreds())
+	if err != nil {
+		t.Fatalf("create_drive_folder: unexpected error: %v", err)
+	}
+	if details["folder_name"] != "My Drive" {
+		t.Errorf("create_drive_folder: expected folder_name 'My Drive', got %v", details["folder_name"])
+	}
+	if details["parent_name"] != "My Drive" {
+		t.Errorf("create_drive_folder: expected parent_name 'My Drive', got %v", details["parent_name"])
+	}
+}
+
+func TestResolveResourceDetails_ListDriveFiles_NoFolderID(t *testing.T) {
+	conn := New()
+	params, _ := json.Marshal(map[string]string{"query": "report"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.list_drive_files", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details != nil {
+		t.Errorf("expected nil details when folder_id is omitted, got %v", details)
+	}
+}
+
+func TestResolveResourceDetails_CreateDriveFolder_Parent(t *testing.T) {
+	srv, conn := testResolveServer(t, map[string]string{
+		"/drive/v3/files/": `{"name":"Projects"}`,
+	})
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{"name": "Q1", "parent_id": "1parentFolder"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.create_drive_folder", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["folder_name"] != "Projects" {
+		t.Errorf("expected folder_name 'Projects', got %v", details["folder_name"])
+	}
+	if details["parent_name"] != "Projects" {
+		t.Errorf("expected parent_name 'Projects', got %v", details["parent_name"])
+	}
+}
+
+func TestResolveResourceDetails_DriveFolder_SupportsAllDrives(t *testing.T) {
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"name":"Shared Receipts"}`))
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{
+		client:       srv.Client(),
+		driveBaseURL: srv.URL,
+	}
+	params, _ := json.Marshal(map[string]string{"folder_id": sharedDriveID})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.upload_drive_file", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["folder_name"] != "Shared Receipts" {
+		t.Errorf("expected folder_name, got %v", details["folder_name"])
+	}
+	q, err := url.ParseQuery(gotQuery)
+	if err != nil {
+		t.Fatalf("parse query: %v", err)
+	}
+	assertSupportsAllDrives(t, q)
+}
+
+func TestResolveResourceDetails_DriveFolder_SharedDriveFallback(t *testing.T) {
+	var fileHits, driveHits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case len(r.URL.Path) >= len("/drive/v3/files/") && r.URL.Path[:len("/drive/v3/files/")] == "/drive/v3/files/":
+			fileHits++
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error":{"message":"File not found","code":404}}`))
+		case len(r.URL.Path) >= len("/drive/v3/drives/") && r.URL.Path[:len("/drive/v3/drives/")] == "/drive/v3/drives/":
+			driveHits++
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"name":"Finance Shared Drive"}`))
+		default:
+			t.Errorf("unexpected request path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{
+		client:       srv.Client(),
+		driveBaseURL: srv.URL,
+	}
+	params, _ := json.Marshal(map[string]string{"folder_id": sharedDriveID})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.upload_drive_file", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["folder_name"] != "Finance Shared Drive" {
+		t.Errorf("expected shared drive name, got %v", details["folder_name"])
+	}
+	if fileHits != 1 || driveHits != 1 {
+		t.Errorf("expected files.get then drives.get, got fileHits=%d driveHits=%d", fileHits, driveHits)
+	}
+}
+
+func TestResolveResourceDetails_DriveFolder_InvalidID(t *testing.T) {
+	conn := New()
+	params, _ := json.Marshal(map[string]string{"folder_id": "not a valid id"})
+	if _, err := conn.ResolveResourceDetails(context.Background(), "google.upload_drive_file", params, validCreds()); err == nil {
+		t.Fatal("expected error for invalid folder_id")
+	}
+}
+
 func TestResolveResourceDetails_UnknownAction(t *testing.T) {
 	conn := New()
 	details, err := conn.ResolveResourceDetails(context.Background(), "google.unknown_action", []byte(`{}`), validCreds())

@@ -31,6 +31,7 @@ var templateParamPattern = regexp.MustCompile(`\{\{(\w+)(?::\w+)?\}\}`)
 //   - resolveSheet         → title, range
 //   - resolveChatSpace     → space_display_name
 //   - resolveCalendar      → calendar_name
+//   - resolveDriveFolder   → folder_name, parent_name
 //   - resolvePresentation  → presentation_title (also title)
 //   - GitHub: connectors/github/resolve_resource_details.go
 //   - resolveWorkflow → workflow_name
@@ -52,6 +53,8 @@ var resourceDetailFields = map[string]bool{
 	"presentation_title": true,
 	"space_display_name": true,
 	"calendar_name":      true,
+	"folder_name":        true,
+	"parent_name":        true,
 	"file_name":          true,
 	"start_time":         true,
 	"subject":            true,
