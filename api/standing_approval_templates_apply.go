@@ -163,6 +163,7 @@ func applyStandingApprovalTemplateCore(
 		Description:        tpl.Description,
 		StartsAt:           startsAt,
 		ExpiresAt:          expiresAt,
+		Unrestricted:       db.ConstraintsAreUnrestricted(standingBytes),
 	})
 	if err != nil {
 		var saErr *db.StandingApprovalError
@@ -189,27 +190,15 @@ func buildStandingApprovalConstraintsFromTemplate(
 	actionType string,
 	templateConstraints []byte,
 ) ([]byte, error) {
+	// Unrestricted templates (empty object or all semantic wildcards) are stored
+	// as {}. Matching fills schema wildcards at auto-approve time. This also
+	// avoids a schema lookup when tests pass a nil DB for these cases.
+	if db.ConstraintsAreUnrestricted(templateConstraints) {
+		return []byte("{}"), nil
+	}
 	validated, err := validateStandingApprovalConstraintsForAction(ctx, pool, registry, actionType, json.RawMessage(templateConstraints))
 	if err == nil {
 		return validated, nil
-	}
-	var obj map[string]json.RawMessage
-	if jsonErr := json.Unmarshal(templateConstraints, &obj); jsonErr != nil {
-		return nil, fmt.Errorf("template constraints must be a JSON object")
-	}
-	if obj == nil {
-		obj = map[string]json.RawMessage{}
-	}
-	allBareWildcard := true
-	for _, v := range obj {
-		var s string
-		if json.Unmarshal(v, &s) != nil || s != "*" {
-			allBareWildcard = false
-			break
-		}
-	}
-	if allBareWildcard {
-		return []byte("{}"), nil
 	}
 	return nil, fmt.Errorf("standing approval constraints could not be derived from template constraints: %w", err)
 }

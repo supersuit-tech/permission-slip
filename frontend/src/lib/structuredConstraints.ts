@@ -67,6 +67,18 @@ function isComparisonOperator(op: string): op is Exclude<RowOperator, "matches" 
   return op === "lte" || op === "gte" || op === "lt" || op === "gt";
 }
 
+/** True when a glob is only `*` characters (`*`, `**`, `***`, …). */
+export function isAllStarGlob(value: string): boolean {
+  return value.length > 0 && [...value].every((ch) => ch === "*");
+}
+
+/** True when a stored constraint value matches every possible string. */
+export function isSemanticWildcardValue(raw: unknown): boolean {
+  if (raw === "*") return true;
+  if (isPatternWrapper(raw) && isAllStarGlob(raw.$pattern)) return true;
+  return false;
+}
+
 function encodeRowValue(row: ConstraintValueRow): unknown {
   if (isComparisonOperator(row.operator)) {
     const trimmed = row.value.trim();
@@ -324,6 +336,53 @@ export function buildStructuredConstraintsFromForm(
   };
 }
 
+/** Collapse a v2 document with no conditions to `{}` (parameterless unrestricted). */
+export function collapseEmptyStructuredConstraints(
+  constraints: Record<string, unknown>,
+): Record<string, unknown> {
+  if (!isStructuredConstraints(constraints)) {
+    return constraints;
+  }
+  const groups = constraints.groups;
+  if (!Array.isArray(groups) || groups.length === 0) {
+    return {};
+  }
+  const hasCondition = groups.some((group) => {
+    if (!group || typeof group !== "object") return false;
+    const conditions = (group as { conditions?: unknown }).conditions;
+    return Array.isArray(conditions) && conditions.length > 0;
+  });
+  return hasCondition ? constraints : {};
+}
+
+/**
+ * Replace blank (unset) rows with explicit wildcards so an unrestricted
+ * document still has well-formed group conditions.
+ */
+export function fillEmptyRowsAsWildcards(
+  form: StructuredConstraintFormState,
+  paramKeys: string[],
+): StructuredConstraintFormState {
+  return {
+    ...form,
+    scenarios: form.scenarios.map((scenario) => {
+      const paramRows = { ...scenario.paramRows };
+      for (const key of paramKeys) {
+        const rows = paramRows[key] ?? [];
+        const hasValue = rows.some(
+          (row) => row.mode === "wildcard" || row.value !== "",
+        );
+        if (!hasValue) {
+          paramRows[key] = [
+            { ...emptyConstraintRow(), mode: "wildcard", value: "*" },
+          ];
+        }
+      }
+      return { ...scenario, paramRows };
+    }),
+  };
+}
+
 export function constraintsObjectHasNonWildcard(
   constraints: Record<string, unknown>,
   dataWindowForm?: DataWindowFormState,
@@ -338,11 +397,16 @@ export function constraintsObjectHasNonWildcard(
     return true;
   }
   for (const [key, value] of Object.entries(constraints)) {
-    if (key === META_NAMESPACE_KEY || key === DATA_WINDOW_NAMESPACE_KEY) {
-      if (key === DATA_WINDOW_NAMESPACE_KEY) return true;
+    if (key === META_NAMESPACE_KEY) {
+      if (value && typeof value === "object") {
+        for (const metaVal of Object.values(value as Record<string, unknown>)) {
+          if (!isSemanticWildcardValue(metaVal)) return true;
+        }
+      }
       continue;
     }
-    if (value !== "*") return true;
+    if (key === DATA_WINDOW_NAMESPACE_KEY) return true;
+    if (!isSemanticWildcardValue(value)) return true;
   }
   return false;
 }
@@ -360,13 +424,16 @@ export function formStateHasNonWildcardConstraint(
       ...Object.values(scenario.metaRows),
     ]) {
       for (const row of rows) {
-        if (row.mode !== "wildcard" && row.value !== "" && row.value !== "*") {
-          return true;
-        }
         if (isComparisonOperator(row.operator) && row.value !== "") {
           return true;
         }
         if (row.operator === "does_not_match" && row.value !== "") {
+          return true;
+        }
+        if (row.mode === "wildcard" || row.value === "" || isAllStarGlob(row.value)) {
+          continue;
+        }
+        if (row.value !== "") {
           return true;
         }
       }

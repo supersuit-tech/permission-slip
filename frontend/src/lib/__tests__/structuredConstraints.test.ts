@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   buildStructuredConstraintsFromForm,
+  collapseEmptyStructuredConstraints,
   constraintsObjectHasNonWildcard,
   constraintsToFormState,
   formStateHasNonWildcardConstraint,
@@ -93,6 +94,52 @@ describe("structuredConstraints", () => {
       }),
     ).toBe(true);
     expect(constraintsObjectHasNonWildcard({ title: "*" })).toBe(false);
+  });
+
+  it("treats all-star patterns as wildcards", () => {
+    expect(
+      constraintsObjectHasNonWildcard({ title: { $pattern: "**" } }),
+    ).toBe(false);
+    expect(
+      constraintsObjectHasNonWildcard({ title: { $pattern: "*" } }),
+    ).toBe(false);
+    expect(
+      constraintsObjectHasNonWildcard({ title: { $pattern: "a*" } }),
+    ).toBe(true);
+    const wildScenario = emptyScenario();
+    wildScenario.paramRows.title = [
+      { ...emptyConstraintRow(), mode: "pattern", value: "**" },
+    ];
+    expect(
+      formStateHasNonWildcardConstraint({ scenarios: [wildScenario] }),
+    ).toBe(false);
+    const mixed = emptyScenario();
+    mixed.paramRows.repo = [
+      { ...emptyConstraintRow(), value: "my-repo", mode: "fixed" },
+    ];
+    mixed.paramRows.title = [
+      { ...emptyConstraintRow(), mode: "pattern", value: "**" },
+    ];
+    expect(formStateHasNonWildcardConstraint({ scenarios: [mixed] })).toBe(
+      true,
+    );
+  });
+
+  it("treats empty form state as unrestricted", () => {
+    expect(
+      formStateHasNonWildcardConstraint({ scenarios: [emptyScenario()] }),
+    ).toBe(false);
+  });
+
+  it("collapses empty v2 documents to {}", () => {
+    expect(
+      collapseEmptyStructuredConstraints(
+        buildStructuredConstraintsFromForm({ scenarios: [emptyScenario()] }),
+      ),
+    ).toEqual({});
+    expect(
+      collapseEmptyStructuredConstraints({ repo: "*" }),
+    ).toEqual({ repo: "*" });
   });
 
   it("round-trips comparison operators", () => {

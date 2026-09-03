@@ -19,6 +19,7 @@ import { colors } from "../../theme/colors";
 import { humanizeActionType } from "./approvalUtils";
 import { formatStandingApprovalConstraintsText } from "./formatStandingApprovalConstraints";
 import { StandingApprovalInstanceScopeLine } from "./StandingApprovalInstanceScopeLine";
+import { constraintsAreUnrestricted } from "./unrestrictedConstraints";
 
 type Props = NativeStackScreenProps<
   RootStackParamList,
@@ -40,14 +41,18 @@ export default function StandingApprovalRequestDetailScreen({
   const { connectorLabel } = useStandingApprovalConnectorLabel(request);
   const { scopeLabel } = useStandingApprovalInstanceScope(request);
 
-  const constraintsText =
+  const constraintsObject =
     request.constraints && typeof request.constraints === "object"
-      ? formatStandingApprovalConstraintsText(
-          request.constraints as Record<string, unknown>,
-        )
+      ? (request.constraints as Record<string, unknown>)
+      : null;
+  const unrestricted = constraintsAreUnrestricted(constraintsObject);
+  const constraintsText = unrestricted
+    ? "Unrestricted — any parameters for this action"
+    : constraintsObject
+      ? formatStandingApprovalConstraintsText(constraintsObject)
       : "No constraints";
 
-  const handleApprove = useCallback(async () => {
+  const runApprove = useCallback(async () => {
     setBusy(true);
     try {
       await approve.mutateAsync(request.request_id);
@@ -58,6 +63,21 @@ export default function StandingApprovalRequestDetailScreen({
       setBusy(false);
     }
   }, [approve, navigation, request.request_id]);
+
+  const handleApprove = useCallback(async () => {
+    if (unrestricted) {
+      Alert.alert(
+        "Unrestricted rule",
+        "This standing approval authorizes any parameters for this action. No approval prompts will be sent.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Approve", onPress: () => { void runApprove(); } },
+        ],
+      );
+      return;
+    }
+    await runApprove();
+  }, [runApprove, unrestricted]);
 
   const handleDeny = useCallback(async () => {
     setBusy(true);

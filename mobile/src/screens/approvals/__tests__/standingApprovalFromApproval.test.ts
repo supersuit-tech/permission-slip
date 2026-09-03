@@ -39,6 +39,7 @@ describe("buildCreateStandingApprovalFromApproval", () => {
     expect(request.action_version).toBe("1");
     expect(request.expires_at).toBeNull();
     expect(request).not.toHaveProperty("source_action_configuration_id");
+    expect(request.confirm_unrestricted).toBeUndefined();
   });
 
   it("pins exact parameter values for non-email actions", () => {
@@ -55,5 +56,21 @@ describe("buildCreateStandingApprovalFromApproval", () => {
       to: "team@example.com",
       subject: "Hello",
     });
+    expect(request.confirm_unrestricted).toBeUndefined();
+  });
+
+  it("confirms unrestricted when derived constraints are all wildcards", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.list_calendars",
+          version: "1",
+          parameters: {},
+        },
+        resource_details: undefined,
+      }),
+    );
+    expect(request.constraints).toEqual({});
+    expect(request.confirm_unrestricted).toBe(true);
   });
 });

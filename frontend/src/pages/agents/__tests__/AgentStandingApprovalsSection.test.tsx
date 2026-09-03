@@ -21,6 +21,7 @@ const mockStandingApprovals: StandingApproval[] = [
     created_at: "2026-01-01T00:00:00Z",
     expires_at: null,
     constraints: { to: { $pattern: "*@mycompany.com" }, subject: "*" },
+    unrestricted: false,
   },
   {
     standing_approval_id: "sa_test2",
@@ -34,6 +35,7 @@ const mockStandingApprovals: StandingApproval[] = [
     created_at: "2026-01-01T00:00:00Z",
     expires_at: "2099-12-31T00:00:00Z",
     constraints: {},
+    unrestricted: false,
   },
 ];
 
@@ -160,6 +162,7 @@ describe("AgentStandingApprovalsSection", () => {
         expires_at: null,
         constraints: {},
         connector_instance_id: null,
+        unrestricted: false,
       },
     ]);
 

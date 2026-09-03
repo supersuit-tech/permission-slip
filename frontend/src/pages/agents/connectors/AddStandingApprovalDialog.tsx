@@ -26,7 +26,10 @@ import {
 } from "./StandingApprovalFormFields";
 import {
   buildStructuredConstraintsFromForm,
+  collapseEmptyStructuredConstraints,
   constraintsToFormState,
+  fillEmptyRowsAsWildcards,
+  formStateHasNonWildcardConstraint,
   type StructuredConstraintFormState,
 } from "@/lib/structuredConstraints";
 import {
@@ -48,7 +51,7 @@ import {
   type DataWindowFormState,
   type DataWindowParams,
 } from "@/lib/dataWindow";
-import { formStateHasNonWildcardConstraint } from "@/lib/structuredConstraints";
+import { UnrestrictedApprovalConfirm } from "./UnrestrictedApprovalConfirm";
 
 interface AddStandingApprovalDialogProps {
   open: boolean;
@@ -84,6 +87,8 @@ export function AddStandingApprovalDialog({
   );
   const [noExpiry, setNoExpiry] = useState(true);
   const [expiresAt, setExpiresAt] = useState(() => defaultExpiresAtLocal());
+  const [confirmUnrestricted, setConfirmUnrestricted] = useState(false);
+  const [expiryTouched, setExpiryTouched] = useState(false);
 
   const selectedAction = useMemo(
     () => actions.find((a) => a.action_type === selectedActionType) ?? null,
@@ -127,6 +132,8 @@ export function AddStandingApprovalDialog({
     setConnectorInstance("*");
     setNoExpiry(true);
     setExpiresAt(defaultExpiresAtLocal());
+    setConfirmUnrestricted(false);
+    setExpiryTouched(false);
   }
 
   function handleOpenChange(nextOpen: boolean) {
@@ -139,7 +146,16 @@ export function AddStandingApprovalDialog({
     setConstraintForm(constraintsToFormState(null));
     setDataWindowForm(parseDataWindowFormState(null));
     setConnectorInstance("*");
+    setConfirmUnrestricted(false);
+    setExpiryTouched(false);
+    setNoExpiry(true);
   }
+
+  const isUnrestricted = !formStateHasNonWildcardConstraint(
+    preparedConstraintForm,
+    dataWindowForm,
+  );
+  const effectiveNoExpiry = isUnrestricted && !expiryTouched ? false : noExpiry;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -152,15 +168,20 @@ export function AddStandingApprovalDialog({
       toast.error("Please enter a name for this standing approval");
       return;
     }
-    if (!formStateHasNonWildcardConstraint(preparedConstraintForm, dataWindowForm)) {
-      toast.error("At least one parameter constraint must be non-wildcard");
+    if (isUnrestricted && !confirmUnrestricted) {
+      toast.error(
+        "Confirm that this standing approval may run with any parameters",
+      );
       return;
     }
 
     try {
       const dataWindow = buildDataWindowConstraint(dataWindowForm);
+      const formForBuild = isUnrestricted
+        ? fillEmptyRowsAsWildcards(preparedConstraintForm, paramKeys)
+        : preparedConstraintForm;
       let builtConstraints = buildStructuredConstraintsFromForm(
-        preparedConstraintForm,
+        formForBuild,
         dataWindow ?? undefined,
       ) as Record<string, unknown>;
       if (showAccountSelect) {
@@ -169,10 +190,7 @@ export function AddStandingApprovalDialog({
           connectorInstance,
         );
       }
-
-      const constraints = standingApprovalConstraintsForCreate(
-        builtConstraints as Record<string, unknown>,
-      );
+      builtConstraints = collapseEmptyStructuredConstraints(builtConstraints);
 
       await createStandingApproval({
         agent_id: agentId,
@@ -180,8 +198,9 @@ export function AddStandingApprovalDialog({
         action_version: "1",
         name: name.trim(),
         description: description.trim() || null,
-        constraints,
-        ...(noExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
+        constraints: builtConstraints,
+        ...(effectiveNoExpiry ? {} : { expires_at: new Date(expiresAt).toISOString() }),
+        ...(isUnrestricted ? { confirm_unrestricted: true } : {}),
       });
 
       toast.success(`Standing approval "${name.trim()}" created`);
@@ -278,11 +297,26 @@ export function AddStandingApprovalDialog({
               />
             ) : null}
 
+            {isUnrestricted && selectedAction && (
+              <UnrestrictedApprovalConfirm
+                checked={confirmUnrestricted}
+                onCheckedChange={setConfirmUnrestricted}
+                riskLevel={riskLevel}
+                disabled={isPending}
+              />
+            )}
+
             <StepLimits
               expiresAt={expiresAt}
-              onExpiresAtChange={setExpiresAt}
-              noExpiry={noExpiry}
-              onNoExpiryChange={setNoExpiry}
+              onExpiresAtChange={(value) => {
+                setExpiryTouched(true);
+                setExpiresAt(value);
+              }}
+              noExpiry={effectiveNoExpiry}
+              onNoExpiryChange={(value) => {
+                setExpiryTouched(true);
+                setNoExpiry(value);
+              }}
             />
           </div>
 
@@ -295,7 +329,7 @@ export function AddStandingApprovalDialog({
             >
               Cancel
             </Button>
-            <Button type="submit" disabled={isPending || !selectedActionType}>
+            <Button type="submit" disabled={isPending || !selectedActionType || (isUnrestricted && !confirmUnrestricted)}>
               {isPending && <Loader2 className="animate-spin" />}
               Create Standing Approval
             </Button>
@@ -311,18 +345,4 @@ function defaultExpiresAtLocal(): string {
   d.setDate(d.getDate() + 30);
   const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
   return local.toISOString().slice(0, 16);
-}
-
-function standingApprovalConstraintsForCreate(
-  params: Record<string, unknown>,
-): Record<string, unknown> {
-  const entries = Object.entries(params);
-  if (entries.length === 0) {
-    return params;
-  }
-  const allBareWildcard = entries.every(([, v]) => v === "*");
-  if (allBareWildcard) {
-    return {};
-  }
-  return params;
 }

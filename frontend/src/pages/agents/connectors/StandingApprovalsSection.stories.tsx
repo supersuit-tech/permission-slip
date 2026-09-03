@@ -8,6 +8,7 @@ import type { Meta, StoryObj } from "@storybook/react";
 import { Pencil, Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { UnrestrictedBadge } from "./UnrestrictedBadge";
 import {
   Card,
   CardHeader,
@@ -145,7 +146,7 @@ function StandingApprovalsSectionLayoutMirror({
                     </div>
                   </TableCell>
                   <TableCell>
-                    <span className="text-xs">Match all</span>
+                    <UnrestrictedBadge />
                   </TableCell>
                   <TableCell className="text-sm">Acme GitHub</TableCell>
                   <TableCell className="text-sm">Expired</TableCell>

@@ -18,6 +18,8 @@ import { formatConnectorDisplayName } from "./approvalConnectorLabel";
 import { ConstraintsSummary } from "./ConstraintsSummary";
 import { useStandingApprovalInstanceScope } from "@/hooks/useStandingApprovalInstanceScope";
 import { StandingApprovalInstanceScopeLine } from "./StandingApprovalInstanceScopeLine";
+import { UnrestrictedApprovalConfirm } from "@/pages/agents/connectors/UnrestrictedApprovalConfirm";
+import { constraintsObjectHasNonWildcard } from "@/lib/structuredConstraints";
 
 interface ReviewStandingApprovalRequestDialogProps {
   request: StandingApprovalRequestSummary;
@@ -34,9 +36,10 @@ export function ReviewStandingApprovalRequestDialog({
 }: ReviewStandingApprovalRequestDialogProps) {
   const { approveRequest, isPending: isApproving } = useApproveStandingApprovalRequest();
   const { denyRequest, isPending: isDenying } = useDenyStandingApprovalRequest();
-  const { connectorName } = useActionSchema(request.action_type);
+  const { connectorName, riskLevel } = useActionSchema(request.action_type);
   const { scopeLabel } = useStandingApprovalInstanceScope(request);
   const [done, setDone] = useState<"approved" | "denied" | null>(null);
+  const [confirmUnrestricted, setConfirmUnrestricted] = useState(false);
 
   const connectorDisplayName = formatConnectorDisplayName({
     connectorName: request.connector_name ?? connectorName,
@@ -47,9 +50,16 @@ export function ReviewStandingApprovalRequestDialog({
     request.constraints && typeof request.constraints === "object"
       ? (request.constraints as Record<string, unknown>)
       : null;
+  const unrestricted = !constraintsObjectHasNonWildcard(constraints ?? {});
   const busy = isApproving || isDenying;
 
   async function handleApprove() {
+    if (unrestricted && !confirmUnrestricted) {
+      toast.error(
+        "Confirm that this standing approval may run with any parameters",
+      );
+      return;
+    }
     try {
       await approveRequest(request.request_id);
       setDone("approved");
@@ -105,12 +115,25 @@ export function ReviewStandingApprovalRequestDialog({
             <p className="text-muted-foreground mb-1 text-xs font-medium uppercase tracking-wide">
               Constraints
             </p>
-            <ConstraintsSummary constraints={constraints} />
+            <ConstraintsSummary
+              constraints={constraints}
+              unrestricted={unrestricted}
+            />
             <p className="text-muted-foreground mt-2 text-xs">
               Verified fields (<span className="font-mono">$meta</span>) match
               server-fetched envelope data, not agent-supplied parameters.
             </p>
           </div>
+
+          {unrestricted && !done && (
+            <UnrestrictedApprovalConfirm
+              checked={confirmUnrestricted}
+              onCheckedChange={setConfirmUnrestricted}
+              riskLevel={riskLevel}
+              disabled={busy}
+              id="review-confirm-unrestricted"
+            />
+          )}
 
           {done === "approved" && (
             <p className="text-green-600 dark:text-green-400">Rule approved and active.</p>
@@ -125,7 +148,7 @@ export function ReviewStandingApprovalRequestDialog({
             <Button variant="outline" onClick={handleDeny} disabled={busy}>
               {isDenying ? <Loader2 className="size-4 animate-spin" /> : "Deny"}
             </Button>
-            <Button onClick={handleApprove} disabled={busy}>
+            <Button onClick={handleApprove} disabled={busy || (unrestricted && !confirmUnrestricted)}>
               {isApproving ? <Loader2 className="size-4 animate-spin" /> : "Approve rule"}
             </Button>
           </div>

@@ -866,7 +866,6 @@ func TestCreateStandingApproval_ConstraintsEmptyObject(t *testing.T) {
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
 
-	// Empty constraints object is rejected.
 	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {}, "expires_at": "%s"}`, agentID, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
@@ -874,7 +873,22 @@ func TestCreateStandingApproval_ConstraintsEmptyObject(t *testing.T) {
 	router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for empty constraints, got %d: %s", w.Code, w.Body.String())
+		t.Fatalf("expected 400 for unconfirmed empty constraints, got %d: %s", w.Code, w.Body.String())
+	}
+
+	confirmed := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {}, "expires_at": "%s", "confirm_unrestricted": true}`, agentID, expiresAt)
+	r = authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, confirmed)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for confirmed empty constraints, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !resp.Unrestricted {
+		t.Fatal("expected unrestricted=true for confirmed empty constraints")
 	}
 }
 
@@ -889,16 +903,35 @@ func TestCreateStandingApproval_ParameterlessActionNullOrEmptyConstraints(t *tes
 	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	for _, constraints := range []string{"null", "{}"} {
-		t.Run("constraints="+constraints, func(t *testing.T) {
-			body := fmt.Sprintf(`{"agent_id": %d, "action_type": %q, "constraints": %s, "expires_at": null}`, agentID, actionType, constraints)
-			r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
-			w := httptest.NewRecorder()
-			router.ServeHTTP(w, r)
-			if w.Code != http.StatusBadRequest {
-				t.Fatalf("expected 400 without explicit constraints, got %d: %s", w.Code, w.Body.String())
-			}
-		})
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": %q, "constraints": null, "expires_at": null}`, agentID, actionType)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for null constraints, got %d: %s", w.Code, w.Body.String())
+	}
+
+	unconfirmed := fmt.Sprintf(`{"agent_id": %d, "action_type": %q, "constraints": {}, "expires_at": null}`, agentID, actionType)
+	r = authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, unconfirmed)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400 for unconfirmed empty constraints, got %d: %s", w.Code, w.Body.String())
+	}
+
+	confirmed := fmt.Sprintf(`{"agent_id": %d, "action_type": %q, "constraints": {}, "expires_at": null, "confirm_unrestricted": true}`, agentID, actionType)
+	r = authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, confirmed)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for confirmed parameterless constraints, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !resp.Unrestricted {
+		t.Fatal("expected unrestricted=true for a parameterless action")
 	}
 }
 
@@ -914,7 +947,7 @@ func TestCreateStandingApproval_ConstraintsAllWildcard(t *testing.T) {
 
 	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
 
-	// All-wildcard constraints should be rejected.
+	// All-wildcard constraints require explicit confirmation.
 	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"to": "*", "subject": "*"}, "expires_at": "%s"}`, agentID, expiresAt)
 	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
 	w := httptest.NewRecorder()
@@ -922,7 +955,53 @@ func TestCreateStandingApproval_ConstraintsAllWildcard(t *testing.T) {
 	router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for all-wildcard constraints, got %d: %s", w.Code, w.Body.String())
+		t.Fatalf("expected 400 for unconfirmed unrestricted constraints, got %d: %s", w.Code, w.Body.String())
+	}
+
+	confirmed := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"to": "*", "subject": "*"}, "expires_at": "%s", "confirm_unrestricted": true}`, agentID, expiresAt)
+	r = authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, confirmed)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for confirmed unrestricted constraints, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !resp.Unrestricted {
+		t.Fatal("expected unrestricted=true on the created standing approval")
+	}
+}
+
+func TestCreateStandingApproval_SemanticWildcardPatternRequiresConfirm(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	agentID := testhelper.InsertUserWithAgent(t, tx, uid, "u_"+uid[:8])
+	standingApprovalTestSetupConnector(t, tx, "email.send")
+
+	deps := &Deps{DB: tx, JWTSigningSecret: testJWTSecret}
+	router := NewRouter(deps)
+
+	expiresAt := time.Now().Add(30 * 24 * time.Hour).UTC().Format(time.RFC3339)
+	body := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"to": {"$pattern": "**"}, "subject": {"$pattern": "*"}}, "expires_at": "%s"}`, agentID, expiresAt)
+	r := authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, body)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	confirmed := fmt.Sprintf(`{"agent_id": %d, "action_type": "email.send", "constraints": {"to": {"$pattern": "**"}, "subject": {"$pattern": "*"}}, "expires_at": "%s", "confirm_unrestricted": true}`, agentID, expiresAt)
+	r = authenticatedJSONRequest(t, http.MethodPost, "/standing-approvals/create", uid, confirmed)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("expected 201 for confirmed all-star $pattern constraints, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if !resp.Unrestricted {
+		t.Fatal("expected unrestricted=true for all-star $pattern constraints")
 	}
 }
 
@@ -947,6 +1026,13 @@ func TestCreateStandingApproval_ConstraintsMixedWildcardAndFixed(t *testing.T) {
 
 	if w.Code != http.StatusCreated {
 		t.Fatalf("expected 201 for mixed constraints, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp standingApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Unrestricted {
+		t.Fatal("expected unrestricted=false when a non-wildcard constraint is present")
 	}
 }
 

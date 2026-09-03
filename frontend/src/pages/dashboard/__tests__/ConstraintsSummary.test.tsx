@@ -105,6 +105,17 @@ describe("ConstraintsSummary", () => {
     expect(screen.getByText("message_id")).toBeInTheDocument();
   });
 
+  it("renders Unrestricted badge when unrestricted is set", () => {
+    render(
+      <ConstraintsSummary
+        constraints={{ repo: "*", title: "*" }}
+        unrestricted
+      />,
+    );
+    expect(screen.getByText("Unrestricted")).toBeInTheDocument();
+    expect(screen.queryByText("repo")).not.toBeInTheDocument();
+  });
+
   it("renders $data_window as a human-readable data window", () => {
     render(
       <ConstraintsSummary

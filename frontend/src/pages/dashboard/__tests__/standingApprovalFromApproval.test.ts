@@ -41,5 +41,21 @@ describe("buildCreateStandingApprovalFromApproval", () => {
     expect(request.name).toBe("read");
     expect(request.description).toBe("read");
     expect(request.expires_at).toBeNull();
+    expect(request.confirm_unrestricted).toBeUndefined();
+  });
+
+  it("confirms unrestricted when the derived constraints are all wildcards", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.list_calendars",
+          version: "1",
+          parameters: {},
+        },
+        resource_details: undefined,
+      }),
+    );
+    expect(request.constraints).toEqual({});
+    expect(request.confirm_unrestricted).toBe(true);
   });
 });

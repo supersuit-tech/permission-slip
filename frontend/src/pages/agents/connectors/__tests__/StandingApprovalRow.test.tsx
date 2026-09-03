@@ -50,6 +50,7 @@ const baseRule: StandingApproval = {
   created_at: "2026-01-01T00:00:00Z",
   expires_at: null,
   constraints: { repo: "myorg/*", title: "*" },
+  unrestricted: false,
 };
 
 describe("StandingApprovalRow", () => {
@@ -71,6 +72,17 @@ describe("StandingApprovalRow", () => {
     renderRow({ ...baseRule, constraints: {} });
 
     expect(screen.getByText("No constraints")).toBeInTheDocument();
+  });
+
+  it("renders Unrestricted badge from the stored flag", () => {
+    renderRow({
+      ...baseRule,
+      unrestricted: true,
+      constraints: { repo: "*", title: "*" },
+    });
+
+    expect(screen.getByText("Unrestricted")).toBeInTheDocument();
+    expect(screen.queryByText("repo")).not.toBeInTheDocument();
   });
 
   it("renders verified sender constraints from $meta", () => {

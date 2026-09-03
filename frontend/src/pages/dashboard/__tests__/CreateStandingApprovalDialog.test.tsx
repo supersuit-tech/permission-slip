@@ -291,7 +291,7 @@ describe("CreateStandingApprovalDialog", () => {
 
     // Helper message should be visible
     expect(
-      screen.getByText(/Standing approvals require parameter constraints/),
+      screen.getByText(/Standing approvals can constrain parameters/),
     ).toBeInTheDocument();
   });
 
@@ -335,7 +335,7 @@ describe("CreateStandingApprovalDialog", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByText(/Standing approvals require parameter constraints/),
+        screen.getByText(/Standing approvals can constrain parameters/),
       ).toBeInTheDocument();
     });
 
