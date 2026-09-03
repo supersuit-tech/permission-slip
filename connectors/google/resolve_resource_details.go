@@ -143,6 +143,8 @@ func (c *GoogleConnector) resolveDriveFile(ctx context.Context, creds connectors
 // folder_id may be a My Drive folder, a Shared Drive folder, or a Shared Drive
 // ID (the drive root). files.get often succeeds for Shared Drive IDs but
 // returns the generic name "Drive"; drives.get supplies the real title.
+// Nested Shared Drive folders include that title so reviewers can see which
+// drive the folder lives in (e.g. "2026-documents in Chiedo's assistant drive").
 // A 404 from files.get still falls back to drives.get.
 func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connectors.Credentials, params json.RawMessage, defaultRootName string) (map[string]any, error) {
 	var p struct {
@@ -189,6 +191,10 @@ func driveRootDisplayName(name string) string {
 	return name + " in the / directory"
 }
 
+func driveFolderInSharedDriveDisplayName(folderName, driveName string) string {
+	return folderName + " in " + driveName
+}
+
 func (c *GoogleConnector) lookupDriveFolderName(ctx context.Context, creds connectors.Credentials, id string) (string, error) {
 	var fileResp struct {
 		Name    string   `json:"name"`
@@ -224,12 +230,18 @@ func (c *GoogleConnector) lookupDriveFolderName(ctx context.Context, creds conne
 		if driveName, err := c.lookupSharedDriveName(ctx, creds, driveID); err == nil && driveName != "" {
 			name = driveName
 		}
+		if name == "" {
+			return "", fmt.Errorf("folder %q has no name", id)
+		}
+		return driveRootDisplayName(name), nil
 	}
 	if name == "" {
 		return "", fmt.Errorf("folder %q has no name", id)
 	}
-	if isDriveRoot {
-		return driveRootDisplayName(name), nil
+	if fileResp.DriveID != "" {
+		if driveName, err := c.lookupSharedDriveName(ctx, creds, fileResp.DriveID); err == nil && driveName != "" {
+			return driveFolderInSharedDriveDisplayName(name, driveName), nil
+		}
 	}
 	return name, nil
 }

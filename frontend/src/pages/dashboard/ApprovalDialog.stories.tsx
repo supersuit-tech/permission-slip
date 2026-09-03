@@ -889,6 +889,38 @@ export const GoogleUploadDriveFile: Story = {
   },
 };
 
+export const GoogleUploadDriveFileNestedSharedDrive: Story = {
+  name: "Google: Upload Drive File (nested Shared Drive folder)",
+  args: {
+    connectorName: "Google",
+    connectorLogo: GOOGLE_LOGO,
+    actionName: "Upload Drive File",
+    actionType: "google.upload_drive_file",
+    agentName: "Chiedobot",
+    riskLevel: "medium",
+    displayTemplate: "Upload {{name}} to {{folder_name}}",
+    preview: null,
+    parameters: {
+      name: "ps-ui-test.pdf",
+      content_base64: "JVBERi0xLjQKJeLjz9MKMSAwIG9iaiA8PC9UeXBlL0NhdGFsb2cvUGFnZXMgMiAwIFI+PiBlbmRvYmoKeHJlZgowIDIKMDAwMDAwMDAwMCA2NTUzNSBmIAp0cmFpbGVyIDw8L1NpemUgMj4+CnN0YXJ0eHJlZgoxNQo=",
+      mime_type: "application/pdf",
+      folder_id: "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d",
+    },
+    schema: {
+      type: "object",
+      required: ["name"],
+      properties: {
+        name: { type: "string", description: "File name", "x-ui": { label: "File name" } },
+        content: { type: "string", description: "UTF-8 text file content" },
+        content_base64: { type: "string", description: "Base64-encoded binary file content", "x-ui": { label: "File" } },
+        mime_type: { type: "string", description: "MIME type" },
+        folder_id: { type: "string", description: "Parent folder ID", "x-ui": { label: "Folder" } },
+      },
+    },
+    resourceDetails: { folder_name: "2026-documents in Chiedo's assistant drive" },
+  },
+};
+
 export const GoogleReadEmail: Story = {
   name: "Google: Read Email",
   args: {

@@ -350,6 +350,18 @@ describe("buildActionSummary", () => {
       expect(result).not.toContain("0AKbIIKZ8knmBUk9PVA");
     });
 
+    it("includes Shared Drive title for a nested folder", () => {
+      const result = buildActionSummary(
+        "google.upload_drive_file",
+        { name: "ps-ui-test.pdf", folder_id: "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d" },
+        "Upload {{name}} to {{folder_name}}",
+        { folder_name: "2026-documents in Chiedo's assistant drive" },
+      );
+      expect(result).toContain("ps-ui-test.pdf");
+      expect(result).toContain("2026-documents in Chiedo's assistant drive");
+      expect(result).not.toContain("1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d");
+    });
+
     it("falls back to Drive when folder_name is missing", () => {
       const result = buildActionSummary(
         "google.upload_drive_file",

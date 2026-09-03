@@ -17,6 +17,14 @@ describe("resolvedResourceDisplayValue", () => {
     ).toBe("Chiedo's assistant drive in the / directory (0AKbllKZ8knmBUk9PVA)");
   });
 
+  it("overlays a nested Shared Drive folder with the drive title", () => {
+    expect(
+      resolvedResourceDisplayValue("folder_id", "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d", {
+        folder_name: "2026-documents in Chiedo's assistant drive",
+      }),
+    ).toBe("2026-documents in Chiedo's assistant drive (1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d)");
+  });
+
   it("overlays calendar_id with calendar_name", () => {
     expect(
       resolvedResourceDisplayValue("calendar_id", "primary", {

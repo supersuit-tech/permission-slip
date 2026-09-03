@@ -201,6 +201,29 @@ describe("ApprovalDetailScreen", () => {
     expect(json).not.toContain("JVBERi0xLjQK");
   });
 
+  it("shows nested Shared Drive folder with the drive title next to folder_id", async () => {
+    const approval = makeApproval({
+      action: {
+        type: "google.upload_drive_file",
+        version: "1",
+        parameters: {
+          name: "ps-ui-test.pdf",
+          folder_id: "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d",
+          mime_type: "application/pdf",
+          content_base64: "JVBERi0xLjQK",
+        },
+      },
+      resource_details: { folder_name: "2026-documents in Chiedo's assistant drive" },
+    });
+    await act(async () => {
+      renderer = renderDetail(approval);
+    });
+    const json = JSON.stringify(renderer.toJSON());
+    expect(json).toContain(
+      "2026-documents in Chiedo's assistant drive (1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d)",
+    );
+  });
+
   it("shows proton in-reply-to card for protonmail.reply_email", async () => {
     const approval = makeApproval({
       action: {

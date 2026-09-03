@@ -246,6 +246,28 @@ describe("SchemaParameterDetails", () => {
     expect(screen.getByText("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)")).toBeInTheDocument();
   });
 
+  it("shows nested Shared Drive folder with the drive title", () => {
+    const driveSchema: ParametersSchema = {
+      type: "object",
+      required: ["name"],
+      properties: {
+        name: { type: "string", description: "File name" },
+        folder_id: { type: "string", description: "Folder ID", "x-ui": { label: "Folder" } },
+      },
+    };
+    render(
+      <SchemaParameterDetails
+        parameters={{ name: "ps-ui-test.pdf", folder_id: "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d" }}
+        schema={driveSchema}
+        resourceDetails={{ folder_name: "2026-documents in Chiedo's assistant drive" }}
+      />,
+    );
+
+    expect(
+      screen.getByText("2026-documents in Chiedo's assistant drive (1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d)"),
+    ).toBeInTheDocument();
+  });
+
   it("summarizes content_base64 instead of dumping encoded bytes", () => {
     const driveSchema: ParametersSchema = {
       type: "object",
