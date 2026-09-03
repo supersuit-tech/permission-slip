@@ -147,14 +147,14 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.list_drive_files",
 			Name:        "Browse Drive files",
 			Description: "Agent can list and search files in Google Drive.",
-			Parameters:  json.RawMessage(`{"query":"*","max_results":"*","folder_id":"*","order_by":"*"}`),
+			Parameters:  json.RawMessage(`{"query":"*","max_results":"*","folder_id":"*","drive_id":"*","order_by":"*"}`),
 		},
 		{
 			ID:          "tpl_google_search_drive",
 			ActionType:  "google.search_drive",
 			Name:        "Search Drive files",
 			Description: "Agent can search Drive by name, content, or file type.",
-			Parameters:  json.RawMessage(`{"query":"*","file_type":"*","folder_id":"*","max_results":"*"}`),
+			Parameters:  json.RawMessage(`{"query":"*","file_type":"*","folder_id":"*","drive_id":"*","max_results":"*"}`),
 		},
 		{
 			ID:          "tpl_google_search_drive_in_folder",

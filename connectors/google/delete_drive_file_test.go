@@ -19,6 +19,7 @@ func TestDeleteDriveFile_Success(t *testing.T) {
 		if r.URL.Path != "/drive/v3/files/file-to-delete" {
 			t.Errorf("expected path /drive/v3/files/file-to-delete, got %s", r.URL.Path)
 		}
+		assertSupportsAllDrives(t, r.URL.Query())
 		if got := r.Header.Get("Authorization"); got != "Bearer ya29.test-access-token-123" {
 			t.Errorf("expected Bearer token, got %q", got)
 		}
@@ -94,9 +95,9 @@ func TestDeleteDriveFile_InvalidFileID(t *testing.T) {
 	action := &deleteDriveFileAction{conn: conn}
 
 	invalidIDs := []string{
-		"file/../../etc",    // path traversal
-		"file id spaces",    // spaces
-		"file'injection",    // quote
+		"file/../../etc", // path traversal
+		"file id spaces", // spaces
+		"file'injection", // quote
 	}
 	for _, id := range invalidIDs {
 		params, _ := json.Marshal(deleteDriveFileParams{FileID: id})

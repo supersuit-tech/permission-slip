@@ -20,6 +20,7 @@ func TestSearchDrive_Success(t *testing.T) {
 		if r.URL.Path != "/drive/v3/files" {
 			t.Errorf("unexpected path: %s", r.URL.Path)
 		}
+		assertAllDrivesList(t, r.URL.Query())
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(driveListResponse{
 			Files: []driveFileEntry{
@@ -175,6 +176,83 @@ func TestSearchDrive_MaxResultsClamp(t *testing.T) {
 	}
 	if capturedPageSize != "100" {
 		t.Errorf("expected pageSize clamped to 100, got %q", capturedPageSize)
+	}
+}
+
+func TestSearchDrive_WithDriveID(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertDriveCorpus(t, r.URL.Query(), sharedDriveID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(driveListResponse{
+			Files: []driveFileEntry{{ID: "folder-1", Name: "Chiedo's Assistant Drive", MimeType: "application/vnd.google-apps.folder"}},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newDriveForTest(srv.Client(), srv.URL)
+	action := &searchDriveAction{conn: conn}
+
+	params, _ := json.Marshal(searchDriveParams{Query: "Chiedo assistant", DriveID: sharedDriveID})
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.search_drive",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["count"].(float64) != 1 {
+		t.Errorf("expected count 1, got %v", data["count"])
+	}
+}
+
+func TestSearchDrive_DriveIDOnly(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertDriveCorpus(t, r.URL.Query(), sharedDriveID)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(driveListResponse{Files: []driveFileEntry{}})
+	}))
+	defer srv.Close()
+
+	conn := newDriveForTest(srv.Client(), srv.URL)
+	action := &searchDriveAction{conn: conn}
+
+	params, _ := json.Marshal(searchDriveParams{DriveID: sharedDriveID})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.search_drive",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestSearchDrive_InvalidDriveID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &searchDriveAction{conn: conn}
+
+	params, _ := json.Marshal(searchDriveParams{DriveID: "drive/../../etc"})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.search_drive",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid drive_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
 

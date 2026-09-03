@@ -25,6 +25,7 @@ type searchDriveParams struct {
 	Query      string `json:"query"`
 	FileType   string `json:"file_type"`
 	FolderID   string `json:"folder_id"`
+	DriveID    string `json:"drive_id"`
 	MaxResults int    `json:"max_results"`
 }
 
@@ -52,8 +53,8 @@ var driveFileTypeNames = func() []string {
 }()
 
 func (p *searchDriveParams) validate() error {
-	if p.Query == "" && p.FileType == "" && p.FolderID == "" {
-		return &connectors.ValidationError{Message: "at least one of query, file_type, or folder_id must be provided"}
+	if p.Query == "" && p.FileType == "" && p.FolderID == "" && p.DriveID == "" {
+		return &connectors.ValidationError{Message: "at least one of query, file_type, folder_id, or drive_id must be provided"}
 	}
 	if p.FileType != "" {
 		if _, ok := driveFileTypeMap[p.FileType]; !ok {
@@ -62,6 +63,9 @@ func (p *searchDriveParams) validate() error {
 	}
 	if p.FolderID != "" && !isValidDriveID(p.FolderID) {
 		return &connectors.ValidationError{Message: "folder_id contains invalid characters; expected alphanumeric ID"}
+	}
+	if p.DriveID != "" && !isValidDriveID(p.DriveID) {
+		return &connectors.ValidationError{Message: "drive_id contains invalid characters; expected alphanumeric ID"}
 	}
 	return nil
 }
@@ -120,6 +124,7 @@ func (a *searchDriveAction) Execute(ctx context.Context, req connectors.ActionRe
 	q.Set("pageSize", strconv.Itoa(params.MaxResults))
 	q.Set("fields", "files(id,name,mimeType,modifiedTime,size,webViewLink)")
 	q.Set("orderBy", "modifiedTime desc")
+	applyDriveListScope(q, params.DriveID)
 
 	var listResp driveListResponse
 	searchURL := a.conn.driveBaseURL + "/drive/v3/files?" + q.Encode()

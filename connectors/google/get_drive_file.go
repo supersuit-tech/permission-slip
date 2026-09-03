@@ -65,7 +65,10 @@ func (a *getDriveFileAction) Execute(ctx context.Context, req connectors.ActionR
 
 	// Step 1: fetch file metadata.
 	fields := "id,name,mimeType,modifiedTime,size,webViewLink"
-	metaURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(params.FileID) + "?fields=" + url.QueryEscape(fields)
+	metaQuery := url.Values{}
+	metaQuery.Set("fields", fields)
+	applySupportsAllDrives(metaQuery)
+	metaURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(params.FileID) + "?" + metaQuery.Encode()
 
 	var meta driveFileEntry
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodGet, metaURL, nil, &meta); err != nil {
@@ -108,13 +111,19 @@ func (a *getDriveFileAction) Execute(ctx context.Context, req connectors.ActionR
 
 // exportContent exports a Google Workspace file as text.
 func (a *getDriveFileAction) exportContent(ctx context.Context, creds connectors.Credentials, fileID, exportMime string) (string, error) {
-	exportURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(fileID) + "/export?mimeType=" + url.QueryEscape(exportMime)
+	exportQuery := url.Values{}
+	exportQuery.Set("mimeType", exportMime)
+	applySupportsAllDrives(exportQuery)
+	exportURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(fileID) + "/export?" + exportQuery.Encode()
 	return a.conn.doRawGet(ctx, creds, exportURL)
 }
 
 // downloadContent downloads a non-Google-Workspace file's content.
 func (a *getDriveFileAction) downloadContent(ctx context.Context, creds connectors.Credentials, fileID string) (string, error) {
-	downloadURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(fileID) + "?alt=media"
+	downloadQuery := url.Values{}
+	downloadQuery.Set("alt", "media")
+	applySupportsAllDrives(downloadQuery)
+	downloadURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(fileID) + "?" + downloadQuery.Encode()
 	return a.conn.doRawGet(ctx, creds, downloadURL)
 }
 
@@ -126,4 +135,3 @@ func isTextMimeType(mimeType string) bool {
 		mimeType == "application/xml" ||
 		mimeType == "application/javascript"
 }
-

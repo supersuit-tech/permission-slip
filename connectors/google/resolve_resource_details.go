@@ -117,7 +117,10 @@ func (c *GoogleConnector) resolveDriveFile(ctx context.Context, creds connectors
 		Name     string `json:"name"`
 		MimeType string `json:"mimeType"`
 	}
-	getURL := c.driveBaseURL + "/drive/v3/files/" + url.PathEscape(p.FileID) + "?fields=" + url.QueryEscape("name,mimeType")
+	q := url.Values{}
+	q.Set("fields", "name,mimeType")
+	applySupportsAllDrives(q)
+	getURL := c.driveBaseURL + "/drive/v3/files/" + url.PathEscape(p.FileID) + "?" + q.Encode()
 	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
 		return nil, err
 	}

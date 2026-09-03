@@ -56,7 +56,10 @@ func (a *deleteDriveFileAction) Execute(ctx context.Context, req connectors.Acti
 	body := driveTrashRequest{Trashed: true}
 	var resp driveTrashResponse
 
-	patchURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(params.FileID) + "?fields=id,name,trashed"
+	q := url.Values{}
+	q.Set("fields", "id,name,trashed")
+	applySupportsAllDrives(q)
+	patchURL := a.conn.driveBaseURL + "/drive/v3/files/" + url.PathEscape(params.FileID) + "?" + q.Encode()
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPatch, patchURL, body, &resp); err != nil {
 		return nil, err
 	}

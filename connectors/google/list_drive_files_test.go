@@ -20,6 +20,7 @@ func TestListDriveFiles_Success(t *testing.T) {
 		if r.URL.Path != "/drive/v3/files" {
 			t.Errorf("expected path /drive/v3/files, got %s", r.URL.Path)
 		}
+		assertAllDrivesList(t, r.URL.Query())
 
 		// Verify trashed=false is in the query
 		q := r.URL.Query().Get("q")
@@ -113,6 +114,7 @@ func TestListDriveFiles_WithFolderID(t *testing.T) {
 		if !strings.Contains(q, "'folder-123' in parents") {
 			t.Errorf("expected folder filter in query, got %q", q)
 		}
+		assertAllDrivesList(t, r.URL.Query())
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(driveListResponse{
@@ -239,6 +241,66 @@ func TestListDriveFiles_RateLimit(t *testing.T) {
 	}
 }
 
+func TestListDriveFiles_WithDriveID(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assertDriveCorpus(t, r.URL.Query(), sharedDriveID)
+		q := r.URL.Query().Get("q")
+		if !strings.Contains(q, "'"+sharedDriveID+"' in parents") {
+			t.Errorf("expected Shared Drive folder filter in query, got %q", q)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(driveListResponse{
+			Files: []driveFileEntry{{ID: "file-1", Name: "receipt.pdf", MimeType: "application/pdf"}},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newDriveForTest(srv.Client(), srv.URL)
+	action := &listDriveFilesAction{conn: conn}
+
+	params, _ := json.Marshal(listDriveFilesParams{FolderID: sharedDriveID, DriveID: sharedDriveID})
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.list_drive_files",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var data struct {
+		Count int `json:"count"`
+	}
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data.Count != 1 {
+		t.Errorf("expected count 1, got %d", data.Count)
+	}
+}
+
+func TestListDriveFiles_InvalidDriveID(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &listDriveFilesAction{conn: conn}
+
+	params, _ := json.Marshal(listDriveFilesParams{DriveID: "bad/drive/id"})
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.list_drive_files",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for invalid drive_id")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestListDriveFiles_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
@@ -257,4 +319,3 @@ func TestListDriveFiles_InvalidJSON(t *testing.T) {
 		t.Errorf("expected ValidationError, got: %T", err)
 	}
 }
-
