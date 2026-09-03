@@ -19,7 +19,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | Scope | Used by |
 |-------|---------|
 | `gmail.send` | `google.send_email` |
-| `gmail.readonly` | `google.list_emails`, `google.read_email` |
+| `gmail.readonly` | `google.list_emails`, `google.read_email`, `google.download_attachment` |
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events`, `google.create_meeting` |
 | `presentations` | `google.create_presentation`, `google.get_presentation`, `google.add_slide` |
 | `spreadsheets` | `google.create_spreadsheet`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets` |
@@ -147,7 +147,7 @@ Fetches a single email by message ID and returns the full body, headers, labels,
 
 **Gmail API:** `GET /gmail/v1/users/me/messages/{id}?format=full` ([docs](https://developers.google.com/gmail/api/reference/rest/v1/users.messages/get))
 
-**Typical workflow:** `list_emails` → `read_email` (using the `id` from the list) → `send_email_reply` (using `thread_id` and `id`).
+**Typical workflow:** `list_emails` → `read_email` (using the `id` from the list) → `download_attachment` (using `attachments[].attachment_id`) → `upload_drive_file` (using `content_base64`) for receipts; or `send_email_reply` (using `thread_id` and `id`).
 
 **Body extraction:**
 - For multipart messages, `text/plain` is preferred over `text/html`.
@@ -158,12 +158,44 @@ Fetches a single email by message ID and returns the full body, headers, labels,
 - Filenames are extracted from `Content-Disposition` headers, falling back to `Content-Type` `name=` parameter.
 - RFC 5987 extended filenames (`filename*=UTF-8''encoded%20name`) are supported and take priority per RFC 6266.
 - Only UTF-8 encoded filenames are decoded; other charsets are skipped to avoid producing invalid strings.
-- The `attachment_id` field can be used with `GET /gmail/v1/users/me/messages/{messageId}/attachments/{attachmentId}` to download content.
+- The `attachment_id` (or `part_id`) field is passed to `google.download_attachment` to fetch the bytes.
 
 **Security notes:**
 - Header names are matched case-insensitively per RFC 5322.
 - MIME tree recursion is capped at depth 20 to prevent stack overflow from crafted deeply-nested messages.
 - Base64url decoding tries raw (no padding) first since that's the Gmail API format, with padded fallback.
+
+---
+
+### `google.download_attachment`
+
+Downloads a single Gmail attachment and returns its bytes as standard base64.
+
+**Risk level:** low
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `message_id` | string | Yes | The Gmail message ID (from `list_emails` or `read_email`) |
+| `attachment_id` | string | Yes | `attachments[].attachment_id` from `read_email`, or the MIME `part_id` |
+
+**Response:**
+
+```json
+{
+  "message_id": "18abc123def",
+  "attachment_id": "ANGjdJ8...",
+  "filename": "receipt.pdf",
+  "mime_type": "application/pdf",
+  "size": 48213,
+  "content_base64": "JVBERi0xLjc..."
+}
+```
+
+**Gmail API:** `GET /gmail/v1/users/me/messages/{id}?format=full` then `GET /gmail/v1/users/me/messages/{messageId}/attachments/{id}` ([docs](https://developers.google.com/gmail/api/reference/rest/v1/users.messages.attachments/get))
+
+Attachments larger than 10 MB are rejected. Use the returned `content_base64` with `google.upload_drive_file` to file a receipt into Drive.
 
 ---
 
@@ -821,7 +853,7 @@ Gets file metadata and optionally downloads content from Google Drive.
 
 ### `google.upload_drive_file`
 
-Creates and uploads a text file to Google Drive.
+Creates and uploads a file to Google Drive. Text can be sent as `content`; PDFs, images, and other binary files as `content_base64`.
 
 **Risk level:** medium
 
@@ -830,23 +862,26 @@ Creates and uploads a text file to Google Drive.
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
 | `name` | string | Yes | — | File name |
-| `content` | string | Yes | — | File content (text, max 4 MB) |
-| `mime_type` | string | No | `text/plain` | MIME type of the file |
+| `content` | string | One of `content` or `content_base64` | — | UTF-8 text content (max 10 MB) |
+| `content_base64` | string | One of `content` or `content_base64` | — | Base64-encoded binary content (max 10 MB decoded) |
+| `mime_type` | string | No | `text/plain` for text; inferred from `name` for binary | MIME type (`application/pdf`, `image/jpeg`, `image/png`, …) |
 | `folder_id` | string | No | — | Parent folder ID |
+
+`content` and `content_base64` are mutually exclusive.
 
 **Response:**
 
 ```json
 {
   "id": "1newFileId123",
-  "name": "report.txt",
+  "name": "receipt.pdf",
   "web_view_link": "https://drive.google.com/file/d/1newFileId123/view"
 }
 ```
 
 **Drive API:** `POST /upload/drive/v3/files?uploadType=multipart` ([docs](https://developers.google.com/drive/api/guides/manage-uploads#multipart))
 
-Uses multipart upload with JSON metadata in the first part and file content in the second. Content is capped at 4 MB to prevent oversized payloads.
+Uses multipart upload with JSON metadata in the first part and file content in the second. Decoded content is capped at 10 MB.
 
 ---
 
@@ -1140,7 +1175,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Browse Drive files | `list_drive_files` | Nothing — agent controls query, folder, and sort |
 | Read Drive files | `get_drive_file` | Nothing — agent can read metadata and content |
 | View Drive file metadata | `get_drive_file` | `include_content` locked to `false` (metadata only) |
-| Upload files to Drive | `upload_drive_file` | Nothing — agent controls name, content, and destination |
+| Upload files to Drive | `upload_drive_file` | Nothing — agent controls name, text or base64 content, MIME type, and destination |
 | Upload files to specific folder | `upload_drive_file` | `folder_id` locked to a specific folder |
 | Trash Drive files | `delete_drive_file` | Nothing — agent can trash any file |
 | Update calendar events | `update_calendar_event` | Nothing — agent can update summary, time, attendees, location |
@@ -1150,6 +1185,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Search Drive within folder | `search_drive` | `folder_id` locked to a specific folder |
 | Create Drive folders | `create_drive_folder` | Nothing — agent controls name and parent |
 | Read any email | `read_email` | Nothing — agent controls message ID |
+| Download email attachments | `download_attachment` | Nothing — agent controls message ID and attachment ID |
 | Reply to emails | `send_email_reply` | Nothing — agent controls thread, message, and body |
 | Archive emails | `archive_email` | Nothing — agent can archive any thread |
 
@@ -1171,12 +1207,13 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 ```
 connectors/google/
 ├── google.go                       # GoogleConnector struct, New(), Actions(), doJSON(), doRawGet(), wrapHTTPError(), ValidateCredentials()
-├── manifest.go                     # Manifest() — 30 action schemas and 41+ templates
+├── manifest.go                     # Manifest() — 32 action schemas and 41+ templates
 ├── docs_types.go                   # Shared Docs API types (batchUpdate request) and helpers (documentEditURL)
 ├── email_helpers.go                # buildGmailRaw() — shared RFC 2822 message builder used by send_email and send_email_reply
 ├── send_email.go                   # google.send_email action
 ├── list_emails.go                  # google.list_emails action
 ├── read_email.go                   # google.read_email action (full body, headers, attachment metadata, MIME tree walking)
+├── download_attachment.go          # google.download_attachment action (Gmail attachment bytes as base64)
 ├── send_email_reply.go             # google.send_email_reply action (fetches headers, strips injection chars, sends reply)
 ├── archive_email.go               # google.archive_email action (thread-level archive via threads.modify)
 ├── create_calendar_event.go        # google.create_calendar_event action
@@ -1203,7 +1240,7 @@ connectors/google/
 ├── calendar_helpers.go             # Shared calendar validation (time range, attendees)
 ├── list_drive_files.go             # google.list_drive_files action + shared isValidDriveID()
 ├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
-├── upload_drive_file.go            # google.upload_drive_file action (multipart upload)
+├── upload_drive_file.go            # google.upload_drive_file action (multipart upload, text or base64 binary)
 ├── delete_drive_file.go            # google.delete_drive_file action (soft delete via trash)
 ├── search_drive.go                 # google.search_drive action (name/fullText/type/folder search)
 ├── create_drive_folder.go          # google.create_drive_folder action
@@ -1212,6 +1249,7 @@ connectors/google/
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
 ├── list_emails_test.go             # List emails action tests
 ├── read_email_test.go              # Read email tests (MIME parsing, attachments, RFC 5987, depth limit, edge cases)
+├── download_attachment_test.go     # Download attachment tests (base64, part_id match, size limit)
 ├── send_email_reply_test.go        # Send email reply tests (thread validation, header injection, Re: prefix)
 ├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding)
 ├── list_calendar_events_test.go    # List events action tests
@@ -1235,7 +1273,7 @@ connectors/google/
 ├── create_meeting_test.go          # Create meeting tests (including Meet link extraction)
 ├── list_drive_files_test.go        # List Drive files tests (including query injection prevention)
 ├── get_drive_file_test.go          # Get Drive file tests (metadata, content export, binary skip)
-├── upload_drive_file_test.go       # Upload tests (multipart, size limit, folder targeting)
+├── upload_drive_file_test.go       # Upload tests (multipart, binary base64, size limit, folder targeting)
 ├── delete_drive_file_test.go       # Delete tests (soft delete, ID validation, rate limiting)
 ├── search_drive_test.go            # Search Drive tests (query escaping, type filter, deterministic errors)
 ├── create_drive_folder_test.go     # Create folder tests (name validation, parent ID)

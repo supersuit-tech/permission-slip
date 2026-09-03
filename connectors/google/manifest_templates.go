@@ -40,6 +40,13 @@ func googleTemplates() []connectors.ManifestTemplate {
 			Description: "Agent can read the full content of any email by message ID.",
 			Parameters:  json.RawMessage(`{"message_id":"*"}`),
 		},
+		{
+			ID:          "tpl_google_download_attachment",
+			ActionType:  "google.download_attachment",
+			Name:        "Download email attachments",
+			Description: "Agent can download Gmail attachment bytes by message ID and attachment ID.",
+			Parameters:  json.RawMessage(`{"message_id":"*","attachment_id":"*"}`),
+		},
 		// --- Gmail write ---
 		{
 			ID:          "tpl_google_send_email",
@@ -175,15 +182,15 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ID:          "tpl_google_upload_drive_file",
 			ActionType:  "google.upload_drive_file",
 			Name:        "Upload files to Drive",
-			Description: "Agent can upload text files to Google Drive.",
-			Parameters:  json.RawMessage(`{"name":"*","content":"*","mime_type":"*","folder_id":"*"}`),
+			Description: "Agent can upload text or binary files (PDF, images) to Google Drive.",
+			Parameters:  json.RawMessage(`{"name":"*","content":"*","content_base64":"*","mime_type":"*","folder_id":"*"}`),
 		},
 		{
 			ID:          "tpl_google_upload_drive_file_to_folder",
 			ActionType:  "google.upload_drive_file",
 			Name:        "Upload files to specific folder",
-			Description: "Agent can upload text files to a specific locked folder in Google Drive.",
-			Parameters:  json.RawMessage(`{"name":"*","content":"*","mime_type":"*","folder_id":"folder-id-here"}`),
+			Description: "Agent can upload text or binary files to a specific locked folder in Google Drive.",
+			Parameters:  json.RawMessage(`{"name":"*","content":"*","content_base64":"*","mime_type":"*","folder_id":"folder-id-here"}`),
 		},
 		{
 			ID:          "tpl_google_create_drive_folder",

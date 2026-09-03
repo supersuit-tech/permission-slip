@@ -26,6 +26,7 @@ var paramValidators = map[string]connectors.ParamValidatorFunc{
 	"google.create_spreadsheet":    makeParamValidator[createSpreadsheetParams](),
 	"google.delete_calendar_event": makeParamValidator[deleteCalendarEventParams](),
 	"google.delete_drive_file":     makeParamValidator[deleteDriveFileParams](),
+	"google.download_attachment":   makeParamValidator[downloadAttachmentParams](),
 	"google.get_document":          makeParamValidator[getDocumentParams](),
 	"google.get_drive_file":        makeParamValidator[getDriveFileParams](),
 	"google.get_presentation":      makeParamValidator[getPresentationParams](),

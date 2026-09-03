@@ -866,11 +866,12 @@ export const GoogleUploadDriveFile: Story = {
     parameters: { name: "meeting-notes-2026-03-16.md", content: "# Meeting Notes\n\n...", mime_type: "text/markdown" },
     schema: {
       type: "object",
-      required: ["name", "content"],
+      required: ["name"],
       properties: {
         name: { type: "string", description: "File name" },
-        content: { type: "string", description: "File content (text)" },
-        mime_type: { type: "string", description: "MIME type", default: "text/plain" },
+        content: { type: "string", description: "UTF-8 text file content" },
+        content_base64: { type: "string", description: "Base64-encoded binary file content" },
+        mime_type: { type: "string", description: "MIME type" },
       },
     },
   },

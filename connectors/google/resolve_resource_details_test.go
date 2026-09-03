@@ -244,6 +244,14 @@ func TestResolveResourceDetails_Email(t *testing.T) {
 		t.Errorf("read_email: expected from 'alice@example.com', got %v", details["from"])
 	}
 
+	details, err = conn.ResolveResourceDetails(context.Background(), "google.download_attachment", params, validCreds())
+	if err != nil {
+		t.Fatalf("download_attachment: unexpected error: %v", err)
+	}
+	if details["subject"] != "Weekly Update" {
+		t.Errorf("download_attachment: expected subject 'Weekly Update', got %v", details["subject"])
+	}
+
 	// archive_email uses thread_id — fetches thread first, then message
 	params, _ = json.Marshal(map[string]string{"thread_id": "thread123"})
 	details, err = conn.ResolveResourceDetails(context.Background(), "google.archive_email", params, validCreds())
