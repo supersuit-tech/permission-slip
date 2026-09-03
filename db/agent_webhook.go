@@ -12,15 +12,16 @@ type AgentWebhookConfig struct {
 	AgentID             int64
 	WebhookURL          *string
 	WebhookTokenVaultID *string
+	WebhookProvider     string
 }
 
-// GetAgentWebhookConfig returns webhook URL and vault token ID for the agent.
+// GetAgentWebhookConfig returns webhook URL, provider, and vault token ID for the agent.
 func GetAgentWebhookConfig(ctx context.Context, db DBTX, agentID int64) (*AgentWebhookConfig, error) {
-	var url, vaultID sql.NullString
+	var url, vaultID, provider sql.NullString
 	err := db.QueryRow(ctx,
-		`SELECT webhook_url, webhook_token_vault_id FROM agents WHERE agent_id = $1`,
+		`SELECT webhook_url, webhook_token_vault_id, webhook_provider FROM agents WHERE agent_id = $1`,
 		agentID,
-	).Scan(&url, &vaultID)
+	).Scan(&url, &vaultID, &provider)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -36,14 +37,22 @@ func GetAgentWebhookConfig(ctx context.Context, db DBTX, agentID int64) (*AgentW
 		s := vaultID.String
 		cfg.WebhookTokenVaultID = &s
 	}
+	if provider.Valid && provider.String != "" {
+		cfg.WebhookProvider = provider.String
+	} else {
+		cfg.WebhookProvider = "openclaw"
+	}
 	return cfg, nil
 }
 
-// SetAgentWebhook stores webhook URL and vault token ID for an agent.
-func SetAgentWebhook(ctx context.Context, db DBTX, agentID int64, webhookURL, tokenVaultID string) error {
+// SetAgentWebhook stores webhook URL, provider, and vault token ID for an agent.
+func SetAgentWebhook(ctx context.Context, db DBTX, agentID int64, webhookURL, tokenVaultID, provider string) error {
+	if provider == "" {
+		provider = "openclaw"
+	}
 	_, err := db.Exec(ctx,
-		`UPDATE agents SET webhook_url = $2, webhook_token_vault_id = $3 WHERE agent_id = $1`,
-		agentID, webhookURL, tokenVaultID,
+		`UPDATE agents SET webhook_url = $2, webhook_token_vault_id = $3, webhook_provider = $4 WHERE agent_id = $1`,
+		agentID, webhookURL, tokenVaultID, provider,
 	)
 	return err
 }
@@ -60,7 +69,7 @@ func ClearAgentWebhook(ctx context.Context, db DBTX, agentID int64) (*string, er
 	}
 	prevVaultID := cfg.WebhookTokenVaultID
 	_, err = db.Exec(ctx,
-		`UPDATE agents SET webhook_url = NULL, webhook_token_vault_id = NULL WHERE agent_id = $1`,
+		`UPDATE agents SET webhook_url = NULL, webhook_token_vault_id = NULL, webhook_provider = 'openclaw' WHERE agent_id = $1`,
 		agentID,
 	)
 	if err != nil {

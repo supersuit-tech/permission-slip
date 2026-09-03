@@ -3,8 +3,8 @@ agentUserWebhook:
     operationId: getAgentWebhookForUser
     summary: Get agent wake webhook (user session)
     description: |
-      Returns the configured hooks URL for the agent. Pass `?test=true` to fire a test wake.
-      The token is never returned — only `configured`, `webhook_url`, and optional warning.
+      Returns the configured webhook URL and provider for the agent. Pass `?test=true` to fire a test wake.
+      The token is never returned — only `configured`, `webhook_url`, `provider`, and optional warning.
     tags:
       - Agents
     security:
@@ -31,8 +31,11 @@ agentUserWebhook:
     operationId: setAgentWebhookForUser
     summary: Register agent wake webhook (user session)
     description: |
-      Register the OpenClaw gateway hooks URL and token for server-push approval wakes.
-      The URL must resolve to a private network address. Performs a test delivery after saving.
+      Register the wake webhook URL and token for server-push approval wakes.
+      `provider` selects the delivery adapter (`openclaw` default, or `grokbot`).
+      OpenClaw URLs must resolve to a private network address. Grok Bot URLs must
+      be `https://api2.cursor.sh/automations/webhook/…`. Performs a test delivery
+      after saving.
     tags:
       - Agents
     security:

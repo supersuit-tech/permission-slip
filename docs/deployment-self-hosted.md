@@ -546,6 +546,8 @@ permission-slip webhook set \
 
 Registration rejects public URLs — only private/tailnet addresses are allowed.
 
+For a **Grok Bot** agent, select provider **Grok Bot** in the dashboard or pass `--provider grokbot` with the public Cursor webhook URL (`https://api2.cursor.sh/automations/webhook/…`). See [Grok Bot push wakes](../integrations/openclaw.md#grok-bot).
+
 ### 4. Verify end-to-end
 
 From the agent settings page, click **Test wake**, or run:

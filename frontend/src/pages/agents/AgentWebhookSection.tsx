@@ -26,11 +26,28 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   useAgentWebhook,
   useClearAgentWebhook,
   useSetAgentWebhook,
   useTestAgentWebhook,
 } from "@/hooks/useAgentWebhook";
+
+type WakeProvider = "openclaw" | "grokbot";
+
+function isWakeProvider(value: string | undefined): value is WakeProvider {
+  return value === "openclaw" || value === "grokbot";
+}
+
+function providerLabel(provider: WakeProvider): string {
+  return provider === "grokbot" ? "Grok Bot" : "OpenClaw";
+}
 
 interface AgentWebhookSectionProps {
   agentId: number;
@@ -44,6 +61,7 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
 
   const [configureOpen, setConfigureOpen] = useState(false);
   const [clearOpen, setClearOpen] = useState(false);
+  const [provider, setProvider] = useState<WakeProvider>("openclaw");
   const [url, setUrl] = useState("");
   const [token, setToken] = useState("");
   const [lastTestMessage, setLastTestMessage] = useState<string | null>(null);
@@ -54,8 +72,13 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
 
   const busy = saving || testing || clearing;
   const configured = webhook?.configured === true;
+  const configuredProvider: WakeProvider = isWakeProvider(webhook?.provider)
+    ? webhook.provider
+    : "openclaw";
+  const grokBot = provider === "grokbot";
 
   function openConfigureDialog() {
+    setProvider(configuredProvider);
     setUrl(webhook?.webhook_url ?? "");
     setToken("");
     setConfigureOpen(true);
@@ -74,6 +97,7 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
         agentId,
         url: trimmedUrl,
         token: trimmedToken,
+        provider,
       });
       setConfigureOpen(false);
       setToken("");
@@ -140,8 +164,8 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
             Push Wake Webhook
           </CardTitle>
           <p className="text-muted-foreground mt-1 text-sm">
-            Register your OpenClaw gateway hooks URL so the server can wake the
-            agent when an approval is resolved.
+            Register an OpenClaw gateway or Grok Bot webhook so the server can
+            wake the agent when an approval is resolved.
           </p>
         </CardHeader>
         <CardContent>
@@ -162,8 +186,9 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
             <div className="flex flex-col items-center justify-center py-8 text-center">
               <BellRing className="text-muted-foreground mb-3 size-10" />
               <p className="text-muted-foreground mb-3 max-w-md text-sm">
-                No push wake webhook configured. Set your OpenClaw gateway hooks
-                URL and token to receive instant wakes when approvals resolve.
+                No push wake webhook configured. Set an OpenClaw gateway hooks
+                URL or a Grok Bot Cursor webhook to receive instant wakes when
+                approvals resolve.
               </p>
               <Button variant="outline" size="sm" onClick={openConfigureDialog}>
                 Configure webhook
@@ -173,7 +198,14 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
             <div className="space-y-4">
               <div className="rounded-lg border p-3">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-sm font-medium">Hooks URL</span>
+                  <span className="text-sm font-medium">
+                    {configuredProvider === "grokbot"
+                      ? "Webhook URL"
+                      : "Hooks URL"}
+                  </span>
+                  <Badge variant="secondary">
+                    {providerLabel(configuredProvider)}
+                  </Badge>
                   <Badge
                     variant="secondary"
                     className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
@@ -261,30 +293,61 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
               {configured ? "Update push wake webhook" : "Configure push wake webhook"}
             </DialogTitle>
             <DialogDescription>
-              Enter your OpenClaw gateway hooks base URL and bearer token. The
-              URL must resolve to a private network address (tailnet, LAN, or
-              loopback). A test wake runs after saving.
+              {grokBot
+                ? "Enter your Grok Bot Cursor automation webhook URL and Authorization header value. The URL must be https://api2.cursor.sh/automations/webhook/…. A test wake runs after saving."
+                : "Enter your OpenClaw gateway hooks base URL and bearer token. The URL must resolve to a private network address (tailnet, LAN, or loopback). A test wake runs after saving."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">
             <div className="space-y-2">
-              <Label htmlFor="webhook-url">Hooks URL</Label>
+              <Label htmlFor="webhook-provider">Provider</Label>
+              <Select
+                value={provider}
+                onValueChange={(value) => {
+                  if (isWakeProvider(value)) {
+                    setProvider(value);
+                  }
+                }}
+              >
+                <SelectTrigger id="webhook-provider" aria-label="Provider">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openclaw">OpenClaw</SelectItem>
+                  <SelectItem value="grokbot">Grok Bot</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="webhook-url">
+                {grokBot ? "Webhook URL" : "Hooks URL"}
+              </Label>
               <Input
                 id="webhook-url"
                 value={url}
                 onChange={(e) => setUrl(e.target.value)}
-                placeholder="http://100.x.x.x:18789/hooks"
+                placeholder={
+                  grokBot
+                    ? "https://api2.cursor.sh/automations/webhook/…"
+                    : "http://100.x.x.x:18789/hooks"
+                }
                 autoComplete="off"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="webhook-token">Hooks token</Label>
+              <Label htmlFor="webhook-token">
+                {grokBot ? "Authorization header" : "Hooks token"}
+              </Label>
               <Input
                 id="webhook-token"
                 type="password"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
-                placeholder="Bearer token from OpenClaw config"
+                placeholder={
+                  grokBot
+                    ? "Value from the Grok Bot webhook Authorization header"
+                    : "Bearer token from OpenClaw config"
+                }
                 autoComplete="new-password"
               />
               <p className="text-muted-foreground text-xs">
@@ -313,7 +376,7 @@ export function AgentWebhookSection({ agentId }: AgentWebhookSectionProps) {
           <DialogHeader>
             <DialogTitle>Clear push wake webhook</DialogTitle>
             <DialogDescription>
-              This removes the registered hooks URL and token for this agent.
+              This removes the registered webhook URL and token for this agent.
               Approval wakes will fall back to heartbeat sweep and watcher until
               you configure a webhook again.
             </DialogDescription>

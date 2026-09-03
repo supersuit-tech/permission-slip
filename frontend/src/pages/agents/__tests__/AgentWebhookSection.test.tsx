@@ -20,6 +20,7 @@ function mockWebhookGet(
   data: {
     configured?: boolean;
     webhook_url?: string;
+    provider?: string;
     warning?: string;
     test?: {
       configured?: boolean;
@@ -82,6 +83,7 @@ describe("AgentWebhookSection", () => {
     mockWebhookGet({
       configured: true,
       webhook_url: "http://100.64.0.5:18789/hooks",
+      provider: "openclaw",
     });
 
     render(<AgentWebhookSection agentId={1} />, { wrapper });
@@ -90,6 +92,7 @@ describe("AgentWebhookSection", () => {
     await waitFor(() => {
       expect(screen.getByText("http://100.64.0.5:18789/hooks")).toBeInTheDocument();
     });
+    expect(screen.getByText("OpenClaw")).toBeInTheDocument();
     expect(screen.getByText("Configured")).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: /Test wake/i }),
@@ -136,6 +139,7 @@ describe("AgentWebhookSection", () => {
         body: {
           url: "http://100.64.0.5:18789/hooks",
           token: "secret-token",
+          provider: "openclaw",
         },
       });
     });
@@ -219,6 +223,58 @@ describe("AgentWebhookSection", () => {
 
     await waitFor(() => {
       expect(screen.getByText(sharedWarning)).toBeInTheDocument();
+    });
+  });
+
+  it("saves a Grok Bot webhook when that provider is selected", async () => {
+    const user = userEvent.setup();
+    mockWebhookGet({ configured: false });
+    mockPut.mockResolvedValue({
+      data: {
+        configured: true,
+        provider: "grokbot",
+        webhook_url: "https://api2.cursor.sh/automations/webhook/wh_abc",
+        test: {
+          configured: true,
+          success: true,
+          message: "Test wake delivered successfully",
+          latency_ms: 20,
+        },
+      },
+    });
+
+    render(<AgentWebhookSection agentId={1} />, { wrapper });
+    await settleAuthHydration();
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /Configure webhook/i }),
+      ).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByRole("button", { name: /Configure webhook/i }));
+    await user.click(screen.getByRole("combobox", { name: /Provider/i }));
+    await user.click(await screen.findByRole("option", { name: /Grok Bot/i }));
+    await user.type(
+      screen.getByLabelText(/Webhook URL/i),
+      "https://api2.cursor.sh/automations/webhook/wh_abc",
+    );
+    await user.type(
+      screen.getByLabelText(/Authorization header/i),
+      "cursor-wh-key",
+    );
+    await user.click(screen.getByRole("button", { name: /Save webhook/i }));
+
+    await waitFor(() => {
+      expect(mockPut).toHaveBeenCalledWith("/v1/agents/{agent_id}/webhook", {
+        headers: { Authorization: expect.stringMatching(/^Bearer /) },
+        params: { path: { agent_id: 1 } },
+        body: {
+          url: "https://api2.cursor.sh/automations/webhook/wh_abc",
+          token: "cursor-wh-key",
+          provider: "grokbot",
+        },
+      });
     });
   });
 

@@ -57,6 +57,10 @@ permission-slip status appr_xxxxxxxx
 
 # One-time setup for push wakes (private tailnet URL + hooks token):
 permission-slip webhook set --url http://<host>:18789/hooks --token <token>
+# Grok Bot (public Cursor webhook — do not use the OpenClaw private-URL path):
+permission-slip webhook set --provider grokbot \
+  --url https://api2.cursor.sh/automations/webhook/<id> \
+  --token <authorization-header-value>
 permission-slip webhook status --test
 ```
 

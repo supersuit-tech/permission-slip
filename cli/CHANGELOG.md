@@ -6,6 +6,16 @@ about new capabilities since their last use.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [0.1.27] - 2026-09-03
+
+### Added
+
+- **`permission-slip webhook set --provider`** — choose the wake adapter.
+  `openclaw` (default) keeps the private-network OpenClaw hooks contract.
+  `grokbot` registers a public Cursor automation webhook
+  (`https://api2.cursor.sh/automations/webhook/…`) and POSTs to that URL as-is
+  ([#1515](https://github.com/supersuit-tech/permission-slip/issues/1515)).
+
 ## [0.1.26] - 2026-07-06
 
 ### Changed

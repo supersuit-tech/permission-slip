@@ -13,8 +13,8 @@ import (
 // agentWakeHTTPClient is used for outbound wake webhooks to private agent networks.
 var agentWakeHTTPClient = &http.Client{Timeout: 10 * time.Second}
 
-// notifyAgentApprovalResolved POSTs a wake to the agent's OpenClaw gateway when
-// configured. Fire-and-forget with retries; no-op when webhook is not set.
+// notifyAgentApprovalResolved POSTs a wake to the agent's configured provider
+// when a webhook is set. Fire-and-forget with retries; no-op when webhook is not set.
 func notifyAgentApprovalResolved(deps *Deps, appr *db.Approval) {
 	NotifyAgentApprovalResolvedSync(deps, appr)
 }
@@ -58,7 +58,7 @@ func deliverAgentWakeTest(ctx context.Context, deps *Deps, agentID int64) (*agen
 			Message:    "No webhook configured",
 		}, nil
 	}
-	delivery, err := agentwake.BuildTestDelivery(*cfg.WebhookURL, token)
+	delivery, err := agentwake.BuildTestDelivery(cfg.WebhookProvider, *cfg.WebhookURL, token, agentID)
 	if err != nil {
 		return nil, err
 	}
@@ -91,10 +91,11 @@ func buildAgentWakeDelivery(ctx context.Context, deps *Deps, agentID int64, appr
 	if cfg == nil || cfg.WebhookURL == nil || *cfg.WebhookURL == "" {
 		return nil, nil
 	}
-	return agentwake.BuildOpenClawDelivery(*cfg.WebhookURL, token, agentwake.WakeRequest{
+	return agentwake.BuildDelivery(cfg.WebhookProvider, *cfg.WebhookURL, token, agentwake.WakeRequest{
 		ApprovalID: approvalID,
 		Status:     status,
 		SessionKey: agentwake.SessionKeyFromApprovalContext(contextJSON),
+		AgentID:    agentID,
 	})
 }
 

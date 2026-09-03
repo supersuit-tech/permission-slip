@@ -467,6 +467,8 @@ permission-slip webhook status --test
 
 The dashboard **Test wake** button runs the same check as `webhook status --test`.
 
+Grok Bot uses `--provider grokbot` and a Cursor automation webhook URL instead of a private OpenClaw hooks URL. See [Grok Bot push wakes](../integrations/openclaw.md#grok-bot).
+
 ### 4. Heartbeat backstop
 
 Enable OpenClaw heartbeat and run `permission-slip pending` each beat. See [OpenClaw integration](../integrations/openclaw.md).

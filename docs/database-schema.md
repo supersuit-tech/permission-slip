@@ -98,6 +98,9 @@ Agents registered by approvers. Identified by auto-incrementing bigserial IDs. R
 | `deactivated_at` | timestamptz | |
 | `last_active_at` | timestamptz | |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
+| `webhook_url` | text | Nullable — push-wake URL (OpenClaw hooks base or Grok Bot Cursor webhook), max 2048 chars |
+| `webhook_token_vault_id` | text | Nullable — vault secret id for the webhook token |
+| `webhook_provider` | text | NOT NULL, DEFAULT `openclaw`, CHECK IN (`openclaw`, `grokbot`) |
 
 **Indexes:** `idx_agents_approver_status` on `(approver_id, status)`, `idx_agents_approver_created` on `(approver_id, created_at DESC, agent_id DESC)`
 

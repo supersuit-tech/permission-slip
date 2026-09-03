@@ -1,7 +1,8 @@
 /**
  * permission-slip webhook set|status|clear
  *
- * Register the OpenClaw gateway hooks URL + token for server-push approval wakes.
+ * Register a push-wake webhook (OpenClaw gateway hooks or Grok Bot Cursor webhook)
+ * for server-push approval wakes.
  */
 
 import type { Command } from "commander";
@@ -13,19 +14,21 @@ import { output, type OutputOptions } from "../output.js";
 export function webhookCommand(program: Command): void {
   const webhookCmd = program
     .command("webhook")
-    .description("Configure OpenClaw gateway push wakes for approval resolution");
+    .description("Configure push wakes for approval resolution (OpenClaw or Grok Bot)");
 
   webhookCmd
     .command("set")
-    .description("Register hooks URL and token (runs a test wake)")
-    .requiredOption("--url <url>", "Gateway hooks base URL (private network only)")
-    .requiredOption("--token <token>", "Hooks bearer token from OpenClaw config")
+    .description("Register webhook URL and token (runs a test wake)")
+    .requiredOption("--url <url>", "OpenClaw hooks base URL, or Grok Bot https://api2.cursor.sh/automations/webhook/… URL")
+    .requiredOption("--token <token>", "OpenClaw hooks bearer token, or Grok Bot Authorization header value")
+    .option("--provider <provider>", "Wake adapter: openclaw (default) or grokbot", "openclaw")
     .option("--server <url>", "Permission Slip server URL")
     .option("--agent-id <id>", "Agent ID")
     .option("--pretty", "Pretty-printed JSON")
     .action(async (opts: {
       url: string;
       token: string;
+      provider?: string;
       server?: string;
       agentId?: string;
       pretty?: boolean;
@@ -35,7 +38,7 @@ export function webhookCommand(program: Command): void {
         const { url: server } = requireServerUrl({ serverFlag: opts.server });
         const agentId = resolveAgentId(server, opts.agentId);
         const client = new ApiClient({ serverUrl: server, agentId });
-        const result = await client.setAgentWebhook(opts.url, opts.token);
+        const result = await client.setAgentWebhook(opts.url, opts.token, opts.provider ?? "openclaw");
         output(result, outputOpts);
         if (result.test && !result.test.success) {
           process.exit(1);

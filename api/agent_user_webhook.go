@@ -37,7 +37,7 @@ func handlePutAgentWebhookForUser(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		resp, opErr := setAgentWebhookCore(r.Context(), deps, agentID, req.URL, req.Token)
+		resp, opErr := setAgentWebhookCore(r.Context(), deps, agentID, req.URL, req.Token, req.Provider)
 		if opErr != nil {
 			RespondError(w, r, opErr.Status, opErr.Body)
 			return

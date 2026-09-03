@@ -179,7 +179,7 @@ func TestDeleteAgentWebhookForUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(ctx, tx, agentID, "http://127.0.0.1:1/hooks", vaultID); err != nil {
+	if err := db.SetAgentWebhook(ctx, tx, agentID, "http://127.0.0.1:1/hooks", vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,7 +232,7 @@ func TestGetAgentWebhookForUser_TestWake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(ctx, tx, agentID, hookSrv.URL+"/hooks", vaultID); err != nil {
+	if err := db.SetAgentWebhook(ctx, tx, agentID, hookSrv.URL+"/hooks", vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
