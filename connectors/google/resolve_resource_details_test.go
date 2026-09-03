@@ -445,11 +445,122 @@ func TestResolveResourceDetails_DriveFolder_SharedDriveFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if details["folder_name"] != "Finance Shared Drive" {
+	if details["folder_name"] != "Finance Shared Drive in the / directory" {
 		t.Errorf("expected shared drive name, got %v", details["folder_name"])
 	}
 	if fileHits != 1 || driveHits != 1 {
 		t.Errorf("expected files.get then drives.get, got fileHits=%d driveHits=%d", fileHits, driveHits)
+	}
+}
+
+func TestResolveResourceDetails_DriveFolder_GenericRootName(t *testing.T) {
+	// files.get succeeds for Shared Drive IDs but returns the generic name
+	// "Drive". The real title comes from drives.get.
+	var fileHits, driveHits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case len(r.URL.Path) >= len("/drive/v3/files/") && r.URL.Path[:len("/drive/v3/files/")] == "/drive/v3/files/":
+			fileHits++
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"name":"Drive","driveId":"` + sharedDriveID + `"}`))
+		case len(r.URL.Path) >= len("/drive/v3/drives/") && r.URL.Path[:len("/drive/v3/drives/")] == "/drive/v3/drives/":
+			driveHits++
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"name":"Chiedo's assistant drive"}`))
+		default:
+			t.Errorf("unexpected request path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{
+		client:       srv.Client(),
+		driveBaseURL: srv.URL,
+	}
+	params, _ := json.Marshal(map[string]string{"folder_id": sharedDriveID})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.upload_drive_file", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := "Chiedo's assistant drive in the / directory"
+	if details["folder_name"] != want {
+		t.Errorf("expected folder_name %q, got %v", want, details["folder_name"])
+	}
+	if details["parent_name"] != want {
+		t.Errorf("expected parent_name %q, got %v", want, details["parent_name"])
+	}
+	if fileHits != 1 || driveHits != 1 {
+		t.Errorf("expected files.get then drives.get, got fileHits=%d driveHits=%d", fileHits, driveHits)
+	}
+}
+
+func TestResolveResourceDetails_DriveFolder_NamedDriveFolderUnchanged(t *testing.T) {
+	// A nested folder that happens to be named "Drive" still has parents, so
+	// we must not replace it with the Shared Drive title.
+	var driveHits int
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case len(r.URL.Path) >= len("/drive/v3/files/") && r.URL.Path[:len("/drive/v3/files/")] == "/drive/v3/files/":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"name":"Drive","driveId":"` + sharedDriveID + `","parents":["` + sharedDriveID + `"]}`))
+		case len(r.URL.Path) >= len("/drive/v3/drives/") && r.URL.Path[:len("/drive/v3/drives/")] == "/drive/v3/drives/":
+			driveHits++
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"name":"Finance Shared Drive"}`))
+		default:
+			t.Errorf("unexpected request path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{
+		client:       srv.Client(),
+		driveBaseURL: srv.URL,
+	}
+	params, _ := json.Marshal(map[string]string{"folder_id": "1nestedDriveFolder"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.upload_drive_file", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["folder_name"] != "Drive" {
+		t.Errorf("expected nested folder name to be kept, got %v", details["folder_name"])
+	}
+	if driveHits != 0 {
+		t.Errorf("did not expect drives.get for a nested folder, got driveHits=%d", driveHits)
+	}
+}
+
+func TestResolveResourceDetails_DriveFolder_GenericRootName_DriveGetFails(t *testing.T) {
+	// files.get already succeeded; a drives.get failure must not drop the
+	// approval's folder details entirely.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case len(r.URL.Path) >= len("/drive/v3/files/") && r.URL.Path[:len("/drive/v3/files/")] == "/drive/v3/files/":
+			w.Header().Set("Content-Type", "application/json")
+			w.Write([]byte(`{"name":"Drive","driveId":"` + sharedDriveID + `"}`))
+		case len(r.URL.Path) >= len("/drive/v3/drives/") && r.URL.Path[:len("/drive/v3/drives/")] == "/drive/v3/drives/":
+			w.WriteHeader(http.StatusNotFound)
+			w.Write([]byte(`{"error":{"message":"Shared drive not found","code":404}}`))
+		default:
+			t.Errorf("unexpected request path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{
+		client:       srv.Client(),
+		driveBaseURL: srv.URL,
+	}
+	params, _ := json.Marshal(map[string]string{"folder_id": sharedDriveID})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.upload_drive_file", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["folder_name"] != "Drive in the / directory" {
+		t.Errorf("expected generic root fallback, got %v", details["folder_name"])
 	}
 }
 
