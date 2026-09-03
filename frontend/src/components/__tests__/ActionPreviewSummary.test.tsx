@@ -343,6 +343,20 @@ describe("buildSummary", () => {
       expect(result).toBe(`Upload ${q("receipt.pdf")} to ${q("Finance Shared Drive")}`);
     });
 
+    it("includes Shared Drive title for a nested folder", () => {
+      const result = buildSummary(
+        "google.upload_drive_file",
+        { name: "ps-ui-test.pdf", folder_id: "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d" },
+        null,
+        null,
+        undefined,
+        { folder_name: "2026-documents in Chiedo's assistant drive" },
+      );
+      expect(result).toBe(
+        `Upload ${q("ps-ui-test.pdf")} to ${q("2026-documents in Chiedo's assistant drive")}`,
+      );
+    });
+
     it("falls back to Drive when folder name is missing", () => {
       const result = buildSummary(
         "google.upload_drive_file",

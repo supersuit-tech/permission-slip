@@ -890,7 +890,7 @@ Creates and uploads a file to Google Drive. Text can be sent as `content`; PDFs,
 
 Uses multipart upload with JSON metadata in the first part and file content in the second. Decoded content is capped at 10 MB. Sends `supportsAllDrives=true` so a Shared Drive folder or drive ID in `folder_id` is accepted as the parent.
 
-Approval UIs resolve `folder_id` to a human-readable folder (or Shared Drive) name via the Drive API, the same way `calendar_id` is resolved to `calendar_name`. Shared Drive *roots* (`folder_id` is the `0A…` drive ID) need a `drives.get` lookup: `files.get` succeeds but returns the generic name `Drive`. The approval then shows e.g. `Chiedo's assistant drive in the / directory`. Binary `content_base64` is shown as a type/size summary rather than raw encoded bytes.
+Approval UIs resolve `folder_id` to a human-readable folder (or Shared Drive) name via the Drive API, the same way `calendar_id` is resolved to `calendar_name`. Shared Drive *roots* (`folder_id` is the `0A…` drive ID) need a `drives.get` lookup: `files.get` succeeds but returns the generic name `Drive`. The approval then shows e.g. `Chiedo's assistant drive in the / directory`. Nested folders inside a Shared Drive append the drive title (`2026-documents in Chiedo's assistant drive`) so the Parameters `folder_id` row shows which drive the folder lives in. Binary `content_base64` is shown as a type/size summary rather than raw encoded bytes.
 
 ---
 
