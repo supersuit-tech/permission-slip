@@ -276,4 +276,17 @@ describe("formatStandingApprovalConstraints", () => {
       },
     ]);
   });
+
+  it("labels $meta calendar_id constraints as verified calendar", () => {
+    const lines = formatStandingApprovalConstraints({
+      calendar_id: "*",
+      $meta: { calendar_id: "work@example.com" },
+    });
+    expect(lines).toContainEqual({
+      label: "Verified calendar",
+      mode: "fixed",
+      value: "work@example.com",
+      verified: true,
+    });
+  });
 });

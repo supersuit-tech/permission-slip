@@ -1,12 +1,76 @@
 package google
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
+
+const maxCalendarIDLength = 1024
+
+// calendarLookup is the Calendar API result for a calendar_id (including
+// "primary" and omitted, which default to the user's primary calendar).
+type calendarLookup struct {
+	ID      string
+	Summary string
+}
+
+// isValidCalendarID rejects values that would break out of the Calendar API
+// path even after URL-escaping (slashes, query/fragment, control chars).
+func isValidCalendarID(s string) bool {
+	if s == "" || len(s) > maxCalendarIDLength {
+		return false
+	}
+	if strings.ContainsAny(s, "/?#\n\r\x00") {
+		return false
+	}
+	return true
+}
+
+func normalizeCalendarID(calendarID string) string {
+	if calendarID == "" {
+		return "primary"
+	}
+	return calendarID
+}
+
+// fetchCalendar loads id+summary via GET /calendars/{calendarId}.
+// Empty calendarID is treated as "primary".
+func (c *GoogleConnector) fetchCalendar(ctx context.Context, creds connectors.Credentials, calendarID string) (calendarLookup, error) {
+	calendarID = normalizeCalendarID(calendarID)
+	if !isValidCalendarID(calendarID) {
+		return calendarLookup{}, fmt.Errorf("invalid calendar_id")
+	}
+
+	var resp struct {
+		ID      string `json:"id"`
+		Summary string `json:"summary"`
+	}
+	getURL := c.calendarBaseURL + "/calendars/" + url.PathEscape(calendarID) + "?fields=id,summary"
+	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
+		return calendarLookup{}, err
+	}
+	return calendarLookup{ID: resp.ID, Summary: resp.Summary}, nil
+}
+
+// lookupCalendar is fetchCalendar plus a fail-closed check that the Calendar
+// API returned a canonical id (used for $meta.calendar_id matching).
+func (c *GoogleConnector) lookupCalendar(ctx context.Context, creds connectors.Credentials, calendarID string) (calendarLookup, error) {
+	cal, err := c.fetchCalendar(ctx, creds, calendarID)
+	if err != nil {
+		return calendarLookup{}, err
+	}
+	if cal.ID == "" {
+		return calendarLookup{}, fmt.Errorf("calendar %q has no id", normalizeCalendarID(calendarID))
+	}
+	return cal, nil
+}
 
 // normalizeCalendarTimeParams rewrites common time-parameter aliases in the raw
 // JSON so the typed unmarshal succeeds even when an LLM agent sends "start"/"end"

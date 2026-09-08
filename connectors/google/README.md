@@ -233,6 +233,8 @@ Creates a new event on Google Calendar.
 - `end_time` must be strictly after `start_time` — equal or earlier times are rejected with a clear validation error.
 - `calendar_id` is URL-encoded in the API path to safely handle IDs containing special characters (e.g., `user@group.calendar.google.com`).
 
+Standing approvals can constrain writes to a verified calendar via `$meta.calendar_id` (see [Standing approval constraints](#standing-approval-constraints-metacalendar_id)).
+
 ---
 
 ### `google.list_calendar_events`
@@ -964,6 +966,25 @@ Deletes a Google Calendar event by ID.
 
 The Google Calendar API returns HTTP 204 No Content on success. The connector synthesizes a response with `status: "deleted"` and the IDs for confirmation.
 
+### Standing approval constraints (`$meta.calendar_id`)
+
+Pinning the `calendar_id` parameter is brittle: agents may send `primary` or the canonical email, and “always allow” copies every event field (summary, times, attendees). For Calendar **writes** (`google.create_calendar_event`, `google.update_calendar_event`, `google.delete_calendar_event`, `google.create_meeting`), standing approvals can pin the **verified calendar** instead:
+
+```json
+{
+  "calendar_id": "*",
+  "$meta": {
+    "calendar_id": "work@example.com"
+  }
+}
+```
+
+Matching uses `GET /calendars/{calendarId}` — never the agent-supplied id as-is. `primary` and an omitted `calendar_id` resolve to the same canonical id as the primary calendar’s email. Other calendars fall through to one-off approval. Lookup failure is fail-closed. Agents discover the field via `GET /agents/{agent_id}/capabilities` → `meta_constraint_fields: ["calendar_id"]`.
+
+Approving a Calendar write from the web or phone “always allow” flow proposes this `$meta.calendar_id` rule (other event parameters are wildcards) when the Calendar API returns a canonical id.
+
+Each write action still needs its own standing approval. `google.list_calendar_events` is not included.
+
 ---
 
 ### `google.search_drive`
@@ -1270,7 +1291,8 @@ connectors/google/
 ├── send_chat_message.go            # google.send_chat_message action
 ├── list_chat_spaces.go             # google.list_chat_spaces action
 ├── create_meeting.go               # google.create_meeting action (Calendar + Meet)
-├── calendar_helpers.go             # Shared calendar validation (time range, attendees)
+├── calendar_helpers.go             # Shared calendar validation (time range, attendees) + calendar lookup
+├── resolve_constraint_metadata.go  # $meta.calendar_id (Calendar writes) and $meta.drive_id (Drive/Sheets)
 ├── list_drive_files.go             # google.list_drive_files action + shared isValidDriveID()
 ├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
 ├── upload_drive_file.go            # google.upload_drive_file action (multipart upload, text or base64 binary)
@@ -1278,7 +1300,6 @@ connectors/google/
 ├── search_drive.go                 # google.search_drive action (name/fullText/type/folder search)
 ├── create_drive_folder.go          # google.create_drive_folder action
 ├── drive_helpers.go                # Shared Drive query flags (supportsAllDrives, corpora)
-├── resolve_constraint_metadata.go  # $meta.drive_id standing-approval matching for Drive writes
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
@@ -1306,13 +1327,13 @@ connectors/google/
 ├── send_chat_message_test.go       # Send chat message tests (including path traversal validation)
 ├── list_chat_spaces_test.go        # List chat spaces tests (including page size clamping)
 ├── create_meeting_test.go          # Create meeting tests (including Meet link extraction)
+├── resolve_constraint_metadata_test.go # $meta.calendar_id and $meta.drive_id lookup tests
 ├── list_drive_files_test.go        # List Drive files tests (including query injection prevention)
 ├── get_drive_file_test.go          # Get Drive file tests (metadata, content export, binary skip)
 ├── upload_drive_file_test.go       # Upload tests (multipart, binary base64, size limit, folder targeting)
 ├── delete_drive_file_test.go       # Delete tests (soft delete, ID validation, rate limiting)
 ├── search_drive_test.go            # Search Drive tests (query escaping, type filter, deterministic errors)
 ├── create_drive_folder_test.go     # Create folder tests (name validation, parent ID)
-├── resolve_constraint_metadata_test.go # $meta.drive_id lookup tests (nested folder, root, My Drive)
 ├── drive_helpers_test.go           # Shared Drive query-flag helper tests
 └── README.md                       # This file
 ```

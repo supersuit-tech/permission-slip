@@ -63,6 +63,8 @@ export function metaConstraintLabel(key: string): string {
       return "Verified Bcc (sent mail only)";
     case "drive_id":
       return "inside Shared Drive";
+    case "calendar_id":
+      return "Verified calendar";
     default:
       return `Verified ${key}`;
   }

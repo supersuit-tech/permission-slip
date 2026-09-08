@@ -20,7 +20,7 @@ func (c *GoogleConnector) ResolveResourceDetails(ctx context.Context, actionType
 	// Calendar
 	case "google.delete_calendar_event", "google.update_calendar_event":
 		return c.resolveCalendarEvent(ctx, creds, params)
-	case "google.list_calendar_events":
+	case "google.list_calendar_events", "google.create_calendar_event", "google.create_meeting":
 		return c.resolveCalendar(ctx, creds, params)
 
 	// Chat
@@ -110,6 +110,34 @@ func (c *GoogleConnector) resolveCalendarEvent(ctx context.Context, creds connec
 	}
 	if endTime != "" {
 		details["end_time"] = endTime
+	}
+	// Best-effort canonical calendar id/name for standing-approval derivation.
+	// Failures must not drop the event title/times already resolved.
+	if cal, err := c.lookupCalendar(ctx, creds, p.CalendarID); err == nil {
+		details["calendar_id"] = cal.ID
+		name := cal.Summary
+		if name == "" {
+			name = cal.ID
+		}
+		if cal.Summary != "" {
+			details["calendar_name"] = cal.Summary
+		}
+		requestedID := p.CalendarID
+		if requestedID == "" {
+			requestedID = "primary"
+		}
+		connectors.AttachResources(details, connectors.ResourceRef{
+			Param: "calendar_id",
+			ID:    requestedID,
+			Name:  name,
+		})
+		if cal.ID != requestedID {
+			connectors.AttachResources(details, connectors.ResourceRef{
+				Param: "calendar_id",
+				ID:    cal.ID,
+				Name:  name,
+			})
+		}
 	}
 	return details, nil
 }
@@ -526,8 +554,8 @@ func (c *GoogleConnector) resolveChatSpace(ctx context.Context, creds connectors
 	}), nil
 }
 
-// resolveCalendar fetches the calendar summary (human-readable name) for a calendar ID.
-// API: GET {calendarBaseURL}/calendars/{calendarId}?fields=summary (Calendar API v3).
+// resolveCalendar fetches the calendar summary (human-readable name) and
+// canonical id for a calendar ID. API: GET /calendars/{calendarId}?fields=id,summary.
 // When calendar_id is empty, defaults to "primary", matching listCalendarEventsParams.normalize().
 func (c *GoogleConnector) resolveCalendar(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
 	var p struct {
@@ -536,23 +564,39 @@ func (c *GoogleConnector) resolveCalendar(ctx context.Context, creds connectors.
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, fmt.Errorf("invalid calendar params: %w", err)
 	}
-	if p.CalendarID == "" {
-		p.CalendarID = "primary"
-	}
 
-	var resp struct {
-		Summary string `json:"summary"`
-	}
-	getURL := c.calendarBaseURL + "/calendars/" + url.PathEscape(p.CalendarID) + "?fields=summary"
-	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
+	cal, err := c.fetchCalendar(ctx, creds, p.CalendarID)
+	if err != nil {
 		return nil, err
 	}
-	details := map[string]any{"calendar_name": resp.Summary}
-	return connectors.AttachResources(details, connectors.ResourceRef{
+	details := map[string]any{}
+	if cal.Summary != "" {
+		details["calendar_name"] = cal.Summary
+	}
+	if cal.ID != "" {
+		details["calendar_id"] = cal.ID
+	}
+	if len(details) == 0 {
+		return nil, fmt.Errorf("calendar %q has no name", normalizeCalendarID(p.CalendarID))
+	}
+	name := cal.Summary
+	if name == "" {
+		name = cal.ID
+	}
+	requestedID := normalizeCalendarID(p.CalendarID)
+	refs := []connectors.ResourceRef{{
 		Param: "calendar_id",
-		ID:    p.CalendarID,
-		Name:  resp.Summary,
-	}), nil
+		ID:    requestedID,
+		Name:  name,
+	}}
+	if cal.ID != "" && cal.ID != requestedID {
+		refs = append(refs, connectors.ResourceRef{
+			Param: "calendar_id",
+			ID:    cal.ID,
+			Name:  name,
+		})
+	}
+	return connectors.AttachResources(details, refs...), nil
 }
 
 // ── Gmail ───────────────────────────────────────────────────────────────────

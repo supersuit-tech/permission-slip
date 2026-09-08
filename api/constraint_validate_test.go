@@ -721,3 +721,66 @@ func TestRequestApproval_AutoApprove_GoogleGetFileUnscopedFallsThrough(t *testin
 	}
 	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 0)
 }
+
+func setupGoogleCalendarStandingApprovalTest(t *testing.T, constraints []byte, metadata map[string]any) (db.DBTX, http.Handler, int64, []byte, string) {
+	t.Helper()
+	return setupGoogleActionStandingApprovalTest(t, googleActionStandingApprovalOpts{
+		actionType:  "google.create_calendar_event",
+		actionName:  "Create Calendar Event",
+		schema:      []byte(`{"type":"object","properties":{"summary":{"type":"string"},"calendar_id":{"type":"string"}}}`),
+		constraints: constraints,
+		metadata:    metadata,
+	})
+}
+
+func TestRequestApproval_AutoApprove_GoogleCalendarIDMatch(t *testing.T) {
+	t.Parallel()
+	tx, router, agentID, privKey, saID := setupGoogleCalendarStandingApprovalTest(t,
+		[]byte(`{"calendar_id":"*","$meta":{"calendar_id":"work@example.com"}}`),
+		map[string]any{"calendar_id": "work@example.com"},
+	)
+
+	reqBody := `{"request_id":"cal-id-match-001","action":{"type":"google.create_calendar_event","parameters":{"summary":"Standup","calendar_id":"primary"}},"context":{"description":"create"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "approved" {
+		t.Errorf("expected approved, got %q", resp.Status)
+	}
+	if resp.StandingApprovalID != saID {
+		t.Errorf("expected standing approval %q, got %q", saID, resp.StandingApprovalID)
+	}
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 1)
+}
+
+func TestRequestApproval_AutoApprove_GoogleCalendarIDMismatchFallsThrough(t *testing.T) {
+	t.Parallel()
+	_, router, agentID, privKey, _ := setupGoogleCalendarStandingApprovalTest(t,
+		[]byte(`{"calendar_id":"*","$meta":{"calendar_id":"work@example.com"}}`),
+		map[string]any{"calendar_id": "other@example.com"},
+	)
+
+	reqBody := `{"request_id":"cal-id-mismatch-001","action":{"type":"google.create_calendar_event","parameters":{"summary":"Standup","calendar_id":"other@example.com"}},"context":{"description":"create"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 pending, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "pending" {
+		t.Errorf("expected pending fallthrough, got %q", resp.Status)
+	}
+}

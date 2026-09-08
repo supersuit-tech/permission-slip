@@ -176,4 +176,28 @@ describe("buildCreateStandingApprovalFromApproval", () => {
       ...GOOGLE_SHARED_DRIVE_WORKSPACE_ACTION_TYPES,
     ]);
   });
+
+  it("uses $meta.calendar_id instead of pinning event fields for Calendar writes", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.create_calendar_event",
+          version: "1",
+          parameters: {
+            summary: "Standup",
+            calendar_id: "primary",
+          },
+        },
+        resource_details: {
+          calendar_id: "alice@example.com",
+          calendar_name: "Personal",
+        },
+      }),
+    );
+    expect(request.constraints).toEqual({
+      calendar_id: "*",
+      $meta: { calendar_id: "alice@example.com" },
+    });
+    expect(request.confirm_unrestricted).toBeUndefined();
+  });
 });

@@ -143,6 +143,21 @@ Exact folder / spreadsheet / range allowlists cannot cover folders the agent cre
 
 The web and phone "always allow" flow proposes one workspace set covering routine Drive + Sheets work inside that Shared Drive. Constraint summaries display this as **inside Shared Drive** rather than a list of wildcard parameters.
 
+## Google Calendar writes (`$meta.calendar_id`)
+
+Exact `calendar_id` parameter pins miss aliases (`primary` vs the primary calendar’s email) and “always allow” copies every event field. For `google.create_calendar_event`, `google.update_calendar_event`, `google.delete_calendar_event`, and `google.create_meeting`, constrain the **verified calendar** instead:
+
+```json
+{
+  "calendar_id": "*",
+  "$meta": {
+    "calendar_id": "work@example.com"
+  }
+}
+```
+
+`$meta.calendar_id` is the canonical Calendar API id from `GET /calendars/{calendarId}`. It matches that calendar regardless of whether the agent sent `primary`, omitted `calendar_id`, or used the email id. Other calendars still require one-off approval. Discover the field via capabilities `meta_constraint_fields`. Each write action still uses its own standing approval.
+
 ## Display formatting (shared)
 
 Human-readable constraint summaries use `@permission-slip/constraints-format` in `shared/constraints/`. The same formatter powers web (`ConstraintsSummary`), mobile (standing approval detail screens), and the CLI (`auto-approve format`). When changing display semantics, update `shared/constraints/format.ts` and its tests once.

@@ -22,14 +22,35 @@ var googleSharedDriveMetadataActions = map[string]struct{}{
 	"google.sheets_list_sheets":  {},
 }
 
+// googleCalendarWriteMetadataActions are Calendar writes whose target calendar
+// can be resolved to a verified canonical ID for $meta.calendar_id matching.
+var googleCalendarWriteMetadataActions = map[string]struct{}{
+	"google.create_calendar_event": {},
+	"google.update_calendar_event": {},
+	"google.delete_calendar_event": {},
+	"google.create_meeting":        {},
+}
+
 // googleDriveMetaConstraintFields are valid $meta keys for Shared Drive actions.
 var googleDriveMetaConstraintFields = []string{"drive_id"}
 
-// ResolveConstraintMetadata returns verified Drive membership for standing
-// approval matching. drive_id is the Shared Drive the target lives on (folder,
-// file, spreadsheet, or a verified drive_id list/search parameter). My Drive
-// targets omit drive_id so a Shared Drive constraint does not match.
+// googleCalendarMetaConstraintFields are valid $meta keys for Calendar write actions.
+var googleCalendarMetaConstraintFields = []string{"calendar_id"}
+
+// ResolveConstraintMetadata returns verified Drive membership or Calendar
+// identity for standing approval matching.
+//
+// drive_id is the Shared Drive the target lives on (folder, file, spreadsheet,
+// or a verified drive_id list/search parameter). My Drive targets omit drive_id
+// so a Shared Drive constraint does not match.
+//
+// calendar_id is the canonical Calendar API id (typically an email), so
+// "primary" and the primary calendar's email resolve to the same value.
+// Lookup failure is unavailable (fail-closed).
 func (c *GoogleConnector) ResolveConstraintMetadata(ctx context.Context, actionType string, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
+	if _, ok := googleCalendarWriteMetadataActions[actionType]; ok {
+		return c.resolveCalendarConstraintMetadata(ctx, params, creds)
+	}
 	if _, ok := googleSharedDriveMetadataActions[actionType]; !ok {
 		return nil, connectors.ErrConstraintMetadataUnavailable
 	}
@@ -45,6 +66,22 @@ func (c *GoogleConnector) ResolveConstraintMetadata(ctx context.Context, actionT
 	default:
 		return c.resolveFolderDriveMeta(ctx, params, creds)
 	}
+}
+
+func (c *GoogleConnector) resolveCalendarConstraintMetadata(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
+	var p struct {
+		CalendarID string `json:"calendar_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, fmt.Errorf("%w: invalid calendar params: %v", connectors.ErrConstraintMetadataUnavailable, err)
+	}
+
+	cal, err := c.lookupCalendar(ctx, creds, p.CalendarID)
+	if err != nil {
+		return nil, fmt.Errorf("%w: %v", connectors.ErrConstraintMetadataUnavailable, err)
+	}
+
+	return map[string]any{"calendar_id": cal.ID}, nil
 }
 
 func (c *GoogleConnector) resolveFolderDriveMeta(ctx context.Context, params json.RawMessage, creds connectors.Credentials) (map[string]any, error) {
@@ -146,10 +183,13 @@ func constraintMetaFromDriveID(driveID string) map[string]any {
 
 // ConstraintMetadataActionSupport reports which $meta fields are valid per action.
 func (c *GoogleConnector) ConstraintMetadataActionSupport(actionType string) ([]string, bool) {
-	if _, ok := googleSharedDriveMetadataActions[actionType]; !ok {
-		return nil, false
+	if _, ok := googleCalendarWriteMetadataActions[actionType]; ok {
+		return googleCalendarMetaConstraintFields, true
 	}
-	return googleDriveMetaConstraintFields, true
+	if _, ok := googleSharedDriveMetadataActions[actionType]; ok {
+		return googleDriveMetaConstraintFields, true
+	}
+	return nil, false
 }
 
 var _ connectors.ConstraintMetadataResolver = (*GoogleConnector)(nil)

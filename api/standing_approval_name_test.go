@@ -28,6 +28,17 @@ func TestDeriveStandingApprovalNameFromRequest_MetaDriveID(t *testing.T) {
 	}
 }
 
+func TestDeriveStandingApprovalNameFromRequest_MetaCalendarID(t *testing.T) {
+	t.Parallel()
+	name := deriveStandingApprovalNameFromRequest("Create Calendar Event", json.RawMessage(`{
+		"calendar_id":"*",
+		"$meta":{"calendar_id":"work@example.com"}
+	}`))
+	if name != "Create Calendar Event — on calendar work@example.com" {
+		t.Fatalf("name = %q", name)
+	}
+}
+
 func TestDeriveStandingApprovalNameFromRequest_ParamConstraint(t *testing.T) {
 	t.Parallel()
 	name := deriveStandingApprovalNameFromRequest("Send Email", json.RawMessage(`{"to":"*@example.com"}`))

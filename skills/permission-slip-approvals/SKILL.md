@@ -61,6 +61,22 @@ permission-slip request --action google.sheets_read_range \
 
 See [Google connector README](../../connectors/google/README.md#standing-approval-constraints-metadrive_id) for details.
 
+**Google Calendar writes (create / update / delete / meeting):**
+
+```bash
+# Auto-approve creates on a specific calendar (any summary/times/attendees)
+permission-slip request --action google.create_calendar_event \
+  --standing-constraints '{"calendar_id":"*","$meta":{"calendar_id":"work@example.com"}}' \
+  --params '{"summary":"Standup","start_time":"2026-09-08T15:00:00Z","end_time":"2026-09-08T15:30:00Z"}'
+```
+
+- Use `$meta.calendar_id` (canonical Calendar API id) — not an exact-parameter dump of the event.
+- `primary` and omitted `calendar_id` resolve to the same id as the primary calendar’s email.
+- Same `$meta.calendar_id` field applies to `google.update_calendar_event`, `google.delete_calendar_event`, and `google.create_meeting`.
+- Other calendars fall through to one-off approval.
+
+See [Google connector README](../../connectors/google/README.md#standing-approval-constraints-metacalendar_id) for details.
+
 ## Commands
 
 ```bash
