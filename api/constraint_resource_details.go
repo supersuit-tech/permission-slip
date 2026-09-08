@@ -147,7 +147,8 @@ func collectFixedConstraintIDs(raw []byte) (map[string][]string, error) {
 	seen := map[string]map[string]struct{}{}
 	for _, group := range sc.Groups {
 		for _, cond := range group.Conditions {
-			if cond.Field == "" || strings.HasPrefix(cond.Field, db.MetaNamespaceKey) || cond.Field == db.DataWindowNamespaceKey {
+			field, ok := resolvableConstraintField(cond.Field)
+			if !ok {
 				continue
 			}
 			switch cond.Op {
@@ -163,10 +164,10 @@ func collectFixedConstraintIDs(raw []byte) (map[string][]string, error) {
 				if !ok {
 					continue
 				}
-				if seen[cond.Field] == nil {
-					seen[cond.Field] = map[string]struct{}{}
+				if seen[field] == nil {
+					seen[field] = map[string]struct{}{}
 				}
-				seen[cond.Field][id] = struct{}{}
+				seen[field][id] = struct{}{}
 			}
 		}
 	}
@@ -179,6 +180,26 @@ func collectFixedConstraintIDs(raw []byte) (map[string][]string, error) {
 		out[field] = list
 	}
 	return out, nil
+}
+
+// resolvableConstraintField maps a constraint field to the ResourceDetailResolver
+// param key. Email $meta.from / $meta.to stay skipped. $meta.calendar_id and
+// $meta.drive_id become calendar_id / drive_id so rule proposals can show names.
+func resolvableConstraintField(field string) (string, bool) {
+	if field == "" || field == db.DataWindowNamespaceKey {
+		return "", false
+	}
+	if strings.HasPrefix(field, db.MetaNamespaceKey+".") {
+		metaKey := strings.TrimPrefix(field, db.MetaNamespaceKey+".")
+		if !strings.HasSuffix(metaKey, "_id") {
+			return "", false
+		}
+		return metaKey, true
+	}
+	if field == db.MetaNamespaceKey || strings.HasPrefix(field, db.MetaNamespaceKey) {
+		return "", false
+	}
+	return field, true
 }
 
 func decodeFixedConstraintID(raw json.RawMessage) (string, bool) {

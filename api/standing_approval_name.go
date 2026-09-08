@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/supersuit-tech/permission-slip/connectors"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
@@ -13,20 +14,20 @@ const standingApprovalAutoRuleDescription = "Standing auto-approve rule"
 // deriveStandingApprovalNameFromRequest builds a human-readable name when a
 // standing approval request is approved, using the action display name and the
 // most meaningful non-wildcard constraint values.
-func deriveStandingApprovalNameFromRequest(actionName string, constraints json.RawMessage) string {
+func deriveStandingApprovalNameFromRequest(actionName string, constraints, resourceDetails json.RawMessage) string {
 	actionName = strings.TrimSpace(actionName)
 	if actionName == "" {
 		actionName = "Action"
 	}
 
-	summary := summarizeStandingApprovalConstraints(constraints)
+	summary := summarizeStandingApprovalConstraints(constraints, resourceDetails)
 	if summary == "" {
 		return truncateStandingApprovalName(fmt.Sprintf("%s auto-approve", actionName))
 	}
 	return truncateStandingApprovalName(fmt.Sprintf("%s — %s", actionName, summary))
 }
 
-func summarizeStandingApprovalConstraints(constraints json.RawMessage) string {
+func summarizeStandingApprovalConstraints(constraints, resourceDetails json.RawMessage) string {
 	if len(constraints) == 0 {
 		return ""
 	}
@@ -36,7 +37,7 @@ func summarizeStandingApprovalConstraints(constraints json.RawMessage) string {
 	}
 
 	if metaRaw, ok := obj[db.MetaNamespaceKey]; ok {
-		if summary := summarizeMetaConstraints(metaRaw); summary != "" {
+		if summary := summarizeMetaConstraints(metaRaw, resourceDetails); summary != "" {
 			return summary
 		}
 	}
@@ -47,6 +48,7 @@ func summarizeStandingApprovalConstraints(constraints json.RawMessage) string {
 			continue
 		}
 		if val := constraintDisplayValue(raw); val != "" && val != "*" {
+			val = overlayConstraintDisplayName(resourceDetails, key, val)
 			parts = append(parts, fmt.Sprintf("%s: %s", key, val))
 		}
 	}
@@ -59,7 +61,7 @@ func summarizeStandingApprovalConstraints(constraints json.RawMessage) string {
 	return strings.Join(parts[:min(2, len(parts))], ", ")
 }
 
-func summarizeMetaConstraints(metaRaw json.RawMessage) string {
+func summarizeMetaConstraints(metaRaw, resourceDetails json.RawMessage) string {
 	var meta map[string]json.RawMessage
 	if err := json.Unmarshal(metaRaw, &meta); err != nil || len(meta) == 0 {
 		return ""
@@ -84,16 +86,33 @@ func summarizeMetaConstraints(metaRaw json.RawMessage) string {
 			continue
 		}
 		if val := constraintDisplayValue(raw); val != "" && val != "*" {
+			val = overlayConstraintDisplayName(resourceDetails, item.key, val)
 			return fmt.Sprintf("%s %s", item.label, val)
 		}
 	}
 
 	for key, raw := range meta {
 		if val := constraintDisplayValue(raw); val != "" && val != "*" {
+			val = overlayConstraintDisplayName(resourceDetails, key, val)
 			return fmt.Sprintf("%s: %s", key, val)
 		}
 	}
 	return ""
+}
+
+func overlayConstraintDisplayName(resourceDetails json.RawMessage, param, id string) string {
+	if id == "" || len(resourceDetails) == 0 {
+		return id
+	}
+	var details map[string]any
+	if json.Unmarshal(resourceDetails, &details) != nil {
+		return id
+	}
+	name, _, ok := connectors.LookupResource(details, param, id)
+	if !ok || name == "" {
+		return id
+	}
+	return name
 }
 
 func constraintDisplayValue(raw json.RawMessage) string {

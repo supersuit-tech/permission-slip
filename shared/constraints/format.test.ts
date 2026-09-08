@@ -277,16 +277,74 @@ describe("formatStandingApprovalConstraints", () => {
     ]);
   });
 
-  it("labels $meta calendar_id constraints as verified calendar", () => {
+  it("labels $meta calendar_id as verified calendar and hides wildcard params", () => {
     const lines = formatStandingApprovalConstraints({
+      event_id: "*",
       calendar_id: "*",
+      summary: "*",
       $meta: { calendar_id: "work@example.com" },
     });
-    expect(lines).toContainEqual({
-      label: "Verified calendar",
-      mode: "fixed",
-      value: "work@example.com",
-      verified: true,
-    });
+    expect(lines).toEqual([
+      {
+        label: "Verified calendar",
+        mode: "fixed",
+        value: "work@example.com",
+        verified: true,
+      },
+    ]);
+  });
+
+  it("overlays calendar names on $meta.calendar_id", () => {
+    const lines = formatStandingApprovalConstraints(
+      {
+        calendar_id: "*",
+        $meta: { calendar_id: "c_abc@group.calendar.google.com" },
+      },
+      {
+        resources: {
+          calendar_id: {
+            "c_abc@group.calendar.google.com": { name: "Team Calendar" },
+          },
+        },
+      },
+    );
+    expect(lines).toEqual([
+      {
+        label: "Verified calendar",
+        mode: "fixed",
+        value: "Team Calendar",
+        verified: true,
+      },
+    ]);
+    expect(
+      formatStandingApprovalConstraintsText(
+        { calendar_id: "*", $meta: { calendar_id: "c_abc@group.calendar.google.com" } },
+        { calendar_name: "Team Calendar" },
+      ),
+    ).toBe("Verified calendar: Team Calendar");
+  });
+
+  it("overlays Shared Drive names on $meta.drive_id", () => {
+    const lines = formatStandingApprovalConstraints(
+      {
+        folder_id: "*",
+        $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+      },
+      {
+        resources: {
+          drive_id: {
+            "0AKbIIKZ8knmBUk9PVA": { name: "Finance Shared Drive" },
+          },
+        },
+      },
+    );
+    expect(lines).toEqual([
+      {
+        label: "inside Shared Drive",
+        mode: "fixed",
+        value: "Finance Shared Drive",
+        verified: true,
+      },
+    ]);
   });
 });

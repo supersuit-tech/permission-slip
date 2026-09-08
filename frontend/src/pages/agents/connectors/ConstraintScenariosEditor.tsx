@@ -266,6 +266,9 @@ function ScenarioCard({
               property={{ type: "string" }}
               rows={rows}
               disabled={disabled}
+              agentId={agentId}
+              connectorId={connectorId}
+              resourceDetails={resourceDetails}
               onRowsChange={(next) => updateMetaRows(field, next)}
             />
           );

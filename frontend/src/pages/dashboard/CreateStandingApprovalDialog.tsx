@@ -92,6 +92,12 @@ export function CreateStandingApprovalDialog({
   const ctxConstraints = isEditMode
     ? (editTarget.constraints as Record<string, unknown>)
     : initialConstraints;
+  const ctxResourceDetails =
+    isEditMode &&
+    editTarget.resource_details &&
+    typeof editTarget.resource_details === "object"
+      ? (editTarget.resource_details as Record<string, unknown>)
+      : null;
 
   const hasInitialContext = !!(ctxAgentId && ctxActionType);
   const [step, setStep] = useState<Step>(hasInitialContext ? 3 : 1);
@@ -504,6 +510,7 @@ export function CreateStandingApprovalDialog({
                 dataWindowForm={dataWindowForm}
                 onDataWindowFormChange={setDataWindowForm}
                 isPending={isPending}
+                resourceDetails={ctxResourceDetails}
               />
             </>
           )}

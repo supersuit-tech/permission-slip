@@ -981,7 +981,7 @@ Pinning the `calendar_id` parameter is brittle: agents may send `primary` or the
 
 Matching uses `GET /calendars/{calendarId}` — never the agent-supplied id as-is. `primary` and an omitted `calendar_id` resolve to the same canonical id as the primary calendar’s email. Other calendars fall through to one-off approval. Lookup failure is fail-closed. Agents discover the field via `GET /agents/{agent_id}/capabilities` → `meta_constraint_fields: ["calendar_id"]`.
 
-Approving a Calendar write from the web or phone “always allow” flow proposes this `$meta.calendar_id` rule (other event parameters are wildcards) when the Calendar API returns a canonical id.
+Approving a Calendar write from the web or phone “always allow” flow proposes this `$meta.calendar_id` rule (other event parameters are wildcards) when the Calendar API returns a canonical id. Constraint summaries resolve the canonical id to the calendar’s display name and hide the wildcard event fields.
 
 Each write action still needs its own standing approval. `google.list_calendar_events` is not included.
 
