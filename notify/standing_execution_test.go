@@ -103,13 +103,13 @@ func TestBuildEmailHTMLBody_StandingExecution(t *testing.T) {
 	h := buildEmailHTMLBody(a)
 
 	checks := []string{
-		"#2563eb",                             // blue accent
-		"Auto-Executed",                       // header
-		"Deploy Bot",                          // agent name
-		"github.issues.create",                // action type
-		"Parameters",                          // parameter summary row
-		"View Activity",                       // CTA button
-		"https://app.example.com/activity",    // URL
+		"#2563eb",                               // blue accent
+		"Auto-Executed",                         // header
+		"Deploy Bot",                            // agent name
+		"github.issues.create",                  // action type
+		"Parameters",                            // parameter summary row
+		"View Activity",                         // CTA button
+		"https://app.example.com/activity",      // URL
 		"auto-approved via a standing approval", // footer
 	}
 	for _, check := range checks {
@@ -189,7 +189,7 @@ func TestBuildPushContent_StandingExecution_NoCount(t *testing.T) {
 func TestSummarizeParameters_WithParams(t *testing.T) {
 	t.Parallel()
 	action := json.RawMessage(`{"type":"test","parameters":{"repo":"acme/app","title":"Deploy v2.1"}}`)
-	summary := summarizeParameters(action)
+	summary := summarizeParameters(action, nil)
 	// Output is sorted by key: repo before title.
 	expected := "repo=acme/app, title=Deploy v2.1"
 	if summary != expected {
@@ -200,7 +200,7 @@ func TestSummarizeParameters_WithParams(t *testing.T) {
 func TestSummarizeParameters_RedactsSensitive(t *testing.T) {
 	t.Parallel()
 	action := json.RawMessage(`{"type":"test","parameters":{"repo":"acme/app","api_key":"sk-secret123","token":"tok-abc"}}`)
-	summary := summarizeParameters(action)
+	summary := summarizeParameters(action, nil)
 	if strings.Contains(summary, "sk-secret123") {
 		t.Error("summary should redact api_key value")
 	}
@@ -220,7 +220,7 @@ func TestSummarizeParameters_RedactsCompoundSensitiveKeys(t *testing.T) {
 	// Compound key names like "aws_secret_access_key" and "db_password"
 	// must also be redacted via substring matching.
 	action := json.RawMessage(`{"type":"test","parameters":{"aws_secret_access_key":"AKIA...","db_password":"hunter2","oauth_token":"ghp_abc"}}`)
-	summary := summarizeParameters(action)
+	summary := summarizeParameters(action, nil)
 	if strings.Contains(summary, "AKIA") {
 		t.Error("summary should redact aws_secret_access_key value")
 	}
@@ -242,7 +242,7 @@ func TestSummarizeParameters_NoFalsePositives(t *testing.T) {
 	t.Parallel()
 	// "author" and "hotkey" should NOT be redacted — they are benign parameter names.
 	action := json.RawMessage(`{"type":"test","parameters":{"author":"alice","hotkey":"ctrl+s","keyboard":"us"}}`)
-	summary := summarizeParameters(action)
+	summary := summarizeParameters(action, nil)
 	if !strings.Contains(summary, "author=alice") {
 		t.Errorf("expected author to not be redacted, got: %s", summary)
 	}
@@ -257,7 +257,7 @@ func TestSummarizeParameters_NoFalsePositives(t *testing.T) {
 func TestSummarizeParameters_NonStringPrimitives(t *testing.T) {
 	t.Parallel()
 	action := json.RawMessage(`{"type":"test","parameters":{"count":42,"enabled":true,"repo":"acme/app","nested":{"a":1}}}`)
-	summary := summarizeParameters(action)
+	summary := summarizeParameters(action, nil)
 	if !strings.Contains(summary, "count=42") {
 		t.Errorf("expected number value to be rendered, got: %s", summary)
 	}
@@ -279,7 +279,7 @@ func TestSummarizeParameters_NonStringPrimitives(t *testing.T) {
 func TestSummarizeParameters_NoParams(t *testing.T) {
 	t.Parallel()
 	action := json.RawMessage(`{"type":"test"}`)
-	if summary := summarizeParameters(action); summary != "" {
+	if summary := summarizeParameters(action, nil); summary != "" {
 		t.Errorf("expected empty summary, got: %s", summary)
 	}
 }
@@ -287,7 +287,7 @@ func TestSummarizeParameters_NoParams(t *testing.T) {
 func TestSummarizeParameters_EmptyParams(t *testing.T) {
 	t.Parallel()
 	action := json.RawMessage(`{"type":"test","parameters":{}}`)
-	if summary := summarizeParameters(action); summary != "" {
+	if summary := summarizeParameters(action, nil); summary != "" {
 		t.Errorf("expected empty summary, got: %s", summary)
 	}
 }
@@ -296,7 +296,7 @@ func TestSummarizeParameters_LongValue(t *testing.T) {
 	t.Parallel()
 	longVal := strings.Repeat("x", 50)
 	action := json.RawMessage(`{"type":"test","parameters":{"desc":"` + longVal + `"}}`)
-	summary := summarizeParameters(action)
+	summary := summarizeParameters(action, nil)
 	if !strings.Contains(summary, "...") {
 		t.Errorf("expected long value to be truncated, got: %s", summary)
 	}
@@ -304,7 +304,7 @@ func TestSummarizeParameters_LongValue(t *testing.T) {
 
 func TestSummarizeParameters_NilAction(t *testing.T) {
 	t.Parallel()
-	if summary := summarizeParameters(nil); summary != "" {
+	if summary := summarizeParameters(nil, nil); summary != "" {
 		t.Errorf("expected empty summary for nil, got: %s", summary)
 	}
 }

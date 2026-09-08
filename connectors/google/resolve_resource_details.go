@@ -74,8 +74,9 @@ func (c *GoogleConnector) resolveCalendarEvent(ctx context.Context, creds connec
 	}
 
 	var resp struct {
-		Summary string `json:"summary"`
-		Start   struct {
+		Summary  string `json:"summary"`
+		HTMLLink string `json:"htmlLink"`
+		Start    struct {
 			DateTime string `json:"dateTime"`
 			Date     string `json:"date"`
 		} `json:"start"`
@@ -84,12 +85,18 @@ func (c *GoogleConnector) resolveCalendarEvent(ctx context.Context, creds connec
 			Date     string `json:"date"`
 		} `json:"end"`
 	}
-	getURL := c.calendarBaseURL + "/calendars/" + url.PathEscape(p.CalendarID) + "/events/" + url.PathEscape(p.EventID) + "?fields=summary,start,end"
+	getURL := c.calendarBaseURL + "/calendars/" + url.PathEscape(p.CalendarID) + "/events/" + url.PathEscape(p.EventID) + "?fields=summary,start,end,htmlLink"
 	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
 		return nil, err
 	}
 
 	details := map[string]any{"title": resp.Summary}
+	connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "event_id",
+		ID:    p.EventID,
+		Name:  resp.Summary,
+		URL:   resp.HTMLLink,
+	})
 	startTime := resp.Start.DateTime
 	if startTime == "" {
 		startTime = resp.Start.Date
@@ -118,21 +125,28 @@ func (c *GoogleConnector) resolveDriveFile(ctx context.Context, creds connectors
 	}
 
 	var resp struct {
-		Name     string `json:"name"`
-		MimeType string `json:"mimeType"`
+		Name        string `json:"name"`
+		MimeType    string `json:"mimeType"`
+		WebViewLink string `json:"webViewLink"`
 	}
 	q := url.Values{}
-	q.Set("fields", "name,mimeType")
+	q.Set("fields", "name,mimeType,webViewLink")
 	applySupportsAllDrives(q)
 	getURL := c.driveBaseURL + "/drive/v3/files/" + url.PathEscape(p.FileID) + "?" + q.Encode()
 	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
 		return nil, err
 	}
 
-	return map[string]any{
+	details := map[string]any{
 		"file_name": resp.Name,
 		"mime_type": resp.MimeType,
-	}, nil
+	}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "file_id",
+		ID:    p.FileID,
+		Name:  resp.Name,
+		URL:   resp.WebViewLink,
+	}), nil
 }
 
 // resolveDriveFolder fetches the human-readable name for a Drive folder_id or
@@ -150,30 +164,67 @@ func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connecto
 	var p struct {
 		FolderID string `json:"folder_id"`
 		ParentID string `json:"parent_id"`
+		DriveID  string `json:"drive_id"`
 	}
 	if err := json.Unmarshal(params, &p); err != nil {
 		return nil, fmt.Errorf("invalid drive folder params: %w", err)
 	}
 
-	id := p.FolderID
-	if id == "" {
-		id = p.ParentID
-	}
-	if id == "" {
-		if defaultRootName == "" {
-			return nil, nil
-		}
-		return driveFolderDetails(defaultRootName), nil
-	}
-	if !isValidDriveID(id) {
-		return nil, fmt.Errorf("invalid folder_id")
+	folderID := p.FolderID
+	if folderID == "" {
+		folderID = p.ParentID
 	}
 
-	name, err := c.lookupDriveFolderName(ctx, creds, id)
-	if err != nil {
-		return nil, err
+	details := map[string]any{}
+	folderParam := "folder_id"
+	if p.FolderID == "" && p.ParentID != "" {
+		folderParam = "parent_id"
 	}
-	return driveFolderDetails(name), nil
+
+	switch {
+	case folderID != "":
+		if !isValidDriveID(folderID) {
+			return nil, fmt.Errorf("invalid folder_id")
+		}
+		name, err := c.lookupDriveFolderName(ctx, creds, folderID)
+		if err != nil {
+			return nil, err
+		}
+		for k, v := range driveFolderDetails(name) {
+			details[k] = v
+		}
+		connectors.AttachResources(details, connectors.ResourceRef{
+			Param: folderParam,
+			ID:    folderID,
+			Name:  name,
+			URL:   driveFolderURL(folderID),
+		})
+	case defaultRootName != "":
+		for k, v := range driveFolderDetails(defaultRootName) {
+			details[k] = v
+		}
+	}
+
+	if p.DriveID != "" && p.DriveID != folderID {
+		if !isValidDriveID(p.DriveID) {
+			return nil, fmt.Errorf("invalid drive_id")
+		}
+		driveName, err := c.lookupDriveFolderName(ctx, creds, p.DriveID)
+		if err != nil {
+			return nil, err
+		}
+		connectors.AttachResources(details, connectors.ResourceRef{
+			Param: "drive_id",
+			ID:    p.DriveID,
+			Name:  driveName,
+			URL:   driveFolderURL(p.DriveID),
+		})
+	}
+
+	if len(details) == 0 {
+		return nil, nil
+	}
+	return details, nil
 }
 
 // genericSharedDriveRootName is what files.get returns for a Shared Drive's
@@ -283,7 +334,13 @@ func (c *GoogleConnector) resolveDocument(ctx context.Context, creds connectors.
 		return nil, err
 	}
 
-	return map[string]any{"title": resp.Title}, nil
+	details := map[string]any{"title": resp.Title}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "document_id",
+		ID:    p.DocumentID,
+		Name:  resp.Title,
+		URL:   documentEditURL(p.DocumentID),
+	}), nil
 }
 
 // ── Sheets ──────────────────────────────────────────────────────────────────
@@ -311,7 +368,12 @@ func (c *GoogleConnector) resolveSpreadsheet(ctx context.Context, creds connecto
 	if p.Range != "" {
 		details["range"] = p.Range
 	}
-	return details, nil
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "spreadsheet_id",
+		ID:    p.SpreadsheetID,
+		Name:  resp.Properties.Title,
+		URL:   spreadsheetURL(p.SpreadsheetID),
+	}), nil
 }
 
 // ── Slides ──────────────────────────────────────────────────────────────────
@@ -334,10 +396,16 @@ func (c *GoogleConnector) resolvePresentation(ctx context.Context, creds connect
 
 	// Include presentation_title so templates can disambiguate from other "title"
 	// params (e.g. optional slide title on google.add_slide).
-	return map[string]any{
+	details := map[string]any{
 		"title":              resp.Title,
 		"presentation_title": resp.Title,
-	}, nil
+	}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "presentation_id",
+		ID:    p.PresentationID,
+		Name:  resp.Title,
+		URL:   presentationURL(p.PresentationID),
+	}), nil
 }
 
 // resolveChatSpace fetches the Chat space display name for approval summaries.
@@ -367,7 +435,13 @@ func (c *GoogleConnector) resolveChatSpace(ctx context.Context, creds connectors
 	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
 		return nil, err
 	}
-	return map[string]any{"space_display_name": resp.DisplayName}, nil
+	details := map[string]any{"space_display_name": resp.DisplayName}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "space_name",
+		ID:    p.SpaceName,
+		Name:  resp.DisplayName,
+		URL:   chatSpaceURL(p.SpaceName),
+	}), nil
 }
 
 // resolveCalendar fetches the calendar summary (human-readable name) for a calendar ID.
@@ -391,7 +465,12 @@ func (c *GoogleConnector) resolveCalendar(ctx context.Context, creds connectors.
 	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
 		return nil, err
 	}
-	return map[string]any{"calendar_name": resp.Summary}, nil
+	details := map[string]any{"calendar_name": resp.Summary}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "calendar_id",
+		ID:    p.CalendarID,
+		Name:  resp.Summary,
+	}), nil
 }
 
 // ── Gmail ───────────────────────────────────────────────────────────────────
@@ -430,7 +509,25 @@ func (c *GoogleConnector) resolveEmail(ctx context.Context, creds connectors.Cre
 		return nil, fmt.Errorf("missing message_id or thread_id")
 	}
 
-	return c.fetchEmailMetadata(ctx, creds, messageID)
+	meta, err := c.fetchEmailMetadata(ctx, creds, messageID)
+	if err != nil {
+		return nil, err
+	}
+	if p.ThreadID != "" && meta != nil {
+		name, _ := meta["subject"].(string)
+		if name == "" {
+			name, _ = meta["from"].(string)
+		}
+		if name != "" {
+			connectors.AttachResources(meta, connectors.ResourceRef{
+				Param: "thread_id",
+				ID:    p.ThreadID,
+				Name:  name,
+				URL:   gmailMessageURL(p.ThreadID),
+			})
+		}
+	}
+	return meta, nil
 }
 
 func (c *GoogleConnector) resolveEmailReply(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
@@ -447,6 +544,20 @@ func (c *GoogleConnector) resolveEmailReply(ctx context.Context, creds connector
 	}
 	if p.ThreadID == "" {
 		return meta, nil
+	}
+	if meta != nil {
+		name, _ := meta["subject"].(string)
+		if name == "" {
+			name, _ = meta["from"].(string)
+		}
+		if name != "" {
+			connectors.AttachResources(meta, connectors.ResourceRef{
+				Param: "thread_id",
+				ID:    p.ThreadID,
+				Name:  name,
+				URL:   gmailMessageURL(p.ThreadID),
+			})
+		}
 	}
 	thread, err := c.buildGmailEmailThread(ctx, creds, p.ThreadID)
 	if err != nil {
@@ -490,6 +601,18 @@ func (c *GoogleConnector) fetchEmailMetadata(ctx context.Context, creds connecto
 	}
 	if len(details) == 0 {
 		return nil, nil
+	}
+	name, _ := details["subject"].(string)
+	if name == "" {
+		name, _ = details["from"].(string)
+	}
+	if name != "" {
+		connectors.AttachResources(details, connectors.ResourceRef{
+			Param: "message_id",
+			ID:    messageID,
+			Name:  name,
+			URL:   gmailMessageURL(messageID),
+		})
 	}
 	return details, nil
 }

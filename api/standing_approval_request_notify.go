@@ -48,15 +48,16 @@ func NotifyStandingApprovalRequest(ctx context.Context, deps *Deps, sar *db.Stan
 	expiresAt := sar.CreatedAt.Add(30 * 24 * time.Hour)
 
 	notifApproval := notify.Approval{
-		ApprovalID:  sar.RequestID,
-		AgentID:     sar.AgentID,
-		AgentName:   agentName,
-		Action:      actionPayload,
-		Context:     ctxPayload,
-		ApprovalURL: approvalURL,
-		ExpiresAt:   expiresAt,
-		CreatedAt:   sar.CreatedAt,
-		Type:        notify.NotificationTypeStandingApprovalRequest,
+		ApprovalID:      sar.RequestID,
+		AgentID:         sar.AgentID,
+		AgentName:       agentName,
+		Action:          actionPayload,
+		Context:         ctxPayload,
+		ApprovalURL:     approvalURL,
+		ExpiresAt:       expiresAt,
+		CreatedAt:       sar.CreatedAt,
+		Type:            notify.NotificationTypeStandingApprovalRequest,
+		ResourceDetails: json.RawMessage(sar.ResourceDetails),
 	}
 
 	recipient := notify.Recipient{

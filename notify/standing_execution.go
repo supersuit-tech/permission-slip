@@ -94,7 +94,7 @@ func isSensitiveKey(key string) bool {
 // (numbers, booleans) are rendered as-is; complex objects show key-only.
 // Output is sorted by key for deterministic ordering.
 // Returns "" if no parameters are present.
-func summarizeParameters(action json.RawMessage) string {
+func summarizeParameters(action json.RawMessage, resourceDetails json.RawMessage) string {
 	if len(action) == 0 {
 		return ""
 	}
@@ -129,13 +129,21 @@ func summarizeParameters(action json.RawMessage) string {
 		}
 		var s string
 		if json.Unmarshal(params[key], &s) == nil {
+			if name := overlayParamDisplayName(resourceDetails, key, s); name != "" {
+				s = name
+			}
 			parts = append(parts, key+"="+TruncateUTF8(s, 30))
 		} else {
 			// For non-string primitives (numbers, booleans) render the raw token;
 			// for complex objects just show the key to avoid information overload.
 			raw := params[key]
 			if len(raw) > 0 && raw[0] != '{' && raw[0] != '[' {
-				parts = append(parts, key+"="+string(raw))
+				id := strings.TrimSpace(strings.Trim(string(raw), `"`))
+				if name := overlayParamDisplayName(resourceDetails, key, id); name != "" {
+					parts = append(parts, key+"="+TruncateUTF8(name, 30))
+				} else {
+					parts = append(parts, key+"="+string(raw))
+				}
 			} else {
 				parts = append(parts, key)
 			}
@@ -168,7 +176,7 @@ func buildStandingExecutionPlainBody(approval Approval) string {
 		b.WriteString(fmt.Sprintf("Action: %s\n", info.ActionType))
 	}
 
-	if paramSummary := summarizeParameters(approval.Action); paramSummary != "" {
+	if paramSummary := summarizeParameters(approval.Action, approval.ResourceDetails); paramSummary != "" {
 		b.WriteString(fmt.Sprintf("Parameters: %s\n", paramSummary))
 	}
 
@@ -204,7 +212,7 @@ func buildStandingExecutionHTMLBody(approval Approval) string {
 	if info.ActionType != "" {
 		b.WriteString(emailDetailRow("Action", html.EscapeString(info.ActionType)))
 	}
-	if paramSummary := summarizeParameters(approval.Action); paramSummary != "" {
+	if paramSummary := summarizeParameters(approval.Action, approval.ResourceDetails); paramSummary != "" {
 		b.WriteString(emailDetailRow("Parameters", html.EscapeString(paramSummary)))
 	}
 	b.WriteString(emailDetailRow("Time", html.EscapeString(approval.CreatedAt.UTC().Format(time.RFC1123))))

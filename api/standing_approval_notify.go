@@ -56,6 +56,11 @@ func NotifyStandingApprovalExecution(ctx context.Context, deps *Deps, exec *db.S
 		CreatedAt:   time.Now(),
 		Type:        notify.NotificationTypeStandingExecution,
 	}
+	if sa, err := db.GetStandingApprovalByIDAndUser(ctx, deps.DB, exec.StandingApprovalID, exec.UserID); err != nil {
+		log.Printf("notify: standing execution: load standing approval %s: %v", exec.StandingApprovalID, err)
+	} else if sa != nil {
+		approval.ResourceDetails = sa.ResourceDetails
+	}
 
 	enabled, err := db.IsNotificationTypeEnabled(ctx, deps.DB, exec.UserID, db.NotificationTypeStandingExecution)
 	if err != nil {

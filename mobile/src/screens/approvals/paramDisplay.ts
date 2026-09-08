@@ -1,9 +1,15 @@
 /**
  * Approval parameter display helpers. Intentionally duplicated from the web
- * frontend (`frontend/src/lib/resourceParameterDisplay.ts` and
- * `frontend/src/lib/binaryParamDisplay.ts`) because web and mobile share no
- * module-level code. Keep both in sync when changing the logic.
+ * frontend because web and mobile share no React components. Resource lookup
+ * lives in @permission-slip/constraints-format — keep call sites in sync.
  */
+import {
+  lookupResolvedResource,
+  overlayResolvedNamesOnParams,
+  safeHttpsHref,
+} from "@permission-slip/constraints-format";
+
+export { overlayResolvedNamesOnParams, safeHttpsHref, lookupResolvedResource };
 
 const MAX_THUMBNAIL_BYTES = 512 * 1024;
 
@@ -13,19 +19,15 @@ export function resolvedResourceDisplayValue(
   rawValue: unknown,
   resourceDetails?: Record<string, unknown> | null,
 ): string | null {
-  if (resourceDetails == null) return null;
-  if (typeof rawValue !== "string" && typeof rawValue !== "number") return null;
-  const raw = String(rawValue);
-  if (raw.length === 0) return null;
+  return lookupResolvedResource(paramKey, rawValue, resourceDetails)?.name ?? null;
+}
 
-  const nameKey = paramKey.endsWith("_id")
-    ? `${paramKey.slice(0, -3)}_name`
-    : `${paramKey}_name`;
-  const name = resourceDetails[nameKey];
-  if (typeof name === "string" && name.length > 0 && name !== raw) {
-    return `${name} (${raw})`;
-  }
-  return null;
+export function resolvedResourceHref(
+  paramKey: string,
+  rawValue: unknown,
+  resourceDetails?: Record<string, unknown> | null,
+): string | undefined {
+  return lookupResolvedResource(paramKey, rawValue, resourceDetails)?.url;
 }
 
 export function isBase64ParamKey(key: string): boolean {

@@ -54,6 +54,9 @@ func TestResolveResourceDetails_CalendarEvent(t *testing.T) {
 		if details["title"] != "Q1 Planning" {
 			t.Errorf("%s: expected title 'Q1 Planning', got %v", actionType, details["title"])
 		}
+		if details["event_name"] != "Q1 Planning" {
+			t.Errorf("%s: expected event_name overlay, got %v", actionType, details["event_name"])
+		}
 		if details["start_time"] != "2026-03-15T14:00:00Z" {
 			t.Errorf("%s: expected start_time, got %v", actionType, details["start_time"])
 		}
@@ -163,6 +166,12 @@ func TestResolveResourceDetails_Spreadsheet(t *testing.T) {
 		}
 		if details["title"] != "Budget Tracker" {
 			t.Errorf("%s: expected title 'Budget Tracker', got %v", actionType, details["title"])
+		}
+		if details["spreadsheet_name"] != "Budget Tracker" {
+			t.Errorf("%s: expected spreadsheet_name overlay, got %v", actionType, details["spreadsheet_name"])
+		}
+		if details["spreadsheet_url"] == nil {
+			t.Errorf("%s: expected spreadsheet_url overlay", actionType)
 		}
 		// sheets_list_sheets doesn't have a range param
 		if actionType != "google.sheets_list_sheets" {

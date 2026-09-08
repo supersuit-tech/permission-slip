@@ -202,4 +202,35 @@ describe("formatStandingApprovalConstraints", () => {
       formatStandingApprovalConstraintsText({ limit: objectValue }),
     ).toBe(`limit: ${JSON.stringify(objectValue)}`);
   });
+
+  it("overlays resource names and URLs on fixed constraint IDs", () => {
+    const lines = formatStandingApprovalConstraints(
+      { spreadsheet_id: "s123" },
+      {
+        resources: {
+          spreadsheet_id: {
+            s123: {
+              name: "Budget 2026",
+              url: "https://docs.google.com/spreadsheets/d/s123",
+            },
+          },
+        },
+      },
+    );
+    expect(lines).toEqual([
+      {
+        label: "spreadsheet_id",
+        mode: "fixed",
+        value: "Budget 2026",
+        verified: false,
+        href: "https://docs.google.com/spreadsheets/d/s123",
+      },
+    ]);
+    expect(
+      formatStandingApprovalConstraintsText(
+        { spreadsheet_id: "s123" },
+        { spreadsheet_name: "Budget 2026" },
+      ),
+    ).toBe("spreadsheet_id: Budget 2026");
+  });
 });

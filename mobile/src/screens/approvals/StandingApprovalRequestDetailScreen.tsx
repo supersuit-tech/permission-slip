@@ -48,9 +48,12 @@ export default function StandingApprovalRequestDetailScreen({
   const unrestricted = constraintsAreUnrestricted(constraintsObject);
   const constraintsText = unrestricted
     ? "Unrestricted — any parameters for this action"
-    : constraintsObject
-      ? formatStandingApprovalConstraintsText(constraintsObject)
-      : "No constraints";
+    : formatStandingApprovalConstraintsText(
+        constraintsObject,
+        request.resource_details && typeof request.resource_details === "object"
+          ? (request.resource_details as Record<string, unknown>)
+          : undefined,
+      );
 
   const runApprove = useCallback(async () => {
     setBusy(true);

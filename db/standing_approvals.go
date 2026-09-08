@@ -27,13 +27,14 @@ type StandingApproval struct {
 	RevokedAt           *time.Time
 	ExpiredAt           *time.Time
 	Unrestricted        bool
+	ResourceDetails     []byte // raw JSONB — resolved names/URLs for constraint IDs
 }
 
 // standingApprovalColumns is the canonical column list for SELECT on the standing_approvals table.
 // Keep in sync with scanStandingApproval.
 const standingApprovalColumns = `standing_approval_id, agent_id, user_id, action_type, action_version,
 	constraints, name, description, connector_instance_id, status,
-	starts_at, expires_at, created_at, revoked_at, expired_at, unrestricted`
+	starts_at, expires_at, created_at, revoked_at, expired_at, unrestricted, resource_details`
 
 // WildcardActionType is the reserved action_type value that means
 // "all actions on this connector".
@@ -66,7 +67,7 @@ func scanStandingApproval(row rowScanner) (*StandingApproval, error) {
 	err := row.Scan(
 		&sa.StandingApprovalID, &sa.AgentID, &sa.UserID, &sa.ActionType, &sa.ActionVersion,
 		&sa.Constraints, &sa.Name, &sa.Description, &sa.ConnectorInstanceID, &sa.Status,
-		&startsAt, &expiresAt, &createdAt, &revokedAt, &expiredAt, &sa.Unrestricted,
+		&startsAt, &expiresAt, &createdAt, &revokedAt, &expiredAt, &sa.Unrestricted, &sa.ResourceDetails,
 	)
 	if err != nil {
 		return nil, err
@@ -147,6 +148,7 @@ type CreateStandingApprovalParams struct {
 	StartsAt            time.Time
 	ExpiresAt           *time.Time // nil means no expiry (until revoked)
 	Unrestricted        bool
+	ResourceDetails     []byte // raw JSONB, may be nil
 }
 
 // CreateStandingApproval inserts a new standing approval with status 'active'.
@@ -159,13 +161,13 @@ func CreateStandingApproval(ctx context.Context, db DBTX, p CreateStandingApprov
 			SELECT 1 FROM agents WHERE agent_id = $2 AND approver_id = $3
 		)
 		INSERT INTO standing_approvals
-		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, name, description, connector_instance_id, status, starts_at, expires_at, unrestricted)
-		 SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12
+		   (standing_approval_id, agent_id, user_id, action_type, action_version, constraints, name, description, connector_instance_id, status, starts_at, expires_at, unrestricted, resource_details)
+		 SELECT $1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12, $13
 		 WHERE EXISTS (SELECT 1 FROM agent_check)
 		 RETURNING `+standingApprovalColumns,
 		p.StandingApprovalID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion,
 		p.Constraints, p.Name, p.Description, p.ConnectorInstanceID,
-		TimestampForSQLite(p.StartsAt), NullableTimestampForSQLite(p.ExpiresAt), p.Unrestricted,
+		TimestampForSQLite(p.StartsAt), NullableTimestampForSQLite(p.ExpiresAt), p.Unrestricted, p.ResourceDetails,
 	)
 	sa, err := scanStandingApproval(row)
 	if err != nil {
@@ -455,15 +457,16 @@ type UpdateStandingApprovalParams struct {
 	ConnectorInstanceID    *string    // nil = all accounts when ConnectorInstanceIDSet is true
 	ConnectorInstanceIDSet bool       // when false, connector_instance_id is left unchanged
 	Unrestricted           bool
+	ResourceDetails        []byte // raw JSONB, may be nil
 }
 
 // UpdateStandingApproval updates the constraints and expires_at of an active
 // standing approval belonging to the given user. Returns the updated approval, or a domain error.
 func UpdateStandingApproval(ctx context.Context, db DBTX, p UpdateStandingApprovalParams) (*StandingApproval, error) {
 	query := `UPDATE standing_approvals
-		 SET constraints = $3, expires_at = $4, unrestricted = $5`
-	args := []any{p.StandingApprovalID, p.UserID, p.Constraints, NullableTimestampForSQLite(p.ExpiresAt), p.Unrestricted}
-	argIdx := 6
+		 SET constraints = $3, expires_at = $4, unrestricted = $5, resource_details = $6`
+	args := []any{p.StandingApprovalID, p.UserID, p.Constraints, NullableTimestampForSQLite(p.ExpiresAt), p.Unrestricted, p.ResourceDetails}
+	argIdx := 7
 	if p.NameSet {
 		query += fmt.Sprintf(`, name = $%d`, argIdx)
 		args = append(args, p.Name)

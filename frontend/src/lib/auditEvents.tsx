@@ -167,7 +167,22 @@ export function getActionSummary(event: AuditEvent): string {
   const params = action.parameters as Record<string, unknown> | undefined;
 
   if (params) {
-    const summary = Object.entries(params)
+    const preferred = ["range", "to", "subject", "title", "query", "name"];
+    const isOpaque = (key: string) =>
+      key === "channel" ||
+      key === "space_name" ||
+      key.endsWith("_id") ||
+      key.endsWith("_base64");
+    const entries = Object.entries(params).filter(([key]) => !isOpaque(key));
+    entries.sort(([a], [b]) => {
+      const ai = preferred.indexOf(a);
+      const bi = preferred.indexOf(b);
+      if (ai === -1 && bi === -1) return 0;
+      if (ai === -1) return 1;
+      if (bi === -1) return -1;
+      return ai - bi;
+    });
+    const summary = entries
       .slice(0, 2)
       .map(([key, val]) => {
         const v = typeof val === "string" ? val : JSON.stringify(val);

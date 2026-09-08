@@ -196,7 +196,8 @@ describe("ApprovalDetailScreen", () => {
       renderer = renderDetail(approval);
     });
     const json = JSON.stringify(renderer.toJSON());
-    expect(json).toContain("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)");
+    expect(json).toContain("Finance Shared Drive");
+    expect(json).not.toContain("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)");
     expect(json).toMatch(/PDF/);
     expect(json).not.toContain("JVBERi0xLjQK");
   });
@@ -220,7 +221,7 @@ describe("ApprovalDetailScreen", () => {
     });
     const json = JSON.stringify(renderer.toJSON());
     expect(json).toContain(
-      "2026-documents in Chiedo's assistant drive (1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d)",
+      "2026-documents in Chiedo's assistant drive",
     );
   });
 

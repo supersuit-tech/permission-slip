@@ -70,6 +70,8 @@ type Approval struct {
 	ExpiresAt   time.Time
 	CreatedAt   time.Time
 	Type        NotificationType // determines which email/SMS/push template to use; zero value = approval
+	// ResourceDetails is optional resolved names/URLs for opaque parameter IDs.
+	ResourceDetails json.RawMessage
 	// BulkApproval fields (when Type == NotificationTypeBulkApproval)
 	BulkGroupID string
 	ActionType  string

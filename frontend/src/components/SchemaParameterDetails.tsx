@@ -4,7 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import type { ParametersSchema, SchemaProperty } from "@/lib/parameterSchema";
 import { friendlyTypeLabel } from "@/lib/parameterSchema";
 import { formatParameterValue, humanizeKey } from "@/lib/formatValues";
-import { resolvedResourceDisplayValue } from "@/lib/resourceParameterDisplay";
+import {
+  resolvedResourceDisplayValue,
+  resolvedResourceHref,
+} from "@/lib/resourceParameterDisplay";
 import {
   isBase64ParamKey,
   formatBinaryParamSummary,
@@ -119,6 +122,7 @@ export function SchemaParameterDetails({
       label: row.label,
       value: resolveDisplayValue(row.key, row.value, parameters, resourceDetails),
       thumbnailSrc: binaryThumbnailSrc(row.key, row.value, parameters),
+      href: resolvedResourceHref(row.key, row.value, resourceDetails),
     }));
 
   const hasDeveloperDetails = schema?.properties != null;
@@ -196,7 +200,11 @@ function DeveloperParameterRow({
   parameters: Record<string, unknown>;
   resourceDetails?: Record<string, unknown> | null;
 }) {
-  const displayValue = resolveDisplayValue(name, value, parameters, resourceDetails);
+  const displayValue = isProvided
+    ? isBase64ParamKey(name)
+      ? resolveDisplayValue(name, value, parameters, resourceDetails)
+      : formatParameterValue(value)
+    : "";
   const thumbnailSrc = binaryThumbnailSrc(name, value, parameters);
   const isDefault =
     defaultValue !== undefined && String(value) === String(defaultValue);

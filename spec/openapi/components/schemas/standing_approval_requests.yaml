@@ -60,6 +60,14 @@ StandingApprovalRequest:
     updated_at:
       type: string
       format: date-time
+    resource_details:
+      type: object
+      nullable: true
+      additionalProperties: true
+      description: |
+        Human-readable metadata for resources referenced by opaque IDs in the
+        proposed constraints. Populated at proposal time via the connector's
+        ResourceDetailResolver. Null when lookup is unsupported or failed.
 
 StandingApprovalRequestListResponse:
   type: object

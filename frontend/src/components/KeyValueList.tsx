@@ -6,6 +6,7 @@ export interface KeyValueEntry {
   label: string;
   value: string;
   thumbnailSrc?: string;
+  href?: string;
 }
 
 interface KeyValueListProps {
@@ -19,7 +20,7 @@ function isLongValue(value: string): boolean {
 export function KeyValueList({ entries }: KeyValueListProps) {
   return (
     <div>
-      {entries.map(({ label, value, thumbnailSrc }, index) => {
+      {entries.map(({ label, value, thumbnailSrc, href }, index) => {
         const isLong = isLongValue(value) || Boolean(thumbnailSrc);
         const isLast = index === entries.length - 1;
 
@@ -49,15 +50,30 @@ export function KeyValueList({ entries }: KeyValueListProps) {
                   className="border-border max-h-24 rounded-md border object-contain"
                 />
               )}
-              <span
-                className={
-                  isLong
-                    ? "text-foreground block text-sm leading-relaxed break-words whitespace-pre-wrap"
-                    : "text-foreground text-sm break-all"
-                }
-              >
-                {value}
-              </span>
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={
+                    isLong
+                      ? "text-foreground block text-sm leading-relaxed break-words whitespace-pre-wrap underline underline-offset-2 hover:text-primary"
+                      : "text-foreground text-sm break-all underline underline-offset-2 hover:text-primary"
+                  }
+                >
+                  {value}
+                </a>
+              ) : (
+                <span
+                  className={
+                    isLong
+                      ? "text-foreground block text-sm leading-relaxed break-words whitespace-pre-wrap"
+                      : "text-foreground text-sm break-all"
+                  }
+                >
+                  {value}
+                </span>
+              )}
             </div>
           </div>
         );

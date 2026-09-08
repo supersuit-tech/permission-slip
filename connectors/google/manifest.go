@@ -202,7 +202,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Read Spreadsheet Range",
 				Description:     "Read cell values from a specified range in a Google Sheets spreadsheet",
 				RiskLevel:       "low",
-				DisplayTemplate: "Read {{range}} from spreadsheet",
+				DisplayTemplate: "Read {{range}} from {{spreadsheet_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["spreadsheet_id", "range"],
@@ -225,7 +225,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Write Spreadsheet Range",
 				Description:     "Write cell values to a specified range in a Google Sheets spreadsheet",
 				RiskLevel:       "medium",
-				DisplayTemplate: "Write to {{range}} in spreadsheet",
+				DisplayTemplate: "Write to {{range}} in {{spreadsheet_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["spreadsheet_id", "range", "values"],
@@ -257,7 +257,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 				Name:            "Append Spreadsheet Rows",
 				Description:     "Append rows to a sheet or table in a Google Sheets spreadsheet",
 				RiskLevel:       "medium",
-				DisplayTemplate: "Append rows to {{range}} in spreadsheet",
+				DisplayTemplate: "Append rows to {{range}} in {{spreadsheet_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
 					"type": "object",
 					"required": ["spreadsheet_id", "range", "values"],

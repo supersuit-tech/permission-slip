@@ -131,6 +131,9 @@ func handleAgentCreateStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			ConnectorName:            connectorName,
 			ConnectorInstanceID:      connectorInstanceID,
 			ConnectorInstanceDisplay: connectorInstanceDisplay,
+			ResourceDetails: resolveConstraintResourceDetails(
+				r.Context(), deps, agent.AgentID, agent.ApproverID, req.ActionType, connectorInstanceID, constraintsBytes,
+			),
 		})
 		if err != nil {
 			log.Printf("[%s] InsertStandingApprovalRequest: %v", TraceID(r.Context()), err)

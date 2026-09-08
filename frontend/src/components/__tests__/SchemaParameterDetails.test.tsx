@@ -243,7 +243,8 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    expect(screen.getByText("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)")).toBeInTheDocument();
+    expect(screen.getByText("Finance Shared Drive")).toBeInTheDocument();
+    expect(screen.queryByText("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)")).not.toBeInTheDocument();
   });
 
   it("shows nested Shared Drive folder with the drive title", () => {
@@ -264,7 +265,7 @@ describe("SchemaParameterDetails", () => {
     );
 
     expect(
-      screen.getByText("2026-documents in Chiedo's assistant drive (1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d)"),
+      screen.getByText("2026-documents in Chiedo's assistant drive"),
     ).toBeInTheDocument();
   });
 

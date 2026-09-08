@@ -3,7 +3,7 @@
  * approval parameters, context details, and timeline entries. Handles both
  * short (inline) and long (stacked) values automatically.
  */
-import { Image, StyleSheet, Text, View } from "react-native";
+import { Image, Linking, Pressable, StyleSheet, Text, View } from "react-native";
 import { colors } from "../../theme/colors";
 import { formatParamValue } from "./approvalUtils";
 
@@ -11,6 +11,7 @@ export interface KeyValueEntry {
   label: string;
   value: unknown;
   thumbnailUri?: string;
+  href?: string;
 }
 
 interface KeyValueListProps {
@@ -20,7 +21,7 @@ interface KeyValueListProps {
 export function KeyValueList({ entries }: KeyValueListProps) {
   return (
     <>
-      {entries.map(({ label, value, thumbnailUri }, index) => {
+      {entries.map(({ label, value, thumbnailUri, href }, index) => {
         const formatted =
           typeof value === "string" ? value : formatParamValue(value);
         const isLong =
@@ -43,12 +44,28 @@ export function KeyValueList({ entries }: KeyValueListProps) {
                 accessibilityIgnoresInvertColors
               />
             )}
-            <Text
-              style={isLong ? styles.valueFull : styles.value}
-              selectable
-            >
-              {formatted}
-            </Text>
+            {href && href.startsWith("https:") ? (
+              <Pressable
+                onPress={() => {
+                  void Linking.openURL(href);
+                }}
+                accessibilityRole="link"
+              >
+                <Text
+                  style={[isLong ? styles.valueFull : styles.value, styles.link]}
+                  selectable
+                >
+                  {formatted}
+                </Text>
+              </Pressable>
+            ) : (
+              <Text
+                style={isLong ? styles.valueFull : styles.value}
+                selectable
+              >
+                {formatted}
+              </Text>
+            )}
           </View>
         );
       })}
@@ -90,6 +107,9 @@ const styles = StyleSheet.create({
     color: colors.gray900,
     marginTop: 4,
     lineHeight: 19,
+  },
+  link: {
+    textDecorationLine: "underline",
   },
   thumbnail: {
     marginTop: 8,

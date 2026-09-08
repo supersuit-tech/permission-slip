@@ -33,6 +33,7 @@ type standingApprovalResponse struct {
 	CreatedAt           time.Time  `json:"created_at"`
 	RevokedAt           *time.Time `json:"revoked_at,omitempty"`
 	Unrestricted        bool       `json:"unrestricted"`
+	ResourceDetails     any        `json:"resource_details,omitempty"`
 }
 
 type standingApprovalListResponse struct {
@@ -314,6 +315,7 @@ func handleCreateStandingApproval(deps *Deps) http.HandlerFunc {
 			StartsAt:           startsAt,
 			ExpiresAt:          req.ExpiresAt,
 			Unrestricted:       db.ConstraintsAreUnrestricted(constraintsBytes),
+			ResourceDetails:    resolveConstraintResourceDetails(r.Context(), deps, req.AgentID, profile.ID, req.ActionType, nil, constraintsBytes),
 		})
 		if err != nil {
 			var saErr *db.StandingApprovalError
@@ -584,6 +586,7 @@ func handleUpdateStandingApproval(deps *Deps) http.HandlerFunc {
 			ConnectorInstanceID:    connectorInstanceID,
 			ConnectorInstanceIDSet: req.ConnectorInstanceIDSet,
 			Unrestricted:           db.ConstraintsAreUnrestricted(constraintsBytes),
+			ResourceDetails:        resolveConstraintResourceDetails(r.Context(), deps, existing.AgentID, profile.ID, existing.ActionType, connectorInstanceID, constraintsBytes),
 		})
 		if err != nil {
 			if handleStandingApprovalError(w, r, err) {
@@ -655,6 +658,7 @@ func toStandingApprovalResponse(sa db.StandingApproval) standingApprovalResponse
 		CreatedAt:           sa.CreatedAt,
 		RevokedAt:           sa.RevokedAt,
 		Unrestricted:        sa.Unrestricted,
+		ResourceDetails:     unmarshalResourceDetails(sa.ResourceDetails),
 	}
 
 	if len(sa.Constraints) > 0 {

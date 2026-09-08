@@ -25,11 +25,12 @@ type StandingApprovalRequest struct {
 	ResultingStandingApprovalID *string
 	CreatedAt                   time.Time
 	UpdatedAt                   time.Time
+	ResourceDetails             []byte // raw JSONB — resolved names/URLs for constraint IDs
 }
 
 const standingApprovalRequestColumns = `request_id, agent_id, user_id, action_type, action_version,
 	constraints, connector_name, connector_instance_id, connector_instance_display,
-	status, decided_at, resulting_standing_approval_id, created_at, updated_at`
+	status, decided_at, resulting_standing_approval_id, created_at, updated_at, resource_details`
 
 // StandingApprovalRequestCursor identifies pagination position.
 type StandingApprovalRequestCursor struct {
@@ -72,7 +73,7 @@ func scanStandingApprovalRequest(row rowScanner) (*StandingApprovalRequest, erro
 	err := row.Scan(
 		&sar.RequestID, &sar.AgentID, &sar.UserID, &sar.ActionType, &sar.ActionVersion,
 		&sar.Constraints, &connectorName, &connectorInstanceID, &connectorInstanceDisplay,
-		&sar.Status, &decidedAt, &resultingSAID, &createdAt, &updatedAt,
+		&sar.Status, &decidedAt, &resultingSAID, &createdAt, &updatedAt, &sar.ResourceDetails,
 	)
 	if err != nil {
 		return nil, err
@@ -120,6 +121,7 @@ type InsertStandingApprovalRequestParams struct {
 	ConnectorName            *string
 	ConnectorInstanceID      *string
 	ConnectorInstanceDisplay *string
+	ResourceDetails          []byte
 }
 
 // InsertStandingApprovalRequest inserts a pending standing approval request.
@@ -127,11 +129,11 @@ func InsertStandingApprovalRequest(ctx context.Context, db DBTX, p InsertStandin
 	row := db.QueryRow(ctx,
 		`INSERT INTO standing_approval_requests
 		   (request_id, agent_id, user_id, action_type, action_version, constraints,
-		    connector_name, connector_instance_id, connector_instance_display, status)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'pending')
+		    connector_name, connector_instance_id, connector_instance_display, resource_details, status)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 'pending')
 		 RETURNING `+standingApprovalRequestColumns,
 		p.RequestID, p.AgentID, p.UserID, p.ActionType, p.ActionVersion, p.Constraints,
-		p.ConnectorName, p.ConnectorInstanceID, p.ConnectorInstanceDisplay,
+		p.ConnectorName, p.ConnectorInstanceID, p.ConnectorInstanceDisplay, p.ResourceDetails,
 	)
 	return scanStandingApprovalRequest(row)
 }
@@ -149,6 +151,18 @@ func GetStandingApprovalRequestByIDAndUser(ctx context.Context, db DBTX, request
 		return nil, nil
 	}
 	return sar, err
+}
+
+// UpdateStandingApprovalRequestResourceDetails stores resolved resource details
+// on an existing request. Used for best-effort backfill on GET of older rows.
+func UpdateStandingApprovalRequestResourceDetails(ctx context.Context, db DBTX, requestID, userID string, details []byte) error {
+	_, err := db.Exec(ctx,
+		`UPDATE standing_approval_requests
+		 SET resource_details = $3
+		 WHERE request_id = $1 AND user_id = $2 AND resource_details IS NULL`,
+		requestID, userID, details,
+	)
+	return err
 }
 
 // ListStandingApprovalRequestsByUser returns paginated requests for a user.

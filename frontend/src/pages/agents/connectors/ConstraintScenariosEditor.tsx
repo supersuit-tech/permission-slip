@@ -42,6 +42,7 @@ interface ConstraintScenariosEditorProps {
   disabled?: boolean;
   agentId?: number;
   connectorId?: string;
+  resourceDetails?: Record<string, unknown> | null;
 }
 
 export function ConstraintScenariosEditor({
@@ -52,6 +53,7 @@ export function ConstraintScenariosEditor({
   disabled,
   agentId,
   connectorId,
+  resourceDetails,
 }: ConstraintScenariosEditorProps) {
   const properties = parametersSchema?.properties ?? {};
   const orderedKeys = parametersSchema
@@ -243,6 +245,7 @@ function ScenarioCard({
               disabled={disabled}
               agentId={agentId}
               connectorId={connectorId}
+              resourceDetails={resourceDetails}
               onRowsChange={(next) => updateParamRows(key, next)}
             />
           );
@@ -298,6 +301,7 @@ function FieldConstraintRows({
   disabled,
   agentId,
   connectorId,
+  resourceDetails,
   onRowsChange,
 }: {
   fieldKey: string;
@@ -308,6 +312,7 @@ function FieldConstraintRows({
   disabled?: boolean;
   agentId?: number;
   connectorId?: string;
+  resourceDetails?: Record<string, unknown> | null;
   onRowsChange: (rows: ConstraintValueRow[]) => void;
 }) {
   const summary = summarizeFieldRows(label, rows);
@@ -349,6 +354,7 @@ function FieldConstraintRows({
             canRemove={rows.length > 1}
             agentId={agentId}
             connectorId={connectorId}
+            resourceDetails={resourceDetails}
             onChange={(patch) => updateRow(row.id, patch)}
             onRemove={() => removeRow(row.id)}
           />
@@ -377,6 +383,7 @@ function ConstraintValueRowEditor({
   canRemove,
   agentId,
   connectorId,
+  resourceDetails,
   onChange,
   onRemove,
 }: {
@@ -387,6 +394,7 @@ function ConstraintValueRowEditor({
   canRemove: boolean;
   agentId?: number;
   connectorId?: string;
+  resourceDetails?: Record<string, unknown> | null;
   onChange: (patch: Partial<ConstraintValueRow>) => void;
   onRemove: () => void;
 }) {
@@ -482,6 +490,7 @@ function ConstraintValueRowEditor({
             placeholder={isWildcard ? "Any value" : undefined}
             agentId={agentId}
             connectorId={connectorId}
+            resourceDetails={resourceDetails}
           />
         )}
       </div>
