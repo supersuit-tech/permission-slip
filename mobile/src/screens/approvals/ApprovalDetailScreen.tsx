@@ -72,6 +72,7 @@ import {
 import {
   formatApprovalParamValue,
   binaryThumbnailUri,
+  resolvedResourceHref,
 } from "./paramDisplay";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
@@ -149,6 +150,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
           resourceDetails,
         ),
         thumbnailUri: binaryThumbnailUri(label, value, parameters),
+        href: resolvedResourceHref(label, value, resourceDetails),
       })),
     [parameters, resourceDetails],
   );

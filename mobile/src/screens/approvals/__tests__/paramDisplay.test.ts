@@ -6,7 +6,7 @@ describe("resolvedResourceDisplayValue", () => {
       resolvedResourceDisplayValue("folder_id", "0AKbIIKZ8knmBUk9PVA", {
         folder_name: "Finance Shared Drive",
       }),
-    ).toBe("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)");
+    ).toBe("Finance Shared Drive");
   });
 
   it("overlays a Shared Drive root path label", () => {
@@ -14,7 +14,7 @@ describe("resolvedResourceDisplayValue", () => {
       resolvedResourceDisplayValue("folder_id", "0AKbllKZ8knmBUk9PVA", {
         folder_name: "Chiedo's assistant drive in the / directory",
       }),
-    ).toBe("Chiedo's assistant drive in the / directory (0AKbllKZ8knmBUk9PVA)");
+    ).toBe("Chiedo's assistant drive in the / directory");
   });
 
   it("overlays a nested Shared Drive folder with the drive title", () => {
@@ -22,7 +22,7 @@ describe("resolvedResourceDisplayValue", () => {
       resolvedResourceDisplayValue("folder_id", "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d", {
         folder_name: "2026-documents in Chiedo's assistant drive",
       }),
-    ).toBe("2026-documents in Chiedo's assistant drive (1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d)");
+    ).toBe("2026-documents in Chiedo's assistant drive");
   });
 
   it("overlays calendar_id with calendar_name", () => {
@@ -30,7 +30,7 @@ describe("resolvedResourceDisplayValue", () => {
       resolvedResourceDisplayValue("calendar_id", "primary", {
         calendar_name: "Work Calendar",
       }),
-    ).toBe("Work Calendar (primary)");
+    ).toBe("Work Calendar");
   });
 });
 

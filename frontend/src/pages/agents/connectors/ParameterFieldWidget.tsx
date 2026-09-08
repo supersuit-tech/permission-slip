@@ -10,6 +10,7 @@ import { CalendarRemoteSelectWidget } from "./CalendarRemoteSelectWidget";
 import { SlackChannelRemoteSelectWidget } from "./SlackChannelRemoteSelectWidget";
 import { SlackUserRemoteSelectWidget } from "./SlackUserRemoteSelectWidget";
 import { SlackUserRemoteMultiSelectWidget } from "./SlackUserRemoteMultiSelectWidget";
+import { lookupResolvedResource } from "@/lib/resourceParameterDisplay";
 
 export interface ParameterFieldWidgetProps {
   /** The parameter key (used for id, fallback label). */
@@ -34,6 +35,8 @@ export interface ParameterFieldWidgetProps {
    * When both sides are concrete datetimes, sets HTML min/max on the datetime-local input.
    */
   siblingDatetimeValue?: string;
+  /** Resolved names/URLs for this standing approval's constraint IDs. */
+  resourceDetails?: Record<string, unknown> | null;
 }
 
 /**
@@ -51,11 +54,13 @@ export function ParameterFieldWidget({
   connectorId,
   placeholder: placeholderOverride,
   siblingDatetimeValue,
+  resourceDetails,
 }: ParameterFieldWidgetProps) {
   const ui = property["x-ui"];
   const widget: WidgetType = ui?.widget ?? inferWidgetFromProperty(property);
   const placeholder = placeholderOverride ?? ui?.placeholder;
   const inputId = `param-${paramKey}`;
+  const resolved = lookupResolvedResource(paramKey, value, resourceDetails);
 
   return (
     <div className="space-y-1">
@@ -73,6 +78,23 @@ export function ParameterFieldWidget({
         connectorId,
         propertyUI: ui,
       })}
+      {resolved && (
+        <p className="text-muted-foreground text-xs">
+          {resolved.url ? (
+            <a
+              href={resolved.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-foreground"
+            >
+              {resolved.name}
+              <ExternalLink className="size-3" />
+            </a>
+          ) : (
+            resolved.name
+          )}
+        </p>
+      )}
       <FieldHints ui={ui} omitHelpText={widget === "remote-select" || widget === "remote-multi-select"} />
     </div>
   );

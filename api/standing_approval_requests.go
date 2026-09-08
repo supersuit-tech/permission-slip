@@ -26,6 +26,7 @@ type standingApprovalRequestResponse struct {
 	ResultingStandingApprovalID *string    `json:"resulting_standing_approval_id,omitempty"`
 	CreatedAt                   time.Time  `json:"created_at"`
 	UpdatedAt                   time.Time  `json:"updated_at"`
+	ResourceDetails             any        `json:"resource_details,omitempty"`
 }
 
 type standingApprovalRequestListResponse struct {
@@ -86,6 +87,7 @@ func toStandingApprovalRequestResponse(sar db.StandingApprovalRequest) standingA
 		ResultingStandingApprovalID: sar.ResultingStandingApprovalID,
 		CreatedAt:                   sar.CreatedAt,
 		UpdatedAt:                   sar.UpdatedAt,
+		ResourceDetails:             unmarshalResourceDetails(sar.ResourceDetails),
 	}
 }
 
@@ -160,6 +162,17 @@ func handleGetStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 		if sar == nil {
 			RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Standing approval request not found"))
 			return
+		}
+
+		if len(sar.ResourceDetails) == 0 {
+			encoded := resolveConstraintResourceDetails(r.Context(), deps, sar.AgentID, profile.ID, sar.ActionType, sar.ConnectorInstanceID, sar.Constraints)
+			if len(encoded) > 0 {
+				if err := db.UpdateStandingApprovalRequestResourceDetails(r.Context(), deps.DB, sar.RequestID, profile.ID, encoded); err != nil {
+					log.Printf("[%s] backfill standing approval request resource_details: %v", TraceID(r.Context()), err)
+				} else {
+					sar.ResourceDetails = encoded
+				}
+			}
 		}
 
 		RespondJSON(w, http.StatusOK, toStandingApprovalRequestResponse(*sar))
@@ -239,6 +252,11 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		resourceDetails := sar.ResourceDetails
+		if len(resourceDetails) == 0 {
+			resourceDetails = resolveConstraintResourceDetails(r.Context(), deps, sar.AgentID, profile.ID, sar.ActionType, sar.ConnectorInstanceID, sar.Constraints)
+		}
+
 		tx, owned, err := db.BeginOrContinue(r.Context(), deps.DB)
 		if err != nil {
 			log.Printf("[%s] ApproveStandingApprovalRequest begin tx: %v", TraceID(r.Context()), err)
@@ -263,6 +281,7 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 			StartsAt:            startsAt,
 			ExpiresAt:           nil,
 			Unrestricted:        db.ConstraintsAreUnrestricted(sar.Constraints),
+			ResourceDetails:     resourceDetails,
 		})
 		if err != nil {
 			if handleStandingApprovalError(w, r, err) {

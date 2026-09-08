@@ -1,3 +1,5 @@
+import { lookupResolvedResource } from "./resourceDisplay";
+
 export type ConstraintMode = "fixed" | "pattern" | "wildcard";
 
 export type ComparisonOp = "lte" | "gte" | "lt" | "gt";
@@ -9,6 +11,7 @@ export interface ParsedConstraintLine {
   verified: boolean;
   negated?: boolean;
   comparisonOp?: ComparisonOp;
+  href?: string;
 }
 
 export const META_NAMESPACE_KEY = "$meta";
@@ -117,8 +120,28 @@ function decodeDisplayValue(raw: unknown): { mode: ConstraintMode; value: string
   return { mode: "fixed", value: String(raw) };
 }
 
+function overlayConstraintValue(
+  field: string,
+  decoded: { mode: ConstraintMode; value: string },
+  raw: unknown,
+  resourceDetails?: Record<string, unknown> | null,
+): { value: string; href?: string } {
+  if (decoded.mode !== "fixed") {
+    return { value: decoded.value };
+  }
+  const resolved = lookupResolvedResource(field, raw, resourceDetails);
+  if (!resolved) {
+    return { value: decoded.value };
+  }
+  if (resolved.url) {
+    return { value: resolved.name, href: resolved.url };
+  }
+  return { value: resolved.name };
+}
+
 function parseStructuredConstraints(
   constraints: Record<string, unknown>,
+  resourceDetails?: Record<string, unknown> | null,
 ): ParsedConstraintLine[] {
   const groups = constraints.groups;
   if (!Array.isArray(groups)) return [];
@@ -175,13 +198,20 @@ function parseStructuredConstraints(
 
       for (const raw of values) {
         const decoded = decodeDisplayValue(raw);
-        lines.push({
+        const overlay = isMeta
+          ? { value: decoded.value }
+          : overlayConstraintValue(field, decoded, raw, resourceDetails);
+        const line: ParsedConstraintLine = {
           label: `${prefix}${label}`,
           mode: decoded.mode,
-          value: decoded.value,
+          value: overlay.value,
           verified: isMeta,
           negated,
-        });
+        };
+        if (overlay.href) {
+          line.href = overlay.href;
+        }
+        lines.push(line);
       }
     }
   });
@@ -192,19 +222,35 @@ function parseValue(
   label: string,
   raw: unknown,
   verified: boolean,
+  field?: string,
+  resourceDetails?: Record<string, unknown> | null,
 ): ParsedConstraintLine {
   const decoded = decodeDisplayValue(raw);
-  return { label, mode: decoded.mode, value: decoded.value, verified };
+  const overlay =
+    !verified && field
+      ? overlayConstraintValue(field, decoded, raw, resourceDetails)
+      : { value: decoded.value };
+  const line: ParsedConstraintLine = {
+    label,
+    mode: decoded.mode,
+    value: overlay.value,
+    verified,
+  };
+  if (overlay.href) {
+    line.href = overlay.href;
+  }
+  return line;
 }
 
 /** Flatten standing approval constraints into human-readable display lines. */
 export function formatStandingApprovalConstraints(
   constraints: Record<string, unknown> | null | undefined,
+  resourceDetails?: Record<string, unknown> | null,
 ): ParsedConstraintLine[] {
   if (!constraints || typeof constraints !== "object") return [];
 
   if (constraints.$version === CONSTRAINT_VERSION) {
-    return parseStructuredConstraints(constraints);
+    return parseStructuredConstraints(constraints, resourceDetails);
   }
 
   const lines: ParsedConstraintLine[] = [];
@@ -230,15 +276,16 @@ export function formatStandingApprovalConstraints(
       }
       continue;
     }
-    lines.push(parseValue(key, raw, false));
+    lines.push(parseValue(key, raw, false, key, resourceDetails));
   }
   return lines;
 }
 
 export function formatStandingApprovalConstraintsText(
   constraints: Record<string, unknown> | null | undefined,
+  resourceDetails?: Record<string, unknown> | null,
 ): string {
-  const lines = formatStandingApprovalConstraints(constraints);
+  const lines = formatStandingApprovalConstraints(constraints, resourceDetails);
   if (lines.length === 0) return "No constraints";
   return lines
     .map((line) => {

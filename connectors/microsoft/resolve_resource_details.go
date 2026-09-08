@@ -90,25 +90,37 @@ func (c *MicrosoftConnector) resolveDriveItemAs(ctx context.Context, creds conne
 	if err := json.Unmarshal(params, &p); err != nil || p.ItemID == "" {
 		return nil, fmt.Errorf("missing item_id")
 	}
-	name, err := c.fetchDriveItemName(ctx, creds, p.ItemID)
+	name, webURL, err := c.fetchDriveItemNameURL(ctx, creds, p.ItemID)
 	if err != nil {
 		return nil, err
 	}
 	if name == "" {
 		return nil, nil
 	}
-	return map[string]any{resultKey: name}, nil
+	details := map[string]any{resultKey: name}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "item_id",
+		ID:    p.ItemID,
+		Name:  name,
+		URL:   webURL,
+	}), nil
 }
 
 func (c *MicrosoftConnector) fetchDriveItemName(ctx context.Context, creds connectors.Credentials, itemID string) (string, error) {
-	path := "/me/drive/items/" + url.PathEscape(itemID) + "?$select=name"
+	name, _, err := c.fetchDriveItemNameURL(ctx, creds, itemID)
+	return name, err
+}
+
+func (c *MicrosoftConnector) fetchDriveItemNameURL(ctx context.Context, creds connectors.Credentials, itemID string) (string, string, error) {
+	path := "/me/drive/items/" + url.PathEscape(itemID) + "?$select=name,webUrl"
 	var resp struct {
-		Name string `json:"name"`
+		Name   string `json:"name"`
+		WebURL string `json:"webUrl"`
 	}
 	if err := c.doRequest(ctx, http.MethodGet, path, creds, nil, &resp); err != nil {
-		return "", err
+		return "", "", err
 	}
-	return resp.Name, nil
+	return resp.Name, resp.WebURL, nil
 }
 
 func (c *MicrosoftConnector) resolveCalendarName(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
@@ -133,7 +145,16 @@ func (c *MicrosoftConnector) resolveCalendarName(ctx context.Context, creds conn
 	if resp.Name == "" {
 		return nil, nil
 	}
-	return map[string]any{"calendar_name": resp.Name}, nil
+	details := map[string]any{"calendar_name": resp.Name}
+	calID := p.CalendarID
+	if calID == "" {
+		calID = "primary"
+	}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "calendar_id",
+		ID:    calID,
+		Name:  resp.Name,
+	}), nil
 }
 
 func (c *MicrosoftConnector) resolveTeamName(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
@@ -150,7 +171,12 @@ func (c *MicrosoftConnector) resolveTeamName(ctx context.Context, creds connecto
 	if name == "" {
 		return nil, nil
 	}
-	return map[string]any{"team_name": name}, nil
+	details := map[string]any{"team_name": name}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "team_id",
+		ID:    p.TeamID,
+		Name:  name,
+	}), nil
 }
 
 func (c *MicrosoftConnector) fetchTeamDisplayName(ctx context.Context, creds connectors.Credentials, teamID string) (string, error) {
@@ -186,9 +212,19 @@ func (c *MicrosoftConnector) resolveTeamAndChannel(ctx context.Context, creds co
 	details := map[string]any{}
 	if teamName != "" {
 		details["team_name"] = teamName
+		connectors.AttachResources(details, connectors.ResourceRef{
+			Param: "team_id",
+			ID:    p.TeamID,
+			Name:  teamName,
+		})
 	}
 	if chResp.DisplayName != "" {
 		details["channel_name"] = chResp.DisplayName
+		connectors.AttachResources(details, connectors.ResourceRef{
+			Param: "channel_id",
+			ID:    p.ChannelID,
+			Name:  chResp.DisplayName,
+		})
 	}
 	if len(details) == 0 {
 		return nil, nil

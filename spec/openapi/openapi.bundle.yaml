@@ -6813,11 +6813,16 @@ components:
             action parameters. Populated at request time via the connector's
             ResourceDetailResolver. Null when the connector doesn't support
             resource resolution or the lookup failed.
+
+            Overlay keys (`{param}_name`, `{param}_url`) and a nested `resources`
+            map (`resources.{param}.{id}.{name,url}`) are included when the
+            connector can resolve them, in addition to connector-specific aliases
+            such as `title` or `folder_name`.
           additionalProperties: true
           example:
             title: Q1 Planning Meeting
-            start_time: '2026-03-15T14:00:00Z'
-            end_time: '2026-03-15T15:00:00Z'
+            event_name: Q1 Planning Meeting
+            event_url: https://calendar.google.com/calendar/event?eid=abc
         execution_status:
           allOf:
             - $ref: '#/components/schemas/ExecutionStatus'
@@ -8098,6 +8103,18 @@ components:
             Downstream consumers should read this flag rather than re-deriving it
             from `constraints`.
           example: false
+        resource_details:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: |
+            Human-readable metadata for resources referenced by opaque IDs in the
+            standing approval constraints. Populated at write time via the connector's
+            ResourceDetailResolver. Null when the connector doesn't support resource
+            resolution, the constraints contain no fixed IDs, or lookup failed.
+          example:
+            spreadsheet_name: Budget 2026
+            spreadsheet_url: https://docs.google.com/spreadsheets/d/abc
       example:
         standing_approval_id: sa_abc123
         agent_id: 42
@@ -11335,6 +11352,14 @@ components:
         updated_at:
           type: string
           format: date-time
+        resource_details:
+          type: object
+          nullable: true
+          additionalProperties: true
+          description: |
+            Human-readable metadata for resources referenced by opaque IDs in the
+            proposed constraints. Populated at proposal time via the connector's
+            ResourceDetailResolver. Null when lookup is unsupported or failed.
     StandingApprovalRequestListResponse:
       type: object
       required:

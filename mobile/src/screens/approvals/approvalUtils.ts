@@ -3,6 +3,8 @@
  * and action summary generation. No React dependencies; fully unit-testable.
  */
 
+import { overlayResolvedNamesOnParams } from "./paramDisplay";
+
 /** Safely coerce action parameters to a plain object. */
 export function safeParams(raw: unknown): Record<string, unknown> {
   if (raw != null && typeof raw === "object" && !Array.isArray(raw)) {
@@ -212,9 +214,7 @@ export function buildActionSummary(
   // 2. Try display template from manifest.
   // Merge resourceDetails so templates can resolve human-readable names (#862).
   if (displayTemplate) {
-    const lookup = resourceDetails
-      ? { ...parameters, ...resourceDetails }
-      : parameters;
+    const lookup = overlayResolvedNamesOnParams(parameters, resourceDetails);
     const result = renderDisplayTemplate(displayTemplate, lookup);
     if (result) return result;
   }

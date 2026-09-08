@@ -229,6 +229,11 @@ export function EditStandingApprovalDialog({
                   disabled={isPending}
                   agentId={agentId}
                   connectorId={connectorId}
+                  resourceDetails={
+                    rule.resource_details && typeof rule.resource_details === "object"
+                      ? (rule.resource_details as Record<string, unknown>)
+                      : null
+                  }
                 />
               </div>
             ) : null}

@@ -17,6 +17,28 @@ func testGitHubResolveServer(t *testing.T, handler http.HandlerFunc) (*httptest.
 	return srv, conn
 }
 
+func assertOwnerRepoOverlay(t *testing.T, details map[string]any, owner, repo string) {
+	t.Helper()
+	if details == nil {
+		t.Fatal("expected resource details")
+	}
+	if details["owner_name"] != owner {
+		t.Errorf("owner_name: want %q, got %v", owner, details["owner_name"])
+	}
+	wantRepo := owner + "/" + repo
+	if details["repo_name"] != wantRepo {
+		t.Errorf("repo_name: want %q, got %v", wantRepo, details["repo_name"])
+	}
+	wantOwnerURL := "https://github.com/" + owner
+	if details["owner_url"] != wantOwnerURL {
+		t.Errorf("owner_url: want %q, got %v", wantOwnerURL, details["owner_url"])
+	}
+	wantRepoURL := "https://github.com/" + owner + "/" + repo
+	if details["repo_url"] != wantRepoURL {
+		t.Errorf("repo_url: want %q, got %v", wantRepoURL, details["repo_url"])
+	}
+}
+
 func TestResolveResourceDetails_Workflow(t *testing.T) {
 	t.Parallel()
 
@@ -46,6 +68,7 @@ func TestResolveResourceDetails_Workflow(t *testing.T) {
 	if details["workflow_name"] != "Deploy to production" {
 		t.Errorf("expected workflow_name, got %v", details["workflow_name"])
 	}
+	assertOwnerRepoOverlay(t, details, "acme", "app")
 }
 
 func TestResolveResourceDetails_Webhook(t *testing.T) {
@@ -82,19 +105,41 @@ func TestResolveResourceDetails_Webhook(t *testing.T) {
 	if details["webhook_events"] != "push, pull_request" {
 		t.Errorf("expected webhook_events, got %v", details["webhook_events"])
 	}
+	assertOwnerRepoOverlay(t, details, "acme", "app")
 }
 
 func TestResolveResourceDetails_UnknownAction(t *testing.T) {
 	t.Parallel()
 
 	conn := New()
-	params, _ := json.Marshal(map[string]string{"owner": "a", "repo": "b"})
+	params, _ := json.Marshal(map[string]any{
+		"owner":        "a",
+		"repo":         "b",
+		"issue_number": 12,
+	})
 	details, err := conn.ResolveResourceDetails(context.Background(), "github.create_issue", params, validCreds())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	assertOwnerRepoOverlay(t, details, "a", "b")
+	if details["issue_number_name"] != "a/b#12" {
+		t.Errorf("issue_number_name: want a/b#12, got %v", details["issue_number_name"])
+	}
+	if details["issue_number_url"] != "https://github.com/a/b/issues/12" {
+		t.Errorf("issue_number_url: want issues URL, got %v", details["issue_number_url"])
+	}
+}
+
+func TestResolveResourceDetails_UnknownAction_NoOwnerRepo(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	details, err := conn.ResolveResourceDetails(context.Background(), "github.create_issue", []byte(`{}`), validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if details != nil {
-		t.Errorf("expected nil details for unhandled action, got %v", details)
+		t.Errorf("expected nil details with no owner/repo, got %v", details)
 	}
 }
 
@@ -128,9 +173,10 @@ func TestResolveResourceDetails_Workflow_EmptyName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if details != nil {
-		t.Errorf("expected nil details for empty workflow name, got %v", details)
+	if _, ok := details["workflow_name"]; ok {
+		t.Errorf("expected no workflow_name for empty API name, got %v", details["workflow_name"])
 	}
+	assertOwnerRepoOverlay(t, details, "acme", "app")
 }
 
 func TestResolveResourceDetails_Webhook_EmptyURLAndEvents(t *testing.T) {
@@ -147,9 +193,10 @@ func TestResolveResourceDetails_Webhook_EmptyURLAndEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if details != nil {
-		t.Errorf("expected nil details when webhook has no URL and no events, got %v", details)
+	if _, ok := details["webhook_url"]; ok {
+		t.Errorf("expected no webhook_url when API returns none, got %v", details["webhook_url"])
 	}
+	assertOwnerRepoOverlay(t, details, "acme", "app")
 }
 
 func TestResolveResourceDetails_Webhook_ManyEventsTruncated(t *testing.T) {

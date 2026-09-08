@@ -21,6 +21,7 @@ export interface ParsedConstraint {
   negated?: boolean;
   comparisonOp?: "lte" | "gte" | "lt" | "gt";
   scenarioIndex?: number;
+  href?: string;
 }
 
 function lineToParsedConstraint(line: {
@@ -29,6 +30,7 @@ function lineToParsedConstraint(line: {
   value: string;
   negated?: boolean;
   comparisonOp?: "lte" | "gte" | "lt" | "gt";
+  href?: string;
 }): ParsedConstraint {
   const scenarioMatch = /^Scenario (\d+): /.exec(line.label);
   return {
@@ -40,12 +42,16 @@ function lineToParsedConstraint(line: {
     scenarioIndex: scenarioMatch
       ? Number.parseInt(scenarioMatch[1] ?? "0", 10) - 1
       : undefined,
+    href: line.href,
   };
 }
 
 /** Flatten standing-approval constraints into display rows (params + $meta + $data_window). */
 export function parseStandingApprovalConstraints(
   constraints: Record<string, unknown> | null | undefined,
+  resourceDetails?: Record<string, unknown> | null,
 ): ParsedConstraint[] {
-  return formatStandingApprovalConstraints(constraints).map(lineToParsedConstraint);
+  return formatStandingApprovalConstraints(constraints, resourceDetails).map(
+    lineToParsedConstraint,
+  );
 }

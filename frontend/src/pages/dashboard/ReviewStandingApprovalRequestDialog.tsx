@@ -118,6 +118,11 @@ export function ReviewStandingApprovalRequestDialog({
             <ConstraintsSummary
               constraints={constraints}
               unrestricted={unrestricted}
+              resourceDetails={
+                request.resource_details && typeof request.resource_details === "object"
+                  ? (request.resource_details as Record<string, unknown>)
+                  : null
+              }
             />
             <p className="text-muted-foreground mt-2 text-xs">
               Verified fields (<span className="font-mono">$meta</span>) match

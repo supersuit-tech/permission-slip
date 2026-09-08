@@ -35,6 +35,7 @@ import {
   truncate,
 } from "@/lib/formatValues";
 import { emailDetailsUnavailable } from "@/lib/emailEnrichment";
+import { overlayResolvedNamesOnParams } from "@/lib/resourceParameterDisplay";
 
 interface ActionPreviewSummaryProps {
   /** Action type identifier, e.g. "github.create_issue". */
@@ -170,9 +171,7 @@ function buildParts(
   // Merge resourceDetails into the lookup so templates can resolve human-readable
   // names (e.g. {{channel_name}} → "#general") instead of raw IDs (#862).
   if (displayTemplate) {
-    const lookup = resourceDetails
-      ? { ...parameters, ...resourceDetails }
-      : parameters;
+    const lookup = overlayResolvedNamesOnParams(parameters, resourceDetails);
     const templateParts = renderTemplate(displayTemplate, lookup);
     if (templateParts) return templateParts;
   }

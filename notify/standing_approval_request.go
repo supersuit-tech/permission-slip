@@ -85,7 +85,7 @@ func buildStandingApprovalRequestHTMLBody(approval Approval) string {
 	if description != "" {
 		b.WriteString(fmt.Sprintf(`<p style="margin:0 0 16px 0;color:#374151;">%s</p>`, html.EscapeString(description)))
 	}
-	if constraints := formatConstraintsForEmail(approval.Action); constraints != "" {
+	if constraints := formatConstraintsForEmail(approval.Action, approval.ResourceDetails); constraints != "" {
 		b.WriteString(fmt.Sprintf(`<pre style="background:#f3f4f6;padding:12px;border-radius:6px;font-size:12px;overflow-x:auto;">%s</pre>`, html.EscapeString(constraints)))
 	}
 	if approval.ApprovalURL != "" {
@@ -95,7 +95,7 @@ func buildStandingApprovalRequestHTMLBody(approval Approval) string {
 	return b.String()
 }
 
-func formatConstraintsForEmail(action json.RawMessage) string {
+func formatConstraintsForEmail(action json.RawMessage, resourceDetails json.RawMessage) string {
 	var obj map[string]json.RawMessage
 	if json.Unmarshal(action, &obj) != nil {
 		return ""
@@ -106,9 +106,9 @@ func formatConstraintsForEmail(action json.RawMessage) string {
 	}
 	var pretty bytes.Buffer
 	if json.Indent(&pretty, raw, "", "  ") != nil {
-		return string(raw)
+		return overlayIDsInText(string(raw), resourceDetails)
 	}
-	return pretty.String()
+	return overlayIDsInText(pretty.String(), resourceDetails)
 }
 
 func buildStandingApprovalRequestPushContent(approval Approval) PushContent {

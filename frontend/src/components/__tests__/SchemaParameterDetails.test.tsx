@@ -205,7 +205,7 @@ describe("SchemaParameterDetails", () => {
     expect(screen.getByText("\u2014")).toBeInTheDocument();
   });
 
-  it("shows resolved Slack channel name with raw ID for slack.send_message", () => {
+  it("shows resolved Slack channel name without the raw ID", () => {
     const slackSchema: ParametersSchema = {
       type: "object",
       required: ["channel", "message"],
@@ -223,10 +223,11 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    expect(screen.getByText("#general (C0123)")).toBeInTheDocument();
+    expect(screen.getByText("#general")).toBeInTheDocument();
+    expect(screen.queryByText("#general (C0123)")).not.toBeInTheDocument();
   });
 
-  it("shows resolved Drive folder name with raw ID", () => {
+  it("shows resolved Drive folder name without the raw ID", () => {
     const driveSchema: ParametersSchema = {
       type: "object",
       required: ["name"],
@@ -243,7 +244,8 @@ describe("SchemaParameterDetails", () => {
       />,
     );
 
-    expect(screen.getByText("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)")).toBeInTheDocument();
+    expect(screen.getByText("Finance Shared Drive")).toBeInTheDocument();
+    expect(screen.queryByText("Finance Shared Drive (0AKbIIKZ8knmBUk9PVA)")).not.toBeInTheDocument();
   });
 
   it("shows nested Shared Drive folder with the drive title", () => {
@@ -264,7 +266,7 @@ describe("SchemaParameterDetails", () => {
     );
 
     expect(
-      screen.getByText("2026-documents in Chiedo's assistant drive (1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d)"),
+      screen.getByText("2026-documents in Chiedo's assistant drive"),
     ).toBeInTheDocument();
   });
 

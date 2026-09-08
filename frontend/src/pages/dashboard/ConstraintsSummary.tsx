@@ -28,13 +28,27 @@ function truncate(value: string, max: number): string {
 
 function ConstraintBadge({ constraint }: { constraint: ParsedConstraint }) {
   const isVerified = constraint.name.startsWith("Verified ");
-  const displayValue = constraint.comparisonOp
+  const truncated = constraint.comparisonOp
     ? `${comparisonOpLabel(constraint.comparisonOp)} ${truncate(constraint.value, VALUE_TRUNCATE_LENGTH)}`
     : constraint.mode === "wildcard"
       ? "any"
       : constraint.negated
         ? `not ${truncate(constraint.value, VALUE_TRUNCATE_LENGTH)}`
         : truncate(constraint.value, VALUE_TRUNCATE_LENGTH);
+
+  const displayValue =
+    constraint.href && constraint.mode === "fixed" && !constraint.negated ? (
+      <a
+        href={constraint.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-muted-foreground underline underline-offset-2 hover:text-foreground"
+      >
+        {truncated}
+      </a>
+    ) : (
+      <span className="text-muted-foreground">{truncated}</span>
+    );
 
   return (
     <Badge
@@ -44,7 +58,7 @@ function ConstraintBadge({ constraint }: { constraint: ParsedConstraint }) {
     >
       {isVerified ? <ShieldCheck className="size-3" /> : modeIcon[constraint.mode]}
       <span className="font-sans font-medium">{constraint.name}</span>
-      <span className="text-muted-foreground">{displayValue}</span>
+      {displayValue}
     </Badge>
   );
 }
@@ -52,17 +66,19 @@ function ConstraintBadge({ constraint }: { constraint: ParsedConstraint }) {
 interface ConstraintsSummaryProps {
   constraints: Record<string, unknown> | null | undefined;
   unrestricted?: boolean;
+  resourceDetails?: Record<string, unknown> | null;
 }
 
 export function ConstraintsSummary({
   constraints,
   unrestricted,
+  resourceDetails,
 }: ConstraintsSummaryProps) {
   const [expanded, setExpanded] = useState(false);
   if (unrestricted) {
     return <UnrestrictedBadge />;
   }
-  const parsed = parseStandingApprovalConstraints(constraints);
+  const parsed = parseStandingApprovalConstraints(constraints, resourceDetails);
 
   if (parsed.length === 0) {
     return (

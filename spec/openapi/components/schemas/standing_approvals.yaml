@@ -197,6 +197,19 @@ StandingApproval:
         from `constraints`.
       example: false
 
+    resource_details:
+      type: object
+      nullable: true
+      additionalProperties: true
+      description: |
+        Human-readable metadata for resources referenced by opaque IDs in the
+        standing approval constraints. Populated at write time via the connector's
+        ResourceDetailResolver. Null when the connector doesn't support resource
+        resolution, the constraints contain no fixed IDs, or lookup failed.
+      example:
+        spreadsheet_name: "Budget 2026"
+        spreadsheet_url: "https://docs.google.com/spreadsheets/d/abc"
+
   example:
     standing_approval_id: "sa_abc123"
     agent_id: 42

@@ -267,7 +267,12 @@ func (c *SlackConnector) resolveChannel(ctx context.Context, creds connectors.Cr
 		name = "#" + name
 	}
 
-	return map[string]any{"channel_name": name}, nil
+	channelURL := "https://slack.com/app_redirect?channel=" + p.Channel
+	details := map[string]any{"channel_name": name}
+	return connectors.AttachResources(details,
+		connectors.ResourceRef{Param: "channel", ID: p.Channel, Name: name, URL: channelURL},
+		connectors.ResourceRef{Param: "channel_id", ID: p.Channel, Name: name, URL: channelURL},
+	), nil
 }
 
 // resolveUser calls users.info to fetch a display name for a user ID parameter.
@@ -321,5 +326,10 @@ func (c *SlackConnector) resolveUser(ctx context.Context, creds connectors.Crede
 		return nil, nil
 	}
 
-	return map[string]any{"user_name": displayName}, nil
+	details := map[string]any{"user_name": displayName}
+	return connectors.AttachResources(details, connectors.ResourceRef{
+		Param: "user_id",
+		ID:    p.UserID,
+		Name:  displayName,
+	}), nil
 }

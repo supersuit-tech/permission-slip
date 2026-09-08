@@ -38,6 +38,8 @@ func TestStandingApprovalsSchema(t *testing.T) {
 		"starts_at", "expires_at", "created_at",
 		"revoked_at", "expired_at",
 		"connector_instance_id",
+		"unrestricted",
+		"resource_details",
 	})
 }
 

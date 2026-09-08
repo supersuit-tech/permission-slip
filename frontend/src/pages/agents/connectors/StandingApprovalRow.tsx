@@ -99,6 +99,11 @@ export function StandingApprovalRow({
         <ConstraintsSummary
           constraints={constraints}
           unrestricted={rule.unrestricted}
+          resourceDetails={
+            rule.resource_details && typeof rule.resource_details === "object"
+              ? (rule.resource_details as Record<string, unknown>)
+              : null
+          }
         />
       </TableCell>
       {showAccountColumn && (

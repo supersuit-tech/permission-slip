@@ -32,16 +32,16 @@ func NotifyApprovalRequest(ctx context.Context, deps *Deps, approval *db.Approva
 	agentName := extractAgentName(agent)
 	approvalURL := fmt.Sprintf("%s/approve/%s", deps.BaseURL, approval.ApprovalID)
 
-
 	notifApproval := notify.Approval{
-		ApprovalID:  approval.ApprovalID,
-		AgentID:     approval.AgentID,
-		AgentName:   agentName,
-		Action:      json.RawMessage(approval.Action),
-		Context:     json.RawMessage(approval.Context),
-		ApprovalURL: approvalURL,
-		ExpiresAt:   approval.ExpiresAt,
-		CreatedAt:   approval.CreatedAt,
+		ApprovalID:      approval.ApprovalID,
+		AgentID:         approval.AgentID,
+		AgentName:       agentName,
+		Action:          json.RawMessage(approval.Action),
+		Context:         json.RawMessage(approval.Context),
+		ApprovalURL:     approvalURL,
+		ExpiresAt:       approval.ExpiresAt,
+		CreatedAt:       approval.CreatedAt,
+		ResourceDetails: json.RawMessage(approval.ResourceDetails),
 	}
 
 	recipient := notify.Recipient{

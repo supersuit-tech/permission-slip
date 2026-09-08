@@ -12,3 +12,9 @@ export {
   type ConstraintMode,
   type ParsedConstraintLine,
 } from "./format";
+export {
+  lookupResolvedResource,
+  overlayResolvedNamesOnParams,
+  safeHttpsHref,
+  type ResolvedResource,
+} from "./resourceDisplay";
