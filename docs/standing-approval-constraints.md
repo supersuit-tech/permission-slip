@@ -156,7 +156,7 @@ Exact `calendar_id` parameter pins miss aliases (`primary` vs the primary calend
 }
 ```
 
-`$meta.calendar_id` is the canonical Calendar API id from `GET /calendars/{calendarId}`. It matches that calendar regardless of whether the agent sent `primary`, omitted `calendar_id`, or used the email id. Other calendars still require one-off approval. Discover the field via capabilities `meta_constraint_fields`. Each write action still uses its own standing approval.
+`$meta.calendar_id` is the canonical Calendar API id from `GET /calendars/{calendarId}`. It matches that calendar regardless of whether the agent sent `primary`, omitted `calendar_id`, or used the email id. Other calendars still require one-off approval. Discover the field via capabilities `meta_constraint_fields`. Each write action still uses its own standing approval. Constraint summaries resolve that id to the calendar’s display name (the same overlay used for parameter IDs) and hide the wildcard event fields.
 
 ## Display formatting (shared)
 

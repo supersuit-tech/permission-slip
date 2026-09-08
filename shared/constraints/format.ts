@@ -177,8 +177,9 @@ function parseStructuredConstraints(
       }
 
       const isMeta = field.startsWith(`${META_NAMESPACE_KEY}.`);
+      const overlayField = constraintOverlayField(field);
       const label = isMeta
-        ? metaConstraintLabel(field.slice(`${META_NAMESPACE_KEY}.`.length))
+        ? metaConstraintLabel(overlayField)
         : field;
 
       if (isComparisonOp(op)) {
@@ -202,9 +203,12 @@ function parseStructuredConstraints(
 
       for (const raw of values) {
         const decoded = decodeDisplayValue(raw);
-        const overlay = isMeta
-          ? { value: decoded.value }
-          : overlayConstraintValue(field, decoded, raw, resourceDetails);
+        const overlay = overlayConstraintValue(
+          overlayField,
+          decoded,
+          raw,
+          resourceDetails,
+        );
         const line: ParsedConstraintLine = {
           label: `${prefix}${label}`,
           mode: decoded.mode,
@@ -230,10 +234,9 @@ function parseValue(
   resourceDetails?: Record<string, unknown> | null,
 ): ParsedConstraintLine {
   const decoded = decodeDisplayValue(raw);
-  const overlay =
-    !verified && field
-      ? overlayConstraintValue(field, decoded, raw, resourceDetails)
-      : { value: decoded.value };
+  const overlay = field
+    ? overlayConstraintValue(field, decoded, raw, resourceDetails)
+    : { value: decoded.value };
   const line: ParsedConstraintLine = {
     label,
     mode: decoded.mode,
@@ -246,14 +249,25 @@ function parseValue(
   return line;
 }
 
-function constraintsHaveDriveIdMeta(
+function constraintOverlayField(field: string): string {
+  if (field.startsWith(`${META_NAMESPACE_KEY}.`)) {
+    return field.slice(`${META_NAMESPACE_KEY}.`.length);
+  }
+  return field;
+}
+
+const SCOPED_RESOURCE_META_KEYS = new Set(["drive_id", "calendar_id"]);
+
+function constraintsHaveScopedResourceMeta(
   constraints: Record<string, unknown>,
 ): boolean {
   const meta = constraints[META_NAMESPACE_KEY];
   if (meta && typeof meta === "object" && !Array.isArray(meta)) {
-    const driveId = (meta as Record<string, unknown>).drive_id;
-    if (driveId !== undefined && driveId !== null && driveId !== "") {
-      return true;
+    for (const key of SCOPED_RESOURCE_META_KEYS) {
+      const value = (meta as Record<string, unknown>)[key];
+      if (value !== undefined && value !== null && value !== "") {
+        return true;
+      }
     }
   }
   if (constraints.$version === CONSTRAINT_VERSION && Array.isArray(constraints.groups)) {
@@ -263,7 +277,9 @@ function constraintsHaveDriveIdMeta(
       for (const cond of conditions) {
         if (!cond || typeof cond !== "object") continue;
         const field = String((cond as Record<string, unknown>).field ?? "");
-        if (field === `${META_NAMESPACE_KEY}.drive_id`) return true;
+        for (const key of SCOPED_RESOURCE_META_KEYS) {
+          if (field === `${META_NAMESPACE_KEY}.${key}`) return true;
+        }
       }
     }
   }
@@ -282,7 +298,7 @@ export function formatStandingApprovalConstraints(
       ? parseStructuredConstraints(constraints, resourceDetails)
       : parseFlatConstraints(constraints, resourceDetails);
 
-  if (constraintsHaveDriveIdMeta(constraints)) {
+  if (constraintsHaveScopedResourceMeta(constraints)) {
     return lines.filter((line) => line.verified || line.mode !== "wildcard");
   }
   return lines;
@@ -299,7 +315,15 @@ function parseFlatConstraints(
       for (const [metaKey, metaVal] of Object.entries(
         raw as Record<string, unknown>,
       )) {
-        lines.push(parseValue(metaConstraintLabel(metaKey), metaVal, true));
+        lines.push(
+          parseValue(
+            metaConstraintLabel(metaKey),
+            metaVal,
+            true,
+            metaKey,
+            resourceDetails,
+          ),
+        );
       }
       continue;
     }

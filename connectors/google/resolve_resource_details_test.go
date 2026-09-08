@@ -275,6 +275,30 @@ func TestResolveResourceDetails_CalendarSummary_DefaultPrimary(t *testing.T) {
 	}
 }
 
+func TestResolveResourceDetails_UpdateDeleteCalendar_CalendarOnly(t *testing.T) {
+	srv, conn := testResolveServer(t, map[string]string{
+		"/calendars/c_abc@group.calendar.google.com": `{"id":"c_abc@group.calendar.google.com","summary":"Team Calendar"}`,
+	})
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{"calendar_id": "c_abc@group.calendar.google.com"})
+	for _, actionType := range []string{"google.update_calendar_event", "google.delete_calendar_event"} {
+		details, err := conn.ResolveResourceDetails(context.Background(), actionType, params, validCreds())
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", actionType, err)
+		}
+		if details["calendar_name"] != "Team Calendar" {
+			t.Errorf("%s: expected calendar_name, got %v", actionType, details["calendar_name"])
+		}
+		resources, _ := details["resources"].(map[string]any)
+		byID, _ := resources["calendar_id"].(map[string]any)
+		entry, _ := byID["c_abc@group.calendar.google.com"].(map[string]any)
+		if entry["name"] != "Team Calendar" {
+			t.Errorf("%s: expected resources overlay, got %v", actionType, details["resources"])
+		}
+	}
+}
+
 func TestResolveResourceDetails_CreateCalendarEvent_CanonicalID(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
 		"/calendars/primary": `{"id":"alice@example.com","summary":"Personal"}`,

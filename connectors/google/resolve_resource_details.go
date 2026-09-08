@@ -19,7 +19,7 @@ func (c *GoogleConnector) ResolveResourceDetails(ctx context.Context, actionType
 	switch actionType {
 	// Calendar
 	case "google.delete_calendar_event", "google.update_calendar_event":
-		return c.resolveCalendarEvent(ctx, creds, params)
+		return c.resolveCalendarEventOrCalendar(ctx, creds, params)
 	case "google.list_calendar_events", "google.create_calendar_event", "google.create_meeting":
 		return c.resolveCalendar(ctx, creds, params)
 
@@ -60,6 +60,26 @@ func (c *GoogleConnector) ResolveResourceDetails(ctx context.Context, actionType
 }
 
 // ── Calendar ────────────────────────────────────────────────────────────────
+
+// resolveCalendarEventOrCalendar resolves an event when event_id is present.
+// Standing-approval $meta.calendar_id lookups have only a calendar id — fall
+// back to resolveCalendar so rule proposals can show the calendar name.
+func (c *GoogleConnector) resolveCalendarEventOrCalendar(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
+	var p struct {
+		EventID    string `json:"event_id"`
+		CalendarID string `json:"calendar_id"`
+	}
+	if err := json.Unmarshal(params, &p); err != nil {
+		return nil, fmt.Errorf("invalid calendar event params: %w", err)
+	}
+	if p.EventID == "" {
+		if p.CalendarID == "" {
+			return nil, fmt.Errorf("missing event_id")
+		}
+		return c.resolveCalendar(ctx, creds, params)
+	}
+	return c.resolveCalendarEvent(ctx, creds, params)
+}
 
 func (c *GoogleConnector) resolveCalendarEvent(ctx context.Context, creds connectors.Credentials, params json.RawMessage) (map[string]any, error) {
 	var p struct {
