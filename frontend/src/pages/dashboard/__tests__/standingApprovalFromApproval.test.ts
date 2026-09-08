@@ -221,4 +221,46 @@ describe("buildCreateStandingApprovalFromApproval", () => {
       "google.list_drive_files",
     );
   });
+
+  it("uses $meta.calendar_id instead of pinning event fields for Calendar writes", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.create_calendar_event",
+          version: "1",
+          parameters: {
+            summary: "Standup",
+            start_time: "2026-09-08T15:00:00Z",
+            calendar_id: "primary",
+          },
+        },
+        resource_details: {
+          calendar_id: "alice@example.com",
+          calendar_name: "Personal",
+        },
+      }),
+    );
+    expect(request.constraints).toEqual({
+      calendar_id: "*",
+      $meta: { calendar_id: "alice@example.com" },
+    });
+    expect(request.confirm_unrestricted).toBeUndefined();
+  });
+
+  it("falls back to exact params when Calendar write has no canonical calendar_id", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.update_calendar_event",
+          version: "1",
+          parameters: { event_id: "evt1", calendar_id: "primary" },
+        },
+        resource_details: { title: "Standup" },
+      }),
+    );
+    expect(request.constraints).toEqual({
+      event_id: "evt1",
+      calendar_id: "primary",
+    });
+  });
 });

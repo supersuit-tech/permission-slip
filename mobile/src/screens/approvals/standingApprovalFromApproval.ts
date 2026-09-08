@@ -28,6 +28,13 @@ const UID_EMAIL_ACTION_TYPES = new Set([
   "protonmail.remove_label",
 ]);
 
+const CALENDAR_WRITE_ACTION_TYPES = new Set([
+  "google.create_calendar_event",
+  "google.update_calendar_event",
+  "google.delete_calendar_event",
+  "google.create_meeting",
+]);
+
 function deriveConstraintsFromParams(
   parameters: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -91,6 +98,20 @@ function deriveSharedDriveConstraint(
   return buildSharedDriveWorkspaceConstraints(actionType, driveId);
 }
 
+function deriveCalendarConstraint(
+  resourceDetails?: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!resourceDetails) return null;
+  const calendarId = resourceDetails.calendar_id;
+  if (typeof calendarId !== "string" || calendarId.length === 0) return null;
+  return {
+    calendar_id: "*",
+    [META_NAMESPACE_KEY]: {
+      calendar_id: calendarId,
+    },
+  };
+}
+
 function deriveStandingApprovalConstraints(
   approval: ApprovalSummary,
 ): Record<string, unknown> {
@@ -113,6 +134,13 @@ function deriveStandingApprovalConstraints(
   );
   if (driveConstraint) {
     return driveConstraint;
+  }
+
+  if (CALENDAR_WRITE_ACTION_TYPES.has(approval.action.type)) {
+    const calendarConstraint = deriveCalendarConstraint(resourceDetails);
+    if (calendarConstraint) {
+      return calendarConstraint;
+    }
   }
 
   return standingApprovalConstraintsForCreate(params);

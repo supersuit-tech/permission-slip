@@ -352,3 +352,126 @@ func TestResolveConstraintMetadata_ListDriveIDLookupFailure(t *testing.T) {
 		t.Fatalf("expected ErrConstraintMetadataUnavailable, got %v", err)
 	}
 }
+
+func TestConstraintMetadataActionSupport_CalendarWrites(t *testing.T) {
+	t.Parallel()
+	c := New()
+
+	for _, actionType := range []string{
+		"google.create_calendar_event",
+		"google.update_calendar_event",
+		"google.delete_calendar_event",
+		"google.create_meeting",
+	} {
+		fields, ok := c.ConstraintMetadataActionSupport(actionType)
+		if !ok {
+			t.Errorf("%s: expected meta constraint support", actionType)
+			continue
+		}
+		if len(fields) != 1 || fields[0] != "calendar_id" {
+			t.Errorf("%s: expected [calendar_id], got %v", actionType, fields)
+		}
+	}
+
+	if _, ok := c.ConstraintMetadataActionSupport("google.send_email"); ok {
+		t.Error("send_email should not advertise Calendar $meta fields")
+	}
+	if _, ok := c.ConstraintMetadataActionSupport("google.list_calendar_events"); ok {
+		t.Error("list_calendar_events should not advertise Calendar write $meta fields")
+	}
+}
+
+func TestResolveConstraintMetadata_CanonicalCalendarID(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/calendars/work@example.com" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":"work@example.com","summary":"Work Calendar"}`))
+	}))
+	defer srv.Close()
+
+	conn := newCalendarForTest(srv.Client(), srv.URL)
+	params, _ := json.Marshal(map[string]string{"calendar_id": "work@example.com"})
+	meta, err := conn.ResolveConstraintMetadata(context.Background(), "google.create_calendar_event", params, validCreds())
+	if err != nil {
+		t.Fatalf("ResolveConstraintMetadata: %v", err)
+	}
+	if meta["calendar_id"] != "work@example.com" {
+		t.Errorf("calendar_id = %v, want work@example.com", meta["calendar_id"])
+	}
+}
+
+func TestResolveConstraintMetadata_PrimaryAliasCanonicalizes(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/calendars/primary" {
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"id":"alice@example.com","summary":"Alice"}`))
+	}))
+	defer srv.Close()
+
+	conn := newCalendarForTest(srv.Client(), srv.URL)
+	for _, params := range []json.RawMessage{
+		json.RawMessage(`{}`),
+		json.RawMessage(`{"calendar_id":"primary"}`),
+		json.RawMessage(`{"calendar_id":"","summary":"Standup"}`),
+	} {
+		meta, err := conn.ResolveConstraintMetadata(context.Background(), "google.create_meeting", params, validCreds())
+		if err != nil {
+			t.Fatalf("params %s: %v", params, err)
+		}
+		if meta["calendar_id"] != "alice@example.com" {
+			t.Errorf("params %s: calendar_id = %v, want alice@example.com", params, meta["calendar_id"])
+		}
+	}
+}
+
+func TestResolveConstraintMetadata_CalendarLookupFailureIsUnavailable(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte(`{"error":{"message":"backend error","code":500}}`))
+	}))
+	defer srv.Close()
+
+	conn := newCalendarForTest(srv.Client(), srv.URL)
+	params, _ := json.Marshal(map[string]string{"calendar_id": "work@example.com"})
+	_, err := conn.ResolveConstraintMetadata(context.Background(), "google.update_calendar_event", params, validCreds())
+	if !errors.Is(err, connectors.ErrConstraintMetadataUnavailable) {
+		t.Fatalf("expected ErrConstraintMetadataUnavailable, got %v", err)
+	}
+}
+
+func TestResolveConstraintMetadata_MissingCanonicalIDIsUnavailable(t *testing.T) {
+	t.Parallel()
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.Write([]byte(`{"summary":"Work Calendar"}`))
+	}))
+	defer srv.Close()
+
+	conn := newCalendarForTest(srv.Client(), srv.URL)
+	params, _ := json.Marshal(map[string]string{"calendar_id": "work@example.com"})
+	_, err := conn.ResolveConstraintMetadata(context.Background(), "google.delete_calendar_event", params, validCreds())
+	if !errors.Is(err, connectors.ErrConstraintMetadataUnavailable) {
+		t.Fatalf("expected ErrConstraintMetadataUnavailable, got %v", err)
+	}
+}
+
+func TestResolveConstraintMetadata_InvalidCalendarID(t *testing.T) {
+	t.Parallel()
+	conn := New()
+	params, _ := json.Marshal(map[string]string{"calendar_id": "../etc/passwd"})
+	_, err := conn.ResolveConstraintMetadata(context.Background(), "google.create_calendar_event", params, validCreds())
+	if !errors.Is(err, connectors.ErrConstraintMetadataUnavailable) {
+		t.Fatalf("expected ErrConstraintMetadataUnavailable, got %v", err)
+	}
+}

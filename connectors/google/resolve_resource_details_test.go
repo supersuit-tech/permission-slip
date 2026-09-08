@@ -233,7 +233,7 @@ func TestResolveResourceDetails_ChatSpace(t *testing.T) {
 
 func TestResolveResourceDetails_CalendarSummary(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
-		"/calendars/work@example.com": `{"summary":"Work Calendar"}`,
+		"/calendars/work@example.com": `{"id":"work@example.com","summary":"Work Calendar"}`,
 	})
 	defer srv.Close()
 
@@ -245,11 +245,20 @@ func TestResolveResourceDetails_CalendarSummary(t *testing.T) {
 	if details["calendar_name"] != "Work Calendar" {
 		t.Errorf("expected calendar_name, got %v", details["calendar_name"])
 	}
+	if details["calendar_id"] != "work@example.com" {
+		t.Errorf("expected calendar_id, got %v", details["calendar_id"])
+	}
+	resources, _ := details["resources"].(map[string]any)
+	byID, _ := resources["calendar_id"].(map[string]any)
+	entry, _ := byID["work@example.com"].(map[string]any)
+	if entry["name"] != "Work Calendar" {
+		t.Errorf("expected resources overlay for calendar_id, got %v", details["resources"])
+	}
 }
 
 func TestResolveResourceDetails_CalendarSummary_DefaultPrimary(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
-		"/calendars/primary": `{"summary":"alice@example.com"}`,
+		"/calendars/primary": `{"id":"alice@example.com","summary":"alice@example.com"}`,
 	})
 	defer srv.Close()
 
@@ -260,6 +269,30 @@ func TestResolveResourceDetails_CalendarSummary_DefaultPrimary(t *testing.T) {
 	}
 	if details["calendar_name"] != "alice@example.com" {
 		t.Errorf("expected calendar_name for primary, got %v", details["calendar_name"])
+	}
+	if details["calendar_id"] != "alice@example.com" {
+		t.Errorf("expected canonical calendar_id for primary, got %v", details["calendar_id"])
+	}
+}
+
+func TestResolveResourceDetails_CreateCalendarEvent_CanonicalID(t *testing.T) {
+	srv, conn := testResolveServer(t, map[string]string{
+		"/calendars/primary": `{"id":"alice@example.com","summary":"Personal"}`,
+	})
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{"summary": "Standup", "calendar_id": "primary"})
+	for _, actionType := range []string{"google.create_calendar_event", "google.create_meeting"} {
+		details, err := conn.ResolveResourceDetails(context.Background(), actionType, params, validCreds())
+		if err != nil {
+			t.Fatalf("%s: unexpected error: %v", actionType, err)
+		}
+		if details["calendar_id"] != "alice@example.com" {
+			t.Errorf("%s: expected canonical calendar_id, got %v", actionType, details["calendar_id"])
+		}
+		if details["calendar_name"] != "Personal" {
+			t.Errorf("%s: expected calendar_name, got %v", actionType, details["calendar_name"])
+		}
 	}
 }
 

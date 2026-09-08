@@ -122,8 +122,23 @@ func TestNormalizeCalendarTimeParams_InvalidJSON(t *testing.T) {
 	t.Parallel()
 	input := json.RawMessage(`not valid json`)
 	result := normalizeCalendarTimeParams(input)
-	// Should return input unchanged
 	if string(result) != string(input) {
 		t.Errorf("expected unchanged input for invalid JSON, got %s", string(result))
+	}
+}
+
+func TestIsValidCalendarID(t *testing.T) {
+	t.Parallel()
+	valid := []string{"primary", "alice@example.com", "user@group.calendar.google.com"}
+	for _, id := range valid {
+		if !isValidCalendarID(id) {
+			t.Errorf("isValidCalendarID(%q) = false, want true", id)
+		}
+	}
+	invalid := []string{"", "../etc/passwd", "cal/endar", "id?x=1", "id#frag", "a\nb"}
+	for _, id := range invalid {
+		if isValidCalendarID(id) {
+			t.Errorf("isValidCalendarID(%q) = true, want false", id)
+		}
 	}
 }

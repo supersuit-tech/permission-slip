@@ -406,3 +406,49 @@ func TestValidateStandingApprovalConstraintKeys_HintsDriveIdMeta(t *testing.T) {
 		t.Fatalf("expected $meta.drive_id hint, got: %s", msg)
 	}
 }
+
+func TestValidateStandingApprovalConstraintKeys_AllowsGoogleCalendarMeta(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "google")
+	schema := []byte(`{"type":"object","properties":{"summary":{"type":"string"},"calendar_id":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.create_calendar_event", "Create Calendar Event", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(google.New())
+
+	constraints := []byte(`{"calendar_id":"*","$meta":{"calendar_id":"work@example.com"}}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.create_calendar_event", constraints); err != nil {
+		t.Fatalf("expected valid Calendar $meta constraints, got: %v", err)
+	}
+
+	updateSchema := []byte(`{"type":"object","properties":{"event_id":{"type":"string"},"calendar_id":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.update_calendar_event", "Update Calendar Event", testhelper.ConnectorActionOpts{
+		ParametersSchema: updateSchema,
+	})
+	updateConstraints := []byte(`{"event_id":"*","calendar_id":"*","$meta":{"calendar_id":"work@example.com"}}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.update_calendar_event", updateConstraints); err != nil {
+		t.Fatalf("expected valid update_calendar_event $meta constraints, got: %v", err)
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_RejectsCalendarMetaOnListEvents(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "google")
+	schema := []byte(`{"type":"object","properties":{"calendar_id":{"type":"string"},"max_results":{"type":"integer"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.list_calendar_events", "List Calendar Events", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(google.New())
+
+	constraints := []byte(`{"calendar_id":"*","$meta":{"calendar_id":"work@example.com"}}`)
+	err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.list_calendar_events", constraints)
+	if err == nil {
+		t.Fatal("expected unsupported $meta action rejection")
+	}
+}

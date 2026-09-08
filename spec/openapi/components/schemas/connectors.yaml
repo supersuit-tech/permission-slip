@@ -392,7 +392,8 @@ ConnectorAction:
       description: |
         Verified metadata fields that may appear under the `$meta` namespace in
         standing approval constraints (e.g. `from` / `sender` for email reads,
-        `drive_id` for Google Drive and Sheets Shared Drive membership).
+        `drive_id` for Google Drive and Sheets Shared Drive membership,
+        `calendar_id` for Google Calendar writes).
       example:
         - drive_id
 
