@@ -17,6 +17,17 @@ func TestDeriveStandingApprovalNameFromRequest_MetaFrom(t *testing.T) {
 	}
 }
 
+func TestDeriveStandingApprovalNameFromRequest_MetaDriveID(t *testing.T) {
+	t.Parallel()
+	name := deriveStandingApprovalNameFromRequest("Upload Drive File", json.RawMessage(`{
+		"folder_id":"*",
+		"$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}
+	}`))
+	if name != "Upload Drive File — in Shared Drive 0AKbIIKZ8knmBUk9PVA" {
+		t.Fatalf("name = %q", name)
+	}
+}
+
 func TestDeriveStandingApprovalNameFromRequest_ParamConstraint(t *testing.T) {
 	t.Parallel()
 	name := deriveStandingApprovalNameFromRequest("Send Email", json.RawMessage(`{"to":"*@example.com"}`))

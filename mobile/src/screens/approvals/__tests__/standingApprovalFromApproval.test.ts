@@ -1,4 +1,8 @@
-import { buildCreateStandingApprovalFromApproval } from "../standingApprovalFromApproval";
+import {
+  buildCreateStandingApprovalFromApproval,
+  buildCreateStandingApprovalsFromApproval,
+} from "../standingApprovalFromApproval";
+import { GOOGLE_SHARED_DRIVE_WORKSPACE_ACTION_TYPES } from "../googleSharedDriveWorkspace";
 import type { ApprovalSummary } from "../../../hooks/useApprovals";
 
 function makeApproval(overrides?: Partial<ApprovalSummary>): ApprovalSummary {
@@ -72,5 +76,104 @@ describe("buildCreateStandingApprovalFromApproval", () => {
     );
     expect(request.constraints).toEqual({});
     expect(request.confirm_unrestricted).toBe(true);
+  });
+
+  it("uses $meta.drive_id instead of pinning folder_id for Shared Drive uploads", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.upload_drive_file",
+          version: "1",
+          parameters: {
+            name: "receipt.pdf",
+            folder_id: "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d",
+          },
+        },
+        resource_details: {
+          folder_name: "2026-639-receipts in Assistant Drive",
+          drive_id: "0AKbIIKZ8knmBUk9PVA",
+        },
+      }),
+    );
+    expect(request.constraints).toEqual({
+      folder_id: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+    expect(request.confirm_unrestricted).toBeUndefined();
+  });
+
+  it("uses $meta.drive_id for Shared Drive folder creates", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.create_drive_folder",
+          version: "1",
+          parameters: {
+            name: "2026-639-receipts",
+            parent_id: "0AKbIIKZ8knmBUk9PVA",
+          },
+        },
+        resource_details: {
+          folder_name: "Assistant Drive in the / directory",
+          drive_id: "0AKbIIKZ8knmBUk9PVA",
+        },
+      }),
+    );
+    expect(request.constraints).toEqual({
+      parent_id: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+  });
+
+  it("uses $meta.drive_id for Shared Drive list and Sheets reads", () => {
+    const list = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.list_drive_files",
+          version: "1",
+          parameters: { folder_id: "1nested", query: "receipt" },
+        },
+        resource_details: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+      }),
+    );
+    expect(list.constraints).toEqual({
+      folder_id: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+
+    const sheets = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.sheets_read_range",
+          version: "1",
+          parameters: { spreadsheet_id: "1sheet", range: "Sheet1!A1:B2" },
+        },
+        resource_details: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+      }),
+    );
+    expect(sheets.constraints).toEqual({
+      spreadsheet_id: "*",
+      range: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+  });
+
+  it("expands Shared Drive always-allow into the Drive + Sheets workspace set", () => {
+    const requests = buildCreateStandingApprovalsFromApproval(
+      makeApproval({
+        action: {
+          type: "google.upload_drive_file",
+          version: "1",
+          parameters: { name: "receipt.pdf", folder_id: "1nested" },
+        },
+        resource_details: {
+          drive_id: "0AKbIIKZ8knmBUk9PVA",
+          drive_name: "Assistant Drive",
+        },
+      }),
+    );
+    expect(requests.map((req) => req.action_type)).toEqual([
+      ...GOOGLE_SHARED_DRIVE_WORKSPACE_ACTION_TYPES,
+    ]);
   });
 });

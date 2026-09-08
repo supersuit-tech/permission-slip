@@ -233,4 +233,47 @@ describe("formatStandingApprovalConstraints", () => {
       ),
     ).toBe("spreadsheet_id: Budget 2026");
   });
+
+  it("labels $meta drive_id as inside Shared Drive and hides wildcard params", () => {
+    const lines = formatStandingApprovalConstraints({
+      folder_id: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+    expect(lines).toEqual([
+      {
+        label: "inside Shared Drive",
+        mode: "fixed",
+        value: "0AKbIIKZ8knmBUk9PVA",
+        verified: true,
+      },
+    ]);
+    expect(
+      formatStandingApprovalConstraintsText({
+        folder_id: "*",
+        $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+      }),
+    ).toBe("inside Shared Drive: 0AKbIIKZ8knmBUk9PVA");
+  });
+
+  it("still shows non-wildcard params alongside Shared Drive scope", () => {
+    const lines = formatStandingApprovalConstraints({
+      folder_id: "*",
+      name: "receipt.pdf",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+    expect(lines).toEqual([
+      {
+        label: "name",
+        mode: "fixed",
+        value: "receipt.pdf",
+        verified: false,
+      },
+      {
+        label: "inside Shared Drive",
+        mode: "fixed",
+        value: "0AKbIIKZ8knmBUk9PVA",
+        verified: true,
+      },
+    ]);
+  });
 });

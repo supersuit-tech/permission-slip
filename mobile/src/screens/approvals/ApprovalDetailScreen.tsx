@@ -30,7 +30,11 @@ import {
 } from "../../hooks/useStandingApprovals";
 import { useCreateStandingApproval } from "../../hooks/useCreateStandingApproval";
 import { useActionSchema } from "../../hooks/useActionSchema";
-import { buildCreateStandingApprovalFromApproval } from "./standingApprovalFromApproval";
+import { standingApprovalsToCreateFromApproval } from "./standingApprovalFromApproval";
+import {
+  isGoogleSharedDriveWorkspaceApproval,
+  sharedDriveWorkspaceCheckboxLabel,
+} from "./googleSharedDriveWorkspace";
 import { colors } from "../../theme/colors";
 import {
   humanizeActionType,
@@ -213,6 +217,14 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   );
   const showAutoApproveCheckbox =
     !standingApprovalsLoading && !hasExistingStandingApproval;
+  const autoApproveCheckboxLabel = isGoogleSharedDriveWorkspaceApproval(
+    approval.action.type,
+    approval.resource_details as Record<string, unknown> | undefined,
+  )
+    ? sharedDriveWorkspaceCheckboxLabel(
+        approval.resource_details as Record<string, unknown> | undefined,
+      )
+    : "Auto-approve all future requests like this";
 
   const { displayTemplate } = useActionSchema(approval.action.type);
   const summary = buildActionSummary(
@@ -279,10 +291,26 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
 
       if (autoApproveFuture) {
         try {
-          await createStandingApproval(
-            buildCreateStandingApprovalFromApproval(approval),
+          const requests = standingApprovalsToCreateFromApproval(
+            approval,
+            standingApprovals,
           );
-          setStandingApprovalCreated(true);
+          let created = 0;
+          let lastError: unknown;
+          for (const req of requests) {
+            try {
+              await createStandingApproval(req);
+              created += 1;
+            } catch (err) {
+              lastError = err;
+            }
+          }
+          if (created > 0) {
+            setStandingApprovalCreated(true);
+          }
+          if (lastError) {
+            throw lastError;
+          }
         } catch (err) {
           const message =
             err instanceof Error
@@ -304,6 +332,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
     approval,
     autoApproveFuture,
     createStandingApproval,
+    standingApprovals,
     scheduleAutoDismiss,
   ]);
 
@@ -577,6 +606,7 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
             showAutoApproveCheckbox={showAutoApproveCheckbox}
             autoApproveFuture={autoApproveFuture}
             onAutoApproveFutureChange={setAutoApproveFuture}
+            autoApproveLabel={autoApproveCheckboxLabel}
           />
         </View>
       )}

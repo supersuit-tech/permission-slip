@@ -124,28 +124,21 @@ func (c *GoogleConnector) resolveDriveFile(ctx context.Context, creds connectors
 		return nil, fmt.Errorf("missing file_id")
 	}
 
-	var resp struct {
-		Name        string `json:"name"`
-		MimeType    string `json:"mimeType"`
-		WebViewLink string `json:"webViewLink"`
-	}
-	q := url.Values{}
-	q.Set("fields", "name,mimeType,webViewLink")
-	applySupportsAllDrives(q)
-	getURL := c.driveBaseURL + "/drive/v3/files/" + url.PathEscape(p.FileID) + "?" + q.Encode()
-	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
+	file, err := c.lookupDriveFile(ctx, creds, p.FileID)
+	if err != nil {
 		return nil, err
 	}
 
 	details := map[string]any{
-		"file_name": resp.Name,
-		"mime_type": resp.MimeType,
+		"file_name": file.Name,
+		"mime_type": file.MimeType,
 	}
+	c.attachSharedDriveDetails(ctx, creds, details, file.DriveID)
 	return connectors.AttachResources(details, connectors.ResourceRef{
 		Param: "file_id",
 		ID:    p.FileID,
-		Name:  resp.Name,
-		URL:   resp.WebViewLink,
+		Name:  file.Name,
+		URL:   file.WebViewLink,
 	}), nil
 }
 
@@ -170,10 +163,7 @@ func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connecto
 		return nil, fmt.Errorf("invalid drive folder params: %w", err)
 	}
 
-	folderID := p.FolderID
-	if folderID == "" {
-		folderID = p.ParentID
-	}
+	folderID := driveFolderTargetID(p.FolderID, p.ParentID)
 
 	details := map[string]any{}
 	folderParam := "folder_id"
@@ -186,21 +176,21 @@ func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connecto
 		if !isValidDriveID(folderID) {
 			return nil, fmt.Errorf("invalid folder_id")
 		}
-		name, err := c.lookupDriveFolderName(ctx, creds, folderID)
+		folder, err := c.lookupDriveFolder(ctx, creds, folderID)
 		if err != nil {
 			return nil, err
 		}
-		for k, v := range driveFolderDetails(name) {
+		for k, v := range driveFolderDetails(folder.Name, folder.DriveID, folder.DriveName) {
 			details[k] = v
 		}
 		connectors.AttachResources(details, connectors.ResourceRef{
 			Param: folderParam,
 			ID:    folderID,
-			Name:  name,
+			Name:  folder.Name,
 			URL:   driveFolderURL(folderID),
 		})
 	case defaultRootName != "":
-		for k, v := range driveFolderDetails(defaultRootName) {
+		for k, v := range driveFolderDetails(defaultRootName, "", "") {
 			details[k] = v
 		}
 	}
@@ -209,9 +199,17 @@ func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connecto
 		if !isValidDriveID(p.DriveID) {
 			return nil, fmt.Errorf("invalid drive_id")
 		}
-		driveName, err := c.lookupDriveFolderName(ctx, creds, p.DriveID)
+		driveName, err := c.lookupSharedDriveName(ctx, creds, p.DriveID)
 		if err != nil {
 			return nil, err
+		}
+		if _, ok := details["drive_id"]; !ok {
+			details["drive_id"] = p.DriveID
+		}
+		if driveName != "" {
+			if _, ok := details["drive_name"]; !ok {
+				details["drive_name"] = driveName
+			}
 		}
 		connectors.AttachResources(details, connectors.ResourceRef{
 			Param: "drive_id",
@@ -227,15 +225,62 @@ func (c *GoogleConnector) resolveDriveFolder(ctx context.Context, creds connecto
 	return details, nil
 }
 
+func driveFolderTargetID(folderID, parentID string) string {
+	if folderID != "" {
+		return folderID
+	}
+	return parentID
+}
+
 // genericSharedDriveRootName is what files.get returns for a Shared Drive's
 // root folder. The real drive title only comes from drives.get.
 const genericSharedDriveRootName = "Drive"
 
-func driveFolderDetails(name string) map[string]any {
-	return map[string]any{
+func driveFolderDetails(name, driveID, driveName string) map[string]any {
+	details := map[string]any{
 		"folder_name": name,
 		"parent_name": name,
 	}
+	attachDriveFields(details, driveID, driveName)
+	return details
+}
+
+func attachDriveFields(details map[string]any, driveID, driveName string) {
+	if driveID != "" {
+		details["drive_id"] = driveID
+	}
+	if driveName != "" {
+		details["drive_name"] = driveName
+	}
+}
+
+func (c *GoogleConnector) attachSharedDriveDetails(ctx context.Context, creds connectors.Credentials, details map[string]any, driveID string) {
+	if driveID == "" {
+		return
+	}
+	details["drive_id"] = driveID
+	if driveName, err := c.lookupSharedDriveName(ctx, creds, driveID); err == nil && driveName != "" {
+		details["drive_name"] = driveName
+	}
+}
+
+// driveFolderLookup is the Drive API result for a folder_id / parent_id.
+// DriveID is set when the folder lives on a Shared Drive (including when the
+// ID itself is the Shared Drive root). DriveName is the Shared Drive title
+// when the Drive API returned it.
+type driveFolderLookup struct {
+	Name      string
+	DriveID   string
+	DriveName string
+}
+
+// driveFileLookup is the Drive API result for a file_id or spreadsheet_id.
+// DriveID is set when the file lives on a Shared Drive.
+type driveFileLookup struct {
+	Name        string
+	MimeType    string
+	DriveID     string
+	WebViewLink string
 }
 
 func driveRootDisplayName(name string) string {
@@ -246,7 +291,7 @@ func driveFolderInSharedDriveDisplayName(folderName, driveName string) string {
 	return folderName + " in " + driveName
 }
 
-func (c *GoogleConnector) lookupDriveFolderName(ctx context.Context, creds connectors.Credentials, id string) (string, error) {
+func (c *GoogleConnector) lookupDriveFolder(ctx context.Context, creds connectors.Credentials, id string) (driveFolderLookup, error) {
 	var fileResp struct {
 		Name    string   `json:"name"`
 		DriveID string   `json:"driveId"`
@@ -259,13 +304,17 @@ func (c *GoogleConnector) lookupDriveFolderName(ctx context.Context, creds conne
 	fileErr := c.doJSON(ctx, creds, http.MethodGet, fileURL, nil, &fileResp)
 	if fileErr != nil {
 		if !isGoogleNotFound(fileErr) {
-			return "", fileErr
+			return driveFolderLookup{}, fileErr
 		}
 		driveName, driveErr := c.lookupSharedDriveName(ctx, creds, id)
 		if driveErr != nil {
-			return "", driveErr
+			return driveFolderLookup{}, driveErr
 		}
-		return driveRootDisplayName(driveName), nil
+		return driveFolderLookup{
+			Name:      driveRootDisplayName(driveName),
+			DriveID:   id,
+			DriveName: driveName,
+		}, nil
 	}
 
 	name := fileResp.Name
@@ -278,23 +327,52 @@ func (c *GoogleConnector) lookupDriveFolderName(ctx context.Context, creds conne
 		if driveID == "" {
 			driveID = id
 		}
-		if driveName, err := c.lookupSharedDriveName(ctx, creds, driveID); err == nil && driveName != "" {
-			name = driveName
+		driveName := ""
+		if lookedUp, err := c.lookupSharedDriveName(ctx, creds, driveID); err == nil && lookedUp != "" {
+			name = lookedUp
+			driveName = lookedUp
 		}
 		if name == "" {
-			return "", fmt.Errorf("folder %q has no name", id)
+			return driveFolderLookup{}, fmt.Errorf("folder %q has no name", id)
 		}
-		return driveRootDisplayName(name), nil
+		return driveFolderLookup{Name: driveRootDisplayName(name), DriveID: driveID, DriveName: driveName}, nil
 	}
 	if name == "" {
-		return "", fmt.Errorf("folder %q has no name", id)
+		return driveFolderLookup{}, fmt.Errorf("folder %q has no name", id)
 	}
 	if fileResp.DriveID != "" {
 		if driveName, err := c.lookupSharedDriveName(ctx, creds, fileResp.DriveID); err == nil && driveName != "" {
-			return driveFolderInSharedDriveDisplayName(name, driveName), nil
+			return driveFolderLookup{
+				Name:      driveFolderInSharedDriveDisplayName(name, driveName),
+				DriveID:   fileResp.DriveID,
+				DriveName: driveName,
+			}, nil
 		}
+		return driveFolderLookup{Name: name, DriveID: fileResp.DriveID}, nil
 	}
-	return name, nil
+	return driveFolderLookup{Name: name}, nil
+}
+
+func (c *GoogleConnector) lookupDriveFile(ctx context.Context, creds connectors.Credentials, id string) (driveFileLookup, error) {
+	var resp struct {
+		Name        string `json:"name"`
+		MimeType    string `json:"mimeType"`
+		DriveID     string `json:"driveId"`
+		WebViewLink string `json:"webViewLink"`
+	}
+	q := url.Values{}
+	q.Set("fields", "name,mimeType,driveId,webViewLink")
+	applySupportsAllDrives(q)
+	getURL := c.driveBaseURL + "/drive/v3/files/" + url.PathEscape(id) + "?" + q.Encode()
+	if err := c.doJSON(ctx, creds, http.MethodGet, getURL, nil, &resp); err != nil {
+		return driveFileLookup{}, err
+	}
+	return driveFileLookup{
+		Name:        resp.Name,
+		MimeType:    resp.MimeType,
+		DriveID:     resp.DriveID,
+		WebViewLink: resp.WebViewLink,
+	}, nil
 }
 
 func (c *GoogleConnector) lookupSharedDriveName(ctx context.Context, creds connectors.Credentials, id string) (string, error) {
@@ -367,6 +445,10 @@ func (c *GoogleConnector) resolveSpreadsheet(ctx context.Context, creds connecto
 	details := map[string]any{"title": resp.Properties.Title}
 	if p.Range != "" {
 		details["range"] = p.Range
+	}
+	// Spreadsheets are Drive files; membership is optional for the preview.
+	if file, err := c.lookupDriveFile(ctx, creds, p.SpreadsheetID); err == nil {
+		c.attachSharedDriveDetails(ctx, creds, details, file.DriveID)
 	}
 	return connectors.AttachResources(details, connectors.ResourceRef{
 		Param: "spreadsheet_id",

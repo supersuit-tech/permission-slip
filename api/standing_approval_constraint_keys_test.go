@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors/google"
 	"github.com/supersuit-tech/permission-slip/connectors/protonmail"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
 )
@@ -307,5 +308,101 @@ func TestValidateStandingApprovalConstraintKeys_RejectsObjectValueInStructuredCo
 	}
 	if !strings.Contains(err.Error(), "constraint value for \"limit\"") {
 		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_AllowsGoogleDriveMeta(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "google")
+	schema := []byte(`{"type":"object","properties":{"name":{"type":"string"},"folder_id":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.upload_drive_file", "Upload Drive File", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(google.New())
+
+	constraints := []byte(`{"folder_id":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.upload_drive_file", constraints); err != nil {
+		t.Fatalf("expected valid Shared Drive $meta constraints, got: %v", err)
+	}
+
+	createSchema := []byte(`{"type":"object","properties":{"name":{"type":"string"},"parent_id":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.create_drive_folder", "Create Drive Folder", testhelper.ConnectorActionOpts{
+		ParametersSchema: createSchema,
+	})
+	createConstraints := []byte(`{"parent_id":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.create_drive_folder", createConstraints); err != nil {
+		t.Fatalf("expected valid create_drive_folder $meta constraints, got: %v", err)
+	}
+
+	listSchema := []byte(`{"type":"object","properties":{"folder_id":{"type":"string"},"drive_id":{"type":"string"},"query":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.list_drive_files", "List Drive Files", testhelper.ConnectorActionOpts{
+		ParametersSchema: listSchema,
+	})
+	listConstraints := []byte(`{"folder_id":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.list_drive_files", listConstraints); err != nil {
+		t.Fatalf("expected valid list_drive_files $meta constraints, got: %v", err)
+	}
+
+	sheetsSchema := []byte(`{"type":"object","properties":{"spreadsheet_id":{"type":"string"},"range":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.sheets_read_range", "Read Sheet Range", testhelper.ConnectorActionOpts{
+		ParametersSchema: sheetsSchema,
+	})
+	sheetsConstraints := []byte(`{"spreadsheet_id":"*","range":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.sheets_read_range", sheetsConstraints); err != nil {
+		t.Fatalf("expected valid sheets_read_range $meta constraints, got: %v", err)
+	}
+
+	getSchema := []byte(`{"type":"object","properties":{"file_id":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.get_drive_file", "Get Drive File", testhelper.ConnectorActionOpts{
+		ParametersSchema: getSchema,
+	})
+	getConstraints := []byte(`{"file_id":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`)
+	if err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.get_drive_file", getConstraints); err != nil {
+		t.Fatalf("expected valid get_drive_file $meta constraints, got: %v", err)
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_RejectsDriveMetaOnSendEmail(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "google")
+	schema := []byte(`{"type":"object","properties":{"to":{"type":"string"},"subject":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.send_email", "Send Email", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(google.New())
+
+	constraints := []byte(`{"to":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`)
+	err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.send_email", constraints)
+	if err == nil {
+		t.Fatal("expected unsupported $meta action rejection")
+	}
+}
+
+func TestValidateStandingApprovalConstraintKeys_HintsDriveIdMeta(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	testhelper.InsertConnector(t, tx, "google")
+	schema := []byte(`{"type":"object","properties":{"name":{"type":"string"},"folder_id":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, "google", "google.upload_drive_file", "Upload Drive File", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+
+	registry := connectors.NewRegistry()
+	registry.Register(google.New())
+
+	constraints := []byte(`{"drive_id":"0AKbIIKZ8knmBUk9PVA"}`)
+	err := validateStandingApprovalConstraintKeys(context.Background(), tx, registry, "google.upload_drive_file", constraints)
+	if err == nil {
+		t.Fatal("expected unknown param rejection with $meta hint")
+	}
+	msg := err.Error()
+	if !strings.Contains(msg, `$meta`) || !strings.Contains(msg, "drive_id") {
+		t.Fatalf("expected $meta.drive_id hint, got: %s", msg)
 	}
 }

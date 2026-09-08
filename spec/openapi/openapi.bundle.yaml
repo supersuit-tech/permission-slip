@@ -7881,10 +7881,10 @@ components:
             type: string
           description: |
             Verified metadata fields that may appear under the `$meta` namespace in
-            standing approval constraints (e.g. `from`, `sender` for email reads).
+            standing approval constraints (e.g. `from` / `sender` for email reads,
+            `drive_id` for Google Drive and Sheets Shared Drive membership).
           example:
-            - from
-            - sender
+            - drive_id
       example:
         action_type: github.create_issue
         operation_type: write
@@ -9149,16 +9149,12 @@ components:
             type: string
           description: |
             Verified metadata fields supported in standing approval `$meta` constraints
-            for this action (e.g. `from`, `to`, `cc`, `bcc`). Values are checked against
-            server-fetched envelope data, not agent-supplied parameters. Omitted when the
-            action does not support `$meta` constraints.
+            for this action (e.g. `from` / `to` on Proton Mail, `drive_id` on Google
+            Drive and Sheets Shared Drive membership). Values are checked against server-fetched data, not
+            agent-supplied parameters. Omitted when the action does not support
+            `$meta` constraints.
           example:
-            - from
-            - sender
-            - senders
-            - to
-            - cc
-            - bcc
+            - drive_id
         standing_approvals:
           type: array
           items:

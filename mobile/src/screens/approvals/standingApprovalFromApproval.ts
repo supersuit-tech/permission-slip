@@ -1,6 +1,13 @@
 import type { components } from "../../api/schema";
 import type { ApprovalSummary } from "../../hooks/useApprovals";
 import { constraintsAreUnrestricted } from "./unrestrictedConstraints";
+import {
+  GOOGLE_SHARED_DRIVE_WORKSPACE_ACTION_TYPES,
+  buildSharedDriveWorkspaceConstraints,
+  isGoogleSharedDriveWorkspaceAction,
+  sharedDriveIdFromResourceDetails,
+  sharedDriveWorkspaceStandingApprovalName,
+} from "./googleSharedDriveWorkspace";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -74,6 +81,16 @@ function deriveEmailSenderConstraint(
   };
 }
 
+function deriveSharedDriveConstraint(
+  actionType: string,
+  resourceDetails?: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  if (!isGoogleSharedDriveWorkspaceAction(actionType)) return null;
+  const driveId = sharedDriveIdFromResourceDetails(resourceDetails);
+  if (!driveId) return null;
+  return buildSharedDriveWorkspaceConstraints(actionType, driveId);
+}
+
 function deriveStandingApprovalConstraints(
   approval: ApprovalSummary,
 ): Record<string, unknown> {
@@ -88,6 +105,14 @@ function deriveStandingApprovalConstraints(
     const constraints = deriveConstraintsFromParams(params);
     constraints.message_id = "*";
     return constraints;
+  }
+
+  const driveConstraint = deriveSharedDriveConstraint(
+    approval.action.type,
+    resourceDetails,
+  );
+  if (driveConstraint) {
+    return driveConstraint;
   }
 
   return standingApprovalConstraintsForCreate(params);
@@ -113,4 +138,64 @@ export function buildCreateStandingApprovalFromApproval(
       ? { confirm_unrestricted: true }
       : {}),
   };
+}
+
+function createRequestForAction(
+  approval: ApprovalSummary,
+  actionType: string,
+  constraints: Record<string, unknown>,
+): CreateStandingApprovalRequest {
+  const version =
+    typeof approval.action.version === "string" && approval.action.version !== ""
+      ? approval.action.version
+      : "1";
+  return {
+    agent_id: approval.agent_id,
+    action_type: actionType,
+    action_version: version,
+    name: sharedDriveWorkspaceStandingApprovalName(
+      actionType,
+      approval.resource_details as Record<string, unknown> | undefined,
+    ),
+    description: "Routine Drive and Sheets work inside this Shared Drive",
+    constraints,
+    expires_at: null,
+    ...(constraintsAreUnrestricted(constraints)
+      ? { confirm_unrestricted: true }
+      : {}),
+  };
+}
+
+export function buildCreateStandingApprovalsFromApproval(
+  approval: ApprovalSummary,
+): CreateStandingApprovalRequest[] {
+  const resourceDetails = approval.resource_details as
+    | Record<string, unknown>
+    | undefined;
+  const driveId = sharedDriveIdFromResourceDetails(resourceDetails);
+  if (!driveId || !isGoogleSharedDriveWorkspaceAction(approval.action.type)) {
+    return [buildCreateStandingApprovalFromApproval(approval)];
+  }
+
+  return GOOGLE_SHARED_DRIVE_WORKSPACE_ACTION_TYPES.map((actionType) =>
+    createRequestForAction(
+      approval,
+      actionType,
+      buildSharedDriveWorkspaceConstraints(actionType, driveId),
+    ),
+  );
+}
+
+export function standingApprovalsToCreateFromApproval(
+  approval: ApprovalSummary,
+  existing: Array<{ agent_id: number; action_type: string }>,
+): CreateStandingApprovalRequest[] {
+  const existingTypes = new Set(
+    existing
+      .filter((sa) => sa.agent_id === approval.agent_id)
+      .map((sa) => sa.action_type),
+  );
+  return buildCreateStandingApprovalsFromApproval(approval).filter(
+    (req) => !existingTypes.has(req.action_type),
+  );
 }

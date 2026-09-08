@@ -20,7 +20,7 @@ If `request` returns `executed: true` or `status: approved`, the action already 
 
 ## Verified metadata constraints (`$meta`)
 
-For connectors that resolve envelope metadata (Proton Mail message-targeted actions), prefer **`$meta` constraints** over plain parameter pins on `from` / `to` — agents can spoof param values, but `$meta` is checked against server-fetched headers.
+For connectors that resolve verified target metadata, prefer **`$meta` constraints** over plain parameter pins — agents can spoof param values, but `$meta` is checked against server-fetched data.
 
 **Proton Mail examples:**
 
@@ -39,6 +39,27 @@ permission-slip request --action protonmail.read_email \
 - For `protonmail.send_email`, constrain outbound `to` / `cc` / `bcc` as normal params; array patterns require **every** recipient to match.
 
 See [Proton Mail connector docs](../../docs/connectors/protonmail.md#standing-approval-constraints-meta) for the full action table.
+
+**Google Drive Shared Drive (Drive + Sheets workspace):**
+
+```bash
+# Auto-approve uploads anywhere in a Shared Drive (including new year/receipts folders)
+permission-slip request --action google.upload_drive_file \
+  --standing-constraints '{"folder_id":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}' \
+  --params '{"name":"receipt.pdf","folder_id":"1nestedYearFolder","content_base64":"..."}'
+
+# Same $meta.drive_id covers list/search/get and Sheets (range may be *)
+permission-slip request --action google.sheets_read_range \
+  --standing-constraints '{"spreadsheet_id":"*","range":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}' \
+  --params '{"spreadsheet_id":"1sheetInDrive","range":"Sheet1!A1:D10"}'
+```
+
+- Use `$meta.drive_id` — not an exhaustive `folder_id` / `spreadsheet_id` `any_of` list.
+- Applies to `google.upload_drive_file`, `google.create_drive_folder`, `google.list_drive_files`, `google.search_drive`, `google.get_drive_file`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, and `google.sheets_list_sheets`.
+- Unscoped list/search (no folder or drive) and out-of-drive destinations (My Drive or a different Shared Drive) fall through to one-off approval.
+- Approving any of these from web/phone "always allow" proposes the full Drive + Sheets workspace set for that Shared Drive.
+
+See [Google connector README](../../connectors/google/README.md#standing-approval-constraints-metadrive_id) for details.
 
 ## Commands
 

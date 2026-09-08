@@ -27,6 +27,7 @@ interface ApprovalActionsProps {
   showAutoApproveCheckbox?: boolean;
   autoApproveFuture?: boolean;
   onAutoApproveFutureChange?: (value: boolean) => void;
+  autoApproveLabel?: string;
 }
 
 export function ApprovalActions({
@@ -38,6 +39,7 @@ export function ApprovalActions({
   showAutoApproveCheckbox = false,
   autoApproveFuture = false,
   onAutoApproveFutureChange,
+  autoApproveLabel = "Auto-approve all future requests like this",
 }: ApprovalActionsProps) {
   const isBusy = isApproving || isDenying;
 
@@ -64,7 +66,7 @@ export function ApprovalActions({
           disabled={disabled || isBusy}
           accessibilityRole="checkbox"
           accessibilityState={{ checked: autoApproveFuture, disabled: disabled || isBusy }}
-          accessibilityLabel="Auto-approve all future requests like this"
+          accessibilityLabel={autoApproveLabel}
           testID="auto-approve-checkbox"
         >
           <View
@@ -82,7 +84,7 @@ export function ApprovalActions({
               (disabled || isBusy) && styles.checkboxLabelDisabled,
             ]}
           >
-            Auto-approve all future requests like this
+            {autoApproveLabel}
           </Text>
         </Pressable>
       )}

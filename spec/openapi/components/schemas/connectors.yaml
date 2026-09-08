@@ -391,10 +391,10 @@ ConnectorAction:
         type: string
       description: |
         Verified metadata fields that may appear under the `$meta` namespace in
-        standing approval constraints (e.g. `from`, `sender` for email reads).
+        standing approval constraints (e.g. `from` / `sender` for email reads,
+        `drive_id` for Google Drive and Sheets Shared Drive membership).
       example:
-        - from
-        - sender
+        - drive_id
 
   example:
     action_type: "github.create_issue"

@@ -890,7 +890,7 @@ Creates and uploads a file to Google Drive. Text can be sent as `content`; PDFs,
 
 Uses multipart upload with JSON metadata in the first part and file content in the second. Decoded content is capped at 10 MB. Sends `supportsAllDrives=true` so a Shared Drive folder or drive ID in `folder_id` is accepted as the parent.
 
-Approval UIs resolve `folder_id` to a human-readable folder (or Shared Drive) name via the Drive API, the same way `calendar_id` is resolved to `calendar_name`. Shared Drive *roots* (`folder_id` is the `0A…` drive ID) need a `drives.get` lookup: `files.get` succeeds but returns the generic name `Drive`. The approval then shows e.g. `Chiedo's assistant drive in the / directory`. Nested folders inside a Shared Drive append the drive title (`2026-documents in Chiedo's assistant drive`) so the Parameters `folder_id` row shows which drive the folder lives in. Binary `content_base64` is shown as a type/size summary rather than raw encoded bytes.
+Approval UIs resolve `folder_id` to a human-readable folder (or Shared Drive) name via the Drive API, the same way `calendar_id` is resolved to `calendar_name`. Shared Drive *roots* (`folder_id` is the `0A…` drive ID) need a `drives.get` lookup: `files.get` succeeds but returns the generic name `Drive`. The approval then shows e.g. `Chiedo's assistant drive in the / directory`. Nested folders inside a Shared Drive append the drive title (`2026-documents in Chiedo's assistant drive`) so the Parameters `folder_id` row shows which drive the folder lives in. Binary `content_base64` is shown as a type/size summary rather than raw encoded bytes. Standing approvals can constrain uploads to an entire Shared Drive via `$meta.drive_id` (see [Standing approval constraints](#standing-approval-constraints-metadrive_id)).
 
 ---
 
@@ -1042,6 +1042,25 @@ Sends `supportsAllDrives=true` so a Shared Drive folder or drive ID in `parent_i
 **Validation:**
 - `name` is required and may not exceed 255 characters (Google Drive allows up to 32,767, but a practical limit prevents oversized API requests).
 - `parent_id`, when provided, must match the alphanumeric Drive ID pattern to prevent injection attacks.
+
+### Standing approval constraints (`$meta.drive_id`)
+
+Exact folder / spreadsheet / range allowlists break as soon as the agent creates a new year folder or reads a slightly different A1 range. For Drive writes, list/search/get, and Sheets read/write/append/list, standing approvals can pin the target to a **verified Shared Drive** instead:
+
+```json
+{
+  "folder_id": "*",
+  "$meta": {
+    "drive_id": "0AKbIIKZ8knmBUk9PVA"
+  }
+}
+```
+
+Supported actions: `google.upload_drive_file`, `google.create_drive_folder`, `google.list_drive_files`, `google.search_drive`, `google.get_drive_file`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets`.
+
+Matching uses the Drive API (`files.get` / `drives.get`) — never an unverified agent-supplied ID. The constraint matches files and folders on that Shared Drive, including nested folders and Sheets whose spreadsheet lives there. List/search with **neither** `folder_id` nor `drive_id` (all files) omit `$meta.drive_id` and fall through. My Drive and other Shared Drives also fall through to one-off approval. Agents discover the field via `GET /agents/{agent_id}/capabilities` → `meta_constraint_fields: ["drive_id"]`. A top-level `drive_id` constraint is only valid on list/search (it is a real parameter there); for other actions use `{"$meta":{"drive_id":...}}`.
+
+Approving any of these actions from the web or phone "always allow" flow proposes **one workspace rule set**: routine Drive + Sheets work whose targets resolve inside that Shared Drive, displayed as "inside this Shared Drive" rather than a dump of `*` parameters.
 
 ---
 
@@ -1259,6 +1278,7 @@ connectors/google/
 ├── search_drive.go                 # google.search_drive action (name/fullText/type/folder search)
 ├── create_drive_folder.go          # google.create_drive_folder action
 ├── drive_helpers.go                # Shared Drive query flags (supportsAllDrives, corpora)
+├── resolve_constraint_metadata.go  # $meta.drive_id standing-approval matching for Drive writes
 ├── google_test.go                  # Connector-level tests (ID, Actions, Manifest, ValidateCredentials)
 ├── helpers_test.go                 # Shared test helpers (validCreds)
 ├── send_email_test.go              # Send email action tests (including MIME injection, base64 encoding)
@@ -1292,6 +1312,7 @@ connectors/google/
 ├── delete_drive_file_test.go       # Delete tests (soft delete, ID validation, rate limiting)
 ├── search_drive_test.go            # Search Drive tests (query escaping, type filter, deterministic errors)
 ├── create_drive_folder_test.go     # Create folder tests (name validation, parent ID)
+├── resolve_constraint_metadata_test.go # $meta.drive_id lookup tests (nested folder, root, My Drive)
 ├── drive_helpers_test.go           # Shared Drive query-flag helper tests
 └── README.md                       # This file
 ```
