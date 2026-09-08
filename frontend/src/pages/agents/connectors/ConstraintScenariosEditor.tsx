@@ -125,6 +125,7 @@ export function ConstraintScenariosEditor({
           disabled={disabled}
           agentId={agentId}
           connectorId={connectorId}
+          resourceDetails={resourceDetails}
           onChange={(next) => updateScenario(index, next)}
           onRemove={() => removeScenario(index)}
           onDuplicate={() => duplicateScenario(index)}
@@ -158,6 +159,7 @@ function ScenarioCard({
   disabled,
   agentId,
   connectorId,
+  resourceDetails,
   onChange,
   onRemove,
   onDuplicate,
@@ -173,6 +175,7 @@ function ScenarioCard({
   disabled?: boolean;
   agentId?: number;
   connectorId?: string;
+  resourceDetails?: Record<string, unknown> | null;
   onChange: (scenario: ConstraintScenario) => void;
   onRemove: () => void;
   onDuplicate: () => void;
