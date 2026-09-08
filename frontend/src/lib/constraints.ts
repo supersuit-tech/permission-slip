@@ -22,6 +22,7 @@ export interface ParsedConstraint {
   comparisonOp?: "lte" | "gte" | "lt" | "gt";
   scenarioIndex?: number;
   href?: string;
+  verified?: boolean;
 }
 
 function lineToParsedConstraint(line: {
@@ -31,6 +32,7 @@ function lineToParsedConstraint(line: {
   negated?: boolean;
   comparisonOp?: "lte" | "gte" | "lt" | "gt";
   href?: string;
+  verified?: boolean;
 }): ParsedConstraint {
   const scenarioMatch = /^Scenario (\d+): /.exec(line.label);
   return {
@@ -43,6 +45,7 @@ function lineToParsedConstraint(line: {
       ? Number.parseInt(scenarioMatch[1] ?? "0", 10) - 1
       : undefined,
     href: line.href,
+    verified: line.verified,
   };
 }
 

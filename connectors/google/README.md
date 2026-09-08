@@ -1045,7 +1045,7 @@ Sends `supportsAllDrives=true` so a Shared Drive folder or drive ID in `parent_i
 
 ### Standing approval constraints (`$meta.drive_id`)
 
-Exact `folder_id` / `parent_id` allowlists break as soon as the agent creates a new year or receipts folder. For `google.upload_drive_file` and `google.create_drive_folder`, standing approvals can pin the destination to a **verified Shared Drive** instead:
+Exact folder / spreadsheet / range allowlists break as soon as the agent creates a new year folder or reads a slightly different A1 range. For Drive writes, list/search/get, and Sheets read/write/append/list, standing approvals can pin the target to a **verified Shared Drive** instead:
 
 ```json
 {
@@ -1056,9 +1056,11 @@ Exact `folder_id` / `parent_id` allowlists break as soon as the agent creates a 
 }
 ```
 
-Matching uses the Drive API (`files.get` / `drives.get`) — never an agent-supplied `drive_id` parameter. The constraint matches the Shared Drive root **or any descendant folder** on that drive. My Drive folders and other Shared Drives fall through to one-off approval. Agents discover the field via `GET /agents/{agent_id}/capabilities` → `meta_constraint_fields: ["drive_id"]`. A top-level `drive_id` constraint on these actions is rejected — use `{"$meta":{"drive_id":...}}`.
+Supported actions: `google.upload_drive_file`, `google.create_drive_folder`, `google.list_drive_files`, `google.search_drive`, `google.get_drive_file`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets`.
 
-Approving an upload or folder-create from the web or phone "always allow" flow proposes this `$meta.drive_id` rule when the destination is on a Shared Drive.
+Matching uses the Drive API (`files.get` / `drives.get`) — never an unverified agent-supplied ID. The constraint matches files and folders on that Shared Drive, including nested folders and Sheets whose spreadsheet lives there. List/search with **neither** `folder_id` nor `drive_id` (all files) omit `$meta.drive_id` and fall through. My Drive and other Shared Drives also fall through to one-off approval. Agents discover the field via `GET /agents/{agent_id}/capabilities` → `meta_constraint_fields: ["drive_id"]`. A top-level `drive_id` constraint is only valid on list/search (it is a real parameter there); for other actions use `{"$meta":{"drive_id":...}}`.
+
+Approving any of these actions from the web or phone "always allow" flow proposes **one workspace rule set**: routine Drive + Sheets work whose targets resolve inside that Shared Drive, displayed as "inside this Shared Drive" rather than a dump of `*` parameters.
 
 ---
 

@@ -498,6 +498,25 @@ func TestRequestApproval_Fallthrough_SurfacesMetadataUnavailableInContext(t *tes
 
 func setupGoogleDriveStandingApprovalTest(t *testing.T, constraints []byte, metadata map[string]any) (db.DBTX, http.Handler, int64, []byte, string) {
 	t.Helper()
+	return setupGoogleActionStandingApprovalTest(t, googleActionStandingApprovalOpts{
+		actionType:  "google.upload_drive_file",
+		actionName:  "Upload Drive File",
+		schema:      []byte(`{"type":"object","properties":{"name":{"type":"string"},"folder_id":{"type":"string"}}}`),
+		constraints: constraints,
+		metadata:    metadata,
+	})
+}
+
+type googleActionStandingApprovalOpts struct {
+	actionType  string
+	actionName  string
+	schema      []byte
+	constraints []byte
+	metadata    map[string]any
+}
+
+func setupGoogleActionStandingApprovalTest(t *testing.T, opts googleActionStandingApprovalOpts) (db.DBTX, http.Handler, int64, []byte, string) {
+	t.Helper()
 	tx := testhelper.SetupTestDB(t)
 	uid := testhelper.GenerateUID(t)
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
@@ -509,24 +528,23 @@ func setupGoogleDriveStandingApprovalTest(t *testing.T, constraints []byte, meta
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
 	testhelper.InsertConnector(t, tx, "google")
-	schema := []byte(`{"type":"object","properties":{"name":{"type":"string"},"folder_id":{"type":"string"}}}`)
-	testhelper.InsertConnectorActionFull(t, tx, "google", "google.upload_drive_file", "Upload Drive File", testhelper.ConnectorActionOpts{
-		ParametersSchema: schema,
+	testhelper.InsertConnectorActionFull(t, tx, "google", opts.actionType, opts.actionName, testhelper.ConnectorActionOpts{
+		ParametersSchema: opts.schema,
 	})
 
 	saID := testhelper.GenerateID(t, "sa_")
 	testhelper.InsertStandingApprovalFull(t, tx, saID, agentID, uid, testhelper.StandingApprovalOpts{
-		ActionType:  "google.upload_drive_file",
-		Constraints: constraints,
+		ActionType:  opts.actionType,
+		Constraints: opts.constraints,
 	})
 
-	action := &mockAction{result: &connectors.ActionResult{Data: json.RawMessage(`{"id":"file-1"}`)}}
+	action := &mockAction{result: &connectors.ActionResult{Data: json.RawMessage(`{"ok":true}`)}}
 	metaConn := &mockMetadataConnector{
 		mockConnector: mockConnector{
 			id:      "google",
-			actions: map[string]connectors.Action{"google.upload_drive_file": action},
+			actions: map[string]connectors.Action{opts.actionType: action},
 		},
-		metadata: metadata,
+		metadata: opts.metadata,
 	}
 	registry := connectors.NewRegistry()
 	registry.Register(metaConn)
@@ -610,6 +628,96 @@ func TestRequestApproval_AutoApprove_GoogleDriveIDMyDriveFallsThrough(t *testing
 	}
 	if resp.Status != "pending" {
 		t.Errorf("expected pending fallthrough for My Drive, got %q", resp.Status)
+	}
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 0)
+}
+
+func TestRequestApproval_AutoApprove_GoogleListDriveMatch(t *testing.T) {
+	t.Parallel()
+	tx, router, agentID, privKey, saID := setupGoogleActionStandingApprovalTest(t, googleActionStandingApprovalOpts{
+		actionType:  "google.list_drive_files",
+		actionName:  "List Drive Files",
+		schema:      []byte(`{"type":"object","properties":{"folder_id":{"type":"string"},"drive_id":{"type":"string"},"query":{"type":"string"}}}`),
+		constraints: []byte(`{"folder_id":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`),
+		metadata:    map[string]any{"drive_id": "0AKbIIKZ8knmBUk9PVA"},
+	})
+
+	reqBody := `{"request_id":"drive-list-match-001","action":{"type":"google.list_drive_files","parameters":{"folder_id":"1nestedFolder","query":"receipt"}},"context":{"description":"list"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "approved" {
+		t.Errorf("expected approved, got %q", resp.Status)
+	}
+	if resp.StandingApprovalID != saID {
+		t.Errorf("expected standing approval %q, got %q", saID, resp.StandingApprovalID)
+	}
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 1)
+}
+
+func TestRequestApproval_AutoApprove_GoogleSheetsRangeMatch(t *testing.T) {
+	t.Parallel()
+	tx, router, agentID, privKey, saID := setupGoogleActionStandingApprovalTest(t, googleActionStandingApprovalOpts{
+		actionType:  "google.sheets_read_range",
+		actionName:  "Read Sheet Range",
+		schema:      []byte(`{"type":"object","properties":{"spreadsheet_id":{"type":"string"},"range":{"type":"string"}}}`),
+		constraints: []byte(`{"spreadsheet_id":"*","range":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`),
+		metadata:    map[string]any{"drive_id": "0AKbIIKZ8knmBUk9PVA"},
+	})
+
+	reqBody := `{"request_id":"sheets-range-match-001","action":{"type":"google.sheets_read_range","parameters":{"spreadsheet_id":"1sheetOnSharedDrive","range":"Sheet1!A1:D10"}},"context":{"description":"read"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "approved" {
+		t.Errorf("expected approved, got %q", resp.Status)
+	}
+	if resp.StandingApprovalID != saID {
+		t.Errorf("expected standing approval %q, got %q", saID, resp.StandingApprovalID)
+	}
+	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 1)
+}
+
+func TestRequestApproval_AutoApprove_GoogleGetFileUnscopedFallsThrough(t *testing.T) {
+	t.Parallel()
+	tx, router, agentID, privKey, saID := setupGoogleActionStandingApprovalTest(t, googleActionStandingApprovalOpts{
+		actionType:  "google.get_drive_file",
+		actionName:  "Get Drive File",
+		schema:      []byte(`{"type":"object","properties":{"file_id":{"type":"string"}}}`),
+		constraints: []byte(`{"file_id":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}`),
+		metadata:    map[string]any{},
+	})
+
+	reqBody := `{"request_id":"drive-get-mydrive-001","action":{"type":"google.get_drive_file","parameters":{"file_id":"1myDriveFile"}},"context":{"description":"get"}}`
+	r := signedJSONRequest(t, http.MethodPost, "/approvals/request", reqBody, privKey, agentID)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 pending, got %d: %s", w.Code, w.Body.String())
+	}
+	var resp agentRequestApprovalResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if resp.Status != "pending" {
+		t.Errorf("expected pending fallthrough for My Drive file, got %q", resp.Status)
 	}
 	testhelper.RequireStandingApprovalExecutionCount(t, tx, saID, 0)
 }

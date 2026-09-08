@@ -7882,7 +7882,7 @@ components:
           description: |
             Verified metadata fields that may appear under the `$meta` namespace in
             standing approval constraints (e.g. `from` / `sender` for email reads,
-            `drive_id` for Google Drive uploads).
+            `drive_id` for Google Drive and Sheets Shared Drive membership).
           example:
             - drive_id
       example:
@@ -9150,7 +9150,7 @@ components:
           description: |
             Verified metadata fields supported in standing approval `$meta` constraints
             for this action (e.g. `from` / `to` on Proton Mail, `drive_id` on Google
-            Drive uploads). Values are checked against server-fetched data, not
+            Drive and Sheets Shared Drive membership). Values are checked against server-fetched data, not
             agent-supplied parameters. Omitted when the action does not support
             `$meta` constraints.
           example:

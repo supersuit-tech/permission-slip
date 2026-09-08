@@ -1,6 +1,13 @@
 import type { components } from "../../api/schema";
 import type { ApprovalSummary } from "../../hooks/useApprovals";
 import { constraintsAreUnrestricted } from "./unrestrictedConstraints";
+import {
+  GOOGLE_SHARED_DRIVE_WORKSPACE_ACTION_TYPES,
+  buildSharedDriveWorkspaceConstraints,
+  isGoogleSharedDriveWorkspaceAction,
+  sharedDriveIdFromResourceDetails,
+  sharedDriveWorkspaceStandingApprovalName,
+} from "./googleSharedDriveWorkspace";
 
 type CreateStandingApprovalRequest =
   components["schemas"]["CreateStandingApprovalRequest"];
@@ -19,11 +26,6 @@ const UID_EMAIL_ACTION_TYPES = new Set([
   "protonmail.delete",
   "protonmail.apply_label",
   "protonmail.remove_label",
-]);
-
-const DRIVE_SHARED_DRIVE_ACTION_TYPES = new Set([
-  "google.upload_drive_file",
-  "google.create_drive_folder",
 ]);
 
 function deriveConstraintsFromParams(
@@ -83,17 +85,10 @@ function deriveSharedDriveConstraint(
   actionType: string,
   resourceDetails?: Record<string, unknown> | null,
 ): Record<string, unknown> | null {
-  if (!resourceDetails) return null;
-  const driveId = resourceDetails.drive_id;
-  if (typeof driveId !== "string" || driveId.length === 0) return null;
-  const destKey =
-    actionType === "google.create_drive_folder" ? "parent_id" : "folder_id";
-  return {
-    [destKey]: "*",
-    [META_NAMESPACE_KEY]: {
-      drive_id: driveId,
-    },
-  };
+  if (!isGoogleSharedDriveWorkspaceAction(actionType)) return null;
+  const driveId = sharedDriveIdFromResourceDetails(resourceDetails);
+  if (!driveId) return null;
+  return buildSharedDriveWorkspaceConstraints(actionType, driveId);
 }
 
 function deriveStandingApprovalConstraints(
@@ -112,14 +107,12 @@ function deriveStandingApprovalConstraints(
     return constraints;
   }
 
-  if (DRIVE_SHARED_DRIVE_ACTION_TYPES.has(approval.action.type)) {
-    const driveConstraint = deriveSharedDriveConstraint(
-      approval.action.type,
-      resourceDetails,
-    );
-    if (driveConstraint) {
-      return driveConstraint;
-    }
+  const driveConstraint = deriveSharedDriveConstraint(
+    approval.action.type,
+    resourceDetails,
+  );
+  if (driveConstraint) {
+    return driveConstraint;
   }
 
   return standingApprovalConstraintsForCreate(params);
@@ -145,4 +138,64 @@ export function buildCreateStandingApprovalFromApproval(
       ? { confirm_unrestricted: true }
       : {}),
   };
+}
+
+function createRequestForAction(
+  approval: ApprovalSummary,
+  actionType: string,
+  constraints: Record<string, unknown>,
+): CreateStandingApprovalRequest {
+  const version =
+    typeof approval.action.version === "string" && approval.action.version !== ""
+      ? approval.action.version
+      : "1";
+  return {
+    agent_id: approval.agent_id,
+    action_type: actionType,
+    action_version: version,
+    name: sharedDriveWorkspaceStandingApprovalName(
+      actionType,
+      approval.resource_details as Record<string, unknown> | undefined,
+    ),
+    description: "Routine Drive and Sheets work inside this Shared Drive",
+    constraints,
+    expires_at: null,
+    ...(constraintsAreUnrestricted(constraints)
+      ? { confirm_unrestricted: true }
+      : {}),
+  };
+}
+
+export function buildCreateStandingApprovalsFromApproval(
+  approval: ApprovalSummary,
+): CreateStandingApprovalRequest[] {
+  const resourceDetails = approval.resource_details as
+    | Record<string, unknown>
+    | undefined;
+  const driveId = sharedDriveIdFromResourceDetails(resourceDetails);
+  if (!driveId || !isGoogleSharedDriveWorkspaceAction(approval.action.type)) {
+    return [buildCreateStandingApprovalFromApproval(approval)];
+  }
+
+  return GOOGLE_SHARED_DRIVE_WORKSPACE_ACTION_TYPES.map((actionType) =>
+    createRequestForAction(
+      approval,
+      actionType,
+      buildSharedDriveWorkspaceConstraints(actionType, driveId),
+    ),
+  );
+}
+
+export function standingApprovalsToCreateFromApproval(
+  approval: ApprovalSummary,
+  existing: Array<{ agent_id: number; action_type: string }>,
+): CreateStandingApprovalRequest[] {
+  const existingTypes = new Set(
+    existing
+      .filter((sa) => sa.agent_id === approval.agent_id)
+      .map((sa) => sa.action_type),
+  );
+  return buildCreateStandingApprovalsFromApproval(approval).filter(
+    (req) => !existingTypes.has(req.action_type),
+  );
 }

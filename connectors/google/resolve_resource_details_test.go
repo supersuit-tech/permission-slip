@@ -153,7 +153,8 @@ func TestResolveResourceDetails_Document(t *testing.T) {
 
 func TestResolveResourceDetails_Spreadsheet(t *testing.T) {
 	srv, conn := testResolveServer(t, map[string]string{
-		"/spreadsheets/": `{"properties":{"title":"Budget Tracker"}}`,
+		"/spreadsheets/":   `{"properties":{"title":"Budget Tracker"}}`,
+		"/drive/v3/files/": `{"name":"Budget Tracker","mimeType":"application/vnd.google-apps.spreadsheet"}`,
 	})
 	defer srv.Close()
 
@@ -376,6 +377,95 @@ func TestResolveResourceDetails_ListDriveFiles_NoFolderID(t *testing.T) {
 	}
 	if details != nil {
 		t.Errorf("expected nil details when folder_id is omitted, got %v", details)
+	}
+}
+
+func TestResolveResourceDetails_ListDriveFiles_DriveIDParam(t *testing.T) {
+	srv, conn := testResolveServer(t, map[string]string{
+		"/drive/v3/drives/": `{"name":"Assistant Drive"}`,
+	})
+	defer srv.Close()
+
+	params, _ := json.Marshal(map[string]string{"drive_id": sharedDriveID, "query": "receipt"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.list_drive_files", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id %q, got %v", sharedDriveID, details["drive_id"])
+	}
+	if details["drive_name"] != "Assistant Drive" {
+		t.Errorf("expected drive_name, got %v", details["drive_name"])
+	}
+}
+
+func TestResolveResourceDetails_DriveFile_SharedDrive(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case len(r.URL.Path) >= len("/drive/v3/files/") && r.URL.Path[:len("/drive/v3/files/")] == "/drive/v3/files/":
+			w.Write([]byte(`{"name":"receipt.pdf","mimeType":"application/pdf","driveId":"` + sharedDriveID + `"}`))
+		case len(r.URL.Path) >= len("/drive/v3/drives/") && r.URL.Path[:len("/drive/v3/drives/")] == "/drive/v3/drives/":
+			w.Write([]byte(`{"name":"Assistant Drive"}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{client: srv.Client(), driveBaseURL: srv.URL}
+	params, _ := json.Marshal(map[string]string{"file_id": "1fileOnSharedDrive"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.get_drive_file", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["file_name"] != "receipt.pdf" {
+		t.Errorf("expected file_name, got %v", details["file_name"])
+	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id %q, got %v", sharedDriveID, details["drive_id"])
+	}
+	if details["drive_name"] != "Assistant Drive" {
+		t.Errorf("expected drive_name, got %v", details["drive_name"])
+	}
+}
+
+func TestResolveResourceDetails_Spreadsheet_SharedDrive(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case len(r.URL.Path) >= len("/spreadsheets/") && r.URL.Path[:len("/spreadsheets/")] == "/spreadsheets/":
+			w.Write([]byte(`{"properties":{"title":"Budget Tracker"}}`))
+		case len(r.URL.Path) >= len("/drive/v3/files/") && r.URL.Path[:len("/drive/v3/files/")] == "/drive/v3/files/":
+			w.Write([]byte(`{"name":"Budget Tracker","mimeType":"application/vnd.google-apps.spreadsheet","driveId":"` + sharedDriveID + `"}`))
+		case len(r.URL.Path) >= len("/drive/v3/drives/") && r.URL.Path[:len("/drive/v3/drives/")] == "/drive/v3/drives/":
+			w.Write([]byte(`{"name":"Assistant Drive"}`))
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{
+		client:        srv.Client(),
+		sheetsBaseURL: srv.URL,
+		driveBaseURL:  srv.URL,
+	}
+	params, _ := json.Marshal(map[string]string{"spreadsheet_id": "1sheetOnSharedDrive", "range": "Sheet1!A1"})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.sheets_read_range", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["title"] != "Budget Tracker" {
+		t.Errorf("expected title, got %v", details["title"])
+	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id %q, got %v", sharedDriveID, details["drive_id"])
+	}
+	if details["drive_name"] != "Assistant Drive" {
+		t.Errorf("expected drive_name, got %v", details["drive_name"])
 	}
 }
 

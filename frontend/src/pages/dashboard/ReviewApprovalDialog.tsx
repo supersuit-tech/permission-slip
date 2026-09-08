@@ -50,8 +50,12 @@ import { emailDetailsUnavailable } from "@/lib/emailEnrichment";
 import { shouldShowEmailApprovalSection } from "@/lib/emailApprovalDetails";
 import { parseStandingApprovalFallthrough } from "@/lib/standingApprovalFallthrough";
 import {
-  buildCreateStandingApprovalFromApproval,
+  standingApprovalsToCreateFromApproval,
 } from "./standingApprovalFromApproval";
+import {
+  isGoogleSharedDriveWorkspaceApproval,
+  sharedDriveWorkspaceCheckboxLabel,
+} from "./googleSharedDriveWorkspace";
 
 /** Auto-close delay (ms) after a successful approval. */
 const SUCCESS_AUTO_CLOSE_MS = 3_000;
@@ -201,6 +205,15 @@ export function ReviewApprovalDialog({
   );
   const showAutoApproveCheckbox =
     !standingApprovalsLoading && !hasExistingStandingApproval;
+  const isWorkspaceStandingApproval = isGoogleSharedDriveWorkspaceApproval(
+    approval.action.type,
+    approval.resource_details as Record<string, unknown> | undefined,
+  );
+  const autoApproveCheckboxLabel = isWorkspaceStandingApproval
+    ? sharedDriveWorkspaceCheckboxLabel(
+        approval.resource_details as Record<string, unknown> | undefined,
+      )
+    : "Auto-approve all future requests like this";
 
   const emailThread = useMemo(
     () => parseEmailThreadFromDetails(approval.context.details),
@@ -252,10 +265,26 @@ export function ReviewApprovalDialog({
 
       if (autoApproveFuture && result.execution_status !== "error") {
         try {
-          await createStandingApproval(
-            buildCreateStandingApprovalFromApproval(approval),
+          const requests = standingApprovalsToCreateFromApproval(
+            approval,
+            standingApprovals,
           );
-          setStandingApprovalCreated(true);
+          let created = 0;
+          let lastError: unknown;
+          for (const req of requests) {
+            try {
+              await createStandingApproval(req);
+              created += 1;
+            } catch (err) {
+              lastError = err;
+            }
+          }
+          if (created > 0) {
+            setStandingApprovalCreated(true);
+          }
+          if (lastError) {
+            throw lastError;
+          }
         } catch (err) {
           toast.error(
             err instanceof Error
@@ -274,6 +303,7 @@ export function ReviewApprovalDialog({
     approval,
     autoApproveFuture,
     createStandingApproval,
+    standingApprovals,
   ]);
 
   const handleDeny = useCallback(async () => {
@@ -356,7 +386,9 @@ export function ReviewApprovalDialog({
               <div className="flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950/30">
                 <CheckCircle className="size-4 shrink-0 text-green-600 dark:text-green-400" aria-hidden="true" />
                 <p className="text-sm text-green-800 dark:text-green-300">
-                  Future matching requests will be auto-approved.
+                  {isWorkspaceStandingApproval
+                    ? "Future Drive and Sheets work inside this Shared Drive will be auto-approved."
+                    : "Future matching requests will be auto-approved."}
                 </p>
               </div>
             )}
@@ -550,7 +582,7 @@ export function ReviewApprovalDialog({
                     htmlFor="auto-approve-future"
                     className="cursor-pointer text-sm font-normal leading-snug"
                   >
-                    Auto-approve all future requests like this
+                    {autoApproveCheckboxLabel}
                   </Label>
                 </div>
               )}

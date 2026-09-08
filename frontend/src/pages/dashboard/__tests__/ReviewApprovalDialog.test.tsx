@@ -376,4 +376,99 @@ describe("ReviewApprovalDialog — iMessage participants", () => {
     });
     expect(screen.queryByTestId("imessage-participants-row")).not.toBeInTheDocument();
   });
+
+  it("Shared Drive always-allow creates the Drive + Sheets workspace set", async () => {
+    setupMocks();
+    mockPost.mockImplementation((url: string) => {
+      if (url === "/v1/approvals/{approval_id}/approve") {
+        return Promise.resolve({
+          data: {
+            approval_id: "appr_test123",
+            status: "approved",
+            approved_at: new Date().toISOString(),
+            confirmation_code: "ABC12-3DEFG",
+            execution_status: "success",
+            execution_result: null,
+          },
+        });
+      }
+      if (url === "/v1/standing-approvals/create") {
+        return Promise.resolve({
+          data: {
+            standing_approval_id: "sa_new",
+            agent_id: 1,
+            action_type: "google.upload_drive_file",
+            status: "active",
+          },
+        });
+      }
+      return Promise.resolve({ data: {} });
+    });
+
+    const user = userEvent.setup();
+    render(
+      <ReviewApprovalDialog
+        approval={makeApproval({
+          action: {
+            type: "google.upload_drive_file",
+            version: "1",
+            parameters: {
+              name: "receipt.pdf",
+              folder_id: "1nestedFolder",
+            },
+          },
+          context: { description: "upload receipt", risk_level: "medium" },
+          resource_details: {
+            folder_name: "2026-639-receipts in Assistant Drive",
+            drive_id: "0AKbIIKZ8knmBUk9PVA",
+            drive_name: "Assistant Drive",
+          },
+        })}
+        agentDisplayName="Test Bot"
+        open={true}
+        onOpenChange={vi.fn()}
+      />,
+      { wrapper },
+    );
+
+    await settleAuthHydration();
+
+    const checkboxLabel =
+      "Auto-approve routine Drive and Sheets work inside Assistant Drive";
+    await waitFor(() => {
+      expect(screen.getByLabelText(checkboxLabel)).toBeInTheDocument();
+    });
+
+    await user.click(screen.getByLabelText(checkboxLabel));
+    await user.click(screen.getByText("Approve"));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          "Future Drive and Sheets work inside this Shared Drive will be auto-approved.",
+        ),
+      ).toBeInTheDocument();
+    });
+
+    const createCalls = mockPost.mock.calls.filter(
+      (call) => call[0] === "/v1/standing-approvals/create",
+    );
+    expect(createCalls).toHaveLength(9);
+    expect(createCalls.map((call) => call[1]?.body?.action_type)).toEqual([
+      "google.upload_drive_file",
+      "google.create_drive_folder",
+      "google.list_drive_files",
+      "google.search_drive",
+      "google.get_drive_file",
+      "google.sheets_read_range",
+      "google.sheets_write_range",
+      "google.sheets_append_rows",
+      "google.sheets_list_sheets",
+    ]);
+    expect(createCalls[5]?.[1]?.body?.constraints).toEqual({
+      spreadsheet_id: "*",
+      range: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+  });
 });

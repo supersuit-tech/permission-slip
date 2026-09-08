@@ -62,7 +62,7 @@ export function metaConstraintLabel(key: string): string {
     case "bcc":
       return "Verified Bcc (sent mail only)";
     case "drive_id":
-      return "Verified Shared Drive";
+      return "inside Shared Drive";
     default:
       return `Verified ${key}`;
   }
@@ -244,6 +244,30 @@ function parseValue(
   return line;
 }
 
+function constraintsHaveDriveIdMeta(
+  constraints: Record<string, unknown>,
+): boolean {
+  const meta = constraints[META_NAMESPACE_KEY];
+  if (meta && typeof meta === "object" && !Array.isArray(meta)) {
+    const driveId = (meta as Record<string, unknown>).drive_id;
+    if (driveId !== undefined && driveId !== null && driveId !== "") {
+      return true;
+    }
+  }
+  if (constraints.$version === CONSTRAINT_VERSION && Array.isArray(constraints.groups)) {
+    for (const group of constraints.groups) {
+      const conditions = (group as { conditions?: unknown[] }).conditions;
+      if (!Array.isArray(conditions)) continue;
+      for (const cond of conditions) {
+        if (!cond || typeof cond !== "object") continue;
+        const field = String((cond as Record<string, unknown>).field ?? "");
+        if (field === `${META_NAMESPACE_KEY}.drive_id`) return true;
+      }
+    }
+  }
+  return false;
+}
+
 /** Flatten standing approval constraints into human-readable display lines. */
 export function formatStandingApprovalConstraints(
   constraints: Record<string, unknown> | null | undefined,
@@ -251,10 +275,21 @@ export function formatStandingApprovalConstraints(
 ): ParsedConstraintLine[] {
   if (!constraints || typeof constraints !== "object") return [];
 
-  if (constraints.$version === CONSTRAINT_VERSION) {
-    return parseStructuredConstraints(constraints, resourceDetails);
-  }
+  const lines =
+    constraints.$version === CONSTRAINT_VERSION
+      ? parseStructuredConstraints(constraints, resourceDetails)
+      : parseFlatConstraints(constraints, resourceDetails);
 
+  if (constraintsHaveDriveIdMeta(constraints)) {
+    return lines.filter((line) => line.verified || line.mode !== "wildcard");
+  }
+  return lines;
+}
+
+function parseFlatConstraints(
+  constraints: Record<string, unknown>,
+  resourceDetails?: Record<string, unknown> | null,
+): ParsedConstraintLine[] {
   const lines: ParsedConstraintLine[] = [];
   for (const [key, raw] of Object.entries(constraints)) {
     if (key === META_NAMESPACE_KEY) {
