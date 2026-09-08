@@ -58,4 +58,69 @@ describe("buildCreateStandingApprovalFromApproval", () => {
     expect(request.constraints).toEqual({});
     expect(request.confirm_unrestricted).toBe(true);
   });
+
+  it("uses $meta.drive_id instead of pinning folder_id for Shared Drive uploads", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.upload_drive_file",
+          version: "1",
+          parameters: {
+            name: "receipt.pdf",
+            folder_id: "1Xv2Naa6LjElcSK55wb9HigrLrAaYPE0d",
+          },
+        },
+        context: { description: "upload receipt", risk_level: "medium" },
+        resource_details: {
+          folder_name: "2026-639-receipts in Assistant Drive",
+          drive_id: "0AKbIIKZ8knmBUk9PVA",
+        },
+      }),
+    );
+    expect(request.constraints).toEqual({
+      folder_id: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+    expect(request.confirm_unrestricted).toBeUndefined();
+  });
+
+  it("uses $meta.drive_id for Shared Drive folder creates", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.create_drive_folder",
+          version: "1",
+          parameters: {
+            name: "2026-639-receipts",
+            parent_id: "0AKbIIKZ8knmBUk9PVA",
+          },
+        },
+        resource_details: {
+          folder_name: "Assistant Drive in the / directory",
+          drive_id: "0AKbIIKZ8knmBUk9PVA",
+        },
+      }),
+    );
+    expect(request.constraints).toEqual({
+      parent_id: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+  });
+
+  it("pins exact folder_id when the upload is not on a Shared Drive", () => {
+    const request = buildCreateStandingApprovalFromApproval(
+      makeApproval({
+        action: {
+          type: "google.upload_drive_file",
+          version: "1",
+          parameters: { name: "notes.md", folder_id: "1myDriveFolder" },
+        },
+        resource_details: { folder_name: "Receipts" },
+      }),
+    );
+    expect(request.constraints).toEqual({
+      name: "notes.md",
+      folder_id: "1myDriveFolder",
+    });
+  });
 });

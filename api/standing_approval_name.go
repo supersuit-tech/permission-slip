@@ -75,6 +75,7 @@ func summarizeMetaConstraints(metaRaw json.RawMessage) string {
 		{"to", "to"},
 		{"cc", "cc"},
 		{"bcc", "bcc"},
+		{"drive_id", "in Shared Drive"},
 	}
 	for _, item := range priority {
 		raw, ok := meta[item.key]

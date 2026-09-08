@@ -126,6 +126,21 @@ Optional future work: a one-time backfill migration to rewrite legacy rows as v2
 
 See also [ADR-002](adr/002-standing-approvals.md) and `db/constraint_validate.go` for engine details.
 
+## Google Drive Shared Drive membership (`$meta.drive_id`)
+
+Exact `folder_id` / `parent_id` allowlists cannot cover folders the agent creates later (for example `2026-639-receipts` under one Shared Drive). For `google.upload_drive_file` and `google.create_drive_folder`, constrain the **verified Shared Drive** instead:
+
+```json
+{
+  "folder_id": "*",
+  "$meta": {
+    "drive_id": "0AKbIIKZ8knmBUk9PVA"
+  }
+}
+```
+
+`$meta.drive_id` is resolved from the Drive API for the destination folder (or Shared Drive root ID). It matches that drive's root **or any descendant**. My Drive and other Shared Drives still require one-off approval. Discover the field via capabilities `meta_constraint_fields`.
+
 ## Display formatting (shared)
 
 Human-readable constraint summaries use `@permission-slip/constraints-format` in `shared/constraints/`. The same formatter powers web (`ConstraintsSummary`), mobile (standing approval detail screens), and the CLI (`auto-approve format`). When changing display semantics, update `shared/constraints/format.ts` and its tests once.

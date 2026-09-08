@@ -20,7 +20,7 @@ If `request` returns `executed: true` or `status: approved`, the action already 
 
 ## Verified metadata constraints (`$meta`)
 
-For connectors that resolve envelope metadata (Proton Mail message-targeted actions), prefer **`$meta` constraints** over plain parameter pins on `from` / `to` — agents can spoof param values, but `$meta` is checked against server-fetched headers.
+For connectors that resolve verified target metadata, prefer **`$meta` constraints** over plain parameter pins — agents can spoof param values, but `$meta` is checked against server-fetched data.
 
 **Proton Mail examples:**
 
@@ -39,6 +39,21 @@ permission-slip request --action protonmail.read_email \
 - For `protonmail.send_email`, constrain outbound `to` / `cc` / `bcc` as normal params; array patterns require **every** recipient to match.
 
 See [Proton Mail connector docs](../../docs/connectors/protonmail.md#standing-approval-constraints-meta) for the full action table.
+
+**Google Drive Shared Drive (upload / create folder):**
+
+```bash
+# Auto-approve uploads anywhere in a Shared Drive (including new year/receipts folders)
+permission-slip request --action google.upload_drive_file \
+  --standing-constraints '{"folder_id":"*","$meta":{"drive_id":"0AKbIIKZ8knmBUk9PVA"}}' \
+  --params '{"name":"receipt.pdf","folder_id":"1nestedYearFolder","content_base64":"..."}'
+```
+
+- Use `$meta.drive_id` — not a top-level `drive_id` or an exhaustive `folder_id` `any_of` list.
+- Same `$meta.drive_id` field applies to `google.create_drive_folder` (`parent_id` may be `*`).
+- Out-of-drive destinations (My Drive or a different Shared Drive) fall through to one-off approval.
+
+See [Google connector README](../../connectors/google/README.md#standing-approval-constraints-metadrive_id) for details.
 
 ## Commands
 

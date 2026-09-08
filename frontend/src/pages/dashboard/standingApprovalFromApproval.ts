@@ -22,6 +22,12 @@ const UID_EMAIL_ACTION_TYPES = new Set([
   "protonmail.remove_label",
 ]);
 
+/** Drive writes whose destination can be scoped to a verified Shared Drive. */
+const DRIVE_SHARED_DRIVE_ACTION_TYPES = new Set([
+  "google.upload_drive_file",
+  "google.create_drive_folder",
+]);
+
 /**
  * Derive initial constraints from an approval's action parameters.
  * Each parameter becomes a fixed constraint pinned to its exact value.
@@ -63,6 +69,24 @@ function deriveEmailSenderConstraint(
   };
 }
 
+function deriveSharedDriveConstraint(
+  actionType: string,
+  resourceDetails?: Record<string, unknown> | null,
+): Record<string, unknown> | null {
+  const driveId = resourceDetails?.drive_id;
+  if (typeof driveId !== "string" || driveId.length === 0) {
+    return null;
+  }
+  const destKey =
+    actionType === "google.create_drive_folder" ? "parent_id" : "folder_id";
+  return {
+    [destKey]: "*",
+    [META_NAMESPACE_KEY]: {
+      drive_id: driveId,
+    },
+  };
+}
+
 function deriveStandingApprovalConstraints(
   approval: ApprovalSummary,
 ): Record<string, unknown> {
@@ -79,6 +103,16 @@ function deriveStandingApprovalConstraints(
     const constraints = deriveConstraintsFromParams(params);
     constraints.message_id = "*";
     return constraints;
+  }
+
+  if (DRIVE_SHARED_DRIVE_ACTION_TYPES.has(approval.action.type)) {
+    const driveConstraint = deriveSharedDriveConstraint(
+      approval.action.type,
+      resourceDetails,
+    );
+    if (driveConstraint) {
+      return driveConstraint;
+    }
   }
 
   return standingApprovalConstraintsForCreate(params);

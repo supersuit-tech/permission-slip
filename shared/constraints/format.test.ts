@@ -233,4 +233,17 @@ describe("formatStandingApprovalConstraints", () => {
       ),
     ).toBe("spreadsheet_id: Budget 2026");
   });
+
+  it("labels $meta drive_id constraints as verified Shared Drive", () => {
+    const lines = formatStandingApprovalConstraints({
+      folder_id: "*",
+      $meta: { drive_id: "0AKbIIKZ8knmBUk9PVA" },
+    });
+    expect(lines).toContainEqual({
+      label: "Verified Shared Drive",
+      mode: "fixed",
+      value: "0AKbIIKZ8knmBUk9PVA",
+      verified: true,
+    });
+  });
 });

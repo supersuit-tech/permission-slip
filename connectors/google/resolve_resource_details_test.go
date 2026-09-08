@@ -457,6 +457,9 @@ func TestResolveResourceDetails_DriveFolder_SharedDriveFallback(t *testing.T) {
 	if details["folder_name"] != "Finance Shared Drive in the / directory" {
 		t.Errorf("expected shared drive name, got %v", details["folder_name"])
 	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id %q, got %v", sharedDriveID, details["drive_id"])
+	}
 	if fileHits != 1 || driveHits != 1 {
 		t.Errorf("expected files.get then drives.get, got fileHits=%d driveHits=%d", fileHits, driveHits)
 	}
@@ -498,6 +501,9 @@ func TestResolveResourceDetails_DriveFolder_GenericRootName(t *testing.T) {
 	}
 	if details["parent_name"] != want {
 		t.Errorf("expected parent_name %q, got %v", want, details["parent_name"])
+	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id %q, got %v", sharedDriveID, details["drive_id"])
 	}
 	if fileHits != 1 || driveHits != 1 {
 		t.Errorf("expected files.get then drives.get, got fileHits=%d driveHits=%d", fileHits, driveHits)
@@ -541,6 +547,9 @@ func TestResolveResourceDetails_DriveFolder_NestedSharedDriveFolder(t *testing.T
 	if details["parent_name"] != want {
 		t.Errorf("expected parent_name %q, got %v", want, details["parent_name"])
 	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id %q, got %v", sharedDriveID, details["drive_id"])
+	}
 	if fileHits != 1 || driveHits != 1 {
 		t.Errorf("expected files.get then drives.get, got fileHits=%d driveHits=%d", fileHits, driveHits)
 	}
@@ -579,6 +588,9 @@ func TestResolveResourceDetails_DriveFolder_NestedFolderNamedDriveKeepsFolderNam
 	if details["folder_name"] != want {
 		t.Errorf("expected nested folder to keep its name and append the drive, got %v", details["folder_name"])
 	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id %q, got %v", sharedDriveID, details["drive_id"])
+	}
 	if driveHits != 1 {
 		t.Errorf("expected drives.get for a nested Shared Drive folder, got driveHits=%d", driveHits)
 	}
@@ -614,6 +626,9 @@ func TestResolveResourceDetails_DriveFolder_NestedSharedDrive_DriveGetFails(t *t
 	if details["folder_name"] != "2026-documents" {
 		t.Errorf("expected folder name fallback, got %v", details["folder_name"])
 	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id even when drives.get fails, got %v", details["drive_id"])
+	}
 }
 
 func TestResolveResourceDetails_DriveFolder_GenericRootName_DriveGetFails(t *testing.T) {
@@ -642,6 +657,9 @@ func TestResolveResourceDetails_DriveFolder_GenericRootName_DriveGetFails(t *tes
 	details, err := conn.ResolveResourceDetails(context.Background(), "google.upload_drive_file", params, validCreds())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["drive_id"] != sharedDriveID {
+		t.Errorf("expected drive_id even when drives.get fails, got %v", details["drive_id"])
 	}
 	if details["folder_name"] != "Drive in the / directory" {
 		t.Errorf("expected generic root fallback, got %v", details["folder_name"])

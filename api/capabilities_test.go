@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
+	"github.com/supersuit-tech/permission-slip/connectors/google"
 	"github.com/supersuit-tech/permission-slip/connectors/protonmail"
 	"github.com/supersuit-tech/permission-slip/db"
 	"github.com/supersuit-tech/permission-slip/db/testhelper"
@@ -602,5 +603,46 @@ func TestGetCapabilities_ProtonMailMetaConstraintFields(t *testing.T) {
 	}
 	if fields[0] != "bcc" || fields[len(fields)-1] != "to" {
 		t.Fatalf("expected sorted meta fields, got %v", fields)
+	}
+}
+
+func TestGetCapabilities_GoogleDriveMetaConstraintFields(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+	agentID, privKey := insertRegisteredAgentWithKey(t, tx, uid)
+
+	connID := testhelper.GenerateID(t, "conn_")
+	testhelper.InsertConnector(t, tx, connID)
+	schema := json.RawMessage(`{"type":"object","properties":{"name":{"type":"string"},"folder_id":{"type":"string"}}}`)
+	testhelper.InsertConnectorActionFull(t, tx, connID, "google.upload_drive_file", "Upload Drive File", testhelper.ConnectorActionOpts{
+		ParametersSchema: schema,
+	})
+	testhelper.InsertAgentConnector(t, tx, agentID, uid, connID)
+
+	registry := connectors.NewRegistry()
+	registry.Register(google.New())
+
+	router := NewRouter(&Deps{DB: tx, JWTSigningSecret: testJWTSecret, Connectors: registry})
+	r := capabilitiesRequest(t, agentID, privKey)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	var resp capabilitiesResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(resp.Connectors) != 1 || len(resp.Connectors[0].Actions) != 1 {
+		t.Fatalf("expected 1 connector with 1 action, got %+v", resp.Connectors)
+	}
+	fields := resp.Connectors[0].Actions[0].MetaConstraintFields
+	if len(fields) != 1 || fields[0] != "drive_id" {
+		t.Fatalf("expected meta_constraint_fields [drive_id], got %v", fields)
 	}
 }

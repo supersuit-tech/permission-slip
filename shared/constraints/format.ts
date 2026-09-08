@@ -61,6 +61,8 @@ export function metaConstraintLabel(key: string): string {
       return "Verified Cc";
     case "bcc":
       return "Verified Bcc (sent mail only)";
+    case "drive_id":
+      return "Verified Shared Drive";
     default:
       return `Verified ${key}`;
   }

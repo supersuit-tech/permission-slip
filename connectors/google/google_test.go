@@ -214,4 +214,6 @@ func TestGoogleConnector_ImplementsInterface(t *testing.T) {
 	t.Parallel()
 	var _ connectors.Connector = (*GoogleConnector)(nil)
 	var _ connectors.ManifestProvider = (*GoogleConnector)(nil)
+	var _ connectors.ConstraintMetadataResolver = (*GoogleConnector)(nil)
+	var _ connectors.ConstraintMetadataCapabilities = (*GoogleConnector)(nil)
 }
