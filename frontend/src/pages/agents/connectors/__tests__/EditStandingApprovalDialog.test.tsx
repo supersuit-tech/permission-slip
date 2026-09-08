@@ -113,4 +113,59 @@ describe("EditStandingApprovalDialog", () => {
     });
     expect(screen.getByDisplayValue("automated@airbnb.com")).toBeInTheDocument();
   });
+
+  it("shows the calendar name for $meta.calendar_id constraints", async () => {
+    const calendarActions: ConnectorAction[] = [
+      {
+        action_type: "google.create_calendar_event",
+        operation_type: "write",
+        name: "Create Calendar Event",
+        description: "Create a calendar event",
+        risk_level: "medium",
+        requires_payment_method: false,
+        parameters_schema: {
+          type: "object",
+          properties: {
+            summary: { type: "string" },
+            calendar_id: { type: "string" },
+          },
+        },
+        meta_constraint_fields: ["calendar_id"],
+      },
+    ];
+
+    renderWithProviders(
+      <EditStandingApprovalDialog
+        open
+        onOpenChange={vi.fn()}
+        rule={{
+          ...nullConstraintRule,
+          action_type: "google.create_calendar_event",
+          name: "Create Calendar Event — on calendar Team Calendar",
+          constraints: {
+            calendar_id: "*",
+            $meta: { calendar_id: "c_abc@group.calendar.google.com" },
+          },
+          resource_details: {
+            resources: {
+              calendar_id: {
+                "c_abc@group.calendar.google.com": { name: "Team Calendar" },
+              },
+            },
+          },
+        }}
+        agentId={42}
+        connectorId="google"
+        actions={calendarActions}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText("Verified calendar")).toBeInTheDocument();
+    });
+    expect(screen.getByText("Team Calendar")).toBeInTheDocument();
+    expect(
+      screen.getByDisplayValue("c_abc@group.calendar.google.com"),
+    ).toBeInTheDocument();
+  });
 });

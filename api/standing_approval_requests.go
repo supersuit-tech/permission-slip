@@ -229,7 +229,7 @@ func handleApproveStandingApprovalRequest(deps *Deps) http.HandlerFunc {
 		} else if displayName != "" {
 			actionName = displayName
 		}
-		ruleName := deriveStandingApprovalNameFromRequest(actionName, sar.Constraints)
+		ruleName := deriveStandingApprovalNameFromRequest(actionName, sar.Constraints, sar.ResourceDetails)
 		ruleDescription := standingApprovalAutoRuleDescription
 
 		actionSchema, err := db.GetActionParametersSchema(r.Context(), deps.DB, sar.ActionType)

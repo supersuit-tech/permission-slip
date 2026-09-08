@@ -140,3 +140,43 @@ export const EnumAndBooleanFields: StoryObj<typeof IMessageConstraintsDemo> = {
   render: () => <IMessageConstraintsDemo />,
   name: "Enum and boolean fields",
 };
+
+const CALENDAR_SCHEMA: ParametersSchema = {
+  type: "object",
+  properties: {
+    calendar_id: { type: "string", description: "Calendar ID" },
+    summary: { type: "string", description: "Event title" },
+  },
+};
+
+function VerifiedCalendarDemo() {
+  const [form, setForm] = useState(() =>
+    constraintsToFormState({
+      calendar_id: "*",
+      $meta: { calendar_id: "c_abc@group.calendar.google.com" },
+    }),
+  );
+
+  return (
+    <div className="max-w-lg rounded-lg border bg-background p-4">
+      <ConstraintScenariosEditor
+        form={form}
+        onChange={setForm}
+        parametersSchema={CALENDAR_SCHEMA}
+        metaFields={["calendar_id"]}
+        resourceDetails={{
+          resources: {
+            calendar_id: {
+              "c_abc@group.calendar.google.com": { name: "Team Calendar" },
+            },
+          },
+        }}
+      />
+    </div>
+  );
+}
+
+export const VerifiedCalendarName: StoryObj<typeof VerifiedCalendarDemo> = {
+  render: () => <VerifiedCalendarDemo />,
+  name: "Verified calendar name",
+};

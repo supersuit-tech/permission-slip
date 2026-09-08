@@ -124,6 +124,7 @@ export function StepConstraints({
   dataWindowForm,
   onDataWindowFormChange,
   isPending,
+  resourceDetails,
 }: {
   configSchema: ParametersSchema | null;
   schemaLoading: boolean;
@@ -136,6 +137,7 @@ export function StepConstraints({
   dataWindowForm: DataWindowFormState;
   onDataWindowFormChange: (value: DataWindowFormState) => void;
   isPending: boolean;
+  resourceDetails?: Record<string, unknown> | null;
 }) {
   const paramKeys = useMemo(
     () => (configSchema?.properties ? Object.keys(configSchema.properties) : []),
@@ -177,6 +179,7 @@ export function StepConstraints({
             parametersSchema={configSchema}
             metaFields={metaFields}
             disabled={isPending}
+            resourceDetails={resourceDetails}
           />
         </div>
       ) : (
