@@ -89,7 +89,7 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.list_calendar_events",
 			Name:        "List calendar events",
 			Description: "Agent can list upcoming events from any calendar.",
-			Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*"}`),
+			Parameters:  json.RawMessage(`{"calendar_id":"*","max_results":"*","time_min":"*","time_max":"*","single_events":"*"}`),
 		},
 		// --- Calendar write ---
 		{
@@ -111,21 +111,21 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.update_calendar_event",
 			Name:        "Update calendar events",
 			Description: "Agent can update the summary, description, time, attendees, and location of calendar events.",
-			Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","clear_attendees":"*","location":"*"}`),
+			Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","clear_attendees":"*","location":"*","scope":"*","instance_start":"*","recurrence":"*"}`),
 		},
 		{
 			ID:          "tpl_google_update_calendar_event_time",
 			ActionType:  "google.update_calendar_event",
 			Name:        "Reschedule calendar events",
 			Description: "Agent can reschedule events (change start/end time only).",
-			Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","start_time":"*","end_time":"*"}`),
+			Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","start_time":"*","end_time":"*","scope":"*","instance_start":"*"}`),
 		},
 		{
 			ID:          "tpl_google_delete_calendar_event",
 			ActionType:  "google.delete_calendar_event",
 			Name:        "Delete calendar events",
 			Description: "Agent can delete events from any calendar.",
-			Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*"}`),
+			Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","scope":"*","instance_start":"*"}`),
 		},
 		{
 			ID:          "tpl_google_create_meeting",

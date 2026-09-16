@@ -192,6 +192,12 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 								"datetime_range_pair": "time_min",
 								"datetime_range_role": "upper"
 							}
+						},
+						"single_events": {
+							"type": "boolean",
+							"default": true,
+							"description": "When true (default), expand recurring series into individual instances so each item has an instance event_id plus recurring_event_id and original_start_time. When false, return series masters (with recurrence) instead of expanded instances.",
+							"x-ui": {"widget": "toggle", "label": "Expand recurring instances"}
 						}
 					}
 				}`)),
@@ -736,7 +742,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "google.update_calendar_event",
 				Name:            "Update Calendar Event",
-				Description:     "Update an existing Google Calendar event (time, title, attendees, or location)",
+				Description:     "Update an existing Google Calendar event (time, title, attendees, location, or recurrence). Use scope to edit one instance, the whole series, or this and following occurrences.",
 				RiskLevel:       "medium",
 				DisplayTemplate: "Update event {{event_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
@@ -745,8 +751,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"event_id": {
 							"type": "string",
-							"description": "The ID of the calendar event to update",
-							"x-ui": {"label": "Event ID", "help_text": "Calendar event ID — from google.list_calendar_events"}
+							"description": "The ID of the calendar event to update. For one occurrence, pass the expanded instance id from list_calendar_events. For the whole series, pass the series master id (recurring_event_id).",
+							"x-ui": {"label": "Event ID", "help_text": "Instance id (scope=instance) or series master id (scope=series) — from google.list_calendar_events"}
 						},
 						"calendar_id": {
 							"type": "string",
@@ -799,6 +805,24 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"type": "string",
 							"description": "Event location",
 							"x-ui": {"label": "Location", "placeholder": "Conference Room A"}
+						},
+						"scope": {
+							"type": "string",
+							"enum": ["instance", "series", "this_and_following"],
+							"description": "What the edit applies to. instance: one occurrence (requires an expanded instance event_id, or master event_id plus instance_start). series: the series master (requires the master event_id). this_and_following: split the series from this occurrence forward. Omit to PATCH event_id as-is (no series semantics).",
+							"x-ui": {"widget": "select", "label": "Scope"}
+						},
+						"instance_start": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Original start of the occurrence when event_id is a series master and scope is instance or this_and_following. RFC 3339 or YYYY-MM-DD for all-day events.",
+							"x-ui": {"label": "Instance start", "widget": "datetime"}
+						},
+						"recurrence": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Replacement recurrence lines for the series master (Google Calendar API shape), e.g. [\"RRULE:FREQ=WEEKLY;BYDAY=TU\"]. Allowed with scope=series or this_and_following; rejected on a single instance.",
+							"x-ui": {"label": "Recurrence", "help_text": "RRULE/EXDATE/RDATE strings — series master only"}
 						}
 					}
 				}`)),
@@ -806,7 +830,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "google.delete_calendar_event",
 				Name:            "Delete Calendar Event",
-				Description:     "Delete or cancel a Google Calendar event",
+				Description:     "Delete or cancel a Google Calendar event. Use scope to cancel one instance, the whole series, or this and following occurrences.",
 				RiskLevel:       "high",
 				DisplayTemplate: "Delete event {{event_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
@@ -815,8 +839,8 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					"properties": {
 						"event_id": {
 							"type": "string",
-							"description": "The ID of the calendar event to delete",
-							"x-ui": {"label": "Event ID", "help_text": "Calendar event ID — from google.list_calendar_events"}
+							"description": "The ID of the calendar event to delete. For one occurrence, pass the expanded instance id from list_calendar_events. For the whole series, pass the series master id (recurring_event_id).",
+							"x-ui": {"label": "Event ID", "help_text": "Instance id (scope=instance) or series master id (scope=series) — from google.list_calendar_events"}
 						},
 						"calendar_id": {
 							"type": "string",
@@ -831,6 +855,18 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 								"help_text": "Connect a credential to select a calendar.",
 								"label": "Calendar"
 							}
+						},
+						"scope": {
+							"type": "string",
+							"enum": ["instance", "series", "this_and_following"],
+							"description": "What the delete applies to. instance: cancel one occurrence (requires an expanded instance event_id, or master event_id plus instance_start). series: delete the series master. this_and_following: end the series before this occurrence. Omit to DELETE event_id as-is (no series semantics).",
+							"x-ui": {"widget": "select", "label": "Scope"}
+						},
+						"instance_start": {
+							"type": "string",
+							"format": "date-time",
+							"description": "Original start of the occurrence when event_id is a series master and scope is instance or this_and_following. RFC 3339 or YYYY-MM-DD for all-day events.",
+							"x-ui": {"label": "Instance start", "widget": "datetime"}
 						}
 					}
 				}`)),

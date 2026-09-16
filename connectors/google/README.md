@@ -253,6 +253,7 @@ Lists upcoming events from Google Calendar.
 | `max_results` | integer | No | `10` | Maximum number of events to return (1-250) |
 | `time_min` | string | No | now | Lower bound for event start time (RFC 3339). Defaults to current time. |
 | `time_max` | string | No | — | Upper bound for event start time (RFC 3339) |
+| `single_events` | boolean | No | `true` | When `true`, expand recurring series into individual instances. When `false`, return series masters (with `recurrence`) instead of expanded instances. |
 
 **Response:**
 
@@ -260,22 +261,27 @@ Lists upcoming events from Google Calendar.
 {
   "events": [
     {
-      "id": "event123",
+      "id": "abc123_20240116T140000Z",
       "summary": "Team Standup",
       "description": "Daily sync",
-      "start_time": "2024-01-15T09:00:00-05:00",
-      "end_time": "2024-01-15T09:30:00-05:00",
+      "start_time": "2024-01-16T09:00:00-05:00",
+      "end_time": "2024-01-16T09:30:00-05:00",
       "status": "confirmed",
       "html_link": "https://calendar.google.com/event?eid=...",
-      "attendees": ["alice@example.com", "bob@example.com"]
+      "attendees": ["alice@example.com", "bob@example.com"],
+      "event_kind": "instance",
+      "recurring_event_id": "abc123",
+      "original_start_time": "2024-01-16T09:00:00-05:00"
     }
   ]
 }
 ```
 
+`event_kind` is `single`, `instance` (an expanded occurrence), or `series_master`. Instance rows include `recurring_event_id` (the series master id) and `original_start_time`. Series masters (when `single_events=false`) include `recurrence`. Use those fields to choose `event_id` + `scope` for `google.update_calendar_event` / `google.delete_calendar_event`.
+
 **Calendar API:** `GET /calendars/{calendarId}/events` ([docs](https://developers.google.com/calendar/api/v3/reference/events/list))
 
-Events are returned as single instances (recurring events expanded) ordered by start time. All-day events use a date string (e.g., `2024-01-15`) instead of a full RFC 3339 timestamp.
+By default, events are returned as single instances (recurring events expanded) ordered by start time. All-day events use a date string (e.g., `2024-01-15`) instead of a full RFC 3339 timestamp.
 
 ---
 
@@ -906,7 +912,7 @@ Updates an existing Google Calendar event using a partial update (PATCH). Only f
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `event_id` | string | Yes | — | The ID of the event to update |
+| `event_id` | string | Yes | — | Instance id (`scope=instance`) or series master id (`scope=series`). From `google.list_calendar_events`. |
 | `calendar_id` | string | No | `primary` | Calendar ID containing the event |
 | `summary` | string | No | — | New event title |
 | `description` | string | No | — | New event description |
@@ -915,8 +921,40 @@ Updates an existing Google Calendar event using a partial update (PATCH). Only f
 | `attendees` | string[] | No | — | Replace the attendee list with these email addresses |
 | `clear_attendees` | boolean | No | `false` | Remove all attendees (mutually exclusive with `attendees`) |
 | `location` | string | No | — | New event location |
+| `scope` | string | No | — | `instance` (one occurrence), `series` (whole series), or `this_and_following` (split from this occurrence forward). Omit to PATCH `event_id` as-is — no series semantics. |
+| `instance_start` | string | No | — | Original start of the occurrence when `event_id` is a series master and `scope` is `instance` or `this_and_following` |
+| `recurrence` | string[] | No | — | Replacement RRULE/EXDATE/RDATE lines on the series master (e.g. `["RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU"]`). Rejected for `scope=instance`. |
 
 At least one update field must be provided. `start_time` and `end_time` must always be provided together.
+
+**Recurring events:** `scope=instance` requires an expanded instance `event_id` (from `list_calendar_events` with `single_events=true`) **or** the series master id plus `instance_start`. `scope=series` requires the master id (`recurring_event_id`), not an instance id. `this_and_following` ends the original RRULE just before this occurrence and creates a new series from that instance (Google’s Calendar UI pattern — the raw API has no THISANDFUTURE flag).
+
+Omit `scope` and the connector still treats `event_id` opaquely (legacy behavior): it PATCHes whatever id you pass, with no master/instance checks.
+
+**Examples:**
+
+Move just the next occurrence (instance id from `list_calendar_events`):
+
+```json
+{
+  "event_id": "abc123_20260120T150000Z",
+  "scope": "instance",
+  "start_time": "2026-01-21T16:00:00Z",
+  "end_time": "2026-01-21T17:00:00Z"
+}
+```
+
+Change every weekly occurrence (and optionally the RRULE):
+
+```json
+{
+  "event_id": "abc123",
+  "scope": "series",
+  "start_time": "2026-01-20T16:00:00Z",
+  "end_time": "2026-01-20T17:00:00Z",
+  "recurrence": ["RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU"]
+}
+```
 
 **Response:**
 
@@ -926,16 +964,20 @@ At least one update field must be provided. `start_time` and `end_time` must alw
   "summary": "Updated Title",
   "html_link": "https://calendar.google.com/event?eid=event-123",
   "status": "confirmed",
-  "updated": "2024-01-15T10:00:00Z"
+  "updated": "2024-01-15T10:00:00Z",
+  "scope": "instance"
 }
 ```
 
-**Calendar API:** `PATCH /calendars/{calendarId}/events/{eventId}` ([docs](https://developers.google.com/calendar/api/v3/reference/events/patch))
+`this_and_following` also returns `original_event_id` (the truncated series master) when a new series is created.
+
+**Calendar API:** `PATCH /calendars/{calendarId}/events/{eventId}` ([docs](https://developers.google.com/calendar/api/v3/reference/events/patch)). `this_and_following` also `PATCH`es the master `recurrence` and `POST`s a new series.
 
 **Implementation notes:**
 - Uses `PATCH` (partial update) via a `map[string]any` request body so that only provided fields are sent. A struct with `omitempty` tags cannot distinguish "not provided" from "intentionally empty" for the attendees list.
 - `clear_attendees: true` sends an explicit empty `attendees: []` array to remove all attendees from the event.
 - `calendar_id` is URL-encoded in the API path to safely handle IDs with special characters (e.g., `group@calendar.google.com`).
+- Companion create-side work (RRULE on `google.create_calendar_event`) is tracked in GitHub issue #1533.
 
 ---
 
@@ -949,8 +991,32 @@ Deletes a Google Calendar event by ID.
 
 | Name | Type | Required | Default | Description |
 |------|------|----------|---------|-------------|
-| `event_id` | string | Yes | — | The ID of the event to delete |
+| `event_id` | string | Yes | — | Instance id (`scope=instance`) or series master id (`scope=series`). From `google.list_calendar_events`. |
 | `calendar_id` | string | No | `primary` | Calendar ID containing the event |
+| `scope` | string | No | — | `instance` (cancel one occurrence), `series` (delete the whole series), or `this_and_following` (end the series before this occurrence). Omit to DELETE `event_id` as-is — no series semantics. |
+| `instance_start` | string | No | — | Original start of the occurrence when `event_id` is a series master and `scope` is `instance` or `this_and_following` |
+
+**Recurring events:** same id/`scope` rules as `google.update_calendar_event`. `this_and_following` on a mid-series instance rewrites the master RRULE with `UNTIL` just before that occurrence (`status: "truncated"`). Deleting the first remaining instance (or a non-recurring event) DELETEs the master (`status: "deleted"`).
+
+**Examples:**
+
+Cancel just next Tuesday:
+
+```json
+{
+  "event_id": "abc123_20260120T150000Z",
+  "scope": "instance"
+}
+```
+
+Delete the entire weekly series:
+
+```json
+{
+  "event_id": "abc123",
+  "scope": "series"
+}
+```
 
 **Response:**
 
@@ -958,13 +1024,14 @@ Deletes a Google Calendar event by ID.
 {
   "event_id": "event-123",
   "calendar_id": "primary",
-  "status": "deleted"
+  "status": "deleted",
+  "scope": "instance"
 }
 ```
 
-**Calendar API:** `DELETE /calendars/{calendarId}/events/{eventId}` ([docs](https://developers.google.com/calendar/api/v3/reference/events/delete))
+**Calendar API:** `DELETE /calendars/{calendarId}/events/{eventId}` ([docs](https://developers.google.com/calendar/api/v3/reference/events/delete)). `this_and_following` may `PATCH` the master `recurrence` instead of deleting.
 
-The Google Calendar API returns HTTP 204 No Content on success. The connector synthesizes a response with `status: "deleted"` and the IDs for confirmation.
+The Google Calendar API returns HTTP 204 No Content on success. The connector synthesizes a response with `status: "deleted"` (or `truncated`) and the IDs for confirmation.
 
 ### Standing approval constraints (`$meta.calendar_id`)
 
@@ -1232,9 +1299,9 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Upload files to Drive | `upload_drive_file` | Nothing — agent controls name, text or base64 content, MIME type, and destination |
 | Upload files to specific folder | `upload_drive_file` | `folder_id` locked to a specific folder |
 | Trash Drive files | `delete_drive_file` | Nothing — agent can trash any file |
-| Update calendar events | `update_calendar_event` | Nothing — agent can update summary, time, attendees, location |
-| Reschedule calendar events | `update_calendar_event` | `summary`, `description`, `attendees`, `location` omitted — time changes only |
-| Delete calendar events | `delete_calendar_event` | Nothing — agent can delete events from any calendar |
+| Update calendar events | `update_calendar_event` | Nothing — agent can update summary, time, attendees, location, recurrence, and series scope |
+| Reschedule calendar events | `update_calendar_event` | `summary`, `description`, `attendees`, `location` omitted — time (and optional scope) only |
+| Delete calendar events | `delete_calendar_event` | Nothing — agent can delete events from any calendar, including one instance or a series |
 | Search Drive files | `search_drive` | Nothing — agent controls query, type, folder, Shared Drive |
 | Search Drive within folder | `search_drive` | `folder_id` locked to a specific folder |
 | Create Drive folders | `create_drive_folder` | Nothing — agent controls name and parent |
@@ -1292,6 +1359,8 @@ connectors/google/
 ├── list_chat_spaces.go             # google.list_chat_spaces action
 ├── create_meeting.go               # google.create_meeting action (Calendar + Meet)
 ├── calendar_helpers.go             # Shared calendar validation (time range, attendees) + calendar lookup
+├── calendar_event_scope.go         # Series vs instance scope resolution for update/delete
+├── calendar_recurrence.go          # RRULE validation and this_and_following UNTIL rewrite
 ├── resolve_constraint_metadata.go  # $meta.calendar_id (Calendar writes) and $meta.drive_id (Drive/Sheets)
 ├── list_drive_files.go             # google.list_drive_files action + shared isValidDriveID()
 ├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
@@ -1309,8 +1378,10 @@ connectors/google/
 ├── send_email_reply_test.go        # Send email reply tests (thread validation, header injection, Re: prefix)
 ├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding)
 ├── list_calendar_events_test.go    # List events action tests
-├── update_calendar_event_test.go   # Update event tests (partial update, clear_attendees, conflict validation)
-├── delete_calendar_event_test.go   # Delete event tests
+├── update_calendar_event_test.go   # Update event tests (partial update, scope, recurrence, this_and_following)
+├── delete_calendar_event_test.go   # Delete event tests (including series vs instance scope)
+├── calendar_event_scope_test.go    # Scope validation and instance-id helpers
+├── calendar_recurrence_test.go     # RRULE UNTIL/COUNT rewrite tests
 ├── create_presentation_test.go     # Create presentation tests
 ├── get_presentation_test.go        # Get presentation tests (including URL encoding)
 ├── add_slide_test.go               # Add slide tests (layout validation, insertion index)
