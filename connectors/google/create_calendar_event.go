@@ -64,7 +64,9 @@ type calendarEventRequest struct {
 }
 
 type calendarEventDateTime struct {
-	DateTime string `json:"dateTime"`
+	DateTime string `json:"dateTime,omitempty"`
+	Date     string `json:"date,omitempty"`
+	TimeZone string `json:"timeZone,omitempty"`
 }
 
 type calendarAttendee struct {

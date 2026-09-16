@@ -20,10 +20,15 @@ type listCalendarEventsAction struct {
 
 // listCalendarEventsParams is the user-facing parameter schema.
 type listCalendarEventsParams struct {
-	CalendarID string `json:"calendar_id"`
-	MaxResults int    `json:"max_results"`
-	TimeMin    string `json:"time_min"`
-	TimeMax    string `json:"time_max"`
+	CalendarID   string `json:"calendar_id"`
+	MaxResults   int    `json:"max_results"`
+	TimeMin      string `json:"time_min"`
+	TimeMax      string `json:"time_max"`
+	SingleEvents *bool  `json:"single_events"`
+}
+
+func (p *listCalendarEventsParams) expandInstances() bool {
+	return p.SingleEvents == nil || *p.SingleEvents
 }
 
 func (p *listCalendarEventsParams) normalize() {
@@ -66,16 +71,19 @@ type calendarListResponse struct {
 }
 
 type calendarListItem struct {
-	ID          string                 `json:"id"`
-	Summary     string                 `json:"summary"`
-	Description string                 `json:"description"`
-	Status      string                 `json:"status"`
-	HTMLLink    string                 `json:"htmlLink"`
-	Start       calendarListDateTime   `json:"start"`
-	End         calendarListDateTime   `json:"end"`
-	Attendees   []calendarListAttendee `json:"attendees"`
-	Created     string                 `json:"created"`
-	Updated     string                 `json:"updated"`
+	ID               string                 `json:"id"`
+	Summary          string                 `json:"summary"`
+	Description      string                 `json:"description"`
+	Status           string                 `json:"status"`
+	HTMLLink         string                 `json:"htmlLink"`
+	Start            calendarListDateTime   `json:"start"`
+	End              calendarListDateTime   `json:"end"`
+	Attendees        []calendarListAttendee `json:"attendees"`
+	Created          string                 `json:"created"`
+	Updated          string                 `json:"updated"`
+	RecurringEventID string                 `json:"recurringEventId"`
+	OriginalStart    calendarListDateTime   `json:"originalStartTime"`
+	Recurrence       []string               `json:"recurrence"`
 }
 
 type calendarListDateTime struct {
@@ -90,14 +98,35 @@ type calendarListAttendee struct {
 
 // eventSummary is the shape returned to the agent.
 type eventSummary struct {
-	ID          string   `json:"id"`
-	Summary     string   `json:"summary"`
-	Description string   `json:"description,omitempty"`
-	StartTime   string   `json:"start_time"`
-	EndTime     string   `json:"end_time"`
-	Status      string   `json:"status"`
-	HTMLLink    string   `json:"html_link"`
-	Attendees   []string `json:"attendees,omitempty"`
+	ID                string   `json:"id"`
+	Summary           string   `json:"summary"`
+	Description       string   `json:"description,omitempty"`
+	StartTime         string   `json:"start_time"`
+	EndTime           string   `json:"end_time"`
+	Status            string   `json:"status"`
+	HTMLLink          string   `json:"html_link"`
+	Attendees         []string `json:"attendees,omitempty"`
+	EventKind         string   `json:"event_kind"`
+	RecurringEventID  string   `json:"recurring_event_id,omitempty"`
+	OriginalStartTime string   `json:"original_start_time,omitempty"`
+	Recurrence        []string `json:"recurrence,omitempty"`
+}
+
+func listDateTimeDisplay(dt calendarListDateTime) string {
+	if dt.DateTime != "" {
+		return dt.DateTime
+	}
+	return dt.Date
+}
+
+func classifyListedEvent(item calendarListItem) string {
+	if item.RecurringEventID != "" {
+		return calendarEventKindInstance
+	}
+	if len(item.Recurrence) > 0 {
+		return calendarEventKindSeriesMaster
+	}
+	return calendarEventKindSingle
 }
 
 // Execute lists upcoming events from Google Calendar.
@@ -113,8 +142,12 @@ func (a *listCalendarEventsAction) Execute(ctx context.Context, req connectors.A
 
 	q := url.Values{}
 	q.Set("maxResults", strconv.Itoa(params.MaxResults))
-	q.Set("singleEvents", "true")
-	q.Set("orderBy", "startTime")
+	if params.expandInstances() {
+		q.Set("singleEvents", "true")
+		q.Set("orderBy", "startTime")
+	} else {
+		q.Set("singleEvents", "false")
+	}
 
 	if params.TimeMin != "" {
 		q.Set("timeMin", params.TimeMin)
@@ -139,6 +172,7 @@ func (a *listCalendarEventsAction) Execute(ctx context.Context, req connectors.A
 			Description: item.Description,
 			Status:      item.Status,
 			HTMLLink:    item.HTMLLink,
+			EventKind:   classifyListedEvent(item),
 		}
 		// Prefer dateTime, fall back to date for all-day events.
 		if item.Start.DateTime != "" {
@@ -150,6 +184,15 @@ func (a *listCalendarEventsAction) Execute(ctx context.Context, req connectors.A
 			ev.EndTime = item.End.DateTime
 		} else {
 			ev.EndTime = item.End.Date
+		}
+		if item.RecurringEventID != "" {
+			ev.RecurringEventID = item.RecurringEventID
+		}
+		if orig := listDateTimeDisplay(item.OriginalStart); orig != "" {
+			ev.OriginalStartTime = orig
+		}
+		if len(item.Recurrence) > 0 {
+			ev.Recurrence = item.Recurrence
 		}
 		attendees := make([]string, 0, len(item.Attendees))
 		for _, att := range item.Attendees {

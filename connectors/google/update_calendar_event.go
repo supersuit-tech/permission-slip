@@ -36,6 +36,9 @@ type updateCalendarEventParams struct {
 	Attendees      []string `json:"attendees"`
 	Location       string   `json:"location"`
 	ClearAttendees bool     `json:"clear_attendees"`
+	Scope          string   `json:"scope"`
+	InstanceStart  string   `json:"instance_start"`
+	Recurrence     []string `json:"recurrence"`
 }
 
 func (p *updateCalendarEventParams) validate() error {
@@ -43,7 +46,8 @@ func (p *updateCalendarEventParams) validate() error {
 		return &connectors.ValidationError{Message: "missing required parameter: event_id"}
 	}
 	hasUpdate := p.Summary != "" || p.Description != "" || p.Location != "" ||
-		p.StartTime != "" || p.EndTime != "" || len(p.Attendees) > 0 || p.ClearAttendees
+		p.StartTime != "" || p.EndTime != "" || len(p.Attendees) > 0 || p.ClearAttendees ||
+		len(p.Recurrence) > 0
 	if !hasUpdate {
 		return &connectors.ValidationError{Message: "at least one field to update must be provided"}
 	}
@@ -58,13 +62,76 @@ func (p *updateCalendarEventParams) validate() error {
 			return err
 		}
 	}
-	return nil
+	if len(p.Recurrence) > 0 {
+		if err := validateRecurrence(p.Recurrence); err != nil {
+			return err
+		}
+		if p.Scope == calendarScopeInstance {
+			return &connectors.ValidationError{
+				Message: "recurrence can only be updated on the series master (scope=series) or when splitting with scope=this_and_following",
+			}
+		}
+		if p.Scope == "" && looksLikeInstanceEventID(p.EventID) {
+			return &connectors.ValidationError{
+				Message: "recurrence cannot be updated on an expanded instance id; pass the series master event_id with scope=series",
+			}
+		}
+	}
+	return validateScopeAgainstEventID(p.Scope, p.EventID, p.InstanceStart)
 }
 
 func (p *updateCalendarEventParams) normalize() {
 	if p.CalendarID == "" {
 		p.CalendarID = "primary"
 	}
+}
+
+func (p *updateCalendarEventParams) patchBody() map[string]any {
+	// Use map[string]any so we can include an explicit empty attendees array
+	// when clear_attendees is true. Struct-based marshaling with omitempty
+	// cannot distinguish "not provided" from "empty list".
+	body := map[string]any{}
+	if p.Summary != "" {
+		body["summary"] = p.Summary
+	}
+	if p.Description != "" {
+		body["description"] = p.Description
+	}
+	if p.Location != "" {
+		body["location"] = p.Location
+	}
+	if p.StartTime != "" {
+		body["start"] = calendarEventDateTime{DateTime: p.StartTime}
+		body["end"] = calendarEventDateTime{DateTime: p.EndTime}
+	}
+	switch {
+	case p.ClearAttendees:
+		body["attendees"] = []calendarAttendee{}
+	case len(p.Attendees) > 0:
+		body["attendees"] = buildAttendees(p.Attendees)
+	}
+	if len(p.Recurrence) > 0 {
+		body["recurrence"] = p.Recurrence
+	}
+	return body
+}
+
+func updateCalendarEventResult(resp calendarEventResponse, extra map[string]string) map[string]string {
+	result := map[string]string{
+		"id":        resp.ID,
+		"html_link": resp.HTMLLink,
+		"status":    resp.Status,
+		"updated":   resp.Updated,
+	}
+	if resp.Summary != "" {
+		result["summary"] = resp.Summary
+	}
+	for k, v := range extra {
+		if v != "" {
+			result[k] = v
+		}
+	}
+	return result
 }
 
 // Execute patches an existing Google Calendar event and returns its updated metadata.
@@ -78,44 +145,77 @@ func (a *updateCalendarEventAction) Execute(ctx context.Context, req connectors.
 	}
 	params.normalize()
 
-	// Use map[string]any so we can include an explicit empty attendees array
-	// when clear_attendees is true. Struct-based marshaling with omitempty
-	// cannot distinguish "not provided" from "empty list".
-	body := map[string]any{}
-	if params.Summary != "" {
-		body["summary"] = params.Summary
+	body := params.patchBody()
+
+	if params.Scope == calendarScopeThisAndFollowing {
+		return a.executeThisAndFollowing(ctx, req, params, body)
 	}
-	if params.Description != "" {
-		body["description"] = params.Description
-	}
-	if params.Location != "" {
-		body["location"] = params.Location
-	}
-	if params.StartTime != "" {
-		body["start"] = calendarEventDateTime{DateTime: params.StartTime}
-		body["end"] = calendarEventDateTime{DateTime: params.EndTime}
-	}
-	switch {
-	case params.ClearAttendees:
-		body["attendees"] = []calendarAttendee{}
-	case len(params.Attendees) > 0:
-		body["attendees"] = buildAttendees(params.Attendees)
+
+	target, err := a.conn.resolveCalendarEventTarget(ctx, req.Credentials, params.CalendarID, params.EventID, params.Scope, params.InstanceStart)
+	if err != nil {
+		return nil, err
 	}
 
 	var resp calendarEventResponse
-	patchURL := a.conn.calendarBaseURL + "/calendars/" + url.PathEscape(params.CalendarID) + "/events/" + url.PathEscape(params.EventID)
+	patchURL := calendarEventPath(a.conn.calendarBaseURL, params.CalendarID, target.TargetID)
 	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPatch, patchURL, body, &resp); err != nil {
 		return nil, err
 	}
 
-	result := map[string]string{
-		"id":        resp.ID,
-		"html_link": resp.HTMLLink,
-		"status":    resp.Status,
-		"updated":   resp.Updated,
+	extra := map[string]string{}
+	if params.Scope != "" {
+		extra["scope"] = params.Scope
 	}
-	if resp.Summary != "" {
-		result["summary"] = resp.Summary
+	return connectors.JSONResult(updateCalendarEventResult(resp, extra))
+}
+
+func (a *updateCalendarEventAction) executeThisAndFollowing(ctx context.Context, req connectors.ActionRequest, params updateCalendarEventParams, body map[string]any) (*connectors.ActionResult, error) {
+	target, err := a.conn.resolveCalendarEventTarget(ctx, req.Credentials, params.CalendarID, params.EventID, params.Scope, params.InstanceStart)
+	if err != nil {
+		return nil, err
 	}
-	return connectors.JSONResult(result)
+
+	// Single (non-recurring) events have no tail to split — PATCH in place.
+	if target.Kind == calendarEventKindSingle || target.Master == nil || target.Instance == nil {
+		var resp calendarEventResponse
+		patchURL := calendarEventPath(a.conn.calendarBaseURL, params.CalendarID, target.TargetID)
+		if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPatch, patchURL, body, &resp); err != nil {
+			return nil, err
+		}
+		return connectors.JSONResult(updateCalendarEventResult(resp, map[string]string{
+			"scope": calendarScopeThisAndFollowing,
+		}))
+	}
+
+	if isFirstSeriesInstance(target.Master, target.Instance) {
+		var resp calendarEventResponse
+		patchURL := calendarEventPath(a.conn.calendarBaseURL, params.CalendarID, target.Master.ID)
+		if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPatch, patchURL, body, &resp); err != nil {
+			return nil, err
+		}
+		return connectors.JSONResult(updateCalendarEventResult(resp, map[string]string{
+			"scope":             calendarScopeThisAndFollowing,
+			"original_event_id": target.Master.ID,
+		}))
+	}
+
+	// Count remaining instances on the original series before we rewrite UNTIL.
+	newRecurrence, err := a.conn.recurrenceForSplitSeries(ctx, req.Credentials, params.CalendarID, target.Master, target.Instance, params.Recurrence)
+	if err != nil {
+		return nil, err
+	}
+	if err := a.conn.truncateSeriesBeforeInstance(ctx, req.Credentials, params.CalendarID, target.Master, target.Instance); err != nil {
+		return nil, err
+	}
+	insertBody := newSeriesBodyFromMaster(target.Master, target.Instance, body, newRecurrence)
+
+	var resp calendarEventResponse
+	insertURL := a.conn.calendarBaseURL + "/calendars/" + url.PathEscape(params.CalendarID) + "/events"
+	if err := a.conn.doJSON(ctx, req.Credentials, http.MethodPost, insertURL, insertBody, &resp); err != nil {
+		return nil, err
+	}
+	return connectors.JSONResult(updateCalendarEventResult(resp, map[string]string{
+		"scope":             calendarScopeThisAndFollowing,
+		"original_event_id": target.Master.ID,
+	}))
 }

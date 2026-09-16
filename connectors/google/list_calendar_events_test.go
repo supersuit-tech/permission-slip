@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/connectors"
@@ -67,6 +68,9 @@ func TestListCalendarEvents_Success(t *testing.T) {
 	}
 	if data.Events[0].Summary != "Team Standup" {
 		t.Errorf("expected first event summary 'Team Standup', got %q", data.Events[0].Summary)
+	}
+	if data.Events[0].EventKind != "single" {
+		t.Errorf("expected event_kind single, got %q", data.Events[0].EventKind)
 	}
 	// All-day event should use Date field.
 	if data.Events[1].StartTime != "2024-01-16" {
@@ -200,5 +204,113 @@ func TestListCalendarEvents_InvalidJSON(t *testing.T) {
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestListCalendarEvents_RecurringInstanceFields(t *testing.T) {
+	t.Parallel()
+
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(calendarListResponse{
+			Items: []calendarListItem{
+				{
+					ID:               "abc123_20240116T140000Z",
+					Summary:          "Weekly standup",
+					Status:           "confirmed",
+					Start:            calendarListDateTime{DateTime: "2024-01-16T09:00:00-05:00"},
+					End:              calendarListDateTime{DateTime: "2024-01-16T09:30:00-05:00"},
+					RecurringEventID: "abc123",
+					OriginalStart:    calendarListDateTime{DateTime: "2024-01-16T09:00:00-05:00"},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	action := &listCalendarEventsAction{conn: newForTest(srv.Client(), "", srv.URL, "")}
+	params, _ := json.Marshal(listCalendarEventsParams{MaxResults: 10})
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.list_calendar_events",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(gotQuery, "singleEvents=true") {
+		t.Errorf("default list should expand instances, query=%s", gotQuery)
+	}
+	var data struct {
+		Events []eventSummary `json:"events"`
+	}
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if len(data.Events) != 1 {
+		t.Fatalf("expected 1 event, got %d", len(data.Events))
+	}
+	ev := data.Events[0]
+	if ev.EventKind != "instance" {
+		t.Errorf("event_kind=%q", ev.EventKind)
+	}
+	if ev.RecurringEventID != "abc123" {
+		t.Errorf("recurring_event_id=%q", ev.RecurringEventID)
+	}
+	if ev.OriginalStartTime != "2024-01-16T09:00:00-05:00" {
+		t.Errorf("original_start_time=%q", ev.OriginalStartTime)
+	}
+}
+
+func TestListCalendarEvents_SeriesMastersWhenNotExpanded(t *testing.T) {
+	t.Parallel()
+
+	var gotQuery string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotQuery = r.URL.RawQuery
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(calendarListResponse{
+			Items: []calendarListItem{
+				{
+					ID:         "abc123",
+					Summary:    "Weekly standup",
+					Status:     "confirmed",
+					Start:      calendarListDateTime{DateTime: "2024-01-16T09:00:00-05:00"},
+					End:        calendarListDateTime{DateTime: "2024-01-16T09:30:00-05:00"},
+					Recurrence: []string{"RRULE:FREQ=WEEKLY;BYDAY=TU"},
+				},
+			},
+		})
+	}))
+	defer srv.Close()
+
+	action := &listCalendarEventsAction{conn: newForTest(srv.Client(), "", srv.URL, "")}
+	single := false
+	params, _ := json.Marshal(listCalendarEventsParams{MaxResults: 10, SingleEvents: &single})
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.list_calendar_events",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(gotQuery, "singleEvents=false") {
+		t.Errorf("expected singleEvents=false, query=%s", gotQuery)
+	}
+	if strings.Contains(gotQuery, "orderBy=startTime") {
+		t.Errorf("orderBy=startTime is invalid when singleEvents=false, query=%s", gotQuery)
+	}
+	var data struct {
+		Events []eventSummary `json:"events"`
+	}
+	json.Unmarshal(result.Data, &data)
+	if len(data.Events) != 1 || data.Events[0].EventKind != "series_master" {
+		t.Fatalf("expected series_master, got %+v", data.Events)
+	}
+	if len(data.Events[0].Recurrence) != 1 {
+		t.Errorf("expected recurrence on master, got %v", data.Events[0].Recurrence)
 	}
 }
