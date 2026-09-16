@@ -216,6 +216,8 @@ Creates a new event or recurring series on Google Calendar.
 | `attendees` | string[] | No | — | List of attendee email addresses |
 | `calendar_id` | string | No | `primary` | Calendar ID (defaults to `primary`) |
 | `recurrence` | string[] | No | — | Google Calendar / RFC 5545 lines (`RRULE`, `EXDATE`, `RDATE`). Creates a series; the returned `id` is the series master. |
+| `reminders` | object | No | calendar default | Custom reminders (`use_default` + `overrides[]` with `method` + `minutes`). Mutually exclusive with `reminder_minutes`. |
+| `reminder_minutes` | integer[] | No | — | Shorthand for popup reminders this many minutes before the event (e.g. `[5, 1]`). Mutually exclusive with `reminders`. |
 
 **Response:**
 
@@ -258,8 +260,40 @@ Other common RRULEs: `RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=12`, `RRULE:FREQ=MONTHLY;
 - `end_time` must be strictly after `start_time` — equal or earlier times are rejected with a clear validation error.
 - `calendar_id` is URL-encoded in the API path to safely handle IDs containing special characters (e.g., `user@group.calendar.google.com`).
 - Each `recurrence` line must be `RRULE`, `EXRULE`, `RDATE`, or `EXDATE` (optional parameters before `:`). `DTSTART` / `DTEND` are rejected — use `start_time` / `end_time`.
+- Reminder `method` must be `popup` or `email`. Minutes must be between 0 and 40320 (4 weeks). At most 5 overrides.
+- `reminders` and `reminder_minutes` cannot both be set. Omitting both uses the calendar's default reminders.
 
-Standing approvals can constrain writes to a verified calendar via `$meta.calendar_id` (see [Standing approval constraints](#standing-approval-constraints-metacalendar_id)). The capabilities schema includes `recurrence`, so “always allow” / `$meta.calendar_id` rules wildcard it like the other event fields. You can also pin an exact RRULE (for example `["RRULE:FREQ=WEEKLY;BYDAY=TU"]`) on a standing approval.
+**Examples:**
+
+Create with a 5-minute popup:
+
+```json
+{
+  "summary": "Team Meeting",
+  "start_time": "2024-01-15T09:00:00-05:00",
+  "end_time": "2024-01-15T10:00:00-05:00",
+  "reminder_minutes": [5]
+}
+```
+
+Eat reminder with 1-minute and 5-minute popups:
+
+```json
+{
+  "summary": "Lunch",
+  "start_time": "2024-01-15T12:00:00-05:00",
+  "end_time": "2024-01-15T12:30:00-05:00",
+  "reminders": {
+    "use_default": false,
+    "overrides": [
+      { "method": "popup", "minutes": 5 },
+      { "method": "popup", "minutes": 1 }
+    ]
+  }
+}
+```
+
+Standing approvals can constrain writes to a verified calendar via `$meta.calendar_id` (see [Standing approval constraints](#standing-approval-constraints-metacalendar_id)). The capabilities schema includes `recurrence`, `reminders`, and `reminder_minutes`, so “always allow” / `$meta.calendar_id` rules wildcard them like the other event fields. You can also pin an exact RRULE (for example `["RRULE:FREQ=WEEKLY;BYDAY=TU"]`) on a standing approval.
 
 The returned series master `id` is what `google.update_calendar_event` / `google.delete_calendar_event` expect for `scope=series`. Expanded instance ids from `google.list_calendar_events` (`single_events=true`) are used with `scope=instance` or `this_and_following` — see those actions for details.
 
@@ -779,6 +813,8 @@ Creates a Google Calendar event with an auto-generated Google Meet conference li
 | `end_time` | string | Yes | — | End time in RFC 3339 format (must be after `start_time`) |
 | `attendees` | string[] | No | — | List of attendee email addresses |
 | `calendar_id` | string | No | `primary` | Calendar ID (defaults to `primary`) |
+| `reminders` | object | No | calendar default | Custom reminders (`use_default` + `overrides[]`). Mutually exclusive with `reminder_minutes`. |
+| `reminder_minutes` | integer[] | No | — | Shorthand for popup reminders this many minutes before the event. Mutually exclusive with `reminders`. |
 
 **Response:**
 
@@ -797,7 +833,8 @@ Creates a Google Calendar event with an auto-generated Google Meet conference li
 - Uses `conferenceDataVersion=1` and `conferenceSolutionKey.type=hangoutsMeet` to request automatic Meet link generation.
 - The `requestId` is derived deterministically from the meeting summary and start time (SHA-256 hash), making the request idempotent — creating the same meeting twice returns the same conference link.
 - The `meet_link` field is only present when Google successfully attaches conference data to the event.
-- Validation rules match `google.create_calendar_event` (RFC 3339 times, end after start).
+- Validation rules match `google.create_calendar_event` (RFC 3339 times, end after start, reminder methods/minutes).
+- Reminder parameters (`reminders`, `reminder_minutes`) are the same as `google.create_calendar_event`.
 
 ---
 
@@ -952,6 +989,8 @@ Updates an existing Google Calendar event using a partial update (PATCH). Only f
 | `scope` | string | No | — | `instance` (one occurrence), `series` (whole series), or `this_and_following` (split from this occurrence forward). Omit to PATCH `event_id` as-is — no series semantics. |
 | `instance_start` | string | No | — | Original start of the occurrence when `event_id` is a series master and `scope` is `instance` or `this_and_following` |
 | `recurrence` | string[] | No | — | Replacement RRULE/EXDATE/RDATE lines on the series master (e.g. `["RRULE:FREQ=WEEKLY;INTERVAL=2;BYDAY=TU"]`). Rejected for `scope=instance`. |
+| `reminders` | object | No | — | Replacement reminder settings. Set `use_default: true` to restore calendar defaults. Mutually exclusive with `reminder_minutes`. |
+| `reminder_minutes` | integer[] | No | — | Shorthand for popup reminders this many minutes before the event. Mutually exclusive with `reminders`. |
 
 At least one update field must be provided. `start_time` and `end_time` must always be provided together.
 
@@ -1006,6 +1045,16 @@ Change every weekly occurrence (and optionally the RRULE):
 - `clear_attendees: true` sends an explicit empty `attendees: []` array to remove all attendees from the event.
 - `calendar_id` is URL-encoded in the API path to safely handle IDs with special characters (e.g., `group@calendar.google.com`).
 - Recurring series: use the series master `id` from `google.create_calendar_event` with `scope=series`, or an expanded instance id with `scope=instance` / `this_and_following`.
+- Reminder patches replace the event's reminder settings. `{"use_default": true}` clears custom overrides and restores the calendar's default reminders.
+
+Clear custom reminders back to default:
+
+```json
+{
+  "event_id": "event-123",
+  "reminders": { "use_default": true }
+}
+```
 
 ---
 
@@ -1063,7 +1112,7 @@ The Google Calendar API returns HTTP 204 No Content on success. The connector sy
 
 ### Standing approval constraints (`$meta.calendar_id`)
 
-Pinning the `calendar_id` parameter is brittle: agents may send `primary` or the canonical email, and “always allow” copies every event field (summary, times, attendees). For Calendar **writes** (`google.create_calendar_event`, `google.update_calendar_event`, `google.delete_calendar_event`, `google.create_meeting`), standing approvals can pin the **verified calendar** instead:
+Pinning the `calendar_id` parameter is brittle: agents may send `primary` or the canonical email, and “always allow” copies every event field (summary, times, attendees, reminders). For Calendar **writes** (`google.create_calendar_event`, `google.update_calendar_event`, `google.delete_calendar_event`, `google.create_meeting`), standing approvals can pin the **verified calendar** instead:
 
 ```json
 {
@@ -1076,7 +1125,7 @@ Pinning the `calendar_id` parameter is brittle: agents may send `primary` or the
 
 Matching uses `GET /calendars/{calendarId}` — never the agent-supplied id as-is. `primary` and an omitted `calendar_id` resolve to the same canonical id as the primary calendar’s email. Other calendars fall through to one-off approval. Lookup failure is fail-closed. Agents discover the field via `GET /agents/{agent_id}/capabilities` → `meta_constraint_fields: ["calendar_id"]`.
 
-Approving a Calendar write from the web or phone “always allow” flow proposes this `$meta.calendar_id` rule (other event parameters are wildcards) when the Calendar API returns a canonical id. Constraint summaries resolve the canonical id to the calendar’s display name and hide the wildcard event fields.
+Approving a Calendar write from the web or phone “always allow” flow proposes this `$meta.calendar_id` rule (other event parameters — including `reminders` and `reminder_minutes` — are wildcards) when the Calendar API returns a canonical id. Constraint summaries resolve the canonical id to the calendar’s display name and hide the wildcard event fields.
 
 Each write action still needs its own standing approval. `google.list_calendar_events` is not included.
 
@@ -1327,7 +1376,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Upload files to Drive | `upload_drive_file` | Nothing — agent controls name, text or base64 content, MIME type, and destination |
 | Upload files to specific folder | `upload_drive_file` | `folder_id` locked to a specific folder |
 | Trash Drive files | `delete_drive_file` | Nothing — agent can trash any file |
-| Update calendar events | `update_calendar_event` | Nothing — agent can update summary, time, attendees, location, recurrence, and series scope |
+| Update calendar events | `update_calendar_event` | Nothing — agent can update summary, time, attendees, location, recurrence, reminders, and series scope |
 | Reschedule calendar events | `update_calendar_event` | `summary`, `description`, `attendees`, `location` omitted — time (and optional scope) only |
 | Delete calendar events | `delete_calendar_event` | Nothing — agent can delete events from any calendar, including one instance or a series |
 | Search Drive files | `search_drive` | Nothing — agent controls query, type, folder, Shared Drive |
@@ -1389,6 +1438,7 @@ connectors/google/
 ├── calendar_helpers.go             # Shared calendar validation (time range, attendees) + calendar lookup
 ├── calendar_event_scope.go         # Series vs instance scope resolution for update/delete
 ├── calendar_recurrence.go          # RRULE / EXDATE / RDATE validation and this_and_following UNTIL rewrite
+├── calendar_reminders.go           # Shared event reminder params (popup/email offsets) for create/update/meeting
 ├── resolve_constraint_metadata.go  # $meta.calendar_id (Calendar writes) and $meta.drive_id (Drive/Sheets)
 ├── list_drive_files.go             # google.list_drive_files action + shared isValidDriveID()
 ├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
@@ -1426,6 +1476,7 @@ connectors/google/
 ├── send_chat_message_test.go       # Send chat message tests (including path traversal validation)
 ├── list_chat_spaces_test.go        # List chat spaces tests (including page size clamping)
 ├── create_meeting_test.go          # Create meeting tests (including Meet link extraction)
+├── calendar_reminders_test.go      # Reminder payload mapping and validation tests
 ├── resolve_constraint_metadata_test.go # $meta.calendar_id and $meta.drive_id lookup tests
 ├── list_drive_files_test.go        # List Drive files tests (including query injection prevention)
 ├── get_drive_file_test.go          # Get Drive file tests (metadata, content export, binary skip)

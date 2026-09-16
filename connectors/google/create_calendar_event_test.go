@@ -27,6 +27,9 @@ func TestCreateCalendarEvent_Success(t *testing.T) {
 		if body.Summary != "Team Meeting" {
 			t.Errorf("expected summary 'Team Meeting', got %q", body.Summary)
 		}
+		if body.Reminders != nil {
+			t.Errorf("expected reminders omitted, got %+v", body.Reminders)
+		}
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(calendarEventResponse{
@@ -424,6 +427,126 @@ func TestCreateCalendarEvent_InvalidJSON(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected error for invalid JSON")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
+func TestCreateCalendarEvent_ReminderMinutes(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body calendarEventRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Reminders == nil {
+			t.Fatal("expected reminders in request body")
+		}
+		if body.Reminders.UseDefault {
+			t.Error("expected useDefault false")
+		}
+		if len(body.Reminders.Overrides) != 1 || body.Reminders.Overrides[0].Method != "popup" || body.Reminders.Overrides[0].Minutes != 5 {
+			t.Errorf("unexpected overrides: %+v", body.Reminders.Overrides)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(calendarEventResponse{ID: "event-rem", Status: "confirmed"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", srv.URL, "")
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"summary":          "Team Meeting",
+		"start_time":       "2024-01-15T09:00:00-05:00",
+		"end_time":         "2024-01-15T10:00:00-05:00",
+		"reminder_minutes": []int{5},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCreateCalendarEvent_CustomReminders(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body calendarEventRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Reminders == nil || len(body.Reminders.Overrides) != 3 {
+			t.Fatalf("expected 3 overrides, got %+v", body.Reminders)
+		}
+		if body.Reminders.Overrides[2].Method != "email" || body.Reminders.Overrides[2].Minutes != 1440 {
+			t.Errorf("email override = %+v", body.Reminders.Overrides[2])
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(calendarEventResponse{ID: "event-eat", Status: "confirmed"})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", srv.URL, "")
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"summary":    "Lunch",
+		"start_time": "2024-01-15T12:00:00-05:00",
+		"end_time":   "2024-01-15T12:30:00-05:00",
+		"reminders": map[string]any{
+			"use_default": false,
+			"overrides": []map[string]any{
+				{"method": "popup", "minutes": 5},
+				{"method": "popup", "minutes": 1},
+				{"method": "email", "minutes": 1440},
+			},
+		},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCreateCalendarEvent_InvalidReminderMethod(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"summary":    "Meeting",
+		"start_time": "2024-01-15T09:00:00-05:00",
+		"end_time":   "2024-01-15T10:00:00-05:00",
+		"reminders": map[string]any{
+			"overrides": []map[string]any{
+				{"method": "sms", "minutes": 5},
+			},
+		},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for unsupported reminder method")
 	}
 	if !connectors.IsValidationError(err) {
 		t.Errorf("expected ValidationError, got: %T", err)

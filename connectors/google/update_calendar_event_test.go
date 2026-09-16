@@ -475,3 +475,82 @@ func TestUpdateCalendarEvent_ThisAndFollowingFirstInstancePatchesMaster(t *testi
 		t.Fatal("expected master PATCH")
 	}
 }
+
+func TestUpdateCalendarEvent_ReplaceReminders(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&gotBody)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"id":     "evt123",
+			"status": "confirmed",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newCalendarForTest(srv.Client(), srv.URL)
+	action := &updateCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"event_id":         "evt123",
+		"reminder_minutes": []int{1, 5},
+	})
+	_, err := action.Execute(context.Background(), connectors.ActionRequest{
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	reminders, ok := gotBody["reminders"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected reminders object, got %v", gotBody["reminders"])
+	}
+	if reminders["useDefault"] != false {
+		t.Errorf("expected useDefault false, got %v", reminders["useDefault"])
+	}
+	overrides, ok := reminders["overrides"].([]any)
+	if !ok || len(overrides) != 2 {
+		t.Fatalf("expected 2 overrides, got %v", reminders["overrides"])
+	}
+}
+
+func TestUpdateCalendarEvent_ResetRemindersToDefault(t *testing.T) {
+	var gotBody map[string]any
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&gotBody)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]string{
+			"id":     "evt123",
+			"status": "confirmed",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newCalendarForTest(srv.Client(), srv.URL)
+	action := &updateCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"event_id": "evt123",
+		"reminders": map[string]any{
+			"use_default": true,
+		},
+	})
+	_, err := action.Execute(context.Background(), connectors.ActionRequest{
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	reminders, ok := gotBody["reminders"].(map[string]any)
+	if !ok {
+		t.Fatalf("expected reminders object, got %v", gotBody["reminders"])
+	}
+	if reminders["useDefault"] != true {
+		t.Errorf("expected useDefault true, got %v", reminders["useDefault"])
+	}
+	if _, hasOverrides := reminders["overrides"]; hasOverrides {
+		t.Errorf("expected overrides omitted when resetting to default, got %v", reminders["overrides"])
+	}
+}

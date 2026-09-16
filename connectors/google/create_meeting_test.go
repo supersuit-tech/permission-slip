@@ -258,3 +258,46 @@ func TestCreateMeeting_AuthFailure(t *testing.T) {
 		t.Errorf("expected AuthError, got: %T (%v)", err, err)
 	}
 }
+
+func TestCreateMeeting_ReminderMinutes(t *testing.T) {
+	t.Parallel()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var body meetingEventRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Reminders == nil || len(body.Reminders.Overrides) != 1 {
+			t.Fatalf("expected one popup reminder, got %+v", body.Reminders)
+		}
+		if body.Reminders.Overrides[0].Method != "popup" || body.Reminders.Overrides[0].Minutes != 5 {
+			t.Errorf("unexpected override: %+v", body.Reminders.Overrides[0])
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(meetingEventResponse{
+			ID:     "event-meet",
+			Status: "confirmed",
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", srv.URL, "")
+	action := &createMeetingAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"summary":          "Team Standup",
+		"start_time":       "2024-01-15T09:00:00-05:00",
+		"end_time":         "2024-01-15T09:30:00-05:00",
+		"reminder_minutes": []int{5},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_meeting",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}

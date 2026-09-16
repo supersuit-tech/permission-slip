@@ -97,21 +97,21 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.create_calendar_event",
 			Name:        "Create calendar events",
 			Description: "Agent can create events on any calendar.",
-			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*","recurrence":"*"}`),
+			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*","recurrence":"*","reminders":"*","reminder_minutes":"*"}`),
 		},
 		{
 			ID:          "tpl_google_create_calendar_event_no_attendees",
 			ActionType:  "google.create_calendar_event",
 			Name:        "Create personal calendar events",
 			Description: "Agent can create events on the primary calendar without inviting attendees.",
-			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary","recurrence":"*"}`),
+			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary","recurrence":"*","reminders":"*","reminder_minutes":"*"}`),
 		},
 		{
 			ID:          "tpl_google_update_calendar_event",
 			ActionType:  "google.update_calendar_event",
 			Name:        "Update calendar events",
-			Description: "Agent can update the summary, description, time, attendees, and location of calendar events.",
-			Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","clear_attendees":"*","location":"*","scope":"*","instance_start":"*","recurrence":"*"}`),
+			Description: "Agent can update the summary, description, time, attendees, location, recurrence, and reminders of calendar events.",
+			Parameters:  json.RawMessage(`{"event_id":"*","calendar_id":"*","summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","clear_attendees":"*","location":"*","scope":"*","instance_start":"*","recurrence":"*","reminders":"*","reminder_minutes":"*"}`),
 		},
 		{
 			ID:          "tpl_google_update_calendar_event_time",
@@ -132,14 +132,14 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.create_meeting",
 			Name:        "Create meetings with Meet link",
 			Description: "Agent can create calendar events with Google Meet links.",
-			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*"}`),
+			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*","reminders":"*","reminder_minutes":"*"}`),
 		},
 		{
 			ID:          "tpl_google_create_meeting_no_attendees",
 			ActionType:  "google.create_meeting",
 			Name:        "Create personal meetings",
 			Description: "Agent can create meetings on the primary calendar without inviting attendees.",
-			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary"}`),
+			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary","reminders":"*","reminder_minutes":"*"}`),
 		},
 		// --- Drive read ---
 		{
