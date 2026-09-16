@@ -4,25 +4,68 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
 func TestValidateRecurrence(t *testing.T) {
 	t.Parallel()
 
-	if err := validateRecurrence(nil); err == nil {
-		t.Fatal("expected error for empty recurrence")
+	tests := []struct {
+		name    string
+		lines   []string
+		wantErr string
+	}{
+		{name: "nil", lines: nil, wantErr: "at least one RRULE"},
+		{name: "empty", lines: []string{}, wantErr: "at least one RRULE"},
+		{name: "weekly rrule", lines: []string{"RRULE:FREQ=WEEKLY;BYDAY=TU"}},
+		{name: "lowercase prefix", lines: []string{"rrule:FREQ=WEEKLY;BYDAY=MO"}},
+		{name: "rdate with params", lines: []string{"RRULE:FREQ=WEEKLY", "RDATE;VALUE=DATE:20240120"}},
+		{name: "exdate", lines: []string{"RRULE:FREQ=WEEKLY", "EXDATE;TZID=America/New_York:20240116T090000"}},
+		{name: "rrule plus exdate", lines: []string{"RRULE:FREQ=WEEKLY;BYDAY=TU", "EXDATE:20240116T140000Z"}},
+		{name: "exdate only", lines: []string{"EXDATE:20260120"}, wantErr: "at least one RRULE"},
+		{name: "bare freq", lines: []string{"FREQ=WEEKLY"}, wantErr: "must be an RRULE"},
+		{name: "empty line", lines: []string{"RRULE:FREQ=DAILY", "  "}, wantErr: "must not be empty"},
+		{name: "missing colon", lines: []string{"RRULE"}, wantErr: "must be an RRULE"},
+		{name: "missing value", lines: []string{"RRULE:"}, wantErr: "must be an RRULE"},
+		{name: "dtstart rejected", lines: []string{"DTSTART:20240116T090000Z"}, wantErr: "DTSTART"},
+		{name: "dtend rejected", lines: []string{"DTEND:20240116T100000Z"}, wantErr: "DTEND"},
+		{name: "unknown property", lines: []string{"SUMMARY:Nope"}, wantErr: "must start with RRULE"},
+		{name: "too many lines", lines: makeRecurrenceLines(maxRecurrenceLines + 1), wantErr: "at most"},
 	}
-	if err := validateRecurrence([]string{"EXDATE:20260120"}); err == nil {
-		t.Fatal("expected error when RRULE is missing")
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			err := validateRecurrence(tt.lines)
+			if tt.wantErr == "" {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !connectors.IsValidationError(err) {
+				t.Errorf("expected ValidationError, got %T", err)
+			}
+			if !strings.Contains(err.Error(), tt.wantErr) {
+				t.Errorf("error %q does not contain %q", err.Error(), tt.wantErr)
+			}
+		})
 	}
-	if err := validateRecurrence([]string{"FREQ=WEEKLY"}); err == nil {
-		t.Fatal("expected error for bare FREQ without RRULE: prefix")
+}
+
+func TestValidateRecurrence_LineTooLong(t *testing.T) {
+	t.Parallel()
+	line := "RRULE:" + strings.Repeat("A", maxRecurrenceLineLen)
+	err := validateRecurrence([]string{line})
+	if err == nil {
+		t.Fatal("expected error for oversized line")
 	}
-	if err := validateRecurrence([]string{"RRULE:FREQ=WEEKLY;BYDAY=TU"}); err != nil {
-		t.Fatalf("valid RRULE rejected: %v", err)
-	}
-	if err := validateRecurrence([]string{"RRULE:FREQ=WEEKLY", "EXDATE:20260120T150000Z"}); err != nil {
-		t.Fatalf("RRULE+EXDATE rejected: %v", err)
+	if !strings.Contains(err.Error(), "exceeds") {
+		t.Errorf("error %q does not mention exceeds", err.Error())
 	}
 }
 
@@ -119,4 +162,12 @@ func TestLooksLikeInstanceEventID(t *testing.T) {
 	if looksLikeInstanceEventID("abc_notadate") {
 		t.Error("non-date suffix should not match")
 	}
+}
+
+func makeRecurrenceLines(n int) []string {
+	lines := make([]string, n)
+	for i := range lines {
+		lines[i] = "RRULE:FREQ=DAILY"
+	}
+	return lines
 }

@@ -201,7 +201,7 @@ Attachments larger than 10 MB are rejected. Use the returned `content_base64` wi
 
 ### `google.create_calendar_event`
 
-Creates a new event on Google Calendar.
+Creates a new event or recurring series on Google Calendar.
 
 **Risk level:** medium
 
@@ -215,6 +215,7 @@ Creates a new event on Google Calendar.
 | `end_time` | string | Yes | — | End time in RFC 3339 format (must be after `start_time`) |
 | `attendees` | string[] | No | — | List of attendee email addresses |
 | `calendar_id` | string | No | `primary` | Calendar ID (defaults to `primary`) |
+| `recurrence` | string[] | No | — | Google Calendar / RFC 5545 lines (`RRULE`, `EXDATE`, `RDATE`). Creates a series; the returned `id` is the series master. |
 
 **Response:**
 
@@ -226,14 +227,41 @@ Creates a new event on Google Calendar.
 }
 ```
 
+When `recurrence` is set, the response also echoes the stored lines and `id` is the series master (not a single instance):
+
+```json
+{
+  "id": "abc123event",
+  "html_link": "https://calendar.google.com/event?eid=abc123",
+  "status": "confirmed",
+  "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=TU"]
+}
+```
+
+**Weekly example**
+
+```json
+{
+  "summary": "Eat before class",
+  "start_time": "2026-09-15T11:30:00-04:00",
+  "end_time": "2026-09-15T12:00:00-04:00",
+  "recurrence": ["RRULE:FREQ=WEEKLY;BYDAY=TU,TH"]
+}
+```
+
+Other common RRULEs: `RRULE:FREQ=WEEKLY;BYDAY=TU;COUNT=12`, `RRULE:FREQ=MONTHLY;BYMONTHDAY=1;UNTIL=20261201T000000Z`.
+
 **Calendar API:** `POST /calendars/{calendarId}/events` ([docs](https://developers.google.com/calendar/api/v3/reference/events/insert))
 
 **Validation:**
 - `start_time` and `end_time` must be valid RFC 3339 timestamps.
 - `end_time` must be strictly after `start_time` — equal or earlier times are rejected with a clear validation error.
 - `calendar_id` is URL-encoded in the API path to safely handle IDs containing special characters (e.g., `user@group.calendar.google.com`).
+- Each `recurrence` line must be `RRULE`, `EXRULE`, `RDATE`, or `EXDATE` (optional parameters before `:`). `DTSTART` / `DTEND` are rejected — use `start_time` / `end_time`.
 
-Standing approvals can constrain writes to a verified calendar via `$meta.calendar_id` (see [Standing approval constraints](#standing-approval-constraints-metacalendar_id)).
+Standing approvals can constrain writes to a verified calendar via `$meta.calendar_id` (see [Standing approval constraints](#standing-approval-constraints-metacalendar_id)). The capabilities schema includes `recurrence`, so “always allow” / `$meta.calendar_id` rules wildcard it like the other event fields. You can also pin an exact RRULE (for example `["RRULE:FREQ=WEEKLY;BYDAY=TU"]`) on a standing approval.
+
+The returned series master `id` is what `google.update_calendar_event` / `google.delete_calendar_event` expect for `scope=series`. Expanded instance ids from `google.list_calendar_events` (`single_events=true`) are used with `scope=instance` or `this_and_following` — see those actions for details.
 
 ---
 
@@ -977,7 +1005,7 @@ Change every weekly occurrence (and optionally the RRULE):
 - Uses `PATCH` (partial update) via a `map[string]any` request body so that only provided fields are sent. A struct with `omitempty` tags cannot distinguish "not provided" from "intentionally empty" for the attendees list.
 - `clear_attendees: true` sends an explicit empty `attendees: []` array to remove all attendees from the event.
 - `calendar_id` is URL-encoded in the API path to safely handle IDs with special characters (e.g., `group@calendar.google.com`).
-- Companion create-side work (RRULE on `google.create_calendar_event`) is tracked in GitHub issue #1533.
+- Recurring series: use the series master `id` from `google.create_calendar_event` with `scope=series`, or an expanded instance id with `scope=instance` / `this_and_following`.
 
 ---
 
@@ -1360,7 +1388,7 @@ connectors/google/
 ├── create_meeting.go               # google.create_meeting action (Calendar + Meet)
 ├── calendar_helpers.go             # Shared calendar validation (time range, attendees) + calendar lookup
 ├── calendar_event_scope.go         # Series vs instance scope resolution for update/delete
-├── calendar_recurrence.go          # RRULE validation and this_and_following UNTIL rewrite
+├── calendar_recurrence.go          # RRULE / EXDATE / RDATE validation and this_and_following UNTIL rewrite
 ├── resolve_constraint_metadata.go  # $meta.calendar_id (Calendar writes) and $meta.drive_id (Drive/Sheets)
 ├── list_drive_files.go             # google.list_drive_files action + shared isValidDriveID()
 ├── get_drive_file.go               # google.get_drive_file action (metadata + content export)
@@ -1376,12 +1404,12 @@ connectors/google/
 ├── read_email_test.go              # Read email tests (MIME parsing, attachments, RFC 5987, depth limit, edge cases)
 ├── download_attachment_test.go     # Download attachment tests (base64, part_id match, size limit)
 ├── send_email_reply_test.go        # Send email reply tests (thread validation, header injection, Re: prefix)
-├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding)
+├── create_calendar_event_test.go   # Create event tests (including time validation, URL encoding, weekly RRULE)
 ├── list_calendar_events_test.go    # List events action tests
 ├── update_calendar_event_test.go   # Update event tests (partial update, scope, recurrence, this_and_following)
 ├── delete_calendar_event_test.go   # Delete event tests (including series vs instance scope)
 ├── calendar_event_scope_test.go    # Scope validation and instance-id helpers
-├── calendar_recurrence_test.go     # RRULE UNTIL/COUNT rewrite tests
+├── calendar_recurrence_test.go     # RRULE validation and UNTIL/COUNT rewrite tests
 ├── create_presentation_test.go     # Create presentation tests
 ├── get_presentation_test.go        # Get presentation tests (including URL encoding)
 ├── add_slide_test.go               # Add slide tests (layout validation, insertion index)

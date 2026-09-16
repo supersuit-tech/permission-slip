@@ -85,7 +85,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "google.create_calendar_event",
 				Name:            "Create Calendar Event",
-				Description:     "Create a new event on Google Calendar",
+				Description:     "Create a new event or recurring series on Google Calendar",
 				RiskLevel:       "medium",
 				DisplayTemplate: "Create event {{summary}} on {{start_time:datetime}} with {{attendees:count}} attendees",
 				Preview: &connectors.ActionPreview{
@@ -137,6 +137,12 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 								"help_text": "Connect a credential to select a calendar.",
 								"label": "Calendar"
 							}
+						},
+						"recurrence": {
+							"type": "array",
+							"items": {"type": "string"},
+							"description": "Recurrence lines in Google Calendar / RFC 5545 form (RRULE, EXDATE, RDATE). Example: [\"RRULE:FREQ=WEEKLY;BYDAY=TU\"]. Creates a series; the returned id is the series master. Do not include DTSTART or DTEND.",
+							"x-ui": {"label": "Recurrence", "help_text": "RFC 5545 lines such as RRULE:FREQ=WEEKLY;BYDAY=TU. Standing approvals can wildcard this field."}
 						}
 					}
 				}`)),

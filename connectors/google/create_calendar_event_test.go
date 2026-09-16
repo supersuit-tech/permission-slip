@@ -302,6 +302,115 @@ func TestCreateCalendarEvent_CalendarIDURLEncoded(t *testing.T) {
 	}
 }
 
+func TestCreateCalendarEvent_ManifestIncludesRecurrence(t *testing.T) {
+	t.Parallel()
+
+	var schema struct {
+		Properties map[string]json.RawMessage `json:"properties"`
+	}
+	for _, action := range New().Manifest().Actions {
+		if action.ActionType != "google.create_calendar_event" {
+			continue
+		}
+		if err := json.Unmarshal(action.ParametersSchema, &schema); err != nil {
+			t.Fatalf("invalid parameters schema: %v", err)
+		}
+		if _, ok := schema.Properties["recurrence"]; !ok {
+			t.Fatal("create_calendar_event schema missing recurrence")
+		}
+		return
+	}
+	t.Fatal("google.create_calendar_event not in manifest")
+}
+
+func TestCreateCalendarEvent_WeeklyRecurrence(t *testing.T) {
+	t.Parallel()
+
+	const weekly = "RRULE:FREQ=WEEKLY;BYDAY=TU"
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost {
+			t.Errorf("expected POST, got %s", r.Method)
+		}
+
+		var body calendarEventRequest
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("failed to decode request body: %v", err)
+		}
+		if body.Summary != "Eat before class" {
+			t.Errorf("expected summary 'Eat before class', got %q", body.Summary)
+		}
+		if len(body.Recurrence) != 1 || body.Recurrence[0] != weekly {
+			t.Errorf("expected recurrence %q, got %#v", weekly, body.Recurrence)
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(calendarEventResponse{
+			ID:         "series-master-1",
+			HTMLLink:   "https://calendar.google.com/event?eid=series-master-1",
+			Status:     "confirmed",
+			Recurrence: []string{weekly},
+		})
+	}))
+	defer srv.Close()
+
+	conn := newForTest(srv.Client(), "", srv.URL, "")
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(createCalendarEventParams{
+		Summary:    "Eat before class",
+		StartTime:  "2026-09-15T11:30:00-04:00",
+		EndTime:    "2026-09-15T12:00:00-04:00",
+		Recurrence: []string{weekly},
+	})
+
+	result, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var data map[string]any
+	if err := json.Unmarshal(result.Data, &data); err != nil {
+		t.Fatalf("failed to unmarshal result: %v", err)
+	}
+	if data["id"] != "series-master-1" {
+		t.Errorf("expected series master id 'series-master-1', got %#v", data["id"])
+	}
+	gotRecurrence, ok := data["recurrence"].([]any)
+	if !ok || len(gotRecurrence) != 1 || gotRecurrence[0] != weekly {
+		t.Errorf("expected recurrence %q in result, got %#v", weekly, data["recurrence"])
+	}
+}
+
+func TestCreateCalendarEvent_InvalidRecurrence(t *testing.T) {
+	t.Parallel()
+
+	conn := New()
+	action := &createCalendarEventAction{conn: conn}
+
+	params, _ := json.Marshal(map[string]any{
+		"summary":    "Meeting",
+		"start_time": "2024-01-15T09:00:00-05:00",
+		"end_time":   "2024-01-15T10:00:00-05:00",
+		"recurrence": []string{"DTSTART:20240115T090000Z", "RRULE:FREQ=WEEKLY;BYDAY=MO"},
+	})
+
+	_, err := action.Execute(t.Context(), connectors.ActionRequest{
+		ActionType:  "google.create_calendar_event",
+		Parameters:  params,
+		Credentials: validCreds(),
+	})
+	if err == nil {
+		t.Fatal("expected error for DTSTART in recurrence")
+	}
+	if !connectors.IsValidationError(err) {
+		t.Errorf("expected ValidationError, got: %T", err)
+	}
+}
+
 func TestCreateCalendarEvent_InvalidJSON(t *testing.T) {
 	t.Parallel()
 
