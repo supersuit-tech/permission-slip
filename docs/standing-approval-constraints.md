@@ -145,7 +145,7 @@ The web and phone "always allow" flow proposes one workspace set covering routin
 
 ## Google Calendar writes (`$meta.calendar_id`)
 
-Exact `calendar_id` parameter pins miss aliases (`primary` vs the primary calendar’s email) and “always allow” copies every event field. For `google.create_calendar_event`, `google.update_calendar_event`, `google.delete_calendar_event`, and `google.create_meeting`, constrain the **verified calendar** instead:
+Exact `calendar_id` parameter pins miss aliases (`primary` vs the primary calendar’s email) and “always allow” copies every event field (summary, times, attendees, reminders). For `google.create_calendar_event`, `google.update_calendar_event`, `google.delete_calendar_event`, and `google.create_meeting`, constrain the **verified calendar** instead:
 
 ```json
 {
@@ -156,7 +156,7 @@ Exact `calendar_id` parameter pins miss aliases (`primary` vs the primary calend
 }
 ```
 
-`$meta.calendar_id` is the canonical Calendar API id from `GET /calendars/{calendarId}`. It matches that calendar regardless of whether the agent sent `primary`, omitted `calendar_id`, or used the email id. Other calendars still require one-off approval. Discover the field via capabilities `meta_constraint_fields`. Each write action still uses its own standing approval. Constraint summaries resolve that id to the calendar’s display name (the same overlay used for parameter IDs) and hide the wildcard event fields.
+`$meta.calendar_id` is the canonical Calendar API id from `GET /calendars/{calendarId}`. It matches that calendar regardless of whether the agent sent `primary`, omitted `calendar_id`, or used the email id. Other calendars still require one-off approval. Discover the field via capabilities `meta_constraint_fields`. Each write action still uses its own standing approval. Unrestricted templates wildcard event fields including `reminders` and `reminder_minutes`. Constraint summaries resolve that id to the calendar’s display name (the same overlay used for parameter IDs) and hide the wildcard event fields.
 
 ## Display formatting (shared)
 

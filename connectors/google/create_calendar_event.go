@@ -27,13 +27,15 @@ func (a *createCalendarEventAction) ParameterAliases() map[string]string {
 
 // createCalendarEventParams is the user-facing parameter schema.
 type createCalendarEventParams struct {
-	Summary     string   `json:"summary"`
-	Description string   `json:"description"`
-	StartTime   string   `json:"start_time"`
-	EndTime     string   `json:"end_time"`
-	Attendees   []string `json:"attendees"`
-	CalendarID  string   `json:"calendar_id"`
-	Recurrence  []string `json:"recurrence"`
+	Summary         string                `json:"summary"`
+	Description     string                `json:"description"`
+	StartTime       string                `json:"start_time"`
+	EndTime         string                `json:"end_time"`
+	Attendees       []string              `json:"attendees"`
+	CalendarID      string                `json:"calendar_id"`
+	Recurrence      []string              `json:"recurrence"`
+	Reminders       *eventRemindersParams `json:"reminders"`
+	ReminderMinutes []int                 `json:"reminder_minutes"`
 }
 
 func (p *createCalendarEventParams) validate() error {
@@ -45,6 +47,9 @@ func (p *createCalendarEventParams) validate() error {
 	}
 	if p.EndTime == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: end_time"}
+	}
+	if _, err := resolveEventReminders(p.Reminders, p.ReminderMinutes); err != nil {
+		return err
 	}
 	if err := validateTimeRange(p.StartTime, p.EndTime); err != nil {
 		return err
@@ -63,12 +68,13 @@ func (p *createCalendarEventParams) normalize() {
 
 // calendarEventRequest is the Google Calendar API request body for events.insert.
 type calendarEventRequest struct {
-	Summary     string                `json:"summary"`
-	Description string                `json:"description,omitempty"`
-	Start       calendarEventDateTime `json:"start"`
-	End         calendarEventDateTime `json:"end"`
-	Attendees   []calendarAttendee    `json:"attendees,omitempty"`
-	Recurrence  []string              `json:"recurrence,omitempty"`
+	Summary     string                    `json:"summary"`
+	Description string                    `json:"description,omitempty"`
+	Start       calendarEventDateTime     `json:"start"`
+	End         calendarEventDateTime     `json:"end"`
+	Attendees   []calendarAttendee        `json:"attendees,omitempty"`
+	Recurrence  []string                  `json:"recurrence,omitempty"`
+	Reminders   *calendarRemindersPayload `json:"reminders,omitempty"`
 }
 
 type calendarEventDateTime struct {
@@ -104,6 +110,11 @@ func (a *createCalendarEventAction) Execute(ctx context.Context, req connectors.
 	}
 	params.normalize()
 
+	reminders, err := resolveEventReminders(params.Reminders, params.ReminderMinutes)
+	if err != nil {
+		return nil, err
+	}
+
 	body := calendarEventRequest{
 		Summary:     params.Summary,
 		Description: params.Description,
@@ -111,6 +122,7 @@ func (a *createCalendarEventAction) Execute(ctx context.Context, req connectors.
 		End:         calendarEventDateTime{DateTime: params.EndTime},
 		Attendees:   buildAttendees(params.Attendees),
 		Recurrence:  params.Recurrence,
+		Reminders:   reminders,
 	}
 
 	var resp calendarEventResponse

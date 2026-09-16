@@ -27,18 +27,20 @@ func (a *updateCalendarEventAction) ParameterAliases() map[string]string {
 
 // updateCalendarEventParams is the user-facing parameter schema.
 type updateCalendarEventParams struct {
-	EventID        string   `json:"event_id"`
-	CalendarID     string   `json:"calendar_id"`
-	Summary        string   `json:"summary"`
-	Description    string   `json:"description"`
-	StartTime      string   `json:"start_time"`
-	EndTime        string   `json:"end_time"`
-	Attendees      []string `json:"attendees"`
-	Location       string   `json:"location"`
-	ClearAttendees bool     `json:"clear_attendees"`
-	Scope          string   `json:"scope"`
-	InstanceStart  string   `json:"instance_start"`
-	Recurrence     []string `json:"recurrence"`
+	EventID         string                `json:"event_id"`
+	CalendarID      string                `json:"calendar_id"`
+	Summary         string                `json:"summary"`
+	Description     string                `json:"description"`
+	StartTime       string                `json:"start_time"`
+	EndTime         string                `json:"end_time"`
+	Attendees       []string              `json:"attendees"`
+	Location        string                `json:"location"`
+	ClearAttendees  bool                  `json:"clear_attendees"`
+	Scope           string                `json:"scope"`
+	InstanceStart   string                `json:"instance_start"`
+	Recurrence      []string              `json:"recurrence"`
+	Reminders       *eventRemindersParams `json:"reminders"`
+	ReminderMinutes []int                 `json:"reminder_minutes"`
 }
 
 func (p *updateCalendarEventParams) validate() error {
@@ -47,7 +49,7 @@ func (p *updateCalendarEventParams) validate() error {
 	}
 	hasUpdate := p.Summary != "" || p.Description != "" || p.Location != "" ||
 		p.StartTime != "" || p.EndTime != "" || len(p.Attendees) > 0 || p.ClearAttendees ||
-		len(p.Recurrence) > 0
+		len(p.Recurrence) > 0 || hasReminderInput(p.Reminders, p.ReminderMinutes)
 	if !hasUpdate {
 		return &connectors.ValidationError{Message: "at least one field to update must be provided"}
 	}
@@ -76,6 +78,9 @@ func (p *updateCalendarEventParams) validate() error {
 				Message: "recurrence cannot be updated on an expanded instance id; pass the series master event_id with scope=series",
 			}
 		}
+	}
+	if _, err := resolveEventReminders(p.Reminders, p.ReminderMinutes); err != nil {
+		return err
 	}
 	return validateScopeAgainstEventID(p.Scope, p.EventID, p.InstanceStart)
 }
@@ -112,6 +117,10 @@ func (p *updateCalendarEventParams) patchBody() map[string]any {
 	}
 	if len(p.Recurrence) > 0 {
 		body["recurrence"] = p.Recurrence
+	}
+	reminders, err := resolveEventReminders(p.Reminders, p.ReminderMinutes)
+	if err == nil && reminders != nil {
+		body["reminders"] = reminders
 	}
 	return body
 }

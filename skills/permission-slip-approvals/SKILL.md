@@ -64,7 +64,7 @@ See [Google connector README](../../connectors/google/README.md#standing-approva
 **Google Calendar writes (create / update / delete / meeting):**
 
 ```bash
-# Auto-approve creates on a specific calendar (any summary/times/attendees)
+# Auto-approve creates on a specific calendar (any summary/times/attendees/reminders)
 permission-slip request --action google.create_calendar_event \
   --standing-constraints '{"calendar_id":"*","$meta":{"calendar_id":"work@example.com"}}' \
   --params '{"summary":"Standup","start_time":"2026-09-08T15:00:00Z","end_time":"2026-09-08T15:30:00Z"}'

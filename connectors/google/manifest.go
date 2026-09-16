@@ -143,6 +143,51 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"items": {"type": "string"},
 							"description": "Recurrence lines in Google Calendar / RFC 5545 form (RRULE, EXDATE, RDATE). Example: [\"RRULE:FREQ=WEEKLY;BYDAY=TU\"]. Creates a series; the returned id is the series master. Do not include DTSTART or DTEND.",
 							"x-ui": {"label": "Recurrence", "help_text": "RFC 5545 lines such as RRULE:FREQ=WEEKLY;BYDAY=TU. Standing approvals can wildcard this field."}
+						},
+						"reminders": {
+							"type": "object",
+							"description": "Event reminder settings. When omitted, the calendar's default reminders are used. Mutually exclusive with reminder_minutes.",
+							"properties": {
+								"use_default": {
+									"type": "boolean",
+									"description": "When true, use the calendar's default reminders. When false, use overrides (or no reminders if overrides is empty).",
+									"x-ui": {"widget": "toggle", "label": "Use calendar default reminders"}
+								},
+								"overrides": {
+									"type": "array",
+									"maxItems": 5,
+									"description": "Custom reminders. Each entry fires a popup or email a number of minutes before the event.",
+									"items": {
+										"type": "object",
+										"required": ["method", "minutes"],
+										"properties": {
+											"method": {
+												"type": "string",
+												"enum": ["popup", "email"],
+												"description": "How the reminder is delivered"
+											},
+											"minutes": {
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 40320,
+												"description": "Minutes before the event start (0-40320, four weeks)"
+											}
+										}
+									}
+								}
+							},
+							"x-ui": {"label": "Reminders"}
+						},
+						"reminder_minutes": {
+							"type": "array",
+							"maxItems": 5,
+							"items": {
+								"type": "integer",
+								"minimum": 0,
+								"maximum": 40320
+							},
+							"description": "Shorthand for popup reminders this many minutes before the event (e.g. [5, 1]). Mutually exclusive with reminders.",
+							"x-ui": {"label": "Reminder minutes", "help_text": "Popup reminders in minutes before the event — e.g. [5, 1]"}
 						}
 					}
 				}`)),
@@ -617,6 +662,51 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 								"help_text": "Connect a credential to select a calendar.",
 								"label": "Calendar"
 							}
+						},
+						"reminders": {
+							"type": "object",
+							"description": "Event reminder settings. When omitted, the calendar's default reminders are used. Mutually exclusive with reminder_minutes.",
+							"properties": {
+								"use_default": {
+									"type": "boolean",
+									"description": "When true, use the calendar's default reminders. When false, use overrides (or no reminders if overrides is empty).",
+									"x-ui": {"widget": "toggle", "label": "Use calendar default reminders"}
+								},
+								"overrides": {
+									"type": "array",
+									"maxItems": 5,
+									"description": "Custom reminders. Each entry fires a popup or email a number of minutes before the event.",
+									"items": {
+										"type": "object",
+										"required": ["method", "minutes"],
+										"properties": {
+											"method": {
+												"type": "string",
+												"enum": ["popup", "email"],
+												"description": "How the reminder is delivered"
+											},
+											"minutes": {
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 40320,
+												"description": "Minutes before the event start (0-40320, four weeks)"
+											}
+										}
+									}
+								}
+							},
+							"x-ui": {"label": "Reminders"}
+						},
+						"reminder_minutes": {
+							"type": "array",
+							"maxItems": 5,
+							"items": {
+								"type": "integer",
+								"minimum": 0,
+								"maximum": 40320
+							},
+							"description": "Shorthand for popup reminders this many minutes before the event (e.g. [5, 1]). Mutually exclusive with reminders.",
+							"x-ui": {"label": "Reminder minutes", "help_text": "Popup reminders in minutes before the event — e.g. [5, 1]"}
 						}
 					}
 				}`)),
@@ -748,7 +838,7 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 			{
 				ActionType:      "google.update_calendar_event",
 				Name:            "Update Calendar Event",
-				Description:     "Update an existing Google Calendar event (time, title, attendees, location, or recurrence). Use scope to edit one instance, the whole series, or this and following occurrences.",
+				Description:     "Update an existing Google Calendar event (time, title, attendees, location, recurrence, or reminders). Use scope to edit one instance, the whole series, or this and following occurrences.",
 				RiskLevel:       "medium",
 				DisplayTemplate: "Update event {{event_id}}",
 				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
@@ -829,6 +919,51 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 							"items": {"type": "string"},
 							"description": "Replacement recurrence lines for the series master (Google Calendar API shape), e.g. [\"RRULE:FREQ=WEEKLY;BYDAY=TU\"]. Allowed with scope=series or this_and_following; rejected on a single instance.",
 							"x-ui": {"label": "Recurrence", "help_text": "RRULE/EXDATE/RDATE strings — series master only"}
+						},
+						"reminders": {
+							"type": "object",
+							"description": "Replacement reminder settings. Set use_default to true to restore the calendar's default reminders. Mutually exclusive with reminder_minutes.",
+							"properties": {
+								"use_default": {
+									"type": "boolean",
+									"description": "When true, restore the calendar's default reminders and clear custom overrides. When false, use overrides (or no reminders if overrides is empty).",
+									"x-ui": {"widget": "toggle", "label": "Use calendar default reminders"}
+								},
+								"overrides": {
+									"type": "array",
+									"maxItems": 5,
+									"description": "Custom reminders. Replaces any existing event-specific reminders.",
+									"items": {
+										"type": "object",
+										"required": ["method", "minutes"],
+										"properties": {
+											"method": {
+												"type": "string",
+												"enum": ["popup", "email"],
+												"description": "How the reminder is delivered"
+											},
+											"minutes": {
+												"type": "integer",
+												"minimum": 0,
+												"maximum": 40320,
+												"description": "Minutes before the event start (0-40320, four weeks)"
+											}
+										}
+									}
+								}
+							},
+							"x-ui": {"label": "Reminders"}
+						},
+						"reminder_minutes": {
+							"type": "array",
+							"maxItems": 5,
+							"items": {
+								"type": "integer",
+								"minimum": 0,
+								"maximum": 40320
+							},
+							"description": "Shorthand for popup reminders this many minutes before the event (e.g. [5, 1]). Mutually exclusive with reminders.",
+							"x-ui": {"label": "Reminder minutes", "help_text": "Popup reminders in minutes before the event — e.g. [5, 1]"}
 						}
 					}
 				}`)),

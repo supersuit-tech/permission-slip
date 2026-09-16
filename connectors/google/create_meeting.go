@@ -33,12 +33,14 @@ func (a *createMeetingAction) ParameterAliases() map[string]string {
 
 // createMeetingParams is the user-facing parameter schema.
 type createMeetingParams struct {
-	Summary     string   `json:"summary"`
-	Description string   `json:"description"`
-	StartTime   string   `json:"start_time"`
-	EndTime     string   `json:"end_time"`
-	Attendees   []string `json:"attendees"`
-	CalendarID  string   `json:"calendar_id"`
+	Summary         string                `json:"summary"`
+	Description     string                `json:"description"`
+	StartTime       string                `json:"start_time"`
+	EndTime         string                `json:"end_time"`
+	Attendees       []string              `json:"attendees"`
+	CalendarID      string                `json:"calendar_id"`
+	Reminders       *eventRemindersParams `json:"reminders"`
+	ReminderMinutes []int                 `json:"reminder_minutes"`
 }
 
 func (p *createMeetingParams) validate() error {
@@ -50,6 +52,9 @@ func (p *createMeetingParams) validate() error {
 	}
 	if p.EndTime == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: end_time"}
+	}
+	if _, err := resolveEventReminders(p.Reminders, p.ReminderMinutes); err != nil {
+		return err
 	}
 	return validateTimeRange(p.StartTime, p.EndTime)
 }
@@ -63,12 +68,13 @@ func (p *createMeetingParams) normalize() {
 // meetingEventRequest is the Google Calendar API request body for creating
 // an event with a Google Meet conference.
 type meetingEventRequest struct {
-	Summary        string                `json:"summary"`
-	Description    string                `json:"description,omitempty"`
-	Start          calendarEventDateTime `json:"start"`
-	End            calendarEventDateTime `json:"end"`
-	Attendees      []calendarAttendee    `json:"attendees,omitempty"`
-	ConferenceData meetingConferenceData `json:"conferenceData"`
+	Summary        string                    `json:"summary"`
+	Description    string                    `json:"description,omitempty"`
+	Start          calendarEventDateTime     `json:"start"`
+	End            calendarEventDateTime     `json:"end"`
+	Attendees      []calendarAttendee        `json:"attendees,omitempty"`
+	ConferenceData meetingConferenceData     `json:"conferenceData"`
+	Reminders      *calendarRemindersPayload `json:"reminders,omitempty"`
 }
 
 // meetingConferenceData requests automatic Google Meet link generation.
@@ -77,7 +83,7 @@ type meetingConferenceData struct {
 }
 
 type meetingCreateRequest struct {
-	RequestID             string                      `json:"requestId"`
+	RequestID             string                       `json:"requestId"`
 	ConferenceSolutionKey meetingConferenceSolutionKey `json:"conferenceSolutionKey"`
 }
 
@@ -87,10 +93,10 @@ type meetingConferenceSolutionKey struct {
 
 // meetingEventResponse is the Google Calendar API response with conference data.
 type meetingEventResponse struct {
-	ID             string                        `json:"id"`
-	HTMLLink       string                        `json:"htmlLink"`
-	Summary        string                        `json:"summary"`
-	Status         string                        `json:"status"`
+	ID             string                         `json:"id"`
+	HTMLLink       string                         `json:"htmlLink"`
+	Summary        string                         `json:"summary"`
+	Status         string                         `json:"status"`
 	ConferenceData *meetingConferenceDataResponse `json:"conferenceData,omitempty"`
 }
 
@@ -114,6 +120,11 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 	}
 	params.normalize()
 
+	reminders, err := resolveEventReminders(params.Reminders, params.ReminderMinutes)
+	if err != nil {
+		return nil, err
+	}
+
 	body := meetingEventRequest{
 		Summary:     params.Summary,
 		Description: params.Description,
@@ -125,6 +136,7 @@ func (a *createMeetingAction) Execute(ctx context.Context, req connectors.Action
 				ConferenceSolutionKey: meetingConferenceSolutionKey{Type: "hangoutsMeet"},
 			},
 		},
+		Reminders: reminders,
 	}
 	body.Attendees = buildAttendees(params.Attendees)
 
