@@ -8,31 +8,80 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
+const (
+	maxRecurrenceLines   = 20
+	maxRecurrenceLineLen = 1024
+)
+
+// validateRecurrence checks Google Calendar / RFC 5545 recurrence lines.
+// Empty input is rejected: callers that treat recurrence as optional (create)
+// must skip this when the array is omitted. A non-empty array must include
+// at least one RRULE. DTSTART/DTEND are rejected because the Calendar API
+// uses start/end instead.
 func validateRecurrence(lines []string) error {
 	if len(lines) == 0 {
 		return &connectors.ValidationError{Message: "recurrence must include at least one RRULE:... string"}
 	}
+	if len(lines) > maxRecurrenceLines {
+		return &connectors.ValidationError{
+			Message: fmt.Sprintf("recurrence must have at most %d lines", maxRecurrenceLines),
+		}
+	}
 	hasRRULE := false
 	for i, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			return &connectors.ValidationError{Message: fmt.Sprintf("recurrence[%d] is empty", i)}
+		name, err := validateRecurrenceLine(i, line)
+		if err != nil {
+			return err
 		}
-		switch {
-		case strings.HasPrefix(line, "RRULE:"):
+		if name == "RRULE" {
 			hasRRULE = true
-		case strings.HasPrefix(line, "EXDATE:"), strings.HasPrefix(line, "RDATE:"):
-			// Google Calendar API recurrence array members.
-		default:
-			return &connectors.ValidationError{
-				Message: fmt.Sprintf("recurrence[%d] must start with RRULE:, EXDATE:, or RDATE:", i),
-			}
 		}
 	}
 	if !hasRRULE {
 		return &connectors.ValidationError{Message: "recurrence must include at least one RRULE:... string"}
 	}
 	return nil
+}
+
+func validateRecurrenceLine(index int, line string) (string, error) {
+	trimmed := strings.TrimSpace(line)
+	if trimmed == "" {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("recurrence[%d] must not be empty", index),
+		}
+	}
+	if len(trimmed) > maxRecurrenceLineLen {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("recurrence[%d] exceeds %d characters", index, maxRecurrenceLineLen),
+		}
+	}
+
+	upper := strings.ToUpper(trimmed)
+	if strings.HasPrefix(upper, "DTSTART") || strings.HasPrefix(upper, "DTEND") {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("recurrence[%d] must not include DTSTART or DTEND; use start_time and end_time", index),
+		}
+	}
+
+	colon := strings.IndexByte(trimmed, ':')
+	if colon < 1 || colon == len(trimmed)-1 {
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("recurrence[%d] must be an RRULE, EXRULE, RDATE, or EXDATE line (e.g. RRULE:FREQ=WEEKLY;BYDAY=TU)", index),
+		}
+	}
+
+	name := upper[:colon]
+	if semi := strings.IndexByte(name, ';'); semi >= 0 {
+		name = name[:semi]
+	}
+	switch name {
+	case "RRULE", "EXRULE", "RDATE", "EXDATE":
+		return name, nil
+	default:
+		return "", &connectors.ValidationError{
+			Message: fmt.Sprintf("recurrence[%d] must start with RRULE, EXRULE, RDATE, or EXDATE", index),
+		}
+	}
 }
 
 func formatRecurrenceUntil(cutoff time.Time, allDay bool) string {

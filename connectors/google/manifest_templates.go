@@ -97,14 +97,14 @@ func googleTemplates() []connectors.ManifestTemplate {
 			ActionType:  "google.create_calendar_event",
 			Name:        "Create calendar events",
 			Description: "Agent can create events on any calendar.",
-			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*"}`),
+			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","attendees":"*","calendar_id":"*","recurrence":"*"}`),
 		},
 		{
 			ID:          "tpl_google_create_calendar_event_no_attendees",
 			ActionType:  "google.create_calendar_event",
 			Name:        "Create personal calendar events",
 			Description: "Agent can create events on the primary calendar without inviting attendees.",
-			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary"}`),
+			Parameters:  json.RawMessage(`{"summary":"*","description":"*","start_time":"*","end_time":"*","calendar_id":"primary","recurrence":"*"}`),
 		},
 		{
 			ID:          "tpl_google_update_calendar_event",

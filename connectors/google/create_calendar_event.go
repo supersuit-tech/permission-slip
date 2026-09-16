@@ -33,6 +33,7 @@ type createCalendarEventParams struct {
 	EndTime     string   `json:"end_time"`
 	Attendees   []string `json:"attendees"`
 	CalendarID  string   `json:"calendar_id"`
+	Recurrence  []string `json:"recurrence"`
 }
 
 func (p *createCalendarEventParams) validate() error {
@@ -45,7 +46,13 @@ func (p *createCalendarEventParams) validate() error {
 	if p.EndTime == "" {
 		return &connectors.ValidationError{Message: "missing required parameter: end_time"}
 	}
-	return validateTimeRange(p.StartTime, p.EndTime)
+	if err := validateTimeRange(p.StartTime, p.EndTime); err != nil {
+		return err
+	}
+	if len(p.Recurrence) == 0 {
+		return nil
+	}
+	return validateRecurrence(p.Recurrence)
 }
 
 func (p *createCalendarEventParams) normalize() {
@@ -61,6 +68,7 @@ type calendarEventRequest struct {
 	Start       calendarEventDateTime `json:"start"`
 	End         calendarEventDateTime `json:"end"`
 	Attendees   []calendarAttendee    `json:"attendees,omitempty"`
+	Recurrence  []string              `json:"recurrence,omitempty"`
 }
 
 type calendarEventDateTime struct {
@@ -75,13 +83,14 @@ type calendarAttendee struct {
 
 // calendarEventResponse is the Google Calendar API response from events.insert.
 type calendarEventResponse struct {
-	ID          string `json:"id"`
-	HTMLLink    string `json:"htmlLink"`
-	Summary     string `json:"summary"`
-	Status      string `json:"status"`
-	Created     string `json:"created"`
-	Updated     string `json:"updated"`
-	Description string `json:"description"`
+	ID          string   `json:"id"`
+	HTMLLink    string   `json:"htmlLink"`
+	Summary     string   `json:"summary"`
+	Status      string   `json:"status"`
+	Created     string   `json:"created"`
+	Updated     string   `json:"updated"`
+	Description string   `json:"description"`
+	Recurrence  []string `json:"recurrence,omitempty"`
 }
 
 // Execute creates a Google Calendar event and returns its metadata.
@@ -101,6 +110,7 @@ func (a *createCalendarEventAction) Execute(ctx context.Context, req connectors.
 		Start:       calendarEventDateTime{DateTime: params.StartTime},
 		End:         calendarEventDateTime{DateTime: params.EndTime},
 		Attendees:   buildAttendees(params.Attendees),
+		Recurrence:  params.Recurrence,
 	}
 
 	var resp calendarEventResponse
@@ -109,9 +119,13 @@ func (a *createCalendarEventAction) Execute(ctx context.Context, req connectors.
 		return nil, err
 	}
 
-	return connectors.JSONResult(map[string]string{
+	result := map[string]any{
 		"id":        resp.ID,
 		"html_link": resp.HTMLLink,
 		"status":    resp.Status,
-	})
+	}
+	if len(resp.Recurrence) > 0 {
+		result["recurrence"] = resp.Recurrence
+	}
+	return connectors.JSONResult(result)
 }

@@ -70,7 +70,7 @@ permission-slip request --action google.create_calendar_event \
   --params '{"summary":"Standup","start_time":"2026-09-08T15:00:00Z","end_time":"2026-09-08T15:30:00Z"}'
 ```
 
-- Use `$meta.calendar_id` (canonical Calendar API id) — not an exact-parameter dump of the event.
+- Use `$meta.calendar_id` (canonical Calendar API id) — not an exact-parameter dump of the event. `recurrence` (RRULE / EXDATE / RDATE) is a schema field on `google.create_calendar_event` and is wildcarded like the other event fields.
 - `primary` and omitted `calendar_id` resolve to the same id as the primary calendar’s email.
 - Same `$meta.calendar_id` field applies to `google.update_calendar_event`, `google.delete_calendar_event`, and `google.create_meeting`.
 - Other calendars fall through to one-off approval.
