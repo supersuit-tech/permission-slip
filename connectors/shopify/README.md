@@ -20,7 +20,7 @@ The credential `auth_type` in the database is `api_key`. Tokens are stored encry
 The connector dynamically constructs the Admin API base URL from `shop_domain`:
 
 ```
-https://{shop_domain}.myshopify.com/admin/api/2024-10
+https://{shop_domain}.myshopify.com/admin/api/2026-07
 ```
 
 Both bare subdomains (`mystore`) and full domains (`mystore.myshopify.com`) are accepted. Custom domains (e.g., `shop.example.com`) are rejected with a validation error.
@@ -35,6 +35,18 @@ Both bare subdomains (`mystore`) and full domains (`mystore.myshopify.com`) are 
 | `shopify.create_product` | Create Product | low | Create a new product with optional variants |
 | `shopify.update_inventory` | Update Inventory | medium | Adjust inventory levels at a specific location |
 | `shopify.create_discount` | Create Discount | medium | Create a discount code (two-step: price rule → discount code) |
+| `shopify.fulfill_order` | Fulfill Order | medium | Create a fulfillment with optional tracking (two-step: fulfillment orders → fulfillments) |
+
+### `shopify.fulfill_order` — Two-Step Flow
+
+Creating a fulfillment requires the [fulfillment-order API](https://shopify.dev/docs/api/admin-rest/latest/resources/fulfillment) — the order-scoped `POST /orders/{id}/fulfillments.json` endpoint was removed in `2022-07`.
+
+1. **GET `/orders/{order_id}/fulfillment_orders.json`** — list fulfillment orders for the order
+2. **POST `/fulfillments.json`** — create a fulfillment with `line_items_by_fulfillment_order`
+
+Fulfillment orders at the same location are combined into one fulfillment. Orders split across locations produce one fulfillment per location. If no fulfillment order supports `create_fulfillment` (already fulfilled, on hold, or missing scopes), the action returns a validation error.
+
+Fulfillment creation requires the `write_merchant_managed_fulfillment_orders` and/or `write_third_party_fulfillment_orders` access scopes on the Admin API token.
 
 ### `shopify.create_discount` — Two-Step Flow
 

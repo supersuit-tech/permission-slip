@@ -401,32 +401,32 @@ func TestShopBaseURL(t *testing.T) {
 		{
 			name:   "bare subdomain",
 			domain: "mystore",
-			want:   "https://mystore.myshopify.com/admin/api/2024-10",
+			want:   "https://mystore.myshopify.com/admin/api/2026-07",
 		},
 		{
 			name:   "full domain",
 			domain: "mystore.myshopify.com",
-			want:   "https://mystore.myshopify.com/admin/api/2024-10",
+			want:   "https://mystore.myshopify.com/admin/api/2026-07",
 		},
 		{
 			name:   "full domain with trailing slash",
 			domain: "mystore.myshopify.com/",
-			want:   "https://mystore.myshopify.com/admin/api/2024-10",
+			want:   "https://mystore.myshopify.com/admin/api/2026-07",
 		},
 		{
 			name:   "subdomain with whitespace",
 			domain: "  mystore  ",
-			want:   "https://mystore.myshopify.com/admin/api/2024-10",
+			want:   "https://mystore.myshopify.com/admin/api/2026-07",
 		},
 		{
 			name:   "subdomain with hyphen",
 			domain: "my-store",
-			want:   "https://my-store.myshopify.com/admin/api/2024-10",
+			want:   "https://my-store.myshopify.com/admin/api/2026-07",
 		},
 		{
 			name:   "uppercase normalized to lowercase",
 			domain: "MyStore",
-			want:   "https://mystore.myshopify.com/admin/api/2024-10",
+			want:   "https://mystore.myshopify.com/admin/api/2026-07",
 		},
 		{
 			name:    "custom domain rejected",

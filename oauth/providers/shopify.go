@@ -22,6 +22,8 @@ func init() {
 				"write_discounts",
 				"read_reports",
 				"read_all_orders",
+				"write_merchant_managed_fulfillment_orders",
+				"write_third_party_fulfillment_orders",
 			},
 			ClientID:     os.Getenv("SHOPIFY_CLIENT_ID"),
 			ClientSecret: os.Getenv("SHOPIFY_CLIENT_SECRET"),
