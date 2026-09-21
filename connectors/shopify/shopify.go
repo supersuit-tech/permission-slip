@@ -20,7 +20,7 @@ import (
 
 const (
 	defaultTimeout = 30 * time.Second
-	apiVersion     = "2024-10"
+	apiVersion     = "2026-07"
 
 	credKeyAccessToken = "access_token"
 	credKeyShopDomain  = "shop_domain"
