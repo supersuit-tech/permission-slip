@@ -541,6 +541,18 @@ const ACTION_FORMATTERS: Record<string, ActionFormatter> = {
     if (folder) return `Create folder \u201C${name}\u201D in ${folder}`;
     return `Create folder \u201C${name}\u201D in Drive`;
   },
+
+  "google.sheets_delete_rows": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    const rowLabel = strVal(rd?.row_label);
+    const sheetName = strVal(rd?.sheet_name);
+    let result = "Delete ";
+    if (rowLabel) result += `${rowLabel} on `;
+    if (sheetName) result += `${sheetName} in `;
+    result += title;
+    return result;
+  },
 };
 
 /**

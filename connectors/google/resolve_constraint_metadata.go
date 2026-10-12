@@ -20,6 +20,7 @@ var googleSharedDriveMetadataActions = map[string]struct{}{
 	"google.sheets_write_range":  {},
 	"google.sheets_append_rows":  {},
 	"google.sheets_list_sheets":  {},
+	"google.sheets_delete_rows":  {},
 }
 
 // googleCalendarWriteMetadataActions are Calendar writes whose target calendar
@@ -61,7 +62,8 @@ func (c *GoogleConnector) ResolveConstraintMetadata(ctx context.Context, actionT
 	case "google.get_drive_file":
 		return c.resolveFileDriveMeta(ctx, params, creds)
 	case "google.sheets_read_range", "google.sheets_write_range",
-		"google.sheets_append_rows", "google.sheets_list_sheets":
+		"google.sheets_append_rows", "google.sheets_list_sheets",
+		"google.sheets_delete_rows":
 		return c.resolveSpreadsheetDriveMeta(ctx, params, creds)
 	default:
 		return c.resolveFolderDriveMeta(ctx, params, creds)

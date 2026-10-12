@@ -60,6 +60,8 @@ var resourceDetailFields = map[string]bool{
 	"subject":            true,
 	"from":               true,
 	"range":              true,
+	"sheet_name":         true,
+	"row_label":          true,
 	// GitHub (see connectors/github/resolve_resource_details.go)
 	"workflow_name":  true,
 	"webhook_url":    true,

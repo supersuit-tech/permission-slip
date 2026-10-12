@@ -2,7 +2,7 @@
 // connector execution layer. It uses Google REST APIs (Gmail, Calendar, Slides, Sheets, Docs, Chat, Drive)
 // with plain net/http and OAuth 2.0 access tokens provided by the platform.
 //
-// The connector exposes 32 actions covering email (send, reply, read, list, archive, download attachment),
+// The connector exposes 33 actions covering email (send, reply, read, list, archive, download attachment),
 // calendar (create, list, list calendars, update, delete, meetings), Slides, Sheets, Docs, Chat, and
 // Drive (list, get, upload including binary, delete, search, create folder).
 package google
@@ -170,6 +170,7 @@ func (c *GoogleConnector) Actions() map[string]connectors.Action {
 		"google.download_attachment":   &downloadAttachmentAction{conn: c},
 		"google.archive_email":         &archiveEmailAction{conn: c},
 		"google.list_calendars":        &listCalendarsAction{conn: c},
+		"google.sheets_delete_rows":    &sheetsDeleteRowsAction{conn: c},
 	}
 }
 

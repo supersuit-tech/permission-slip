@@ -22,7 +22,7 @@ The credential `auth_type` is `oauth2` with `oauth_provider` set to `google` (a 
 | `gmail.readonly` | `google.list_emails`, `google.read_email`, `google.download_attachment` |
 | `calendar.events` | `google.create_calendar_event`, `google.list_calendar_events`, `google.create_meeting` |
 | `presentations` | `google.create_presentation`, `google.get_presentation`, `google.add_slide` |
-| `spreadsheets` | `google.create_spreadsheet`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets` |
+| `spreadsheets` | `google.create_spreadsheet`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets`, `google.sheets_delete_rows` |
 | `documents` | `google.create_document`, `google.get_document`, `google.update_document` |
 | `chat.spaces.readonly` | `google.list_chat_spaces` |
 | `chat.messages.create` | `google.send_chat_message` |
@@ -566,6 +566,46 @@ The response includes `row_count` and `column_count` from the sheet's grid prope
 
 ---
 
+### `google.sheets_delete_rows`
+
+Deletes rows or columns from a Google Sheets tab via `spreadsheets.batchUpdate` `deleteDimension`. Remaining cells shift up (rows) or left (columns). This is a destructive high-risk write: the approval preview includes the tab name, 1-based row/column labels, and the current cell values being removed.
+
+**Risk level:** high
+
+**Parameters:**
+
+| Name | Type | Required | Description |
+|------|------|----------|-------------|
+| `spreadsheet_id` | string | Yes | The ID of the spreadsheet |
+| `sheet_id` | integer | One of `sheet_id` or `sheet_name` | Numeric tab id from `google.sheets_list_sheets` (`0` is the first tab) |
+| `sheet_name` | string | One of `sheet_id` or `sheet_name` | Worksheet title (resolved to a numeric id before the delete) |
+| `start_index` | integer | With `end_index`, or use `ranges` | 0-based inclusive start. UI row 11 is `10`. |
+| `end_index` | integer | With `start_index`, or use `ranges` | 0-based exclusive end. Deleting UI rows 11–12 is `start_index` 10, `end_index` 12. |
+| `dimension` | string | No | `ROWS` (default) or `COLUMNS` |
+| `ranges` | object[] | No | Extra `{start_index, end_index}` spans. Merged, then applied bottom-up in one batch so indices do not shift. |
+
+**Response:**
+
+```json
+{
+  "spreadsheet_id": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms",
+  "sheet_id": 0,
+  "sheet_name": "Sheet1",
+  "dimension": "ROWS",
+  "deleted_count": 2,
+  "ranges": [{"start_index": 10, "end_index": 12}]
+}
+```
+
+**Sheets API:** `POST /v4/spreadsheets/{id}:batchUpdate` with `deleteDimension` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/batchUpdate))
+
+**Implementation notes:**
+- `sheet_id` `0` is valid (the first worksheet). The connector distinguishes omitted vs zero with a pointer field.
+- Multiple ranges are merged when they overlap, then sent highest-index first so earlier rows/columns keep their original indices.
+- Approval `ResolveResourceDetails` reads the current values (`values:batchGet`) so the approver sees exactly what disappears. Previews are capped at 50 rows.
+
+---
+
 ### `google.create_spreadsheet`
 
 Creates a new Google Sheets spreadsheet (same API family as `google.sheets_read_range` / write / append, but creates an empty file you can pass to those actions).
@@ -592,7 +632,7 @@ Creates a new Google Sheets spreadsheet (same API family as `google.sheets_read_
 **Sheets API:** `POST /v4/spreadsheets` ([docs](https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets/create))
 
 **Implementation notes:**
-- Returns `spreadsheet_id` for use with `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, and `google.sheets_list_sheets`.
+- Returns `spreadsheet_id` for use with `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets`, and `google.sheets_delete_rows`.
 - If the API omits `spreadsheetUrl` in the response, the connector builds an edit URL from `spreadsheet_id`.
 
 ---
@@ -1221,7 +1261,9 @@ Exact folder / spreadsheet / range allowlists break as soon as the agent creates
 }
 ```
 
-Supported actions: `google.upload_drive_file`, `google.create_drive_folder`, `google.list_drive_files`, `google.search_drive`, `google.get_drive_file`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets`.
+Supported actions: `google.upload_drive_file`, `google.create_drive_folder`, `google.list_drive_files`, `google.search_drive`, `google.get_drive_file`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, `google.sheets_list_sheets`, `google.sheets_delete_rows`.
+
+`google.sheets_delete_rows` supports `$meta.drive_id` matching so a standing approval can pin deletes to a Shared Drive, but it is not included in the web/phone "routine Drive and Sheets work" workspace checkbox — row deletion is destructive and stays on its own approval.
 
 Matching uses the Drive API (`files.get` / `drives.get`) — never an unverified agent-supplied ID. The constraint matches files and folders on that Shared Drive, including nested folders and Sheets whose spreadsheet lives there. List/search with **neither** `folder_id` nor `drive_id` (all files) omit `$meta.drive_id` and fall through. My Drive and other Shared Drives also fall through to one-off approval. Agents discover the field via `GET /agents/{agent_id}/capabilities` → `meta_constraint_fields: ["drive_id"]`. A top-level `drive_id` constraint is only valid on list/search (it is a real parameter there); for other actions use `{"$meta":{"drive_id":...}}`.
 
@@ -1357,6 +1399,7 @@ The connector ships with constrained templates that demonstrate parameter lockin
 | Read from specific spreadsheet | `sheets_read_range` | `spreadsheet_id` locked; agent chooses range |
 | Write to specific spreadsheet | `sheets_write_range` | `spreadsheet_id` locked; agent chooses range and values |
 | Append to specific spreadsheet | `sheets_append_rows` | `spreadsheet_id` locked; agent chooses range and values |
+| Delete rows in specific spreadsheet | `sheets_delete_rows` | `spreadsheet_id` locked; agent chooses tab and row/column spans |
 | Read from any spreadsheet | `sheets_read_range` | Nothing — agent controls all parameters |
 | List worksheets in any spreadsheet | `sheets_list_sheets` | Nothing — agent controls spreadsheet |
 | Create spreadsheets | `create_spreadsheet` | Nothing — agent controls title and optional tab names |
@@ -1405,7 +1448,7 @@ Each action lives in its own file. To add one (e.g., `google.delete_calendar_eve
 ```
 connectors/google/
 ├── google.go                       # GoogleConnector struct, New(), Actions(), doJSON(), doRawGet(), wrapHTTPError(), ValidateCredentials()
-├── manifest.go                     # Manifest() — 32 action schemas and 41+ templates
+├── manifest.go                     # Manifest() — 33 action schemas and 41+ templates
 ├── docs_types.go                   # Shared Docs API types (batchUpdate request) and helpers (documentEditURL)
 ├── email_helpers.go                # buildGmailRaw() — shared RFC 2822 message builder used by send_email and send_email_reply
 ├── send_email.go                   # google.send_email action
@@ -1426,6 +1469,7 @@ connectors/google/
 ├── sheets_write.go                 # google.sheets_write_range action
 ├── sheets_append.go                # google.sheets_append_rows action
 ├── sheets_list.go                  # google.sheets_list_sheets action
+├── sheets_delete.go                # google.sheets_delete_rows action (batchUpdate deleteDimension)
 ├── sheets_helpers.go               # Shared validation helpers for Sheets actions
 ├── create_spreadsheet.go           # google.create_spreadsheet action (Sheets API)
 ├── create_document.go              # google.create_document action

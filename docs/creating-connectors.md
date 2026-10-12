@@ -1068,6 +1068,7 @@ connectors/
 │   ├── sheets_write.go       # google.sheets_write_range action
 │   ├── sheets_append.go      # google.sheets_append_rows action
 │   ├── sheets_list.go        # google.sheets_list_sheets action
+│   ├── sheets_delete.go      # google.sheets_delete_rows action (batchUpdate deleteDimension)
 │   ├── create_spreadsheet.go # google.create_spreadsheet action (Sheets API)
 │   ├── sheets_helpers.go     # Shared validation (row/cell limits, ragged row check)
 │   ├── send_chat_message.go  # google.send_chat_message action (Google Chat API)

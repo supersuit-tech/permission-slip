@@ -363,6 +363,22 @@ const ACTION_DESCRIBERS: Record<string, ActionDescriber> = {
     return [text("List sheets in "), val(title)];
   },
 
+  "google.sheets_delete_rows": (_params, rd) => {
+    const title = strVal(rd?.title);
+    if (!title) return null;
+    const parts: SummaryPart[] = [text("Delete ")];
+    const rowLabel = strVal(rd?.row_label);
+    if (rowLabel) {
+      parts.push(val(rowLabel), text(" on "));
+    }
+    const sheetName = strVal(rd?.sheet_name);
+    if (sheetName) {
+      parts.push(val(sheetName), text(" in "));
+    }
+    parts.push(val(title));
+    return parts;
+  },
+
   // ── Google Slides ───────────────────────────────────────────────
 
   "google.get_presentation": (_params, rd) => {

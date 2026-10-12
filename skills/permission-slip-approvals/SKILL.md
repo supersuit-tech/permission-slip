@@ -56,6 +56,7 @@ permission-slip request --action google.sheets_read_range \
 
 - Use `$meta.drive_id` — not an exhaustive `folder_id` / `spreadsheet_id` `any_of` list.
 - Applies to `google.upload_drive_file`, `google.create_drive_folder`, `google.list_drive_files`, `google.search_drive`, `google.get_drive_file`, `google.sheets_read_range`, `google.sheets_write_range`, `google.sheets_append_rows`, and `google.sheets_list_sheets`.
+- `google.sheets_delete_rows` can use `$meta.drive_id` on its own standing approval but is not part of the routine workspace set.
 - Unscoped list/search (no folder or drive) and out-of-drive destinations (My Drive or a different Shared Drive) fall through to one-off approval.
 - Approving any of these from web/phone "always allow" proposes the full Drive + Sheets workspace set for that Shared Drive.
 

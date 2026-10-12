@@ -39,6 +39,10 @@ import {
   parseProtonBatchEmails,
 } from "@/components/previews/ProtonBatchEmailsPreview";
 import { ImessageParticipantsRow } from "@/components/previews/ImessageParticipantsRow";
+import {
+  SheetsDeletePreview,
+  parseSheetsDeletePreview,
+} from "@/components/previews/SheetsDeletePreview";
 import type { components } from "@/api/schema";
 import { TimelineView, type TimelineEntry } from "@/components/TimelineView";
 import { formatAbsoluteTime } from "@/lib/utils";
@@ -234,6 +238,14 @@ export function ReviewApprovalDialog({
   const protonBatchEmails = useMemo(
     () =>
       parseProtonBatchEmails(
+        approval.resource_details as Record<string, unknown> | undefined,
+      ),
+    [approval.resource_details],
+  );
+
+  const sheetsDeletePreview = useMemo(
+    () =>
+      parseSheetsDeletePreview(
         approval.resource_details as Record<string, unknown> | undefined,
       ),
     [approval.resource_details],
@@ -508,6 +520,9 @@ export function ReviewApprovalDialog({
                     <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
                       <ProtonBatchEmailsPreview emails={protonBatchEmails} />
                     </div>
+                  )}
+                  {sheetsDeletePreview && (
+                    <SheetsDeletePreview preview={sheetsDeletePreview} />
                   )}
                   <ImessageParticipantsRow
                     resourceDetails={

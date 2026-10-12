@@ -402,6 +402,23 @@ describe("buildSummary", () => {
     });
   });
 
+  describe("google.sheets_delete_rows", () => {
+    it("shows tab, 1-based rows, and spreadsheet title", () => {
+      const result = buildSummary(
+        "google.sheets_delete_rows",
+        { spreadsheet_id: "s123", sheet_id: 0, start_index: 10, end_index: 12 },
+        null,
+        null,
+        undefined,
+        { title: "Budget Tracker", sheet_name: "Sheet1", row_label: "rows 11–12" },
+      );
+      expect(result).toContain("Delete");
+      expect(result).toContain("rows 11–12");
+      expect(result).toContain("Sheet1");
+      expect(result).toContain("Budget Tracker");
+    });
+  });
+
   // ── Google Slides ───────────────────────────────────────────────
 
   describe("google.get_presentation", () => {
