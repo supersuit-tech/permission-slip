@@ -10,8 +10,6 @@ import (
 	"github.com/supersuit-tech/permission-slip/connectors"
 )
 
-func intPtr(v int) *int { return &v }
-
 func TestColumnIndexToA1(t *testing.T) {
 	t.Parallel()
 	tests := []struct {
