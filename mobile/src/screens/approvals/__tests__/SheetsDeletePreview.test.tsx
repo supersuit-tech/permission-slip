@@ -49,10 +49,8 @@ describe("SheetsDeletePreview", () => {
     });
     const node = renderer?.root.find((n) => n.props.testID === "sheets-delete-preview");
     expect(node).toBeTruthy();
-    const texts = renderer?.root.findAllByType("Text").map((t) =>
-      t.children.map(String).join(""),
-    );
-    expect(texts?.some((s) => s.includes("rows 11–12 on Sheet1"))).toBe(true);
-    expect(texts?.some((s) => s.includes("Alice"))).toBe(true);
+    const tree = JSON.stringify(renderer?.toJSON());
+    expect(tree).toContain("rows 11–12 on Sheet1");
+    expect(tree).toContain("Alice");
   });
 });
