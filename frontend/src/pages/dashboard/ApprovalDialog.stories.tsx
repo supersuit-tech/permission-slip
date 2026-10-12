@@ -35,6 +35,10 @@ import {
   parseProtonBatchEmails,
 } from "@/components/previews/ProtonBatchEmailsPreview";
 import { ImessageParticipantsRow } from "@/components/previews/ImessageParticipantsRow";
+import {
+  SheetsDeletePreview,
+  parseSheetsDeletePreview,
+} from "@/components/previews/SheetsDeletePreview";
 import { SchemaParameterDetails } from "@/components/SchemaParameterDetails";
 import { TimelineView } from "@/components/TimelineView";
 import { CountdownBadge, RiskBadge } from "./approval-components";
@@ -104,6 +108,7 @@ function ApprovalDialogStory({
 }: MockApprovalProps) {
   const hasParams = Object.keys(parameters).length > 0;
   const protonBatchEmails = parseProtonBatchEmails(resourceDetails);
+  const sheetsDeletePreview = parseSheetsDeletePreview(resourceDetails);
 
   if (dialogState === "approved-success") {
     return (
@@ -253,6 +258,9 @@ function ApprovalDialogStory({
               <div className="overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
                 <ProtonBatchEmailsPreview emails={protonBatchEmails} />
               </div>
+            )}
+            {sheetsDeletePreview && (
+              <SheetsDeletePreview preview={sheetsDeletePreview} />
             )}
             <ImessageParticipantsRow resourceDetails={resourceDetails} />
           </div>
@@ -727,6 +735,46 @@ export const GoogleSheetsAppendRows: Story = {
       },
     },
     resourceDetails: { title: "Deployment Log" },
+  },
+};
+
+export const GoogleSheetsDeleteRows: Story = {
+  name: "Google: Delete Spreadsheet Rows",
+  args: {
+    connectorName: "Google",
+    connectorLogo: GOOGLE_LOGO,
+    actionName: "Delete Spreadsheet Rows",
+    actionType: "google.sheets_delete_rows",
+    agentName: "Chiedobot",
+    riskLevel: "high",
+    displayTemplate: "Delete {{row_label}} on {{sheet_name}} in {{title}}",
+    preview: null,
+    parameters: {
+      spreadsheet_id: "1abc2def3ghi4jkl",
+      sheet_id: 0,
+      start_index: 10,
+      end_index: 12,
+    },
+    schema: {
+      type: "object",
+      required: ["spreadsheet_id"],
+      properties: {
+        spreadsheet_id: { type: "string", description: "The ID of the spreadsheet" },
+        sheet_id: { type: "integer", description: "Numeric worksheet tab id" },
+        start_index: { type: "integer", description: "0-based inclusive start" },
+        end_index: { type: "integer", description: "0-based exclusive end" },
+      },
+    },
+    resourceDetails: {
+      title: "Q1 Revenue Tracker",
+      sheet_name: "Sheet1",
+      row_label: "rows 11–12",
+      row_numbers: [11, 12],
+      values: [
+        ["Alice", 30, "NYC"],
+        ["Duplicate Alice", 30, "NYC"],
+      ],
+    },
   },
 };
 

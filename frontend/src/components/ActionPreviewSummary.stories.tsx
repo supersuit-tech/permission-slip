@@ -83,6 +83,21 @@ export const GoogleSheetsReadRange: Story = {
   },
 };
 
+export const GoogleSheetsDeleteRows: Story = {
+  name: "google.sheets_delete_rows",
+  args: {
+    actionType: "google.sheets_delete_rows",
+    parameters: { spreadsheet_id: "1abc2def", sheet_id: 0, start_index: 10, end_index: 12 },
+    schema: null,
+    actionName: "Delete Spreadsheet Rows",
+    resourceDetails: {
+      title: "Q1 Revenue Tracker",
+      sheet_name: "Sheet1",
+      row_label: "rows 11–12",
+    },
+  },
+};
+
 export const GoogleReadEmail: Story = {
   name: "google.read_email",
   args: {

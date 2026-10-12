@@ -43,6 +43,8 @@ func (c *GoogleConnector) ResolveResourceDetails(ctx context.Context, actionType
 	case "google.sheets_read_range", "google.sheets_write_range",
 		"google.sheets_append_rows", "google.sheets_list_sheets":
 		return c.resolveSpreadsheet(ctx, creds, params)
+	case "google.sheets_delete_rows":
+		return c.resolveSpreadsheetDelete(ctx, creds, params)
 
 	// Slides
 	case "google.get_presentation", "google.add_slide":

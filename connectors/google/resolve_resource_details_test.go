@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -180,6 +181,71 @@ func TestResolveResourceDetails_Spreadsheet(t *testing.T) {
 				t.Errorf("%s: expected range, got %v", actionType, details["range"])
 			}
 		}
+	}
+}
+
+func TestResolveResourceDetails_SheetsDeleteRows(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case strings.HasPrefix(r.URL.Path, "/drive/v3/files/"):
+			w.Write([]byte(`{"name":"Budget Tracker","mimeType":"application/vnd.google-apps.spreadsheet"}`))
+		case strings.HasSuffix(r.URL.Path, "/values:batchGet"):
+			json.NewEncoder(w).Encode(sheetsBatchGetValuesResponse{
+				ValueRanges: []sheetsValueRange{
+					{Range: "Sheet1!11:12", Values: [][]any{
+						{"Alice", 30, "NYC"},
+						{"Bob", 28, "SEA"},
+					}},
+				},
+			})
+		case r.URL.Path == "/spreadsheets/s123":
+			json.NewEncoder(w).Encode(map[string]any{
+				"properties": map[string]any{"title": "Budget Tracker"},
+				"sheets": []map[string]any{
+					{"properties": map[string]any{"sheetId": 0, "title": "Sheet1"}},
+				},
+			})
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+	defer srv.Close()
+
+	conn := &GoogleConnector{
+		client:        srv.Client(),
+		sheetsBaseURL: srv.URL,
+		driveBaseURL:  srv.URL,
+	}
+	params, _ := json.Marshal(sheetsDeleteRowsParams{
+		SpreadsheetID: "s123",
+		SheetID:       intPtr(0),
+		StartIndex:    intPtr(10),
+		EndIndex:      intPtr(12),
+	})
+	details, err := conn.ResolveResourceDetails(context.Background(), "google.sheets_delete_rows", params, validCreds())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if details["title"] != "Budget Tracker" {
+		t.Errorf("title = %v, want Budget Tracker", details["title"])
+	}
+	if details["sheet_name"] != "Sheet1" {
+		t.Errorf("sheet_name = %v, want Sheet1", details["sheet_name"])
+	}
+	if details["row_label"] != "rows 11–12" {
+		t.Errorf("row_label = %v, want rows 11–12", details["row_label"])
+	}
+	values, ok := details["values"].([][]any)
+	if !ok {
+		t.Fatalf("values type %T, want [][]any", details["values"])
+	}
+	if len(values) != 2 {
+		t.Fatalf("values len = %d, want 2", len(values))
+	}
+	if values[0][0] != "Alice" {
+		t.Errorf("values[0][0] = %v, want Alice", values[0][0])
 	}
 }
 
@@ -873,6 +939,11 @@ func TestResolveResourceDetails_MissingParams(t *testing.T) {
 	_, err = conn.ResolveResourceDetails(context.Background(), "google.sheets_read_range", params, validCreds())
 	if err == nil {
 		t.Error("expected error for missing spreadsheet_id")
+	}
+
+	_, err = conn.ResolveResourceDetails(context.Background(), "google.sheets_delete_rows", params, validCreds())
+	if err == nil {
+		t.Error("expected error for missing spreadsheet_id on sheets_delete_rows")
 	}
 
 	// Missing presentation_id

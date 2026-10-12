@@ -78,6 +78,10 @@ import {
   binaryThumbnailUri,
   resolvedResourceHref,
 } from "./paramDisplay";
+import {
+  parseSheetsDeletePreview,
+  SheetsDeletePreview,
+} from "./SheetsDeletePreview";
 
 type Props = NativeStackScreenProps<RootStackParamList, "ApprovalDetail">;
 
@@ -188,6 +192,14 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
   const imessageParticipants = useMemo(
     () =>
       parseImessageParticipants(
+        approval.resource_details as Record<string, unknown> | undefined,
+      ),
+    [approval.resource_details],
+  );
+
+  const sheetsDeletePreview = useMemo(
+    () =>
+      parseSheetsDeletePreview(
         approval.resource_details as Record<string, unknown> | undefined,
       ),
     [approval.resource_details],
@@ -534,6 +546,13 @@ export default function ApprovalDetailScreen({ route, navigation }: Props) {
                 {formatImessageParticipants(imessageParticipants)}
               </Text>
             </View>
+          </View>
+        )}
+
+        {sheetsDeletePreview && (
+          <View style={styles.sectionMajor}>
+            <Text style={styles.sectionLabel}>Rows to delete</Text>
+            <SheetsDeletePreview preview={sheetsDeletePreview} />
           </View>
         )}
 

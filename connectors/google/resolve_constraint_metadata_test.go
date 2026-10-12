@@ -25,6 +25,7 @@ func TestConstraintMetadataActionSupport_SharedDriveActions(t *testing.T) {
 		"google.sheets_write_range",
 		"google.sheets_append_rows",
 		"google.sheets_list_sheets",
+		"google.sheets_delete_rows",
 	} {
 		fields, ok := c.ConstraintMetadataActionSupport(actionType)
 		if !ok {

@@ -44,6 +44,7 @@ var paramValidators = map[string]connectors.ParamValidatorFunc{
 	"google.update_calendar_event": makeParamValidator[updateCalendarEventParams](),
 	"google.update_document":       makeParamValidator[updateDocumentParams](),
 	"google.upload_drive_file":     makeParamValidator[uploadDriveFileParams](),
+	"google.sheets_delete_rows":    makeParamValidator[sheetsDeleteRowsParams](),
 }
 
 func makeParamValidator[T any, PT interface {

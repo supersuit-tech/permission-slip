@@ -383,6 +383,79 @@ func (c *GoogleConnector) Manifest() *connectors.ConnectorManifest {
 					}
 				}`)),
 			},
+			{
+				ActionType:      "google.sheets_delete_rows",
+				Name:            "Delete Spreadsheet Rows",
+				Description:     "Delete rows or columns from a Google Sheets tab via deleteDimension. Destructive: remaining cells shift up (rows) or left (columns). Always review the current cell contents in the approval preview before confirming.",
+				RiskLevel:       "high",
+				DisplayTemplate: "Delete {{row_label}} on {{sheet_name}} in {{title}}",
+				ParametersSchema: json.RawMessage(connectors.TrimIndent(`{
+					"type": "object",
+					"required": ["spreadsheet_id"],
+					"allOf": [
+						{"anyOf": [{"required": ["sheet_id"]}, {"required": ["sheet_name"]}]},
+						{"anyOf": [{"required": ["start_index", "end_index"]}, {"required": ["ranges"]}]}
+					],
+					"properties": {
+						"spreadsheet_id": {
+							"type": "string",
+							"description": "The ID of the spreadsheet (the long string in the URL between /d/ and /edit)",
+							"x-ui": {"label": "Spreadsheet ID", "placeholder": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms", "help_text": "From the Google Sheets URL between /d/ and /edit"}
+						},
+						"sheet_id": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "Numeric worksheet tab id from google.sheets_list_sheets (0 is the first tab). Required when sheet_name is omitted.",
+							"x-ui": {"label": "Sheet ID", "help_text": "Numeric tab id from google.sheets_list_sheets — 0 is the first tab"}
+						},
+						"sheet_name": {
+							"type": "string",
+							"description": "Worksheet tab title (e.g. 'Sheet1'). Required when sheet_id is omitted. Resolved to a numeric sheet id before the delete.",
+							"x-ui": {"label": "Sheet name", "placeholder": "Sheet1"}
+						},
+						"start_index": {
+							"type": "integer",
+							"minimum": 0,
+							"description": "0-based inclusive start of the span to delete. Row 11 in the UI is start_index 10. Use with end_index, or pass ranges instead.",
+							"x-ui": {"label": "Start index", "help_text": "0-based inclusive — UI row 11 is 10"}
+						},
+						"end_index": {
+							"type": "integer",
+							"minimum": 1,
+							"description": "0-based exclusive end of the span to delete. Deleting UI rows 11–12 is start_index 10, end_index 12.",
+							"x-ui": {"label": "End index", "help_text": "0-based exclusive — deleting UI rows 11–12 is end_index 12"}
+						},
+						"dimension": {
+							"type": "string",
+							"enum": ["ROWS", "COLUMNS"],
+							"default": "ROWS",
+							"description": "What to delete. ROWS (default) shifts remaining rows up. COLUMNS shifts remaining columns left.",
+							"x-ui": {"widget": "select", "label": "Dimension"}
+						},
+						"ranges": {
+							"type": "array",
+							"items": {
+								"type": "object",
+								"required": ["start_index", "end_index"],
+								"properties": {
+									"start_index": {
+										"type": "integer",
+										"minimum": 0,
+										"description": "0-based inclusive start"
+									},
+									"end_index": {
+										"type": "integer",
+										"minimum": 1,
+										"description": "0-based exclusive end"
+									}
+								}
+							},
+							"description": "Optional additional spans to delete in one batch. Applied bottom-up so earlier indices stay stable. Overlapping spans are merged.",
+							"x-ui": {"label": "Ranges", "help_text": "Extra start/end spans — applied bottom-up in one batch"}
+						}
+					}
+				}`)),
+			},
 			// Docs actions
 			{
 				ActionType:      "google.create_document",

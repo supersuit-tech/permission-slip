@@ -285,6 +285,13 @@ func googleTemplates() []connectors.ManifestTemplate {
 			Description: "Agent can create new Google Sheets spreadsheets with any title and optional worksheet tab names.",
 			Parameters:  json.RawMessage(`{"title":"*","sheet_titles":"*"}`),
 		},
+		{
+			ID:          "tpl_google_sheets_delete_rows",
+			ActionType:  "google.sheets_delete_rows",
+			Name:        "Delete rows in specific spreadsheet",
+			Description: "Locks the spreadsheet; agent chooses the tab and row or column spans to delete. Destructive — remaining cells shift.",
+			Parameters:  json.RawMessage(`{"spreadsheet_id":"SPREADSHEET_ID","sheet_id":"*","sheet_name":"*","start_index":"*","end_index":"*","dimension":"*","ranges":"*"}`),
+		},
 		// --- Slides ---
 		{
 			ID:          "tpl_google_create_presentation",

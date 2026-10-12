@@ -372,6 +372,20 @@ describe("buildActionSummary", () => {
       expect(result).toContain("to Drive");
     });
   });
+
+  describe("google.sheets_delete_rows", () => {
+    it("shows tab, 1-based rows, and spreadsheet title", () => {
+      const result = buildActionSummary(
+        "google.sheets_delete_rows",
+        { spreadsheet_id: "s123", sheet_id: 0, start_index: 10, end_index: 12 },
+        "Delete {{row_label}} on {{sheet_name}} in {{title}}",
+        { title: "Budget Tracker", sheet_name: "Sheet1", row_label: "rows 11–12" },
+      );
+      expect(result).toContain("rows 11–12");
+      expect(result).toContain("Sheet1");
+      expect(result).toContain("Budget Tracker");
+    });
+  });
 });
 
 describe("formatRelativeTime", () => {
