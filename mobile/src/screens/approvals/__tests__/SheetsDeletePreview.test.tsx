@@ -1,4 +1,5 @@
-import { render, screen } from "@testing-library/react-native";
+import { createElement } from "react";
+import { create, act, type ReactTestRenderer } from "react-test-renderer";
 import {
   parseSheetsDeletePreview,
   SheetsDeletePreview,
@@ -24,20 +25,34 @@ describe("parseSheetsDeletePreview", () => {
 });
 
 describe("SheetsDeletePreview", () => {
-  it("renders row contents", () => {
-    render(
-      <SheetsDeletePreview
-        preview={{
-          sheetName: "Sheet1",
-          rowLabel: "rows 11–12",
-          values: [["Alice", 30]],
-          rowNumbers: [11],
-          truncated: false,
-        }}
-      />,
+  let renderer: ReactTestRenderer | undefined;
+
+  afterEach(async () => {
+    await act(async () => {
+      renderer?.unmount();
+    });
+  });
+
+  it("renders row contents", async () => {
+    await act(async () => {
+      renderer = create(
+        createElement(SheetsDeletePreview, {
+          preview: {
+            sheetName: "Sheet1",
+            rowLabel: "rows 11–12",
+            values: [["Alice", 30]],
+            rowNumbers: [11],
+            truncated: false,
+          },
+        }),
+      );
+    });
+    const node = renderer?.root.find((n) => n.props.testID === "sheets-delete-preview");
+    expect(node).toBeTruthy();
+    const texts = renderer?.root.findAllByType("Text").map((t) =>
+      t.children.map(String).join(""),
     );
-    expect(screen.getByTestId("sheets-delete-preview")).toBeTruthy();
-    expect(screen.getByText(/rows 11–12 on Sheet1/)).toBeTruthy();
-    expect(screen.getByText(/Alice/)).toBeTruthy();
+    expect(texts?.some((s) => s.includes("rows 11–12 on Sheet1"))).toBe(true);
+    expect(texts?.some((s) => s.includes("Alice"))).toBe(true);
   });
 });
