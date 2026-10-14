@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/supersuit-tech/permission-slip/actions/workflows/ci.yml/badge.svg)](https://github.com/supersuit-tech/permission-slip/actions/workflows/ci.yml)
 
-**Approve what [Openclaw](https://openclaw.org) does before it does it.**
+**Approve what [Openclaw](https://openclaw.org) does before it does it deterministically.**
 
 ```
 ┌──────────┐         ┌─────────────────┐         ┌──────────────┐
