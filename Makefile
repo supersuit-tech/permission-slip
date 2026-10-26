@@ -197,10 +197,9 @@ mobile-update:
 # Run all dependency audits
 audit: audit-backend audit-frontend audit-mobile
 
-# Audit Go modules for known vulnerabilities.
-# govulncheck v1.8.0+ needs Go 1.26; stay on v1.7.0 while go.mod is Go 1.25.
+# Audit Go modules for known vulnerabilities (requires govulncheck)
 audit-backend:
-	go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
+	go install golang.org/x/vuln/cmd/govulncheck@latest
 	govulncheck ./...
 
 # Audit npm packages for known vulnerabilities
