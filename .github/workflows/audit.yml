@@ -73,8 +73,9 @@ jobs:
       - name: Ensure frontend/dist exists for go:embed
         run: mkdir -p frontend/dist && touch frontend/dist/.gitkeep
 
+      # v1.8.0+ requires Go 1.26. This module is Go 1.25 and CI sets GOTOOLCHAIN=local.
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.7.0
 
       - name: Run govulncheck
         run: govulncheck ./...
