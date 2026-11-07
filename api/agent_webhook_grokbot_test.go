@@ -211,6 +211,7 @@ func TestNotifyAgentWake_GrokBotPostsExactURL(t *testing.T) {
 
 	approvalID := testhelper.GenerateID(t, "appr_")
 	testhelper.InsertApproval(t, tx, approvalID, agentID, uid)
+	testhelper.MustExec(t, tx, `UPDATE approvals SET wake_callback_url = $1 WHERE approval_id = $2`, webhookURL, approvalID)
 	appr, err := db.GetApprovalByID(context.Background(), tx, approvalID)
 	if err != nil || appr == nil {
 		t.Fatalf("GetApprovalByID: %v", err)

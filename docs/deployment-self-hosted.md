@@ -534,23 +534,26 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 
 Expect `200`. Non-2xx means fix tailnet routing, gateway listen address, or token before continuing.
 
-### 3. Register the webhook from the agent machine
+### 3. Register the wake token and send the URL per request
 
-On the machine where the agent runs (with CLI registered), or from the dashboard on the agent settings page (**Push Wake Webhook**):
+`webhook set` stores the hooks token. Approval wakes go to the `callback_url` on each request, not to the URL saved here.
 
 ```bash
 permission-slip webhook set \
   --url http://100.x.x.x:18789/hooks \
   --token <your-hooks-token>
+
+permission-slip request --action email.send --params '{...}' \
+  --callback-url http://100.x.x.x:18789/hooks
 ```
 
-Registration rejects public URLs — only private/tailnet addresses are allowed.
+`callback_url` must be a private or tailnet address for OpenClaw.
 
-For a **Grok Bot** agent, select provider **Grok Bot** in the dashboard or pass `--provider grokbot` with the public Cursor webhook URL (`https://api2.cursor.sh/automations/webhook/…`). See [Grok Bot push wakes](../integrations/openclaw.md#grok-bot).
+For a **Grok Bot** agent, pass `--provider grokbot` on `webhook set` and send the Cursor webhook URL as `--callback-url`. See [Grok Bot push wakes](../integrations/openclaw.md#grok-bot).
 
 ### 4. Verify end-to-end
 
-From the agent settings page, click **Test wake**, or run:
+Run:
 
 ```bash
 permission-slip webhook status --test

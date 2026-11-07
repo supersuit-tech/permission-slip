@@ -45,7 +45,7 @@ export function requestCommand(program: Command): void {
     )
     .option(
       "--callback-url <url>",
-      "Full push-wake callback URL for this request only (overrides registered webhook URL on resolution)",
+      "Full push-wake callback URL for this request (OpenClaw hooks base or Grok Bot webhook). Stored on the approval and used when it resolves.",
     )
     .option(
       "--server <url>",

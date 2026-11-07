@@ -10,7 +10,7 @@ import (
 )
 
 // normalizeOptionalCallbackURL trims and validates an optional per-request wake URL.
-// Returns nil when raw is empty (use agent default).
+// Returns nil when raw is empty (no push wake for this request).
 func normalizeOptionalCallbackURL(raw string) (*string, *ErrorResponse) {
 	trimmed := strings.TrimSpace(raw)
 	if trimmed == "" {
@@ -30,11 +30,7 @@ func normalizeOptionalCallbackURL(raw string) (*string, *ErrorResponse) {
 	return &trimmed, nil
 }
 
-// approvalHasPushWakeDestination reports whether resolution wakes can be pushed
-// for this approval (per-request callback and/or registered agent webhook).
-func approvalHasPushWakeDestination(appr *db.Approval, agentWebhookConfigured bool) bool {
-	if appr != nil && appr.WakeCallbackURL != nil && strings.TrimSpace(*appr.WakeCallbackURL) != "" {
-		return true
-	}
-	return agentWebhookConfigured
+// approvalHasPushWakeDestination reports whether this approval stored a per-request callback URL.
+func approvalHasPushWakeDestination(appr *db.Approval) bool {
+	return appr != nil && appr.WakeCallbackURL != nil && strings.TrimSpace(*appr.WakeCallbackURL) != ""
 }

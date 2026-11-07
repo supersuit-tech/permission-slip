@@ -50,7 +50,7 @@ type agentRequestApprovalResponse struct {
 	// retryable is false for all approval outcomes — agents must not blindly re-request.
 	Retryable bool `json:"retryable"`
 
-	// push_wake_configured is true when a push wake destination exists (per-request callback_url and/or registered webhook).
+	// push_wake_configured is true when this request included callback_url.
 	PushWakeConfigured bool `json:"push_wake_configured,omitempty"`
 
 	// ── Auto-approved fields (status="approved") ──
@@ -370,15 +370,13 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 
 		approvalURL := fmt.Sprintf("%s/approve/%s", deps.BaseURL, approval.ApprovalID)
 
-		pushWake, _ := db.AgentHasWebhook(r.Context(), deps.DB, agent.AgentID)
-
 		RespondJSON(w, http.StatusOK, agentRequestApprovalResponse{
 			ApprovalID:         approval.ApprovalID,
 			ApprovalURL:        approvalURL,
 			Status:             approval.Status,
 			Terminal:           false,
 			Retryable:          false,
-			PushWakeConfigured: approvalHasPushWakeDestination(approval, pushWake),
+			PushWakeConfigured: approvalHasPushWakeDestination(approval),
 			ExpiresAt:          &approval.ExpiresAt,
 			CreatedAt:          &approval.CreatedAt,
 		})

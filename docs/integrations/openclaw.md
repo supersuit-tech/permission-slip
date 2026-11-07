@@ -48,45 +48,36 @@ sequenceDiagram
 ## Setup
 
 1. Install and register the CLI per [agents.md](../agents.md).
-2. **Push wakes (recommended):** enable OpenClaw gateway hooks, then register the hooks URL and token from either:
-   - **Dashboard:** open the agent's settings page → **Push Wake Webhook** → configure URL + token and use **Test wake**
-   - **CLI:**
+2. **Push wakes:** enable OpenClaw gateway hooks. The agent sends its current hooks URL on each approval request (`--callback-url`). Register the hooks **token** once so Permission Slip can authenticate the POST:
    ```bash
-   permission-slip webhook set --url http://<tailnet-host>:18789/hooks --token <hooks-token>
-   permission-slip webhook status --test
+   permission-slip webhook set --url http://127.0.0.1:18789/hooks --token <hooks-token>
    ```
-   Grok Bot agents use `--provider grokbot` and a public Cursor webhook URL instead — see [Grok Bot](#grok-bot).
-   See [Self-hosted deployment — OpenClaw push wakes](../deployment-self-hosted.md#openclaw-push-wakes).
+   The URL stored by `webhook set` is not used as the wake destination. Pass the reachable URL on `request`. Grok Bot uses the same token registration with `--provider grokbot` — see [Grok Bot](#grok-bot).
 3. **Heartbeat backstop:** ensure OpenClaw heartbeat is enabled; the skill instructs running `permission-slip pending` each beat.
-4. **Watcher fallback:** when no webhook is configured, pending `request` / `status` output still includes `wait_hint` + `wait_command` for `permission-slip watch`.
+4. **Watcher fallback:** when a request omits `callback_url`, pending `request` / `status` output still includes `wait_hint` + `wait_command` for `permission-slip watch`.
 
 ## Commands
 
-### Webhook registration
+### Wake destination
 
-Configure from the agent settings page (**Push Wake Webhook** section) or via CLI:
+The agent settings page does not collect a webhook URL. Pass the current endpoint on each request:
 
 ```bash
-permission-slip webhook set --url http://100.x.x.x:18789/hooks --token <token>
-permission-slip webhook set --provider grokbot \
-  --url https://api2.cursor.sh/automations/webhook/<id> \
-  --token <authorization-header-value>
-permission-slip webhook status          # show config (includes provider)
-permission-slip webhook status --test   # fire test wake
-permission-slip webhook clear           # remove config
+permission-slip request --action email.send --params '{...}' \
+  --callback-url "http://my-host.tailnet:18789/hooks"
 ```
 
-In the dashboard, **Push Wake Webhook** has an **OpenClaw** / **Grok Bot** provider dropdown. **Test wake** fires the selected provider's delivery and shows success/failure plus latency.
+`webhook set` stores the bearer token (and provider) used on that POST. It does not choose where the wake is sent.
 
-For **OpenClaw**, the hooks URL must resolve to a **private** address (RFC1918, Tailscale `100.64.0.0/10`, or loopback). Public URLs are rejected at registration. This check is not relaxed for OpenClaw.
+For **OpenClaw**, `callback_url` must resolve to a **private** address (RFC1918, Tailscale `100.64.0.0/10`, or loopback).
 
-For **Grok Bot**, the URL must be a public Cursor automation webhook: `https://api2.cursor.sh/automations/webhook/<id>`. The server POSTs to that URL as-is (no `/hooks/wake` suffix).
+For **Grok Bot**, `callback_url` must be `https://api2.cursor.sh/automations/webhook/<id>`. The server POSTs to that URL as-is (no `/hooks/wake` suffix).
 
-If another of your agents is already registered with the same hooks URL, `webhook set` and `webhook status` include an advisory `warning` field. Sharing one gateway across agents is allowed, but wakes without `session_key` in approval context are delivered to the gateway's main session and may reach the wrong agent — pass `--session-key` on `request` (or `session_key` in API context) for shared-gateway setups, or give each agent its own gateway.
+Wakes without `session_key` in approval context are delivered to the gateway's main session and may reach the wrong agent on a shared gateway — pass `--session-key` on `request`.
 
 ### Per-request callback URL (dynamic hostnames)
 
-When your agent's reachable address changes often (for example a Tailscale hostname change), you do not need to update the registered webhook URL before every approval. Register the hooks **token** once with `webhook set`, then pass the current full hooks base URL on each request:
+When the host's Tailscale name changes, the agent sends the new URL on the next request. Earlier approvals keep the URL they were created with.
 
 ```bash
 # Discover current tailnet address (example — use your agent's own probe)
@@ -97,13 +88,13 @@ permission-slip request --action email.send --params '{...}' \
   --session-key 'agent:main:imessage'
 ```
 
-API equivalent: `callback_url` on `POST /v1/approvals/request` (optional). Permission Slip stores it on that approval and uses it for resolution wakes and retries. A later request may use a different URL without affecting earlier approvals. Explicit `callback_url` takes precedence over the registered default **for that request only**. Webhook `Authorization` still comes from the registered token when present.
+API equivalent: `callback_url` on `POST /v1/approvals/request`. Permission Slip stores it on that approval and uses it for resolution wakes and retries. Webhook `Authorization` comes from the token saved with `webhook set`.
 
 OpenClaw: pass the hooks base (`…/hooks`) or a full path ending in `/hooks/wake` or `/hooks/agent`. Grok Bot: pass the full `https://api2.cursor.sh/automations/webhook/…` URL.
 
 ### Push wake payloads (what Permission Slip POSTs)
 
-On approval resolution, the server POSTs to your registered hooks **base URL** plus a path suffix. Permission Slip does not use custom hook mapping subpaths — it calls OpenClaw's built-in hooks API directly.
+On approval resolution, the server POSTs to the approval's `callback_url` (hooks base) plus a path suffix. Permission Slip does not use custom hook mapping subpaths — it calls OpenClaw's built-in hooks API directly.
 
 | Branch | When | Path | JSON body |
 |--------|------|------|-----------|
@@ -216,7 +207,7 @@ Use the same `--session-key` value you passed to `request`. Use when no webhook 
 Grok Bot agents need the same two layers as OpenClaw: **push wake** (this page) plus a `permission-slip pending` sweep as backstop. They cannot use OpenClaw's private `/hooks/wake` API.
 
 1. In the Grok Bot routine, copy the automation webhook URL (`https://api2.cursor.sh/automations/webhook/…`) and Authorization header / webhook key.
-2. Register it from the dashboard (**Push Wake Webhook** → provider **Grok Bot**) or:
+2. Register the Authorization token (the URL here is not the wake destination):
 
    ```bash
    permission-slip webhook set --provider grokbot \
@@ -224,7 +215,9 @@ Grok Bot agents need the same two layers as OpenClaw: **push wake** (this page) 
      --token <authorization-header-value>
    ```
 
-3. On approval resolution the server POSTs **to that URL as-is** with:
+   Pass that same Cursor webhook URL as `--callback-url` on each `permission-slip request`.
+
+3. On approval resolution the server POSTs **to that request's `callback_url` as-is** with:
 
    ```json
    {

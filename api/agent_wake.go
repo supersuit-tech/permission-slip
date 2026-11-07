@@ -105,28 +105,19 @@ func buildAgentWakeDelivery(ctx context.Context, deps *Deps, appr *db.Approval, 
 		return nil, err
 	}
 
-	cfg, token, err := loadAgentWakeCredentials(ctx, deps, appr.AgentID)
+	// Destination is only the URL stored on this approval. A URL registered on
+	// the agent is not a fallback — the agent sends its current address per request.
+	if strings.TrimSpace(webhookURL) == "" {
+		return nil, nil
+	}
+
+	_, token, err := loadAgentWakeCredentials(ctx, deps, appr.AgentID)
 	if err != nil {
 		if deps.Logger != nil {
 			deps.Logger.Warn("agent wake: load credentials failed",
 				slog.Int64("agent_id", appr.AgentID), slog.String("error", err.Error()))
 		}
 		return nil, err
-	}
-
-	if webhookURL == "" {
-		if cfg == nil || cfg.WebhookURL == nil || *cfg.WebhookURL == "" {
-			return nil, nil
-		}
-		webhookURL = *cfg.WebhookURL
-		provider = cfg.WebhookProvider
-		if provider == "" {
-			provider = agentwake.ProviderOpenClaw
-		}
-	}
-
-	if strings.TrimSpace(webhookURL) == "" {
-		return nil, nil
 	}
 
 	return agentwake.BuildDelivery(provider, webhookURL, token, agentwake.WakeRequest{

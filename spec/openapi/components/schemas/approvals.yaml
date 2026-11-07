@@ -84,12 +84,13 @@ ApprovalRequest:
       maxLength: 2048
       format: uri
       description: |
-        Optional full push-wake callback URL for **this request only**. When set, resolution
-        wakes POST to this destination instead of the agent's registered webhook URL.
-        OpenClaw URLs must target a private network (Tailscale, RFC1918, or loopback);
-        Grok Bot URLs must be `https://api2.cursor.sh/automations/webhook/…`.
+        Full push-wake callback URL for this request. Resolution wakes POST here.
+        There is no agent-level webhook URL; the agent sends its current address
+        on each request. OpenClaw URLs must target a private network (Tailscale,
+        RFC1918, or loopback). Grok Bot URLs must be
+        `https://api2.cursor.sh/automations/webhook/…`.
         The URL is stored on the approval and used for delayed resolution and retries.
-        Webhook authentication still uses the agent's registered webhook token when configured.
+        The Authorization header still uses the agent's registered webhook token when one is set.
       example: "http://my-host.tailnet:18789/hooks"
 
   example:

@@ -5,7 +5,6 @@ import { useAgent } from "@/hooks/useAgent";
 import { useAgentConnectors } from "@/hooks/useAgentConnectors";
 import { AgentInfoSection } from "./AgentInfoSection";
 import { AgentPaymentMethodSection } from "./AgentPaymentMethodSection";
-import { AgentWebhookSection } from "./AgentWebhookSection";
 import { AgentConnectorsSection } from "./AgentConnectorsSection";
 import { AgentStandingApprovalsSection } from "./AgentStandingApprovalsSection";
 import { DeactivateSection } from "./DeactivateSection";
@@ -62,7 +61,6 @@ export function AgentConfigPage() {
       <BackLink />
       <AgentInfoSection agent={agent} />
       <AgentPaymentMethodSection agentId={agentId} />
-      <AgentWebhookSection agentId={agentId} />
       <AgentConnectorsSection
         agentId={agentId}
         connectors={connectors}
