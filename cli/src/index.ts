@@ -14,7 +14,7 @@
  *   request        Request approval for an action (auto-approves if standing approval matches)
  *   watch          Poll a pending approval in the background and wake the session on resolve
  *   pending        Heartbeat sweep — list pending and recently resolved approvals
- *   webhook        Configure OpenClaw gateway push wakes (set / status / clear)
+ *   webhook        Register the wake token (set / status / clear). Destinations use request --callback-url
  *   request-bulk   Request bulk approval for N same-type actions (one notification)
  *   request-status Check the status/outcome of an approval request
  *   changelog      Show CLI updates since your last session (read before multi-step work)

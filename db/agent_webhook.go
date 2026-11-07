@@ -45,14 +45,16 @@ func GetAgentWebhookConfig(ctx context.Context, db DBTX, agentID int64) (*AgentW
 	return cfg, nil
 }
 
-// SetAgentWebhook stores webhook URL, provider, and vault token ID for an agent.
-func SetAgentWebhook(ctx context.Context, db DBTX, agentID int64, webhookURL, tokenVaultID, provider string) error {
+// SetAgentWakeCredentials stores the wake token and provider for an agent.
+// The destination URL is not stored here — each approval carries its own callback_url.
+// Any previously saved webhook_url is cleared.
+func SetAgentWakeCredentials(ctx context.Context, db DBTX, agentID int64, tokenVaultID, provider string) error {
 	if provider == "" {
 		provider = "openclaw"
 	}
 	_, err := db.Exec(ctx,
-		`UPDATE agents SET webhook_url = $2, webhook_token_vault_id = $3, webhook_provider = $4 WHERE agent_id = $1`,
-		agentID, webhookURL, tokenVaultID, provider,
+		`UPDATE agents SET webhook_url = NULL, webhook_token_vault_id = $2, webhook_provider = $3 WHERE agent_id = $1`,
+		agentID, tokenVaultID, provider,
 	)
 	return err
 }

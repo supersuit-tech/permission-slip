@@ -127,6 +127,7 @@ Approval requests created by agents that require an approver's decision. Uses SH
 | `approved_at` | timestamptz | |
 | `denied_at` | timestamptz | |
 | `cancelled_at` | timestamptz | |
+| `wake_callback_url` | text | Nullable — per-request push-wake destination (max 2048 chars); overrides agent `webhook_url` for that approval's resolution wakes |
 | `created_at` | timestamptz | NOT NULL, DEFAULT now() |
 
 **Indexes:** `idx_approvals_agent_status` on `(agent_id, status)`, `idx_approvals_agent_created` on `(agent_id, created_at)`, `idx_approvals_expires_at` on `(expires_at)`, `idx_approvals_approver_created` on `(approver_id, created_at DESC, approval_id DESC)`

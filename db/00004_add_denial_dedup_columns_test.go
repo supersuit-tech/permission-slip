@@ -88,7 +88,8 @@ CREATE TABLE approvals (
     execution_result TEXT,
     executed_at TEXT,
     resource_details TEXT,
-    bulk_group_id TEXT
+    bulk_group_id TEXT,
+    wake_callback_url TEXT
 );`); err != nil {
 		t.Fatalf("create pre-#1286 approvals table: %v", err)
 	}

@@ -25,10 +25,7 @@ func approvalStateFlags(status string) (terminal, retryable bool) {
 
 func respondAgentApprovalStatus(w http.ResponseWriter, r *http.Request, deps *Deps, appr *db.Approval) {
 	status := resolvedApprovalStatus(*appr)
-	pushWake := false
-	if deps != nil && deps.DB != nil {
-		pushWake, _ = db.AgentHasWebhook(r.Context(), deps.DB, appr.AgentID)
-	}
+	_ = deps
 
 	switch status {
 	case "denied":
@@ -49,7 +46,7 @@ func respondAgentApprovalStatus(w http.ResponseWriter, r *http.Request, deps *De
 	}
 
 	terminal, retryable := approvalStateFlags(status)
-	resp := buildAgentApprovalStatusResponse(appr, status, terminal, retryable, pushWake)
+	resp := buildAgentApprovalStatusResponse(appr, status, terminal, retryable, approvalHasPushWakeDestination(appr))
 	RespondJSON(w, http.StatusOK, resp)
 }
 

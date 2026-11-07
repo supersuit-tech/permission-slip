@@ -256,6 +256,7 @@ export class ApiClient {
     context?: { description?: string; risk_level?: string; session_key?: string },
     payment?: { paymentMethodId?: string; amountCents?: number },
     requestId?: string,
+    callbackUrl?: string,
   ) {
     const resolvedRequestId = (requestId && requestId.trim().length > 0)
       ? requestId
@@ -270,6 +271,10 @@ export class ApiClient {
     }
     if (payment?.amountCents !== undefined) {
       body.amount_cents = payment.amountCents;
+    }
+    const trimmedCallback = callbackUrl?.trim();
+    if (trimmedCallback) {
+      body.callback_url = trimmedCallback;
     }
     return this.request<{
       approval_id?: string;
@@ -381,11 +386,10 @@ export class ApiClient {
     });
   }
 
-  /** PUT /agent/webhook — register wake webhook URL, token, and provider */
-  async setAgentWebhook(url: string, token: string, provider = "openclaw") {
+  /** PUT /agent/webhook — register wake token and provider (not a destination URL) */
+  async setAgentWebhook(token: string, provider = "openclaw") {
     return this.request<{
       configured: boolean;
-      webhook_url?: string;
       provider?: string;
       warning?: string;
       test?: {
@@ -397,27 +401,31 @@ export class ApiClient {
     }>({
       method: "PUT",
       routerPath: "/agent/webhook",
-      body: { url, token, provider },
+      body: { token, provider },
     });
   }
 
-  /** GET /agent/webhook — show webhook config; pass test=true to fire a test wake */
-  async getAgentWebhook(test = false) {
+  /** GET /agent/webhook — show token registration. Pass testUrl to fire a test wake there. */
+  async getAgentWebhook(testUrl?: string) {
+    const trimmed = testUrl?.trim();
+    const query = trimmed
+      ? `test=true&url=${encodeURIComponent(trimmed)}`
+      : undefined;
     return this.request<{
       configured: boolean;
-      webhook_url?: string;
       provider?: string;
       warning?: string;
       test?: {
         configured: boolean;
         success: boolean;
         message: string;
+        webhook_url?: string;
         latency_ms?: number;
       };
     }>({
       method: "GET",
       routerPath: "/agent/webhook",
-      query: test ? "test=true" : undefined,
+      query,
     });
   }
 

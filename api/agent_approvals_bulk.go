@@ -27,6 +27,7 @@ type bulkApprovalRequestItem struct {
 	Configuration   *agentApprovalConfigRef `json:"configuration,omitempty"`
 	PaymentMethodID string                  `json:"payment_method_id,omitempty"`
 	AmountCents     *int                    `json:"amount_cents,omitempty"`
+	CallbackURL     string                  `json:"callback_url,omitempty"`
 }
 
 type agentBulkRequestApprovalRequest struct {
@@ -70,6 +71,7 @@ type preparedBulkItem struct {
 	actionFingerprint   string
 	connectorInstanceID string
 	resourceDetails     []byte
+	wakeCallbackURL     *string
 }
 
 func RegisterAgentBulkApprovalRoutes(mux *http.ServeMux, deps *Deps) {
@@ -255,6 +257,7 @@ func handleAgentBulkRequestApproval(deps *Deps) http.HandlerFunc {
 				ResourceDetails:   item.resourceDetails,
 				ActionFingerprint: item.actionFingerprint,
 				ExpiresAt:         expiresAt,
+				WakeCallbackURL:   item.wakeCallbackURL,
 			}, item.requestID)
 			if insErr != nil {
 				var apprErr *db.ApprovalError
@@ -377,6 +380,22 @@ func prepareBulkItems(w http.ResponseWriter, r *http.Request, deps *Deps, agent 
 				TraceID(r.Context()), item.Configuration.ConfigurationID)
 		}
 
+		wakeCallbackURL, wakeURLErr := normalizeOptionalCallbackURL(item.CallbackURL)
+		if wakeURLErr != nil {
+			RespondError(w, r, http.StatusBadRequest, *wakeURLErr)
+			return nil, fmt.Errorf("invalid callback_url")
+		}
+		if wakeCallbackURL != nil {
+			if providerErr := ensureCallbackMatchesRegisteredProvider(r.Context(), deps, agent.AgentID, *wakeCallbackURL); providerErr != nil {
+				status := http.StatusBadRequest
+				if providerErr.Error.Code == ErrInternalError {
+					status = http.StatusInternalServerError
+				}
+				RespondError(w, r, status, *providerErr)
+				return nil, fmt.Errorf("invalid callback_url")
+			}
+		}
+
 		resourceDetails := resolveResourceDetailsForBulk(r.Context(), deps, agent, actionType, actionParams, connectorInstanceID)
 		contextForStore := mergeSlackContextFromResourceDetailsIntoContext(
 			mergeEmailThreadFromResourceDetailsIntoContext(item.Context, resourceDetails),
@@ -392,6 +411,7 @@ func prepareBulkItems(w http.ResponseWriter, r *http.Request, deps *Deps, agent 
 			actionFingerprint:   db.ComputeActionFingerprint(agent.AgentID, agent.ApproverID, item.Action),
 			connectorInstanceID: connectorInstanceID,
 			resourceDetails:     resourceDetails,
+			wakeCallbackURL:     wakeCallbackURL,
 		})
 	}
 	return prepared, nil

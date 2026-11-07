@@ -456,18 +456,16 @@ curl -sS -o /dev/null -w "%{http_code}\n" \
 
 Expect `200` from the server host over tailnet.
 
-### 3. Register and test
-
-From the agent settings page (**Push Wake Webhook**) or via CLI:
+### 3. Register the token and pass the URL per request
 
 ```bash
-permission-slip webhook set --url http://100.x.x.x:18789/hooks --token <your-hooks-token>
-permission-slip webhook status --test
+permission-slip webhook set --token <your-hooks-token>
+permission-slip webhook status --test --url http://100.x.x.x:18789/hooks
 ```
 
-The dashboard **Test wake** button runs the same check as `webhook status --test`.
+`webhook set` stores the token. Pass the current hooks URL on each approval with `--callback-url`, and pass the same kind of URL to `webhook status --test`. There is no webhook URL field on the agent settings page.
 
-Grok Bot uses `--provider grokbot` and a Cursor automation webhook URL instead of a private OpenClaw hooks URL. See [Grok Bot push wakes](../integrations/openclaw.md#grok-bot).
+Grok Bot uses `--provider grokbot` and sends the Cursor automation webhook URL as `--callback-url`. See [Grok Bot push wakes](../integrations/openclaw.md#grok-bot).
 
 ### 4. Heartbeat backstop
 

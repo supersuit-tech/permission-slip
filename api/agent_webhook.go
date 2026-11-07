@@ -15,7 +15,7 @@ import (
 )
 
 type setAgentWebhookRequest struct {
-	URL      string `json:"url" validate:"required"`
+	URL      string `json:"url,omitempty"`
 	Token    string `json:"token" validate:"required"`
 	Provider string `json:"provider,omitempty"`
 }
@@ -74,7 +74,11 @@ func handlePutAgentWebhook(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		resp, opErr := setAgentWebhookCore(r.Context(), deps, agent.AgentID, req.URL, req.Token, req.Provider)
+		if strings.TrimSpace(req.URL) != "" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "webhook registration stores a token, not a destination URL. Pass callback_url on each approval request."))
+			return
+		}
+		resp, opErr := setAgentWebhookCore(r.Context(), deps, agent.AgentID, req.Token, req.Provider)
 		if opErr != nil {
 			RespondError(w, r, opErr.Status, opErr.Body)
 			return
@@ -86,9 +90,13 @@ func handlePutAgentWebhook(deps *Deps) http.HandlerFunc {
 func handleGetAgentWebhook(deps *Deps) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		agent := AuthenticatedAgent(r.Context())
-		runTest := r.URL.Query().Get("test") == "true"
+		testURL, opErr := testWakeURL(r)
+		if opErr != nil {
+			RespondError(w, r, opErr.Status, opErr.Body)
+			return
+		}
 
-		resp, opErr := getAgentWebhookCore(r.Context(), deps, agent.AgentID, runTest)
+		resp, opErr := getAgentWebhookCore(r.Context(), deps, agent.AgentID, testURL)
 		if opErr != nil {
 			RespondError(w, r, opErr.Status, opErr.Body)
 			return
@@ -108,7 +116,28 @@ func handleDeleteAgentWebhook(deps *Deps) http.HandlerFunc {
 	}
 }
 
-func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL, rawToken, rawProvider string) (*agentWebhookStatusResponse, *agentWebhookOpError) {
+func testWakeURL(r *http.Request) (string, *agentWebhookOpError) {
+	runTest := r.URL.Query().Get("test") == "true"
+	rawURL := strings.TrimSpace(r.URL.Query().Get("url"))
+	if !runTest {
+		if rawURL != "" {
+			return "", &agentWebhookOpError{
+				Status: http.StatusBadRequest,
+				Body:   BadRequest(ErrInvalidRequest, "url is only accepted with test=true"),
+			}
+		}
+		return "", nil
+	}
+	if rawURL == "" {
+		return "", &agentWebhookOpError{
+			Status: http.StatusBadRequest,
+			Body:   BadRequest(ErrInvalidRequest, "url is required to send a test wake"),
+		}
+	}
+	return rawURL, nil
+}
+
+func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawToken, rawProvider string) (*agentWebhookStatusResponse, *agentWebhookOpError) {
 	if deps.Vault == nil {
 		return nil, &agentWebhookOpError{
 			Status: http.StatusServiceUnavailable,
@@ -116,7 +145,6 @@ func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL,
 		}
 	}
 
-	url := strings.TrimSpace(rawURL)
 	token := strings.TrimSpace(rawToken)
 	if token == "" {
 		return nil, &agentWebhookOpError{
@@ -129,19 +157,6 @@ func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL,
 		return nil, &agentWebhookOpError{
 			Status: http.StatusBadRequest,
 			Body:   BadRequest(ErrInvalidRequest, err.Error()),
-		}
-	}
-	if err := validateWakeWebhookURL(provider, url); err != nil {
-		var valErr *connectors.ValidationError
-		if errors.As(err, &valErr) {
-			return nil, &agentWebhookOpError{
-				Status: http.StatusBadRequest,
-				Body:   BadRequest(ErrInvalidWebhookURL, valErr.Message),
-			}
-		}
-		return nil, &agentWebhookOpError{
-			Status: http.StatusBadRequest,
-			Body:   BadRequest(ErrInvalidWebhookURL, err.Error()),
 		}
 	}
 
@@ -166,7 +181,7 @@ func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL,
 		}
 	}
 
-	if err := db.SetAgentWebhook(ctx, deps.DB, agentID, url, vaultID, provider); err != nil {
+	if err := db.SetAgentWakeCredentials(ctx, deps.DB, agentID, vaultID, provider); err != nil {
 		_ = deps.Vault.DeleteSecret(ctx, deps.DB, vaultID)
 		log.Printf("[%s] setAgentWebhookCore: update agent: %v", TraceID(ctx), err)
 		CaptureError(ctx, err)
@@ -182,24 +197,13 @@ func setAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, rawURL,
 		}
 	}
 
-	testCtx, cancel := contextWithTimeout(ctx, 15*time.Second)
-	defer cancel()
-	testResult, err := deliverAgentWakeTest(testCtx, deps, agentID)
-	if err != nil {
-		log.Printf("[%s] setAgentWebhookCore: test delivery: %v", TraceID(ctx), err)
-	}
-
-	resp := agentWebhookStatusResponse{
+	return &agentWebhookStatusResponse{
 		Configured: true,
-		WebhookURL: url,
 		Provider:   provider,
-		Test:       testResult,
-	}
-	populateWebhookSharedURLWarning(ctx, deps, &resp, agentID, url, provider)
-	return &resp, nil
+	}, nil
 }
 
-func getAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, runTest bool) (*agentWebhookStatusResponse, *agentWebhookOpError) {
+func getAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, testURL string) (*agentWebhookStatusResponse, *agentWebhookOpError) {
 	cfg, err := db.GetAgentWebhookConfig(ctx, deps.DB, agentID)
 	if err != nil {
 		log.Printf("[%s] getAgentWebhookCore: %v", TraceID(ctx), err)
@@ -211,20 +215,39 @@ func getAgentWebhookCore(ctx context.Context, deps *Deps, agentID int64, runTest
 	}
 
 	resp := agentWebhookStatusResponse{}
-	if cfg != nil && cfg.WebhookURL != nil && *cfg.WebhookURL != "" {
+	if cfg != nil && cfg.WebhookTokenVaultID != nil && *cfg.WebhookTokenVaultID != "" {
 		resp.Configured = true
-		resp.WebhookURL = *cfg.WebhookURL
 		resp.Provider = cfg.WebhookProvider
 		if resp.Provider == "" {
 			resp.Provider = agentwake.ProviderOpenClaw
 		}
-		populateWebhookSharedURLWarning(ctx, deps, &resp, agentID, *cfg.WebhookURL, resp.Provider)
 	}
 
-	if runTest {
+	if testURL != "" {
+		if !resp.Configured {
+			resp.Test = &agentWebhookTestResult{
+				Configured: false,
+				Success:    false,
+				Message:    "No wake token configured",
+			}
+			return &resp, nil
+		}
+		if err := validateWakeWebhookURL(resp.Provider, testURL); err != nil {
+			var valErr *connectors.ValidationError
+			if errors.As(err, &valErr) {
+				return nil, &agentWebhookOpError{
+					Status: http.StatusBadRequest,
+					Body:   BadRequest(ErrInvalidWebhookURL, valErr.Message),
+				}
+			}
+			return nil, &agentWebhookOpError{
+				Status: http.StatusBadRequest,
+				Body:   BadRequest(ErrInvalidWebhookURL, err.Error()),
+			}
+		}
 		testCtx, cancel := contextWithTimeout(ctx, 15*time.Second)
 		defer cancel()
-		testResult, err := deliverAgentWakeTest(testCtx, deps, agentID)
+		testResult, err := deliverAgentWakeTest(testCtx, deps, agentID, testURL)
 		if err != nil {
 			log.Printf("[%s] getAgentWebhookCore: test: %v", TraceID(ctx), err)
 			CaptureError(ctx, err)

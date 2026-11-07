@@ -1,8 +1,8 @@
 /**
  * permission-slip webhook set|status|clear
  *
- * Register a push-wake webhook (OpenClaw gateway hooks or Grok Bot Cursor webhook)
- * for server-push approval wakes.
+ * Register the wake token and provider. The destination URL is passed per
+ * approval request via --callback-url, and to a test wake via status --test --url.
  */
 
 import type { Command } from "commander";
@@ -18,15 +18,13 @@ export function webhookCommand(program: Command): void {
 
   webhookCmd
     .command("set")
-    .description("Register webhook URL and token (runs a test wake)")
-    .requiredOption("--url <url>", "OpenClaw hooks base URL, or Grok Bot https://api2.cursor.sh/automations/webhook/… URL")
+    .description("Register the wake token and provider. Pass the destination with request --callback-url.")
     .requiredOption("--token <token>", "OpenClaw hooks bearer token, or Grok Bot Authorization header value")
     .option("--provider <provider>", "Wake adapter: openclaw (default) or grokbot", "openclaw")
     .option("--server <url>", "Permission Slip server URL")
     .option("--agent-id <id>", "Agent ID")
     .option("--pretty", "Pretty-printed JSON")
     .action(async (opts: {
-      url: string;
       token: string;
       provider?: string;
       server?: string;
@@ -38,11 +36,8 @@ export function webhookCommand(program: Command): void {
         const { url: server } = requireServerUrl({ serverFlag: opts.server });
         const agentId = resolveAgentId(server, opts.agentId);
         const client = new ApiClient({ serverUrl: server, agentId });
-        const result = await client.setAgentWebhook(opts.url, opts.token, opts.provider ?? "openclaw");
+        const result = await client.setAgentWebhook(opts.token, opts.provider ?? "openclaw");
         output(result, outputOpts);
-        if (result.test && !result.test.success) {
-          process.exit(1);
-        }
       } catch (err) {
         output({ error: err instanceof Error ? err.message : String(err) }, outputOpts);
         process.exit(1);
@@ -51,23 +46,28 @@ export function webhookCommand(program: Command): void {
 
   webhookCmd
     .command("status")
-    .description("Show webhook config and optionally fire a test wake")
-    .option("--test", "Fire a test wake to verify delivery")
+    .description("Show wake token registration and optionally fire a test wake")
+    .option("--test", "Fire a test wake to the URL given by --url")
+    .option("--url <url>", "Destination for --test (current hooks base or Grok Bot webhook)")
     .option("--server <url>", "Permission Slip server URL")
     .option("--agent-id <id>", "Agent ID")
     .option("--pretty", "Pretty-printed JSON")
     .action(async (opts: {
       test?: boolean;
+      url?: string;
       server?: string;
       agentId?: string;
       pretty?: boolean;
     }) => {
       const outputOpts: OutputOptions = { pretty: opts.pretty ?? false };
       try {
+        if (opts.test && !opts.url?.trim()) {
+          throw new Error("--url is required with --test");
+        }
         const { url: server } = requireServerUrl({ serverFlag: opts.server });
         const agentId = resolveAgentId(server, opts.agentId);
         const client = new ApiClient({ serverUrl: server, agentId });
-        const result = await client.getAgentWebhook(Boolean(opts.test));
+        const result = await client.getAgentWebhook(opts.test ? opts.url : undefined);
         output(result, outputOpts);
         if (opts.test && result.test && !result.test.success) {
           process.exit(1);

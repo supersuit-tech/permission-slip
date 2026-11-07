@@ -82,7 +82,8 @@ See [Google connector README](../../connectors/google/README.md#standing-approva
 
 ```bash
 # Submit an action (auto-executes when a standing approval matches)
-permission-slip request --action email.send --params '{"to":"user@example.com","subject":"Hi"}'
+permission-slip request --action email.send --params '{"to":"user@example.com","subject":"Hi"}' \
+  --callback-url http://<host>:18789/hooks'
 
 # Heartbeat backstop — run on every OpenClaw heartbeat:
 permission-slip pending
@@ -93,13 +94,11 @@ permission-slip watch appr_xxxxxxxx --session-key <your session key>
 # After wake — fetch the outcome:
 permission-slip status appr_xxxxxxxx
 
-# One-time setup for push wakes (private tailnet URL + hooks token):
-permission-slip webhook set --url http://<host>:18789/hooks --token <token>
-# Grok Bot (public Cursor webhook — do not use the OpenClaw private-URL path):
-permission-slip webhook set --provider grokbot \
-  --url https://api2.cursor.sh/automations/webhook/<id> \
-  --token <authorization-header-value>
-permission-slip webhook status --test
+# One-time setup stores the hooks token. The wake URL is --callback-url on each request:
+permission-slip webhook set --token <token>
+# Grok Bot:
+permission-slip webhook set --provider grokbot --token <authorization-header-value>
+permission-slip webhook status --test --url http://<host>:18789/hooks
 ```
 
 ## Multiple pending approvals

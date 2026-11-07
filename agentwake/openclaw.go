@@ -46,7 +46,26 @@ func BuildOpenClawDelivery(webhookBaseURL, token string, req WakeRequest) (*Deli
 	var body []byte
 	var err error
 
-	if sk := strings.TrimSpace(req.SessionKey); sk != "" {
+	sk := strings.TrimSpace(req.SessionKey)
+	if agentPath, wakePath, exact := openClawHookPaths(base); exact {
+		if agentPath {
+			if sk == "" {
+				return nil, fmt.Errorf("session_key is required when callback_url targets /hooks/agent")
+			}
+			targetURL = base
+			body, err = json.Marshal(map[string]string{
+				"message":    message,
+				"wakeMode":   "next-heartbeat",
+				"sessionKey": sk,
+			})
+		} else if wakePath {
+			targetURL = base
+			body, err = json.Marshal(map[string]string{
+				"text": message,
+				"mode": "now",
+			})
+		}
+	} else if sk != "" {
 		targetURL = base + "/agent"
 		body, err = json.Marshal(map[string]string{
 			"message":    message,
@@ -97,4 +116,22 @@ func SessionKeyFromApprovalContext(contextJSON []byte) string {
 		return ""
 	}
 	return strings.TrimSpace(sk)
+}
+
+// openClawHookPaths reports whether webhookURL already ends with OpenClaw's
+// built-in /hooks/agent or /hooks/wake path (full callback URL mode).
+func openClawHookPaths(webhookURL string) (agentPath, wakePath, exact bool) {
+	u, err := url.Parse(webhookURL)
+	if err != nil {
+		return false, false, false
+	}
+	path := strings.TrimRight(u.EscapedPath(), "/")
+	switch {
+	case strings.HasSuffix(path, "/agent"):
+		return true, false, true
+	case strings.HasSuffix(path, "/wake"):
+		return false, true, true
+	default:
+		return false, false, false
+	}
 }

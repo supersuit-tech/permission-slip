@@ -44,6 +44,10 @@ export function requestCommand(program: Command): void {
       "OpenClaw session key for this approval; stored in context so server push wakes target the active chat",
     )
     .option(
+      "--callback-url <url>",
+      "Full push-wake callback URL for this request (OpenClaw hooks base or Grok Bot webhook). Stored on the approval and used when it resolves.",
+    )
+    .option(
       "--server <url>",
       "Permission Slip server URL — required unless PS_SERVER or config default_server is set",
     )
@@ -59,6 +63,7 @@ export function requestCommand(program: Command): void {
       description?: string;
       riskLevel?: string;
       sessionKey?: string;
+      callbackUrl?: string;
       server?: string;
       agentId?: string;
       requestId?: string;
@@ -100,6 +105,7 @@ export function requestCommand(program: Command): void {
             context,
             { paymentMethodId: opts.paymentMethodId, amountCents: opts.amountCents },
             opts.requestId,
+            opts.callbackUrl,
           );
 
         const tryRecoverConnectorInstance = async (

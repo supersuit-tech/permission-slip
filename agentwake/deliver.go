@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -85,13 +86,23 @@ func (e *httpStatusError) Error() string {
 	return fmt.Sprintf("webhook returned HTTP %d", e.code)
 }
 
+func redactURLQueryForLog(raw string) string {
+	u, err := url.Parse(raw)
+	if err != nil || u.RawQuery == "" {
+		return raw
+	}
+	u.RawQuery = "<redacted>"
+	u.Fragment = ""
+	return u.String()
+}
+
 // DeliverAsync fires delivery in a goroutine with retries; outcomes are logged.
 func DeliverAsync(logger *slog.Logger, client HTTPDoer, delivery *Delivery, logAttrs ...any) {
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
 		err := DeliverPOST(ctx, client, delivery)
-		attrs := append([]any{"url", delivery.URL}, logAttrs...)
+		attrs := append([]any{"url", redactURLQueryForLog(delivery.URL)}, logAttrs...)
 		if err != nil {
 			attrs = append(attrs, "error", err)
 			if logger != nil {

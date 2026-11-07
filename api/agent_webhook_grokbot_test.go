@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -63,13 +64,20 @@ func TestPutAgentWebhook_GrokBotAcceptsCursorURL(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := `{"provider":"grokbot","url":"` + webhookURL + `","token":"cursor-wh-key"}`
+	body := `{"provider":"grokbot","token":"cursor-wh-key"}`
 	r := signedJSONRequest(t, http.MethodPut, "/agent/webhook", body, privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	r = signedJSONRequest(t, http.MethodGet, "/agent/webhook?test=true&url="+url.QueryEscape(webhookURL), "", privKey, agentID)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("test wake: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	if gotURL != webhookURL {
 		t.Fatalf("delivered URL = %q, want as-is %q", gotURL, webhookURL)
@@ -89,7 +97,7 @@ func TestPutAgentWebhook_GrokBotAcceptsCursorURL(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	if !resp.Configured || resp.Provider != agentwake.ProviderGrokBot || resp.WebhookURL != webhookURL {
+	if !resp.Configured || resp.Provider != agentwake.ProviderGrokBot || resp.WebhookURL != "" {
 		t.Fatalf("unexpected resp: %+v", resp)
 	}
 	if resp.Test == nil || !resp.Test.Success {
@@ -109,8 +117,15 @@ func TestPutAgentWebhook_GrokBotRejectsNonCursorURL(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := `{"provider":"grokbot","url":"https://example.com/hooks","token":"secret"}`
-	r := signedJSONRequest(t, http.MethodPut, "/agent/webhook", body, privKey, agentID)
+	putBody := `{"provider":"grokbot","token":"secret"}`
+	putReq := signedJSONRequest(t, http.MethodPut, "/agent/webhook", putBody, privKey, agentID)
+	putW := httptest.NewRecorder()
+	router.ServeHTTP(putW, putReq)
+	if putW.Code != http.StatusOK {
+		t.Fatalf("token save: expected 200, got %d: %s", putW.Code, putW.Body.String())
+	}
+
+	r := signedJSONRequest(t, http.MethodGet, "/agent/webhook?test=true&url="+url.QueryEscape("https://example.com/hooks"), "", privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -138,8 +153,15 @@ func TestPutAgentWebhook_OpenClawStillRejectsCursorURL(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := `{"provider":"openclaw","url":"https://api2.cursor.sh/automations/webhook/wh_x","token":"secret"}`
-	r := signedJSONRequest(t, http.MethodPut, "/agent/webhook", body, privKey, agentID)
+	putBody := `{"provider":"openclaw","token":"secret"}`
+	putReq := signedJSONRequest(t, http.MethodPut, "/agent/webhook", putBody, privKey, agentID)
+	putW := httptest.NewRecorder()
+	router.ServeHTTP(putW, putReq)
+	if putW.Code != http.StatusOK {
+		t.Fatalf("token save: expected 200, got %d: %s", putW.Code, putW.Body.String())
+	}
+
+	r := signedJSONRequest(t, http.MethodGet, "/agent/webhook?test=true&url="+url.QueryEscape("https://api2.cursor.sh/automations/webhook/wh_x"), "", privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
@@ -160,7 +182,7 @@ func TestPutAgentWebhook_InvalidProvider(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := `{"provider":"zapier","url":"http://127.0.0.1:1/hooks","token":"secret"}`
+	body := `{"provider":"zapier","token":"secret"}`
 	r := signedJSONRequest(t, http.MethodPut, "/agent/webhook", body, privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -205,12 +227,13 @@ func TestNotifyAgentWake_GrokBotPostsExactURL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(context.Background(), tx, agentID, webhookURL, vaultID, agentwake.ProviderGrokBot); err != nil {
+	if err := db.SetAgentWakeCredentials(context.Background(), tx, agentID, vaultID, agentwake.ProviderGrokBot); err != nil {
 		t.Fatal(err)
 	}
 
 	approvalID := testhelper.GenerateID(t, "appr_")
 	testhelper.InsertApproval(t, tx, approvalID, agentID, uid)
+	testhelper.MustExec(t, tx, `UPDATE approvals SET wake_callback_url = $1 WHERE approval_id = $2`, webhookURL, approvalID)
 	appr, err := db.GetApprovalByID(context.Background(), tx, approvalID)
 	if err != nil || appr == nil {
 		t.Fatalf("GetApprovalByID: %v", err)
@@ -252,8 +275,7 @@ func TestGetAgentWebhook_ReturnsProvider(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	url := "https://api2.cursor.sh/automations/webhook/wh_get"
-	if err := db.SetAgentWebhook(context.Background(), tx, agentID, url, vaultID, agentwake.ProviderGrokBot); err != nil {
+	if err := db.SetAgentWakeCredentials(context.Background(), tx, agentID, vaultID, agentwake.ProviderGrokBot); err != nil {
 		t.Fatal(err)
 	}
 
@@ -270,7 +292,7 @@ func TestGetAgentWebhook_ReturnsProvider(t *testing.T) {
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
 	}
-	if !resp.Configured || resp.Provider != agentwake.ProviderGrokBot || resp.WebhookURL != url {
+	if !resp.Configured || resp.Provider != agentwake.ProviderGrokBot || resp.WebhookURL != "" {
 		t.Fatalf("resp = %+v", resp)
 	}
 }
