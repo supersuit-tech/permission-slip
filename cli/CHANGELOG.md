@@ -6,6 +6,17 @@ about new capabilities since their last use.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Added
+
+- **`permission-slip request --callback-url`** — full push-wake URL for that approval only. The server stores it and uses it when the approval resolves, including retries.
+
+### Changed
+
+- **`permission-slip webhook set`** stores the wake token and `--provider` only. It no longer takes `--url`.
+- **`permission-slip webhook status --test`** requires `--url` for the destination to test. Approval wakes are not sent to a URL saved on the agent.
+
 ## [0.1.27] - 2026-09-03
 
 ### Added

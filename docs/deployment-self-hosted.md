@@ -536,15 +536,15 @@ Expect `200`. Non-2xx means fix tailnet routing, gateway listen address, or toke
 
 ### 3. Register the wake token and send the URL per request
 
-`webhook set` stores the hooks token. Approval wakes go to the `callback_url` on each request, not to the URL saved here.
+`webhook set` stores the hooks token only. Approval wakes go to the `callback_url` on each request.
 
 ```bash
-permission-slip webhook set \
-  --url http://100.x.x.x:18789/hooks \
-  --token <your-hooks-token>
+permission-slip webhook set --token <your-hooks-token>
 
 permission-slip request --action email.send --params '{...}' \
   --callback-url http://100.x.x.x:18789/hooks
+
+permission-slip webhook status --test --url http://100.x.x.x:18789/hooks
 ```
 
 `callback_url` must be a private or tailnet address for OpenClaw.
@@ -553,11 +553,7 @@ For a **Grok Bot** agent, pass `--provider grokbot` on `webhook set` and send th
 
 ### 4. Verify end-to-end
 
-Run:
-
-```bash
-permission-slip webhook status --test
-```
+Run the `webhook status --test --url …` command from the previous step.
 
 Success means the server reached your gateway and the test wake was accepted. If this fails, re-check step 2 from the server host.
 

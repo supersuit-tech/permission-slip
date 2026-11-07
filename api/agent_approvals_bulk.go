@@ -71,7 +71,7 @@ type preparedBulkItem struct {
 	actionFingerprint   string
 	connectorInstanceID string
 	resourceDetails     []byte
-	wakeCallbackURL    *string
+	wakeCallbackURL     *string
 }
 
 func RegisterAgentBulkApprovalRoutes(mux *http.ServeMux, deps *Deps) {
@@ -385,6 +385,16 @@ func prepareBulkItems(w http.ResponseWriter, r *http.Request, deps *Deps, agent 
 			RespondError(w, r, http.StatusBadRequest, *wakeURLErr)
 			return nil, fmt.Errorf("invalid callback_url")
 		}
+		if wakeCallbackURL != nil {
+			if providerErr := ensureCallbackMatchesRegisteredProvider(r.Context(), deps, agent.AgentID, *wakeCallbackURL); providerErr != nil {
+				status := http.StatusBadRequest
+				if providerErr.Error.Code == ErrInternalError {
+					status = http.StatusInternalServerError
+				}
+				RespondError(w, r, status, *providerErr)
+				return nil, fmt.Errorf("invalid callback_url")
+			}
+		}
 
 		resourceDetails := resolveResourceDetailsForBulk(r.Context(), deps, agent, actionType, actionParams, connectorInstanceID)
 		contextForStore := mergeSlackContextFromResourceDetailsIntoContext(
@@ -401,7 +411,7 @@ func prepareBulkItems(w http.ResponseWriter, r *http.Request, deps *Deps, agent 
 			actionFingerprint:   db.ComputeActionFingerprint(agent.AgentID, agent.ApproverID, item.Action),
 			connectorInstanceID: connectorInstanceID,
 			resourceDetails:     resourceDetails,
-			wakeCallbackURL:    wakeCallbackURL,
+			wakeCallbackURL:     wakeCallbackURL,
 		})
 	}
 	return prepared, nil

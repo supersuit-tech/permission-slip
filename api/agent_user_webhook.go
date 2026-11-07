@@ -3,6 +3,7 @@ package api
 import (
 	"log"
 	"net/http"
+	"strings"
 )
 
 func init() {
@@ -37,7 +38,11 @@ func handlePutAgentWebhookForUser(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		resp, opErr := setAgentWebhookCore(r.Context(), deps, agentID, req.URL, req.Token, req.Provider)
+		if strings.TrimSpace(req.URL) != "" {
+			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "webhook registration stores a token, not a destination URL. Pass callback_url on each approval request."))
+			return
+		}
+		resp, opErr := setAgentWebhookCore(r.Context(), deps, agentID, req.Token, req.Provider)
 		if opErr != nil {
 			RespondError(w, r, opErr.Status, opErr.Body)
 			return
@@ -58,8 +63,12 @@ func handleGetAgentWebhookForUser(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		runTest := r.URL.Query().Get("test") == "true"
-		resp, opErr := getAgentWebhookCore(r.Context(), deps, agentID, runTest)
+		testURL, opErr := testWakeURL(r)
+		if opErr != nil {
+			RespondError(w, r, opErr.Status, opErr.Body)
+			return
+		}
+		resp, opErr := getAgentWebhookCore(r.Context(), deps, agentID, testURL)
 		if opErr != nil {
 			log.Printf("[%s] GetAgentWebhookForUser: %v", TraceID(r.Context()), opErr)
 			RespondError(w, r, opErr.Status, opErr.Body)

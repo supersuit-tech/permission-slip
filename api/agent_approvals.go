@@ -136,6 +136,16 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			RespondError(w, r, http.StatusBadRequest, *wakeURLErr)
 			return
 		}
+		if wakeCallbackURL != nil {
+			if providerErr := ensureCallbackMatchesRegisteredProvider(r.Context(), deps, agent.AgentID, *wakeCallbackURL); providerErr != nil {
+				status := http.StatusBadRequest
+				if providerErr.Error.Code == ErrInternalError {
+					status = http.StatusInternalServerError
+				}
+				RespondError(w, r, status, *providerErr)
+				return
+			}
+		}
 
 		// Validate action has a "type" field.
 		var actionObj map[string]json.RawMessage

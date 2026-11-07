@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 	"time"
 
@@ -26,9 +27,16 @@ func TestPutAgentWebhook_RejectsPublicURL(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := `{"url":"http://8.8.8.8/hooks","token":"secret"}`
+	body := `{"token":"secret"}`
 	r := signedJSONRequest(t, http.MethodPut, "/agent/webhook", body, privKey, agentID)
 	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected token save 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	r = signedJSONRequest(t, http.MethodGet, "/agent/webhook?test=true&url="+url.QueryEscape("http://8.8.8.8/hooks"), "", privKey, agentID)
+	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusBadRequest {
@@ -69,13 +77,20 @@ func TestPutAgentWebhook_SuccessWithTestDelivery(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := `{"url":"` + hookSrv.URL + `/hooks","token":"hook-secret"}`
+	body := `{"token":"hook-secret"}`
 	r := signedJSONRequest(t, http.MethodPut, "/agent/webhook", body, privKey, agentID)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	r = signedJSONRequest(t, http.MethodGet, "/agent/webhook?test=true&url="+url.QueryEscape(hookSrv.URL+"/hooks"), "", privKey, agentID)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("test wake: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	if receivedAuth != "Bearer hook-secret" {
 		t.Fatalf("Authorization = %q", receivedAuth)
@@ -120,7 +135,7 @@ func TestNotifyAgentWake_DispatchesToHooks(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(context.Background(), tx, agentID, hookSrv.URL+"/hooks", vaultID, "openclaw"); err != nil {
+	if err := db.SetAgentWakeCredentials(context.Background(), tx, agentID, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -173,14 +188,14 @@ func TestAgentWebhook_SharedURLWarning(t *testing.T) {
 		t.Fatal(err)
 	}
 	sharedURL := hookSrv.URL + "/hooks"
-	if err := db.SetAgentWebhook(context.Background(), tx, agent1, sharedURL, vaultID, "openclaw"); err != nil {
+	if err := db.SetAgentWakeCredentials(context.Background(), tx, agent1, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	putBody := `{"url":"` + sharedURL + `/","token":"hook-secret-2"}`
+	putBody := `{"token":"hook-secret-2"}`
 	putReq := signedJSONRequest(t, http.MethodPut, "/agent/webhook", putBody, privKey2, agent2)
 	putW := httptest.NewRecorder()
 	router.ServeHTTP(putW, putReq)
@@ -192,8 +207,8 @@ func TestAgentWebhook_SharedURLWarning(t *testing.T) {
 	if err := json.Unmarshal(putW.Body.Bytes(), &putResp); err != nil {
 		t.Fatal(err)
 	}
-	if putResp.Warning != agentWebhookSharedURLWarning {
-		t.Fatalf("PUT warning = %q, want %q", putResp.Warning, agentWebhookSharedURLWarning)
+	if putResp.Warning != "" || putResp.WebhookURL != "" {
+		t.Fatalf("token registration must not store a URL or shared-URL warning, got %+v", putResp)
 	}
 
 	getReq := signedJSONRequest(t, http.MethodGet, "/agent/webhook", "", privKey2, agent2)
@@ -207,8 +222,8 @@ func TestAgentWebhook_SharedURLWarning(t *testing.T) {
 	if err := json.Unmarshal(getW.Body.Bytes(), &getResp); err != nil {
 		t.Fatal(err)
 	}
-	if getResp.Warning != agentWebhookSharedURLWarning {
-		t.Fatalf("GET warning = %q, want %q", getResp.Warning, agentWebhookSharedURLWarning)
+	if getResp.Warning != "" || getResp.WebhookURL != "" {
+		t.Fatalf("status must not return a destination URL, got %+v", getResp)
 	}
 }
 
@@ -236,14 +251,14 @@ func TestAgentWebhook_UniqueURLNoWarning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(context.Background(), tx, agent1, hookSrv.URL+"/hooks-a", vaultID, "openclaw"); err != nil {
+	if err := db.SetAgentWakeCredentials(context.Background(), tx, agent1, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	putBody := `{"url":"` + hookSrv.URL + `/hooks-b","token":"hook-secret-2"}`
+	putBody := `{"token":"hook-secret-2"}`
 	putReq := signedJSONRequest(t, http.MethodPut, "/agent/webhook", putBody, privKey2, agent2)
 	putW := httptest.NewRecorder()
 	router.ServeHTTP(putW, putReq)

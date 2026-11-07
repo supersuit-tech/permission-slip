@@ -48,11 +48,13 @@ sequenceDiagram
 ## Setup
 
 1. Install and register the CLI per [agents.md](../agents.md).
-2. **Push wakes:** enable OpenClaw gateway hooks. The agent sends its current hooks URL on each approval request (`--callback-url`). Register the hooks **token** once so Permission Slip can authenticate the POST:
+2. **Push wakes:** enable OpenClaw gateway hooks. Register the hooks **token** once, and pass the current hooks URL on every approval request:
    ```bash
-   permission-slip webhook set --url http://127.0.0.1:18789/hooks --token <hooks-token>
+   permission-slip webhook set --token <hooks-token>
+   permission-slip request --action email.send --params '{...}' \
+     --callback-url "http://my-host.tailnet:18789/hooks"
    ```
-   The URL stored by `webhook set` is not used as the wake destination. Pass the reachable URL on `request`. Grok Bot uses the same token registration with `--provider grokbot` — see [Grok Bot](#grok-bot).
+   Grok Bot uses `--provider grokbot` — see [Grok Bot](#grok-bot).
 3. **Heartbeat backstop:** ensure OpenClaw heartbeat is enabled; the skill instructs running `permission-slip pending` each beat.
 4. **Watcher fallback:** when a request omits `callback_url`, pending `request` / `status` output still includes `wait_hint` + `wait_command` for `permission-slip watch`.
 
@@ -67,7 +69,7 @@ permission-slip request --action email.send --params '{...}' \
   --callback-url "http://my-host.tailnet:18789/hooks"
 ```
 
-`webhook set` stores the bearer token (and provider) used on that POST. It does not choose where the wake is sent.
+`webhook set --token` stores the bearer token and provider. It does not take a destination URL.
 
 For **OpenClaw**, `callback_url` must resolve to a **private** address (RFC1918, Tailscale `100.64.0.0/10`, or loopback).
 
@@ -211,11 +213,11 @@ Grok Bot agents need the same two layers as OpenClaw: **push wake** (this page) 
 
    ```bash
    permission-slip webhook set --provider grokbot \
-     --url https://api2.cursor.sh/automations/webhook/<id> \
      --token <authorization-header-value>
    ```
 
-   Pass that same Cursor webhook URL as `--callback-url` on each `permission-slip request`.
+   Pass the Cursor webhook URL as `--callback-url` on each `permission-slip request`.
+   Test delivery with `permission-slip webhook status --test --url https://api2.cursor.sh/automations/webhook/<id>`.
 
 3. On approval resolution the server POSTs **to that request's `callback_url` as-is** with:
 

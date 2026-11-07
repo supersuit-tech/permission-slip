@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"testing"
 
 	"github.com/supersuit-tech/permission-slip/db"
@@ -99,13 +100,20 @@ func TestPutAgentWebhookForUser_HappyPath(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := []byte(fmt.Sprintf(`{"url":"%s/hooks","token":"hook-secret"}`, hookSrv.URL))
+	body := []byte(`{"token":"hook-secret"}`)
 	r := authenticatedRequestWithBody(t, http.MethodPut, fmt.Sprintf("/agents/%d/webhook", agentID), uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	r = authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/webhook?test=true&url=%s", agentID, url.QueryEscape(hookSrv.URL+"/hooks")), uid)
+	w = httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("test wake: expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 	if receivedAuth != "Bearer hook-secret" {
 		t.Fatalf("Authorization = %q", receivedAuth)
@@ -131,9 +139,16 @@ func TestPutAgentWebhookForUser_InvalidPublicURL(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := []byte(`{"url":"http://8.8.8.8/hooks","token":"secret"}`)
+	body := []byte(`{"token":"secret"}`)
 	r := authenticatedRequestWithBody(t, http.MethodPut, fmt.Sprintf("/agents/%d/webhook", agentID), uid, body)
 	w := httptest.NewRecorder()
+	router.ServeHTTP(w, r)
+	if w.Code != http.StatusOK {
+		t.Fatalf("token save: expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+
+	r = authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/webhook?test=true&url=%s", agentID, url.QueryEscape("http://8.8.8.8/hooks")), uid)
+	w = httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 
 	if w.Code != http.StatusBadRequest {
@@ -157,7 +172,7 @@ func TestPutAgentWebhookForUser_VaultUnavailable(t *testing.T) {
 	deps := &Deps{DB: tx, Vault: nil, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	body := []byte(`{"url":"http://127.0.0.1:1/hooks","token":"secret"}`)
+	body := []byte(`{"token":"secret"}`)
 	r := authenticatedRequestWithBody(t, http.MethodPut, fmt.Sprintf("/agents/%d/webhook", agentID), uid, body)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
@@ -179,7 +194,7 @@ func TestDeleteAgentWebhookForUser(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(ctx, tx, agentID, "http://127.0.0.1:1/hooks", vaultID, "openclaw"); err != nil {
+	if err := db.SetAgentWakeCredentials(ctx, tx, agentID, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -232,14 +247,14 @@ func TestGetAgentWebhookForUser_TestWake(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(ctx, tx, agentID, hookSrv.URL+"/hooks", vaultID, "openclaw"); err != nil {
+	if err := db.SetAgentWakeCredentials(ctx, tx, agentID, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
 	deps := &Deps{DB: tx, Vault: mockVault, JWTSigningSecret: testJWTSecret}
 	router := NewRouter(deps)
 
-	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/webhook?test=true", agentID), uid)
+	r := authenticatedRequest(t, http.MethodGet, fmt.Sprintf("/agents/%d/webhook?test=true&url=%s", agentID, url.QueryEscape(hookSrv.URL+"/hooks")), uid)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, r)
 

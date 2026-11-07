@@ -15,15 +15,18 @@ func TestAgentWebhook_ProviderRoundTrip(t *testing.T) {
 	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
 	agentID := testhelper.InsertAgentWithStatus(t, tx, uid, "registered")
 
-	if err := db.SetAgentWebhook(ctx, tx, agentID, "https://api2.cursor.sh/automations/webhook/wh_x", "vault-1", "grokbot"); err != nil {
+	if err := db.SetAgentWakeCredentials(ctx, tx, agentID, "vault-1", "grokbot"); err != nil {
 		t.Fatal(err)
 	}
 	cfg, err := db.GetAgentWebhookConfig(ctx, tx, agentID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg == nil || cfg.WebhookURL == nil || *cfg.WebhookURL == "" {
-		t.Fatal("expected webhook url")
+	if cfg == nil || cfg.WebhookTokenVaultID == nil || *cfg.WebhookTokenVaultID != "vault-1" {
+		t.Fatal("expected wake token vault id")
+	}
+	if cfg.WebhookURL != nil {
+		t.Fatal("wake registration must not store a destination URL")
 	}
 	if cfg.WebhookProvider != "grokbot" {
 		t.Fatalf("provider = %q", cfg.WebhookProvider)

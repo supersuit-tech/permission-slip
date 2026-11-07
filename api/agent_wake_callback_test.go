@@ -44,7 +44,7 @@ func TestRequestApproval_WithCallbackURL_StoresAndWakesPerRequest(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := db.SetAgentWebhook(context.Background(), tx, agentID, defaultSrv.URL+"/hooks", vaultID, "openclaw"); err != nil {
+	if err := db.SetAgentWakeCredentials(context.Background(), tx, agentID, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -112,7 +112,7 @@ func TestRequestApproval_CallbackURLWithoutRegisteredWebhook(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Register token only — no default callback URL (simulates hostname-only preregistration removal).
-	if err := db.SetAgentWebhook(context.Background(), tx, agentID, hookSrv.URL+"/hooks", vaultID, "openclaw"); err != nil {
+	if err := db.SetAgentWakeCredentials(context.Background(), tx, agentID, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 	testhelper.MustExec(t, tx, `UPDATE agents SET webhook_url = NULL WHERE agent_id = $1`, agentID)
@@ -198,7 +198,7 @@ func TestRequestApproval_DelayedWakeUsesStoredCallbackURL(t *testing.T) {
 		t.Fatal(err)
 	}
 	storedCallback := hookSrv.URL + "/hooks"
-	if err := db.SetAgentWebhook(context.Background(), tx, agentID, "http://127.0.0.1:9/hooks", vaultID, "openclaw"); err != nil {
+	if err := db.SetAgentWakeCredentials(context.Background(), tx, agentID, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
 

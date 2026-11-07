@@ -459,11 +459,11 @@ Expect `200` from the server host over tailnet.
 ### 3. Register the token and pass the URL per request
 
 ```bash
-permission-slip webhook set --url http://100.x.x.x:18789/hooks --token <your-hooks-token>
-permission-slip webhook status --test
+permission-slip webhook set --token <your-hooks-token>
+permission-slip webhook status --test --url http://100.x.x.x:18789/hooks
 ```
 
-`webhook set` stores the token. Pass the current hooks URL on each approval with `--callback-url`. There is no webhook URL field on the agent settings page.
+`webhook set` stores the token. Pass the current hooks URL on each approval with `--callback-url`, and pass the same kind of URL to `webhook status --test`. There is no webhook URL field on the agent settings page.
 
 Grok Bot uses `--provider grokbot` and sends the Cursor automation webhook URL as `--callback-url`. See [Grok Bot push wakes](../integrations/openclaw.md#grok-bot).
 

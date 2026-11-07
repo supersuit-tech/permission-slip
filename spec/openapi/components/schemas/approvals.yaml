@@ -90,7 +90,8 @@ ApprovalRequest:
         RFC1918, or loopback). Grok Bot URLs must be
         `https://api2.cursor.sh/automations/webhook/…`.
         The URL is stored on the approval and used for delayed resolution and retries.
-        The Authorization header still uses the agent's registered webhook token when one is set.
+        The Authorization header uses the token registered with `PUT /agent/webhook`.
+        That registration does not store a destination URL.
       example: "http://my-host.tailnet:18789/hooks"
 
   example:

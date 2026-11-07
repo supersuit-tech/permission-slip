@@ -56,19 +56,23 @@ func notifyAgentWake(deps *Deps, appr *db.Approval, status string) {
 }
 
 // deliverAgentWakeTest sends a test wake synchronously and returns the delivery result.
-func deliverAgentWakeTest(ctx context.Context, deps *Deps, agentID int64) (*agentWebhookTestResult, error) {
+func deliverAgentWakeTest(ctx context.Context, deps *Deps, agentID int64, rawURL string) (*agentWebhookTestResult, error) {
 	cfg, token, err := loadAgentWakeCredentials(ctx, deps, agentID)
 	if err != nil {
 		return nil, err
 	}
-	if cfg == nil || cfg.WebhookURL == nil || *cfg.WebhookURL == "" {
+	if cfg == nil || cfg.WebhookTokenVaultID == nil || *cfg.WebhookTokenVaultID == "" {
 		return &agentWebhookTestResult{
 			Configured: false,
 			Success:    false,
-			Message:    "No webhook configured",
+			Message:    "No wake token configured",
 		}, nil
 	}
-	delivery, err := agentwake.BuildTestDelivery(cfg.WebhookProvider, *cfg.WebhookURL, token, agentID)
+	provider := cfg.WebhookProvider
+	if provider == "" {
+		provider = agentwake.ProviderOpenClaw
+	}
+	delivery, err := agentwake.BuildTestDelivery(provider, rawURL, token, agentID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +80,7 @@ func deliverAgentWakeTest(ctx context.Context, deps *Deps, agentID int64) (*agen
 	err = agentwake.DeliverPOST(ctx, agentWakeHTTPClient, delivery)
 	result := &agentWebhookTestResult{
 		Configured: true,
-		WebhookURL: *cfg.WebhookURL,
+		WebhookURL: rawURL,
 	}
 	if err != nil {
 		result.Success = false
@@ -111,13 +115,16 @@ func buildAgentWakeDelivery(ctx context.Context, deps *Deps, appr *db.Approval, 
 		return nil, nil
 	}
 
-	_, token, err := loadAgentWakeCredentials(ctx, deps, appr.AgentID)
+	cfg, token, err := loadAgentWakeCredentials(ctx, deps, appr.AgentID)
 	if err != nil {
 		if deps.Logger != nil {
 			deps.Logger.Warn("agent wake: load credentials failed",
 				slog.Int64("agent_id", appr.AgentID), slog.String("error", err.Error()))
 		}
 		return nil, err
+	}
+	if cfg != nil && cfg.WebhookTokenVaultID != nil && *cfg.WebhookTokenVaultID != "" && cfg.WebhookProvider != "" {
+		provider = cfg.WebhookProvider
 	}
 
 	return agentwake.BuildDelivery(provider, webhookURL, token, agentwake.WakeRequest{
