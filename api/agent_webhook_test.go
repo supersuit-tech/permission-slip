@@ -187,7 +187,6 @@ func TestAgentWebhook_SharedURLWarning(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	sharedURL := hookSrv.URL + "/hooks"
 	if err := db.SetAgentWakeCredentials(context.Background(), tx, agent1, vaultID, "openclaw"); err != nil {
 		t.Fatal(err)
 	}
