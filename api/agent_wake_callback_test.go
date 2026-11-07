@@ -180,9 +180,9 @@ func TestRequestApproval_DelayedWakeUsesStoredCallbackURL(t *testing.T) {
 	pubKeySSH, _, _ := GenerateEd25519OpenSSHKey()
 	agentID := testhelper.InsertAgentWithPublicKey(t, tx, uid, "registered", pubKeySSH)
 
-	var receivedURL string
+	var receivedPath string
 	hookSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		receivedURL = r.URL.String()
+		receivedPath = r.URL.Path
 		_, _ = io.Copy(io.Discard, r.Body)
 		w.WriteHeader(http.StatusOK)
 	}))
@@ -217,10 +217,10 @@ func TestRequestApproval_DelayedWakeUsesStoredCallbackURL(t *testing.T) {
 	NotifyAgentApprovalResolvedSync(deps, appr)
 
 	deadline := time.Now().Add(5 * time.Second)
-	for receivedURL == "" && time.Now().Before(deadline) {
+	for receivedPath == "" && time.Now().Before(deadline) {
 		time.Sleep(50 * time.Millisecond)
 	}
-	if receivedURL != "/wake" {
-		t.Fatalf("wake path = %q, want /wake", receivedURL)
+	if receivedPath != "/hooks/wake" {
+		t.Fatalf("wake path = %q, want /hooks/wake", receivedPath)
 	}
 }
