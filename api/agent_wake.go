@@ -4,6 +4,7 @@ import (
 	"context"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/supersuit-tech/permission-slip/agentwake"
@@ -11,7 +12,13 @@ import (
 )
 
 // agentWakeHTTPClient is used for outbound wake webhooks to private agent networks.
-var agentWakeHTTPClient = &http.Client{Timeout: 10 * time.Second}
+// Redirects are not followed — the destination URL must be the final POST target.
+var agentWakeHTTPClient = &http.Client{
+	Timeout: 10 * time.Second,
+	CheckRedirect: func(req *http.Request, via []*http.Request) error {
+		return http.ErrUseLastResponse
+	},
+}
 
 // notifyAgentApprovalResolved POSTs a wake to the agent's configured provider
 // when a webhook is set. Fire-and-forget with retries; no-op when webhook is not set.
@@ -25,21 +32,24 @@ func NotifyAgentApprovalResolvedSync(deps *Deps, appr *db.Approval) {
 		return
 	}
 	status := resolvedApprovalStatus(*appr)
-	notifyAgentWake(deps, appr.AgentID, appr.ApprovalID, status, appr.Context)
+	notifyAgentWake(deps, appr, status)
 }
 
 // notifyAgentWake delivers a wake for the given approval outcome.
-func notifyAgentWake(deps *Deps, agentID int64, approvalID, status string, contextJSON []byte) {
+func notifyAgentWake(deps *Deps, appr *db.Approval, status string) {
+	if appr == nil {
+		return
+	}
 	go func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 		defer cancel()
-		delivery, err := buildAgentWakeDelivery(ctx, deps, agentID, approvalID, status, contextJSON)
+		delivery, err := buildAgentWakeDelivery(ctx, deps, appr, status)
 		if err != nil || delivery == nil {
 			return
 		}
 		agentwake.DeliverAsync(deps.Logger, agentWakeHTTPClient, delivery,
-			slog.Int64("agent_id", agentID),
-			slog.String("approval_id", approvalID),
+			slog.Int64("agent_id", appr.AgentID),
+			slog.String("approval_id", appr.ApprovalID),
 			slog.String("status", status),
 		)
 	}()
@@ -79,24 +89,68 @@ func deliverAgentWakeTest(ctx context.Context, deps *Deps, agentID int64) (*agen
 	return result, nil
 }
 
-func buildAgentWakeDelivery(ctx context.Context, deps *Deps, agentID int64, approvalID, status string, contextJSON []byte) (*agentwake.Delivery, error) {
-	cfg, token, err := loadAgentWakeCredentials(ctx, deps, agentID)
+func buildAgentWakeDelivery(ctx context.Context, deps *Deps, appr *db.Approval, status string) (*agentwake.Delivery, error) {
+	if appr == nil {
+		return nil, nil
+	}
+
+	webhookURL, provider, err := resolveApprovalWakeTarget(appr)
 	if err != nil {
 		if deps.Logger != nil {
-			deps.Logger.Warn("agent wake: load credentials failed",
-				slog.Int64("agent_id", agentID), slog.String("error", err.Error()))
+			deps.Logger.Warn("agent wake: resolve target failed",
+				slog.Int64("agent_id", appr.AgentID),
+				slog.String("approval_id", appr.ApprovalID),
+				slog.String("error", err.Error()))
 		}
 		return nil, err
 	}
-	if cfg == nil || cfg.WebhookURL == nil || *cfg.WebhookURL == "" {
+
+	cfg, token, err := loadAgentWakeCredentials(ctx, deps, appr.AgentID)
+	if err != nil {
+		if deps.Logger != nil {
+			deps.Logger.Warn("agent wake: load credentials failed",
+				slog.Int64("agent_id", appr.AgentID), slog.String("error", err.Error()))
+		}
+		return nil, err
+	}
+
+	if webhookURL == "" {
+		if cfg == nil || cfg.WebhookURL == nil || *cfg.WebhookURL == "" {
+			return nil, nil
+		}
+		webhookURL = *cfg.WebhookURL
+		provider = cfg.WebhookProvider
+		if provider == "" {
+			provider = agentwake.ProviderOpenClaw
+		}
+	}
+
+	if strings.TrimSpace(webhookURL) == "" {
 		return nil, nil
 	}
-	return agentwake.BuildDelivery(cfg.WebhookProvider, *cfg.WebhookURL, token, agentwake.WakeRequest{
-		ApprovalID: approvalID,
+
+	return agentwake.BuildDelivery(provider, webhookURL, token, agentwake.WakeRequest{
+		ApprovalID: appr.ApprovalID,
 		Status:     status,
-		SessionKey: agentwake.SessionKeyFromApprovalContext(contextJSON),
-		AgentID:    agentID,
+		SessionKey: agentwake.SessionKeyFromApprovalContext(appr.Context),
+		AgentID:    appr.AgentID,
 	})
+}
+
+// resolveApprovalWakeTarget returns the per-request callback URL when set on the approval.
+func resolveApprovalWakeTarget(appr *db.Approval) (webhookURL, provider string, err error) {
+	if appr.WakeCallbackURL == nil {
+		return "", "", nil
+	}
+	url := strings.TrimSpace(*appr.WakeCallbackURL)
+	if url == "" {
+		return "", "", nil
+	}
+	provider, err = agentwake.InferProviderFromCallbackURL(url)
+	if err != nil {
+		return "", "", err
+	}
+	return url, provider, nil
 }
 
 func loadAgentWakeCredentials(ctx context.Context, deps *Deps, agentID int64) (*db.AgentWebhookConfig, string, error) {
@@ -104,10 +158,7 @@ func loadAgentWakeCredentials(ctx context.Context, deps *Deps, agentID int64) (*
 	if err != nil {
 		return nil, "", err
 	}
-	if cfg == nil || cfg.WebhookURL == nil || *cfg.WebhookURL == "" {
-		return cfg, "", nil
-	}
-	if deps.Vault == nil || cfg.WebhookTokenVaultID == nil || *cfg.WebhookTokenVaultID == "" {
+	if deps.Vault == nil || cfg == nil || cfg.WebhookTokenVaultID == nil || *cfg.WebhookTokenVaultID == "" {
 		return cfg, "", nil
 	}
 	secret, err := deps.Vault.ReadSecret(ctx, deps.DB, *cfg.WebhookTokenVaultID)

@@ -79,6 +79,19 @@ ApprovalRequest:
         limits configured on the payment method.
       example: 9900
 
+    callback_url:
+      type: string
+      maxLength: 2048
+      format: uri
+      description: |
+        Optional full push-wake callback URL for **this request only**. When set, resolution
+        wakes POST to this destination instead of the agent's registered webhook URL.
+        OpenClaw URLs must target a private network (Tailscale, RFC1918, or loopback);
+        Grok Bot URLs must be `https://api2.cursor.sh/automations/webhook/…`.
+        The URL is stored on the approval and used for delayed resolution and retries.
+        Webhook authentication still uses the agent's registered webhook token when configured.
+      example: "http://my-host.tailnet:18789/hooks"
+
   example:
     agent_id: 42
     request_id: "a925fbe0-db83-4969-9dc5-27f40385f12c"
@@ -579,6 +592,13 @@ BulkApprovalRequestItem:
           type: string
           pattern: '^ac_[a-f0-9]{32}$'
           maxLength: 36
+    callback_url:
+      type: string
+      maxLength: 2048
+      format: uri
+      description: |
+        Optional per-item push-wake callback URL. Same semantics as `callback_url` on
+        `POST /v1/approvals/request`.
 
 BulkApprovalRequest:
   type: object

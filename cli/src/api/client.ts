@@ -256,6 +256,7 @@ export class ApiClient {
     context?: { description?: string; risk_level?: string; session_key?: string },
     payment?: { paymentMethodId?: string; amountCents?: number },
     requestId?: string,
+    callbackUrl?: string,
   ) {
     const resolvedRequestId = (requestId && requestId.trim().length > 0)
       ? requestId
@@ -270,6 +271,10 @@ export class ApiClient {
     }
     if (payment?.amountCents !== undefined) {
       body.amount_cents = payment.amountCents;
+    }
+    const trimmedCallback = callbackUrl?.trim();
+    if (trimmedCallback) {
+      body.callback_url = trimmedCallback;
     }
     return this.request<{
       approval_id?: string;

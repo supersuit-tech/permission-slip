@@ -49,7 +49,7 @@ func respondAgentApprovalStatus(w http.ResponseWriter, r *http.Request, deps *De
 	}
 
 	terminal, retryable := approvalStateFlags(status)
-	resp := buildAgentApprovalStatusResponse(appr, status, terminal, retryable, pushWake)
+	resp := buildAgentApprovalStatusResponse(appr, status, terminal, retryable, approvalHasPushWakeDestination(appr, pushWake))
 	RespondJSON(w, http.StatusOK, resp)
 }
 

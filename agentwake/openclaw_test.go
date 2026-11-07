@@ -98,6 +98,20 @@ func TestWakeDeliveryFromStoredApprovalContext(t *testing.T) {
 	}
 }
 
+func TestBuildOpenClawDelivery_FullCallbackWakePath(t *testing.T) {
+	full := "http://100.64.0.8:18789/hooks/wake"
+	d, err := BuildOpenClawDelivery(full, "secret", WakeRequest{
+		ApprovalID: "appr_full",
+		Status:     "approved",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if d.URL != full {
+		t.Fatalf("URL = %q, want exact callback path", d.URL)
+	}
+}
+
 func TestWakeMessage_Expired(t *testing.T) {
 	msg := WakeMessage("appr_1", "expired")
 	if !strings.Contains(msg, "expired unanswered") {

@@ -25,6 +25,7 @@ type agentRequestApprovalRequest struct {
 	Configuration   *agentApprovalConfigRef `json:"configuration,omitempty"`
 	PaymentMethodID string                  `json:"payment_method_id,omitempty"`
 	AmountCents     *int                    `json:"amount_cents,omitempty"`
+	CallbackURL     string                  `json:"callback_url,omitempty"`
 }
 
 type agentApprovalConfigRef struct {
@@ -49,7 +50,7 @@ type agentRequestApprovalResponse struct {
 	// retryable is false for all approval outcomes — agents must not blindly re-request.
 	Retryable bool `json:"retryable"`
 
-	// push_wake_configured is true when the agent has registered an OpenClaw gateway webhook.
+	// push_wake_configured is true when a push wake destination exists (per-request callback_url and/or registered webhook).
 	PushWakeConfigured bool `json:"push_wake_configured,omitempty"`
 
 	// ── Auto-approved fields (status="approved") ──
@@ -127,6 +128,12 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 		}
 		if len(req.Context) > maxApprovalContextJSONBytes {
 			RespondError(w, r, http.StatusBadRequest, BadRequest(ErrInvalidRequest, "context exceeds maximum size"))
+			return
+		}
+
+		wakeCallbackURL, wakeURLErr := normalizeOptionalCallbackURL(req.CallbackURL)
+		if wakeURLErr != nil {
+			RespondError(w, r, http.StatusBadRequest, *wakeURLErr)
 			return
 		}
 
@@ -333,6 +340,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			ResourceDetails:   resourceDetails,
 			ActionFingerprint: actionFingerprint,
 			ExpiresAt:         expiresAt,
+			WakeCallbackURL:   wakeCallbackURL,
 		}, req.RequestID)
 		if err != nil {
 			var apprErr *db.ApprovalError
@@ -370,7 +378,7 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			Status:             approval.Status,
 			Terminal:           false,
 			Retryable:          false,
-			PushWakeConfigured: pushWake,
+			PushWakeConfigured: approvalHasPushWakeDestination(approval, pushWake),
 			ExpiresAt:          &approval.ExpiresAt,
 			CreatedAt:          &approval.CreatedAt,
 		})

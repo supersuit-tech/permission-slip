@@ -84,6 +84,23 @@ For **Grok Bot**, the URL must be a public Cursor automation webhook: `https://a
 
 If another of your agents is already registered with the same hooks URL, `webhook set` and `webhook status` include an advisory `warning` field. Sharing one gateway across agents is allowed, but wakes without `session_key` in approval context are delivered to the gateway's main session and may reach the wrong agent — pass `--session-key` on `request` (or `session_key` in API context) for shared-gateway setups, or give each agent its own gateway.
 
+### Per-request callback URL (dynamic hostnames)
+
+When your agent's reachable address changes often (for example a Tailscale hostname change), you do not need to update the registered webhook URL before every approval. Register the hooks **token** once with `webhook set`, then pass the current full hooks base URL on each request:
+
+```bash
+# Discover current tailnet address (example — use your agent's own probe)
+CURRENT_HOOKS="http://$(tailscale status --json | jq -r '.Self.DNSName' | sed 's/\.$//'):18789/hooks"
+
+permission-slip request --action email.send --params '{...}' \
+  --callback-url "$CURRENT_HOOKS" \
+  --session-key 'agent:main:imessage'
+```
+
+API equivalent: `callback_url` on `POST /v1/approvals/request` (optional). Permission Slip stores it on that approval and uses it for resolution wakes and retries. A later request may use a different URL without affecting earlier approvals. Explicit `callback_url` takes precedence over the registered default **for that request only**. Webhook `Authorization` still comes from the registered token when present.
+
+OpenClaw: pass the hooks base (`…/hooks`) or a full path ending in `/hooks/wake` or `/hooks/agent`. Grok Bot: pass the full `https://api2.cursor.sh/automations/webhook/…` URL.
+
 ### Push wake payloads (what Permission Slip POSTs)
 
 On approval resolution, the server POSTs to your registered hooks **base URL** plus a path suffix. Permission Slip does not use custom hook mapping subpaths — it calls OpenClaw's built-in hooks API directly.

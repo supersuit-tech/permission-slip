@@ -28,6 +28,7 @@ type Approval struct {
 	CancelledAt       *time.Time
 	DenialReason      *string
 	ActionFingerprint string
+	WakeCallbackURL   *string // per-request push-wake destination; overrides agent webhook when set
 	CreatedAt         time.Time
 }
 
@@ -36,7 +37,7 @@ type Approval struct {
 const approvalColumns = `approval_id, agent_id, approver_id, bulk_group_id, action, context,
 	status, execution_status, execution_result, executed_at, resource_details,
 	expires_at, approved_at, denied_at, cancelled_at, denial_reason,
-	action_fingerprint, created_at`
+	action_fingerprint, wake_callback_url, created_at`
 
 // ApprovalCursor identifies the position of the last item on a page,
 // using both created_at and approval_id as a compound key to avoid
@@ -57,11 +58,12 @@ func scanApproval(row rowScanner) (*Approval, error) {
 	var a Approval
 	var bulkGroupID sql.NullString
 	var executedAt, expiresAt, approvedAt, deniedAt, cancelledAt, createdAt sql.NullString
-	var denialReason, actionFingerprint sql.NullString
+	var denialReason, actionFingerprint, wakeCallbackURL sql.NullString
 	err := row.Scan(
 		&a.ApprovalID, &a.AgentID, &a.ApproverID, &bulkGroupID, &a.Action, &a.Context,
 		&a.Status, &a.ExecutionStatus, &a.ExecutionResult, &executedAt, &a.ResourceDetails,
-		&expiresAt, &approvedAt, &deniedAt, &cancelledAt, &denialReason, &actionFingerprint, &createdAt,
+		&expiresAt, &approvedAt, &deniedAt, &cancelledAt, &denialReason, &actionFingerprint,
+		&wakeCallbackURL, &createdAt,
 	)
 	if err != nil {
 		return nil, err
@@ -96,6 +98,10 @@ func scanApproval(row rowScanner) (*Approval, error) {
 	}
 	if actionFingerprint.Valid {
 		a.ActionFingerprint = actionFingerprint.String
+	}
+	if wakeCallbackURL.Valid && wakeCallbackURL.String != "" {
+		url := wakeCallbackURL.String
+		a.WakeCallbackURL = &url
 	}
 	a.CreatedAt, err2 = sqliteTimeRequired(createdAt)
 	if err2 != nil {
