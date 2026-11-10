@@ -99,7 +99,16 @@ func resolveConstraintMetadata(
 
 	resolveCtx, cancel := context.WithTimeout(ctx, constraintMetadataResolveTimeout)
 	defer cancel()
-	resolveCtx, creds := resolveResourceDetailsContext(resolveCtx, deps, agentID, userID, actionType, connectorID, connectorInstanceID)
+	resolveCtx, creds, credErr := resolveResourceDetailsContext(resolveCtx, deps, agentID, userID, actionType, connectorID, connectorInstanceID)
+	if credErr != nil {
+		if connectors.IsOAuthRefreshError(credErr) {
+			return nil, db.ErrMetadataUnresolved
+		}
+		var ve *connectors.ValidationError
+		if errors.As(credErr, &ve) {
+			return nil, db.ErrMetadataUnresolved
+		}
+	}
 
 	meta, err := resolver.ResolveConstraintMetadata(resolveCtx, actionType, execParams, creds)
 	if err != nil {

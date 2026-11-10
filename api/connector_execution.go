@@ -526,7 +526,7 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 			lastKnownTokenExpiry = conn.TokenExpiry
 		} else {
 			// No refresh token — can't refresh. Mark as needs_reauth.
-			if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
+			if statusErr := MarkOAuthConnectionNeedsReauth(ctx, deps, conn.ID, conn.UserID); statusErr != nil {
 				log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)
 				CaptureError(ctx, statusErr)
 			}
@@ -562,7 +562,7 @@ func refreshOAuthConnection(ctx context.Context, deps *Deps, conn *db.OAuthConne
 			return nil
 		}
 		log.Printf("oauth refresh failed for provider %q connection %s: %v", providerID, conn.ID, err)
-		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
+		if statusErr := MarkOAuthConnectionNeedsReauth(ctx, deps, conn.ID, conn.UserID); statusErr != nil {
 			log.Printf("failed to update OAuth connection status to needs_reauth: %v", statusErr)
 			CaptureError(ctx, statusErr)
 		}

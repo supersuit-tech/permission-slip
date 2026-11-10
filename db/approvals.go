@@ -394,3 +394,25 @@ func diagnoseApprovalFailure(ctx context.Context, db DBTX, approvalID, approverI
 	// Status is pending but UPDATE didn't match → must be expired.
 	return &ApprovalError{Code: ApprovalErrExpired}
 }
+
+// CancelPendingApprovalsForOAuthConnection cancels non-expired pending approvals
+// whose action types belong to a connector credential binding that uses the
+// given OAuth connection.
+func CancelPendingApprovalsForOAuthConnection(ctx context.Context, db DBTX, oauthConnectionID string) (int64, error) {
+	result, err := db.Exec(ctx, `
+		UPDATE approvals
+		SET status = 'cancelled', cancelled_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+		WHERE status = 'pending' AND datetime(expires_at) > datetime('now')
+		  AND EXISTS (
+		    SELECT 1 FROM agent_connector_credentials acc
+		    WHERE acc.agent_id = approvals.agent_id
+		      AND acc.oauth_connection_id = $1
+		      AND json_extract(approvals.action, '$.type') LIKE acc.connector_id || '.%'
+		  )`,
+		oauthConnectionID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return RowsAffected(result), nil
+}

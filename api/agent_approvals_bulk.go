@@ -375,6 +375,12 @@ func prepareBulkItems(w http.ResponseWriter, r *http.Request, deps *Deps, agent 
 			return nil, fmt.Errorf("invalid parameters")
 		}
 
+		if preflightErr := preflightApprovalCredentials(r.Context(), deps, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID); preflightErr != nil {
+			if respondApprovalCredentialPreflight(w, r, actionType, agent.AgentID, preflightErr) {
+				return nil, preflightErr
+			}
+		}
+
 		if item.Configuration != nil && strings.TrimSpace(item.Configuration.ConfigurationID) != "" {
 			log.Printf("[%s] BulkRequestApproval: configuration field is deprecated and ignored (configuration_id=%q)",
 				TraceID(r.Context()), item.Configuration.ConfigurationID)
@@ -396,7 +402,12 @@ func prepareBulkItems(w http.ResponseWriter, r *http.Request, deps *Deps, agent 
 			}
 		}
 
-		resourceDetails := resolveResourceDetailsForBulk(r.Context(), deps, agent, actionType, actionParams, connectorInstanceID)
+		resourceDetails, rdErr := resolveResourceDetailsForBulk(r.Context(), deps, agent, actionType, actionParams, connectorInstanceID)
+		if rdErr != nil {
+			if respondApprovalCredentialPreflight(w, r, actionType, agent.AgentID, rdErr) {
+				return nil, rdErr
+			}
+		}
 		contextForStore := mergeSlackContextFromResourceDetailsIntoContext(
 			mergeEmailThreadFromResourceDetailsIntoContext(item.Context, resourceDetails),
 			resourceDetails,
@@ -485,40 +496,43 @@ func parseAndNormalizeBulkAction(w http.ResponseWriter, r *http.Request, deps *D
 	return actionObj, actionType, true
 }
 
-func resolveResourceDetailsForBulk(ctx context.Context, deps *Deps, agent *db.Agent, actionType string, actionParams json.RawMessage, connectorInstanceID string) []byte {
+func resolveResourceDetailsForBulk(ctx context.Context, deps *Deps, agent *db.Agent, actionType string, actionParams json.RawMessage, connectorInstanceID string) ([]byte, error) {
 	if deps.Connectors == nil {
-		return nil
+		return nil, nil
 	}
 	cid := strings.SplitN(actionType, ".", 2)
 	if len(cid) != 2 {
-		return nil
+		return nil, nil
 	}
 	conn, ok := deps.Connectors.Get(cid[0])
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	resolver, ok := conn.(connectors.ResourceDetailResolver)
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	resolveCtx, cancel := context.WithTimeout(ctx, resourceDetailsResolveTimeout)
 	defer cancel()
-	resolveCtx, resolveCreds := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
+	resolveCtx, resolveCreds, credErr := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
+	if credErr != nil {
+		return nil, credErr
+	}
 	details, err := retryResourceDetails(resolveCtx, func(callCtx context.Context) (map[string]any, error) {
 		return resolver.ResolveResourceDetails(callCtx, actionType, actionParams, resolveCreds)
 	})
 	if err != nil {
 		log.Printf("[%s] BulkRequest ResolveResourceDetails: %v", TraceID(ctx), err)
-		return nil
+		return nil, nil
 	}
 	if details == nil {
-		return nil
+		return nil, nil
 	}
 	encoded, err := json.Marshal(details)
 	if err != nil {
-		return nil
+		return nil, nil
 	}
-	return encoded
+	return encoded, nil
 }
 
 type bulkStandingOutcome struct {

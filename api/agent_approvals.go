@@ -253,6 +253,12 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
+		if preflightErr := preflightApprovalCredentials(r.Context(), deps, agent.AgentID, agent.ApproverID, actionType, connectorInstanceID); preflightErr != nil {
+			if respondApprovalCredentialPreflight(w, r, actionType, agent.AgentID, preflightErr) {
+				return
+			}
+		}
+
 		// Deprecated: configuration field is accepted but ignored (removed in a future release).
 		if req.Configuration != nil && strings.TrimSpace(req.Configuration.ConfigurationID) != "" {
 			log.Printf("[%s] AgentRequestApproval: configuration field is deprecated and ignored (configuration_id=%q)",
@@ -317,7 +323,12 @@ func handleAgentRequestApproval(deps *Deps) http.HandlerFunc {
 				if conn, ok := deps.Connectors.Get(cid[0]); ok {
 					if resolver, ok := conn.(connectors.ResourceDetailResolver); ok {
 						resolveCtx, resolveCancel := context.WithTimeout(r.Context(), resourceDetailsResolveTimeout)
-						resolveCtx, resolveCreds := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
+						resolveCtx, resolveCreds, credErr := resolveResourceDetailsContext(resolveCtx, deps, agent.AgentID, agent.ApproverID, actionType, cid[0], connectorInstanceID)
+						if credErr != nil {
+							if respondApprovalCredentialPreflight(w, r, actionType, agent.AgentID, credErr) {
+								return
+							}
+						}
 						details, resolveErr := retryResourceDetails(resolveCtx, func(callCtx context.Context) (map[string]any, error) {
 							return resolver.ResolveResourceDetails(callCtx, actionType, actionParams, resolveCreds)
 						})
@@ -493,25 +504,33 @@ const resourceDetailsResolveTimeout = 30 * time.Second
 
 // resolveResourceDetailsContext resolves credentials for resource detail lookup
 // and attaches connector-specific runtime state (e.g. Proton Mail UIDVALIDITY).
-// Returns empty credentials on any failure since resolution is non-fatal.
-func resolveResourceDetailsContext(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string) (context.Context, connectors.Credentials) {
+// Authorization failures (OAuth refresh, missing binding) are returned as errors
+// so callers can abort approval creation; other lookup failures are non-fatal.
+func resolveResourceDetailsContext(ctx context.Context, deps *Deps, agentID int64, userID, actionType, connectorID, connectorInstanceID string) (context.Context, connectors.Credentials, error) {
 	reqCreds, err := db.GetRequiredCredentialsByActionType(ctx, deps.DB, actionType)
 	if err != nil {
 		log.Printf("[%s] ResolveResourceDetails: required credentials lookup for %s: %v", TraceID(ctx), actionType, err)
-		return ctx, connectors.NewCredentials(nil)
+		return ctx, connectors.NewCredentials(nil), nil
 	}
 	if len(reqCreds) == 0 {
-		return ctx, connectors.NewCredentials(nil)
+		return ctx, connectors.NewCredentials(nil), nil
 	}
 	resolved, err := resolveCredentialsForExecution(ctx, deps, agentID, userID, actionType, connectorID, connectorInstanceID, reqCreds)
 	if err != nil {
+		if connectors.IsOAuthRefreshError(err) {
+			return ctx, connectors.NewCredentials(nil), err
+		}
+		var ve *connectors.ValidationError
+		if errors.As(err, &ve) {
+			return ctx, connectors.NewCredentials(nil), err
+		}
 		log.Printf("[%s] ResolveResourceDetails: credential resolution for %s: %v", TraceID(ctx), actionType, err)
-		return ctx, connectors.NewCredentials(nil)
+		return ctx, connectors.NewCredentials(nil), nil
 	}
 	if connectorID == "protonmail" && resolved.CredentialID != "" {
 		ctx = connectors.ContextWithMailboxUIDValidity(ctx, newProtonmailUIDValidityStore(ctx, deps, resolved.CredentialID))
 	}
-	return ctx, resolved.Credentials
+	return ctx, resolved.Credentials, nil
 }
 
 // emitApprovalRequestAuditEvent writes an audit event for a new approval request.

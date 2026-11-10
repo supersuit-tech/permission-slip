@@ -97,7 +97,7 @@ func lookupResourceDetails(
 	}
 	resolveCtx, cancel := context.WithTimeout(ctx, resourceDetailsResolveTimeout)
 	defer cancel()
-	resolveCtx, creds := resolveResourceDetailsContext(resolveCtx, deps, agentID, userID, actionType, connectorID, connectorInstanceID)
+	resolveCtx, creds, _ := resolveResourceDetailsContext(resolveCtx, deps, agentID, userID, actionType, connectorID, connectorInstanceID)
 	details, err := retryResourceDetails(resolveCtx, func(callCtx context.Context) (map[string]any, error) {
 		return resolver.ResolveResourceDetails(callCtx, actionType, encoded, creds)
 	})
