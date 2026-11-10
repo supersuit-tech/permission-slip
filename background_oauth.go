@@ -146,7 +146,7 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 			lastKnownAccessVaultID = conn.AccessTokenVaultID
 			lastKnownTokenExpiry = conn.TokenExpiry
 		} else {
-			if err := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); err != nil {
+			if err := api.MarkOAuthConnectionNeedsReauth(ctx, &api.Deps{DB: deps.DB}, conn.ID, conn.UserID); err != nil {
 				connLog.Error("oauth refresh: failed to mark connection as needs_reauth", "error", err)
 				sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, err))
 			}
@@ -168,7 +168,7 @@ func refreshSingleConnection(ctx context.Context, deps OAuthRefreshDeps, logger 
 		if skipFlip && fresh != nil && fresh.Status == db.OAuthStatusActive {
 			return nil
 		}
-		if statusErr := db.UpdateOAuthConnectionStatus(ctx, deps.DB, conn.ID, conn.UserID, db.OAuthStatusNeedsReauth); statusErr != nil {
+		if statusErr := api.MarkOAuthConnectionNeedsReauth(ctx, &api.Deps{DB: deps.DB}, conn.ID, conn.UserID); statusErr != nil {
 			connLog.Error("oauth refresh: failed to mark connection as needs_reauth", "error", statusErr)
 			sentry.CaptureException(fmt.Errorf("oauth refresh status update failed for %s: %w", conn.ID, statusErr))
 		}

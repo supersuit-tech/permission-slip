@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/supersuit-tech/permission-slip/connectors"
 	"github.com/supersuit-tech/permission-slip/db"
 )
 
@@ -195,7 +196,37 @@ func handleDecideApprovalBulkGroup(deps *Deps) http.HandlerFunc {
 }
 
 func approveBulkItem(r *http.Request, deps *Deps, userID, approvalID string) bulkDecisionResult {
-	appr, agentMeta, err := db.ApproveApproval(r.Context(), deps.DB, approvalID, userID)
+	appr, err := db.GetApprovalByIDAndApprover(r.Context(), deps.DB, approvalID, userID)
+	if err != nil || appr == nil {
+		return bulkDecisionResult{
+			ApprovalID: approvalID,
+			Status:     "skipped",
+			Error: &bulkItemError{
+				Code:    "approval_not_found",
+				Message: "Approval not found",
+			},
+		}
+	}
+	if preflightErr := preflightApprovalFromStoredAction(r.Context(), deps, appr); preflightErr != nil {
+		msg := "OAuth authorization required — reconnect the provider in Settings"
+		if connectors.IsOAuthRefreshError(preflightErr) {
+			var oauthErr *connectors.OAuthRefreshError
+			if connectors.AsOAuthRefreshError(preflightErr, &oauthErr) && oauthErr.Message != "" {
+				msg = oauthErr.Message
+			}
+		}
+		return bulkDecisionResult{
+			ApprovalID: approvalID,
+			Status:     "skipped",
+			Error: &bulkItemError{
+				Code:    string(ErrOAuthRefreshFailed),
+				Message: msg,
+			},
+		}
+	}
+
+	var agentMeta []byte
+	appr, agentMeta, err = db.ApproveApproval(r.Context(), deps.DB, approvalID, userID)
 	if err != nil {
 		var apprErr *db.ApprovalError
 		if errors.As(err, &apprErr) {

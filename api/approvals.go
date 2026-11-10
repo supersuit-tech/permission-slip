@@ -199,7 +199,28 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 			return
 		}
 
-		appr, agentMeta, err := db.ApproveApproval(r.Context(), deps.DB, approvalID, profile.ID)
+		appr, err := db.GetApprovalByIDAndApprover(r.Context(), deps.DB, approvalID, profile.ID)
+		if err != nil {
+			log.Printf("[%s] ApproveApproval lookup: %v", TraceID(r.Context()), err)
+			CaptureError(r.Context(), err)
+			RespondError(w, r, http.StatusInternalServerError, InternalError("Failed to approve approval"))
+			return
+		}
+		if appr == nil {
+			RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Approval not found"))
+			return
+		}
+		if resolvedApprovalStatus(*appr) == "pending" {
+			if preflightErr := preflightApprovalFromStoredAction(r.Context(), deps, appr); preflightErr != nil {
+				actionType := actionTypeFromJSON(appr.Action)
+				if respondApprovalCredentialPreflight(w, r, actionType, appr.AgentID, preflightErr) {
+					return
+				}
+			}
+		}
+
+		var agentMeta []byte
+		appr, agentMeta, err = db.ApproveApproval(r.Context(), deps.DB, approvalID, profile.ID)
 		if err != nil {
 			if handleApprovalError(w, r, err) {
 				return
@@ -265,15 +286,7 @@ func executeApprovalAction(ctx context.Context, deps *Deps, userID string, appr 
 		_ = json.Unmarshal(appr.Action, &actionObj)
 	}
 
-	var connectorInstanceID string
-	if len(appr.Action) > 0 {
-		var raw map[string]json.RawMessage
-		if json.Unmarshal(appr.Action, &raw) == nil {
-			if v, ok := raw["_connector_instance_id"]; ok {
-				_ = json.Unmarshal(v, &connectorInstanceID)
-			}
-		}
-	}
+	connectorInstanceID := connectorInstanceIDFromApprovalAction(appr.Action)
 
 	result, execErr := executeConnectorAction(ctx, deps, appr.AgentID, userID, actionType, actionObj.Parameters, nil, connectorInstanceID)
 
