@@ -210,15 +210,12 @@ func handleApproveApproval(deps *Deps) http.HandlerFunc {
 			RespondError(w, r, http.StatusNotFound, NotFound(ErrApprovalNotFound, "Approval not found"))
 			return
 		}
-		if resolvedApprovalStatus(*appr) != "pending" {
-			if handleApprovalError(w, r, &db.ApprovalError{Code: db.ApprovalErrAlreadyResolved, Status: appr.Status}) {
-				return
-			}
-		}
-		if preflightErr := preflightApprovalFromStoredAction(r.Context(), deps, appr); preflightErr != nil {
-			actionType := actionTypeFromJSON(appr.Action)
-			if respondApprovalCredentialPreflight(w, r, actionType, appr.AgentID, preflightErr) {
-				return
+		if resolvedApprovalStatus(*appr) == "pending" {
+			if preflightErr := preflightApprovalFromStoredAction(r.Context(), deps, appr); preflightErr != nil {
+				actionType := actionTypeFromJSON(appr.Action)
+				if respondApprovalCredentialPreflight(w, r, actionType, appr.AgentID, preflightErr) {
+					return
+				}
 			}
 		}
 
