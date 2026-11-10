@@ -77,7 +77,7 @@ func TestAgentRequestApproval_PreflightRejectsNeedsReauth(t *testing.T) {
 		t.Fatalf("expected 401, got %d: %s", w.Code, w.Body.String())
 	}
 
-	var errResp errorResponse
+	var errResp ErrorResponse
 	if err := json.Unmarshal(w.Body.Bytes(), &errResp); err != nil {
 		t.Fatalf("unmarshal error: %v", err)
 	}
