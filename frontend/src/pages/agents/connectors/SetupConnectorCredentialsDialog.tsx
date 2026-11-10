@@ -79,7 +79,10 @@ export function SetupConnectorCredentialsDialog({
     useState(false);
   const [addCredentialTarget, setAddCredentialTarget] =
     useState<RequiredCredential | null>(null);
-  const [googleNoticeOpen, setGoogleNoticeOpen] = useState(false);
+  const [googleNoticeState, setGoogleNoticeState] = useState<{
+    mode: "connect" | "reconnect";
+    replaceId?: string;
+  } | null>(null);
   const { tryAssign } = useTryAutoAssign(agentId, connectorId);
 
   const isLoading = detailLoading || providersLoading || connectionsLoading;
@@ -112,6 +115,9 @@ export function SetupConnectorCredentialsDialog({
   const needsReauth =
     !isAlreadyConnected &&
     providerConnections.some((c) => c.status === "needs_reauth");
+  const needsReauthConnection = providerConnections.find(
+    (c) => c.status === "needs_reauth",
+  );
 
   // Find static (API key / basic) credential requirements
   const staticCredentials = requiredCredentials.filter(
@@ -125,8 +131,13 @@ export function SetupConnectorCredentialsDialog({
     effectiveOAuthProvider != null &&
     SHOP_REQUIRED_PROVIDERS.has(effectiveOAuthProvider);
 
-  function performOAuthRedirect() {
+  function performOAuthRedirect(replaceId?: string) {
     if (!session?.access_token || !effectiveOAuthProvider) return;
+
+    const authorizeOptions = {
+      scopes: oauthCredential?.oauth_scopes,
+      ...(replaceId ? { replaceId } : {}),
+    };
 
     if (needsShopDomain) {
       const trimmed = shopSubdomain.trim().toLowerCase();
@@ -135,7 +146,7 @@ export function SetupConnectorCredentialsDialog({
       const url = getOAuthAuthorizeUrl(
         effectiveOAuthProvider,
         session.access_token,
-        oauthCredential?.oauth_scopes,
+        authorizeOptions,
       );
       window.location.href = `${url}&shop=${encodeURIComponent(subdomain)}`;
       return;
@@ -144,17 +155,21 @@ export function SetupConnectorCredentialsDialog({
     window.location.href = getOAuthAuthorizeUrl(
       effectiveOAuthProvider,
       session.access_token,
-      oauthCredential?.oauth_scopes,
+      authorizeOptions,
     );
   }
 
   function handleOAuthConnect() {
     if (!session?.access_token || !effectiveOAuthProvider) return;
+    const replaceId = needsReauth ? needsReauthConnection?.id : undefined;
     if (effectiveOAuthProvider === "google" && isSaas) {
-      setGoogleNoticeOpen(true);
+      setGoogleNoticeState({
+        mode: needsReauth ? "reconnect" : "connect",
+        replaceId,
+      });
       return;
     }
-    performOAuthRedirect();
+    performOAuthRedirect(replaceId);
   }
 
   function handleUseApiKey(credential: RequiredCredential) {
@@ -292,12 +307,15 @@ export function SetupConnectorCredentialsDialog({
 
       {isSaas && (
         <GoogleBetaNoticeDialog
-          open={googleNoticeOpen}
-          mode={needsReauth ? "reconnect" : "connect"}
-          onOpenChange={setGoogleNoticeOpen}
+          open={!!googleNoticeState}
+          mode={googleNoticeState?.mode ?? "connect"}
+          onOpenChange={(nextOpen) => {
+            if (!nextOpen) setGoogleNoticeState(null);
+          }}
           onContinue={() => {
-            setGoogleNoticeOpen(false);
-            performOAuthRedirect();
+            const replaceId = googleNoticeState?.replaceId;
+            setGoogleNoticeState(null);
+            performOAuthRedirect(replaceId);
           }}
         />
       )}

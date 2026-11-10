@@ -57,12 +57,12 @@ func insertTestOAuthConnection(t *testing.T, tx db.DBTX, v *vault.MockVaultStore
 // useful for tests that need to insert vault secrets before creating deps.
 func oauthDepsWithVault(tx db.DBTX, v *vault.MockVaultStore) *Deps {
 	return &Deps{
-		DB:                tx,
-		Vault:             v,
+		DB:               tx,
+		Vault:            v,
 		JWTSigningSecret: testJWTSecret,
-		OAuthProviders:    oauth.NewRegistry(),
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
+		OAuthProviders:   oauth.NewRegistry(),
+		OAuthStateSecret: testOAuthStateSecret,
+		BaseURL:          "http://localhost:3000",
 	}
 }
 
@@ -86,12 +86,12 @@ func oauthDeps(tx db.DBTX) *Deps {
 		// No client credentials
 	})
 	return &Deps{
-		DB:                tx,
-		Vault:             vault.NewMockVaultStore(),
+		DB:               tx,
+		Vault:            vault.NewMockVaultStore(),
 		JWTSigningSecret: testJWTSecret,
-		OAuthProviders:    reg,
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
+		OAuthProviders:   reg,
+		OAuthStateSecret: testOAuthStateSecret,
+		BaseURL:          "http://localhost:3000",
 	}
 }
 
@@ -111,12 +111,12 @@ func oauthDepsWithSlack(tx db.DBTX) *Deps {
 		Source:       oauth.SourceBuiltIn,
 	})
 	return &Deps{
-		DB:                tx,
-		Vault:             vault.NewMockVaultStore(),
+		DB:               tx,
+		Vault:            vault.NewMockVaultStore(),
 		JWTSigningSecret: testJWTSecret,
-		OAuthProviders:    reg,
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
+		OAuthProviders:   reg,
+		OAuthStateSecret: testOAuthStateSecret,
+		BaseURL:          "http://localhost:3000",
 	}
 }
 
@@ -1017,6 +1017,154 @@ func TestStoreOAuthTokens_CreateNew(t *testing.T) {
 	}
 }
 
+func TestStoreOAuthTokens_DedupesSameEmailWithoutReplaceID(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+	emailExtra := map[string]string{"email": "dup@example.com", "display_name": "Dup User"}
+
+	token1 := &oauth2.Token{
+		AccessToken:  "access-old",
+		RefreshToken: "refresh-old",
+		Expiry:       time.Now().Add(time.Hour),
+		TokenType:    "Bearer",
+	}
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, emailExtra, ""); err != nil {
+		t.Fatalf("first storeOAuthTokens: %v", err)
+	}
+
+	token2 := &oauth2.Token{
+		AccessToken:  "access-new",
+		RefreshToken: "refresh-new",
+		Expiry:       time.Now().Add(2 * time.Hour),
+		TokenType:    "Bearer",
+	}
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "email"}, token2, emailExtra, ""); err != nil {
+		t.Fatalf("second storeOAuthTokens: %v", err)
+	}
+
+	conns, err := db.ListOAuthConnectionsByUser(t.Context(), tx, uid)
+	if err != nil {
+		t.Fatalf("list connections: %v", err)
+	}
+	if len(conns) != 1 {
+		t.Fatalf("expected 1 connection after same-email dedupe, got %d", len(conns))
+	}
+	if len(conns[0].Scopes) != 2 {
+		t.Errorf("expected 2 scopes after deduped re-auth, got %d", len(conns[0].Scopes))
+	}
+}
+
+func TestStoreOAuthTokens_AllowsDistinctEmailsWithoutReplaceID(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+
+	token1 := &oauth2.Token{
+		AccessToken:  "access-a",
+		RefreshToken: "refresh-a",
+		Expiry:       time.Now().Add(time.Hour),
+		TokenType:    "Bearer",
+	}
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token1, map[string]string{"email": "a@example.com"}, ""); err != nil {
+		t.Fatalf("first storeOAuthTokens: %v", err)
+	}
+
+	token2 := &oauth2.Token{
+		AccessToken:  "access-b",
+		RefreshToken: "refresh-b",
+		Expiry:       time.Now().Add(time.Hour),
+		TokenType:    "Bearer",
+	}
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token2, map[string]string{"email": "b@example.com"}, ""); err != nil {
+		t.Fatalf("second storeOAuthTokens: %v", err)
+	}
+
+	conns, err := db.ListOAuthConnectionsByUser(t.Context(), tx, uid)
+	if err != nil {
+		t.Fatalf("list connections: %v", err)
+	}
+	if len(conns) != 2 {
+		t.Fatalf("expected 2 connections for different emails, got %d", len(conns))
+	}
+}
+
+func TestStoreOAuthTokens_PurgesPreexistingDuplicateIdentities(t *testing.T) {
+	t.Parallel()
+	tx := testhelper.SetupTestDB(t)
+	uid := testhelper.GenerateUID(t)
+	testhelper.InsertUser(t, tx, uid, "u_"+uid[:8])
+
+	deps := oauthDeps(tx)
+	emailExtra := map[string]string{"email": "dup@example.com"}
+
+	for i := 0; i < 2; i++ {
+		suffix := "a"
+		if i == 1 {
+			suffix = "b"
+		}
+		token := &oauth2.Token{
+			AccessToken:  "access-" + suffix,
+			RefreshToken: "refresh-" + suffix,
+			Expiry:       time.Now().Add(time.Hour),
+			TokenType:    "Bearer",
+		}
+		if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid"}, token, emailExtra, ""); err != nil {
+			t.Fatalf("storeOAuthTokens pass %d: %v", i, err)
+		}
+	}
+
+	connsBefore, err := db.ListOAuthConnectionsByUser(t.Context(), tx, uid)
+	if err != nil {
+		t.Fatalf("list before: %v", err)
+	}
+	if len(connsBefore) != 1 {
+		t.Fatalf("expected dedupe to leave 1 connection before manual duplicate, got %d", len(connsBefore))
+	}
+
+	// Seed a second row with the same email (simulates legacy duplicates).
+	dupExtra, _ := json.Marshal(emailExtra)
+	accessID, err := deps.Vault.(*vault.MockVaultStore).CreateSecret(t.Context(), tx, "legacy_access", []byte("legacy"))
+	if err != nil {
+		t.Fatalf("vault: %v", err)
+	}
+	legacyID := testhelper.GenerateID(t, "oconn_")
+	if _, err := db.CreateOAuthConnection(t.Context(), tx, db.CreateOAuthConnectionParams{
+		ID:                 legacyID,
+		UserID:             uid,
+		Provider:           "google",
+		AccessTokenVaultID: accessID,
+		Scopes:             []string{"openid"},
+		ExtraData:          dupExtra,
+	}); err != nil {
+		t.Fatalf("insert legacy duplicate: %v", err)
+	}
+
+	token3 := &oauth2.Token{
+		AccessToken:  "access-final",
+		RefreshToken: "refresh-final",
+		Expiry:       time.Now().Add(2 * time.Hour),
+		TokenType:    "Bearer",
+	}
+	if _, err := storeOAuthTokens(t.Context(), deps, uid, "google", []string{"openid", "profile"}, token3, emailExtra, ""); err != nil {
+		t.Fatalf("final storeOAuthTokens: %v", err)
+	}
+
+	conns, err := db.ListOAuthConnectionsByUser(t.Context(), tx, uid)
+	if err != nil {
+		t.Fatalf("list connections: %v", err)
+	}
+	if len(conns) != 1 {
+		t.Fatalf("expected 1 connection after purge, got %d", len(conns))
+	}
+}
+
 func TestStoreOAuthTokens_ReplacesExisting(t *testing.T) {
 	t.Parallel()
 	tx := testhelper.SetupTestDB(t)
@@ -1349,12 +1497,12 @@ func oauthDepsWithShopify(tx db.DBTX) *Deps {
 		Source:       oauth.SourceBuiltIn,
 	})
 	return &Deps{
-		DB:                tx,
-		Vault:             vault.NewMockVaultStore(),
+		DB:               tx,
+		Vault:            vault.NewMockVaultStore(),
 		JWTSigningSecret: testJWTSecret,
-		OAuthProviders:    reg,
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
+		OAuthProviders:   reg,
+		OAuthStateSecret: testOAuthStateSecret,
+		BaseURL:          "http://localhost:3000",
 	}
 }
 
@@ -1871,12 +2019,12 @@ func oauthDepsWithZendesk(tx db.DBTX) *Deps {
 		Source:       oauth.SourceBuiltIn,
 	})
 	return &Deps{
-		DB:                tx,
-		Vault:             vault.NewMockVaultStore(),
+		DB:               tx,
+		Vault:            vault.NewMockVaultStore(),
 		JWTSigningSecret: testJWTSecret,
-		OAuthProviders:    reg,
-		OAuthStateSecret:  testOAuthStateSecret,
-		BaseURL:           "http://localhost:3000",
+		OAuthProviders:   reg,
+		OAuthStateSecret: testOAuthStateSecret,
+		BaseURL:          "http://localhost:3000",
 	}
 }
 
