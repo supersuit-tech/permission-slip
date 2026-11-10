@@ -767,8 +767,7 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 }
 
 // storeOAuthTokens persists the OAuth tokens in the vault and creates or
-// updates the oauth_connections row. If a connection already exists for this
-// user+provider, it is replaced (re-authorization flow).
+// updates the oauth_connections row.
 //
 // stateExtra contains additional key-value pairs to persist in extra_data
 // alongside any fields extracted from the token response. This is used for
@@ -776,8 +775,9 @@ func handleOAuthCallback(deps *Deps) http.HandlerFunc {
 // It may be nil when no state-derived extra data is needed.
 //
 // replaceID, if non-empty, is the ID of an existing connection to replace.
-// When set, only that specific connection is deleted. When empty, a new
-// connection is created alongside any existing ones for the same provider.
+// When set, only that specific connection is deleted before insert. When empty,
+// a matching identity (e.g. same Google account email) reuses replace semantics
+// instead of creating a duplicate row.
 func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string, scopes []string, token *oauth2.Token, stateExtra map[string]string, replaceID string) (string, error) {
 	tx, owned, err := db.BeginOrContinue(ctx, deps.DB)
 	if err != nil {
@@ -787,8 +787,24 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 		defer db.RollbackTx(ctx, tx) //nolint:errcheck // best-effort cleanup
 	}
 
+	extraData := extractTokenExtraData(token, stateExtra)
+
+	var duplicateIDsToPurge []string
+	if replaceID == "" {
+		identityKey := oauthConnectionIdentityKey(providerID, extraData)
+		if identityKey != "" {
+			matchIDs, findErr := findOAuthConnectionIDsByIdentity(ctx, tx, userID, providerID, identityKey)
+			if findErr != nil {
+				return "", fmt.Errorf("find oauth connections by identity: %w", findErr)
+			}
+			if len(matchIDs) > 0 {
+				replaceID = matchIDs[0]
+				duplicateIDsToPurge = matchIDs[1:]
+			}
+		}
+	}
+
 	// When replaceID is set, delete that specific connection (reconnect flow).
-	// When empty, create a new connection alongside any existing ones.
 	var existing *db.DeleteOAuthConnectionResult
 	var oldConn *db.OAuthConnection
 	if replaceID != "" {
@@ -815,6 +831,20 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 			// Ignore the replaceID — create a new connection instead.
 		}
 		// If oldConn is nil or belongs to another user, just ignore and create new.
+	}
+
+	for _, dupID := range duplicateIDsToPurge {
+		dupDeleted, dupErr := db.DeleteOAuthConnectionByID(ctx, tx, userID, dupID)
+		if dupErr != nil {
+			var connErr *db.OAuthConnectionError
+			if !errors.As(dupErr, &connErr) || connErr.Code != db.OAuthConnectionErrNotFound {
+				return "", fmt.Errorf("delete duplicate oauth connection %q: %w", dupID, dupErr)
+			}
+			continue
+		}
+		if err := purgeOAuthConnectionVaultSecrets(ctx, deps, tx, dupDeleted); err != nil {
+			return "", fmt.Errorf("purge duplicate oauth connection vault secrets: %w", err)
+		}
 	}
 
 	// Track the old refresh token vault ID so we can reuse it if the new
@@ -868,12 +898,6 @@ func storeOAuthTokens(ctx context.Context, deps *Deps, userID, providerID string
 	if !token.Expiry.IsZero() {
 		tokenExpiry = &token.Expiry
 	}
-
-	// Extract provider-specific extra data from the token response.
-	// For example, Salesforce includes instance_url which connectors
-	// need to construct API base URLs. State-derived extra data (e.g.
-	// Shopify's shop_domain) is merged in after token extraction.
-	extraData := extractTokenExtraData(token, stateExtra)
 
 	_, err = db.CreateOAuthConnection(ctx, tx, db.CreateOAuthConnectionParams{
 		ID:                  connID,
