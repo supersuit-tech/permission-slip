@@ -105,19 +105,26 @@ func applyConnectorInstanceToAction(ctx context.Context, d db.DBTX, agent *db.Ag
 		}
 	} else {
 		if selector == "" {
-			def, err := db.GetDefaultAgentConnectorInstance(ctx, d, agent.AgentID, agent.ApproverID, connectorID)
+			elig, err := db.ListConnectorInstanceEligibility(ctx, d, agent.AgentID, agent.ApproverID, connectorID)
 			if err != nil {
 				return "", err
 			}
-			if def != nil {
-				inst = def
-			} else {
+			chosen, require := selectDefaultConnectorInstance(instances, elig)
+			if len(require) > 0 {
+				resp := BadRequest(ErrConnectorInstanceRequired, instanceRequiredMessage(instances))
+				resp.Error.Details = map[string]any{
+					"available_instances": availableInstancesDetails(require),
+				}
+				return "", &connectorInstanceResolutionError{status: http.StatusBadRequest, resp: resp}
+			}
+			if chosen == nil {
 				resp := BadRequest(ErrConnectorInstanceRequired, "connector_instance is required when multiple instances exist and no default is set")
 				resp.Error.Details = map[string]any{
 					"available_instances": availableInstancesDetails(instances),
 				}
 				return "", &connectorInstanceResolutionError{status: http.StatusBadRequest, resp: resp}
 			}
+			inst = chosen
 		} else {
 			resolved, err := db.ResolveAgentConnectorInstance(ctx, d, agent.AgentID, agent.ApproverID, connectorID, selector)
 			if err != nil {

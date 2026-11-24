@@ -121,9 +121,23 @@ type DeleteCredentialResult struct {
 // Returns the vault_secret_id so the caller can delete the vault secret too.
 // Returns a *CredentialError with code CredentialErrNotFound if no matching row exists.
 func DeleteCredential(ctx context.Context, db DBTX, credID, userID string) (*DeleteCredentialResult, error) {
+	// Confirm ownership before detaching connector instances so a caller cannot
+	// unbind another user's credential by guessing its id.
+	var owned string
+	err := db.QueryRow(ctx, `SELECT id FROM credentials WHERE id = $1 AND user_id = $2`, credID, userID).Scan(&owned)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, &CredentialError{Code: CredentialErrNotFound, Message: "Credential not found"}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := releaseConnectorInstancesForBinding(ctx, db, bindingColumnCredential, credID); err != nil {
+		return nil, err
+	}
+
 	var result DeleteCredentialResult
 	var deletedAt sql.NullString
-	err := db.QueryRow(ctx, `
+	err = db.QueryRow(ctx, `
 		DELETE FROM credentials
 		WHERE id = $1 AND user_id = $2
 		RETURNING strftime('%Y-%m-%dT%H:%M:%fZ', 'now') AS deleted_at, vault_secret_id`, credID, userID,

@@ -186,7 +186,11 @@ ConnectorCapability:
         $ref: '#/ConnectorInstanceCapability'
       description: |
         Enabled connector instances for this agent (one row per workspace/account binding).
+        Instances whose bound OAuth connection or credential was deleted are omitted, as are
+        unbound leftovers when another instance of the same connector still has a live binding.
         Use `display` (credential nickname) or `id` as `action.parameters.connector_instance` when multiple instances exist.
+        Requests that omit `connector_instance` use the default instance when it is credential-ready,
+        otherwise the only ready instance.
 
     actions:
       type: array

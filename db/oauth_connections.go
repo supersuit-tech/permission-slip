@@ -1,13 +1,12 @@
 package db
 
 import (
-	"database/sql"
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
-
 )
 
 // OAuth connection status values. Must match the CHECK constraint on
@@ -291,8 +290,25 @@ type DeleteOAuthConnectionResult struct {
 // The userID parameter ensures the caller owns the connection (defense-in-depth).
 // Returns the vault secret IDs so the caller can delete the vault secrets too.
 func DeleteOAuthConnectionByID(ctx context.Context, db DBTX, userID, connectionID string) (*DeleteOAuthConnectionResult, error) {
-	var result DeleteOAuthConnectionResult
+	// Confirm ownership before detaching connector instances so a caller cannot
+	// unbind another user's connection by guessing its id.
+	var owned string
 	err := db.QueryRow(ctx, `
+		SELECT id FROM oauth_connections WHERE id = $1 AND user_id = $2`,
+		connectionID, userID,
+	).Scan(&owned)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, &OAuthConnectionError{Code: OAuthConnectionErrNotFound, Message: "OAuth connection not found"}
+	}
+	if err != nil {
+		return nil, err
+	}
+	if err := releaseConnectorInstancesForBinding(ctx, db, bindingColumnOAuth, connectionID); err != nil {
+		return nil, err
+	}
+
+	var result DeleteOAuthConnectionResult
+	err = db.QueryRow(ctx, `
 		DELETE FROM oauth_connections
 		WHERE id = $1 AND user_id = $2
 		RETURNING access_token_vault_id, refresh_token_vault_id`,
