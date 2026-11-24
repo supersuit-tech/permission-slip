@@ -138,34 +138,9 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	instRows, err := db.Query(ctx, `
 		SELECT ac.connector_id, ac.connector_instance_id,
 		       `+connectorInstanceDisplayNameSQL+`,
-		       NOT EXISTS (
-		           SELECT 1 FROM connector_required_credentials crc
-		           WHERE crc.connector_id = ac.connector_id
-		             AND NOT (
-		                 (crc.auth_type != 'oauth2' AND EXISTS (
-		                     SELECT 1 FROM agent_connector_credentials acc
-		                     INNER JOIN credentials cr ON cr.id = acc.credential_id
-		                     WHERE acc.agent_id = ac.agent_id
-		                       AND acc.connector_id = ac.connector_id
-		                       AND acc.connector_instance_id = ac.connector_instance_id
-		                       AND acc.approver_id = ac.approver_id
-		                       AND cr.user_id = ac.approver_id
-		                       AND (cr.service = crc.service OR cr.service = ac.connector_id)
-		                 ))
-		                 OR (crc.auth_type = 'oauth2' AND EXISTS (
-		                     SELECT 1 FROM agent_connector_credentials acc
-		                     INNER JOIN oauth_connections oc ON oc.id = acc.oauth_connection_id
-		                     WHERE acc.agent_id = ac.agent_id
-		                       AND acc.connector_id = ac.connector_id
-		                       AND acc.connector_instance_id = ac.connector_instance_id
-		                       AND acc.approver_id = ac.approver_id
-		                       AND oc.user_id = ac.approver_id
-		                       AND oc.provider = crc.oauth_provider
-		                       AND oc.status = 'active'
-		                       AND (SELECT COUNT(*) = 0 FROM json_each(crc.oauth_scopes) s WHERE NOT EXISTS (SELECT 1 FROM json_each(oc.scopes) os WHERE os.value = s.value))
-		                 ))
-		             )
-		       ) AS credentials_ready
+		       `+connectorInstanceCredentialsReadySQL+` AS credentials_ready,
+		       `+connectorInstanceDanglingSQL+` AS binding_dangling,
+		       `+connectorInstanceLiveBindingSQL+` AS has_live_binding
 		FROM agent_connectors ac
 		LEFT JOIN agent_connector_credentials acc
 		       ON acc.agent_id = ac.agent_id
@@ -183,15 +158,51 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 	}
 	defer instRows.Close()
 
+	type scannedInstance struct {
+		ci       CapabilityConnectorInstance
+		dangling bool
+		hasLive  bool
+	}
+	var scanned []scannedInstance
 	for instRows.Next() {
-		var ci CapabilityConnectorInstance
-		if err := instRows.Scan(&ci.ConnectorID, &ci.ConnectorInstanceID, &ci.DisplayName, &ci.CredentialsReady); err != nil {
+		var s scannedInstance
+		if err := instRows.Scan(&s.ci.ConnectorID, &s.ci.ConnectorInstanceID, &s.ci.DisplayName, &s.ci.CredentialsReady, &s.dangling, &s.hasLive); err != nil {
 			return nil, err
 		}
-		caps.ConnectorInstances = append(caps.ConnectorInstances, ci)
+		scanned = append(scanned, s)
 	}
 	if err := instRows.Err(); err != nil {
 		return nil, err
+	}
+	// Hide instances whose OAuth connection or credential was deleted, and
+	// unbound leftovers when a sibling still has a live binding. Grouping is
+	// safe because the query orders by connector_id.
+	visibleInstances := make(map[string]struct{})
+	var group []scannedInstance
+	flushGroup := func() {
+		anyLive := false
+		for _, s := range group {
+			if s.hasLive {
+				anyLive = true
+			}
+		}
+		for _, s := range group {
+			if !ConnectorInstanceVisible(s.dangling, s.hasLive, s.ci.CredentialsReady, anyLive) {
+				continue
+			}
+			caps.ConnectorInstances = append(caps.ConnectorInstances, s.ci)
+			visibleInstances[s.ci.ConnectorInstanceID] = struct{}{}
+		}
+		group = group[:0]
+	}
+	for _, s := range scanned {
+		if len(group) > 0 && group[0].ci.ConnectorID != s.ci.ConnectorID {
+			flushGroup()
+		}
+		group = append(group, s)
+	}
+	if len(group) > 0 {
+		flushGroup()
 	}
 
 	// 2. Actions for enabled connectors.
@@ -263,6 +274,11 @@ func GetAgentCapabilities(ctx context.Context, db DBTX, agentID int64, approverI
 			return nil, expErr
 		}
 		if instID.Valid {
+			if _, ok := visibleInstances[instID.String]; !ok {
+				// The instance was omitted (deleted credential or unbound
+				// orphan). Don't advertise an approval the agent can't use.
+				continue
+			}
 			s := instID.String
 			sa.ConnectorInstanceID = &s
 		}

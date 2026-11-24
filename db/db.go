@@ -198,6 +198,9 @@ func Migrate(ctx context.Context, path string) error {
 	if err := goose.UpContext(ctx, conn, "migrations_sqlite"); err != nil {
 		return fmt.Errorf("run migrations: %w", err)
 	}
+	if err := repairDanglingOnSQLDB(ctx, conn); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -211,6 +214,9 @@ func MigratePool(ctx context.Context, pool *Pool) error {
 	}
 	if err := goose.UpContext(ctx, pool.raw, "migrations_sqlite"); err != nil {
 		return fmt.Errorf("run migrations: %w", err)
+	}
+	if _, err := RepairDanglingConnectorInstances(ctx, pool); err != nil {
+		return err
 	}
 	return nil
 }
